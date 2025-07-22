@@ -1,0 +1,21 @@
+[package]
+name = "gpui-storybook-macros"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+version.workspace = true
+publish = false
+
+[lib]
+proc-macro = true
+
+[dependencies]
+gpui-storybook-core = { workspace = true }
+heck = { workspace = true }
+inventory = { workspace = true }
+proc-macro2 = { workspace = true }
+quote = { workspace = true }
+syn = { features = [ "full" ], workspace = true }
+
+[lints]
+workspace = true

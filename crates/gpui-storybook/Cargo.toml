@@ -1,0 +1,29 @@
+[package]
+name = "gpui-storybook"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+version.workspace = true
+publish = false
+license-file = "LICENSE-APACHE"
+
+[features]
+default = [  ]
+macros = [ "dep:gpui-storybook-macros" ]
+
+[dependencies]
+anyhow = { workspace = true }
+gpui = { workspace = true }
+gpui-component = { workspace = true }
+gpui-storybook-core = { workspace = true }
+gpui-storybook-macros = { optional = true, workspace = true }
+i18n-embed = { features = [ "fluent-system", "desktop-requester" ], workspace = true }
+i18n-embed-fl = { workspace = true }
+i18n-manager = { workspace = true }
+rust-embed = { workspace = true }
+serde = { features = [ "derive" ], workspace = true }
+serde_json = { workspace = true }
+tracing-subscriber = { features = [ "env-filter" ], workspace = true }
+
+[lints]
+workspace = true
