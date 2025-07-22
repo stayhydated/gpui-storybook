@@ -1,7 +1,6 @@
 [package]
 name = "gpui-storybook"
 edition.workspace = true
-license.workspace = true
 repository.workspace = true
 version.workspace = true
 publish = false
