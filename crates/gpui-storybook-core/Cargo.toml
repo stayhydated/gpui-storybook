@@ -7,9 +7,9 @@ version.workspace = true
 publish = false
 
 [dependencies]
-es-fluent-manager-singleton = { workspace = true }
-es-fluent-manager-core = { workspace = true }
 anyhow = { workspace = true }
+es-fluent-manager-core = { workspace = true }
+es-fluent-manager-singleton = { workspace = true }
 gpui = { workspace = true }
 gpui-component = { workspace = true }
 inventory = { workspace = true }
