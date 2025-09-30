@@ -7,6 +7,8 @@ version.workspace = true
 publish = false
 
 [dependencies]
+es-fluent-manager-singleton = { workspace = true }
+es-fluent-manager-core = { workspace = true }
 anyhow = { workspace = true }
 gpui = { workspace = true }
 gpui-component = { workspace = true }
@@ -17,6 +19,11 @@ rust-embed = { workspace = true }
 serde = { features = [ "derive" ], workspace = true }
 serde_json = { workspace = true }
 tracing-subscriber = { features = [ "env-filter" ], workspace = true }
+unic-langid = { workspace = true }
+
+[build-dependencies]
+es-fluent-build = { workspace = true }
+log = { workspace = true }
 
 [lints]
 workspace = true
