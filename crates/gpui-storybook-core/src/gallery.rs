@@ -34,7 +34,7 @@ impl Gallery {
         let subscriptions = vec![
             #[allow(clippy::single_match)]
             cx.subscribe(&search_input, |this, _, event, cx_window| match event {
-                InputEvent::Change(_) => {
+                InputEvent::Change => {
                     let query = this
                         .search_input
                         .read(cx_window)
