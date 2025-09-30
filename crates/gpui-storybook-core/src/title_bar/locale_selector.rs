@@ -30,7 +30,7 @@ impl LocaleSelector {
         _: &mut Context<Self>,
     ) {
         set_locale(&locale.0);
-        crate::i18n::change_language(&locale.0).unwrap();
+        crate::i18n::change_locale(&locale.0).unwrap();
         window.refresh();
     }
 }

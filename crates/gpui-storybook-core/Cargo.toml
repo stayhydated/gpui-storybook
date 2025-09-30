@@ -8,11 +8,10 @@ publish = false
 
 [dependencies]
 anyhow = { workspace = true }
+es-fluent-manager-core = { workspace = true }
+es-fluent-manager-singleton = { workspace = true }
 gpui = { workspace = true }
 gpui-component = { workspace = true }
-i18n-embed = { features = [ "fluent-system", "desktop-requester" ], workspace = true }
-i18n-embed-fl = { workspace = true }
-i18n-manager = { workspace = true }
 inventory = { workspace = true }
 proc-macro2 = { workspace = true }
 quote = { workspace = true }
@@ -20,6 +19,11 @@ rust-embed = { workspace = true }
 serde = { features = [ "derive" ], workspace = true }
 serde_json = { workspace = true }
 tracing-subscriber = { features = [ "env-filter" ], workspace = true }
+unic-langid = { workspace = true }
+
+[build-dependencies]
+es-fluent-build = { workspace = true }
+log = { workspace = true }
 
 [lints]
 workspace = true
