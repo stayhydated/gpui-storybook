@@ -8,8 +8,8 @@ publish = false
 
 [dependencies]
 anyhow = { workspace = true }
-es-fluent-manager-core = { workspace = true }
-es-fluent-manager-singleton = { workspace = true }
+es-fluent = { workspace = true }
+es-fluent-manager-embedded = { workspace = true }
 gpui = { workspace = true }
 gpui-component = { workspace = true }
 inventory = { workspace = true }

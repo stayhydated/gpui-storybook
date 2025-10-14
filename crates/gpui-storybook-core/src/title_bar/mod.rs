@@ -1,7 +1,6 @@
-mod font_size_selector;
 mod locale_selector;
 
-use self::{font_size_selector::FontSizeSelector, locale_selector::LocaleSelector};
+use self::locale_selector::LocaleSelector;
 use gpui::{
     AnyElement, App, AppContext as _, ClickEvent, Context, Corner, Entity, Hsla,
     InteractiveElement as _, IntoElement, MouseButton, ParentElement as _, Render, SharedString,
@@ -19,7 +18,6 @@ use std::rc::Rc;
 pub struct AppTitleBar {
     title: SharedString,
     locale_selector: Entity<LocaleSelector>,
-    font_size_selector: Entity<FontSizeSelector>,
     theme_color: Entity<ColorPickerState>,
     child: Rc<dyn Fn(&mut Window, &mut App) -> AnyElement>,
     _subscriptions: Vec<Subscription>,
@@ -32,7 +30,6 @@ impl AppTitleBar {
         cx: &mut Context<Self>,
     ) -> Self {
         let locale_selector = cx.new(|cx| LocaleSelector::new(window, cx));
-        let font_size_selector = cx.new(|cx| FontSizeSelector::new(window, cx));
 
         if cx.should_auto_hide_scrollbars() {
             Theme::global_mut(cx).scrollbar_show = ScrollbarShow::Scrolling;
@@ -56,7 +53,6 @@ impl AppTitleBar {
         Self {
             title: title.into(),
             locale_selector,
-            font_size_selector,
             theme_color,
             child: Rc::new(|_, _| div().into_any_element()),
             _subscriptions,
@@ -135,7 +131,6 @@ impl Render for AppTitleBar {
                             .on_click(cx.listener(Self::change_color_mode)),
                     )
                     .child(self.locale_selector.clone())
-                    .child(self.font_size_selector.clone())
                     .child(
                         Button::new("github")
                             .icon(IconName::GitHub)
