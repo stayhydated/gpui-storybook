@@ -6,6 +6,9 @@ license = "Unlicense"
 publish = false
 
 [dependencies]
+gpui = { workspace = true }
+gpui-component = { workspace = true }
+gpui-storybook = { workspace = true }
 
 [lints]
 workspace = true
