@@ -43,24 +43,3 @@ pub fn story_init(_args: TokenStream, input: TokenStream) -> TokenStream {
 
     expanded.into()
 }
-
-#[proc_macro]
-pub fn story_registry(_input: TokenStream) -> TokenStream {
-    let expanded = quote! {
-        pub fn init(cx: &mut ::gpui::App) {
-            for entry in inventory::iter::<::gpui_storybook::__registry::InitEntry> {
-                (entry.init_fn)(cx);
-            }
-        }
-
-        pub fn generate_stories(window: &mut ::gpui::Window, cx: &mut ::gpui::App) -> Vec<::gpui::Entity<::gpui_storybook::StoryContainer>> {
-            let mut stories = Vec::new();
-            for entry in inventory::iter::<::gpui_storybook::__registry::StoryEntry> {
-                stories.push((entry.create_fn)(window, cx));
-            }
-            stories
-        }
-    };
-
-    expanded.into()
-}

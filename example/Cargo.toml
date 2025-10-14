@@ -1,0 +1,11 @@
+[package]
+name = "gpui-storybook-example"
+version.workspace = true
+edition.workspace = true
+license = "Unlicense"
+publish = false
+
+[dependencies]
+
+[lints]
+workspace = true

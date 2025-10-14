@@ -7,7 +7,7 @@ publish = false
 license-file = "LICENSE-APACHE"
 
 [features]
-default = [  ]
+default = [ "macros" ]
 macros = [ "dep:gpui-storybook-macros" ]
 
 [dependencies]
@@ -16,6 +16,7 @@ gpui = { workspace = true }
 gpui-component = { workspace = true }
 gpui-storybook-core = { workspace = true }
 gpui-storybook-macros = { optional = true, workspace = true }
+inventory = { workspace = true }
 rust-embed = { workspace = true }
 serde = { features = [ "derive" ], workspace = true }
 serde_json = { workspace = true }

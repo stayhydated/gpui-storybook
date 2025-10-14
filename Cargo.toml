@@ -1,5 +1,10 @@
 [workspace]
-members = [ "crates/gpui-storybook", "crates/gpui-storybook-core", "crates/gpui-storybook-macros" ]
+members = [
+  "crates/gpui-storybook",
+  "crates/gpui-storybook-core",
+  "crates/gpui-storybook-macros",
+  "example",
+]
 resolver = "3"
 
 [workspace.package]
@@ -20,15 +25,14 @@ crate-paths = "0.1.0"
 darling = "0.20.10"
 derive_more = "2.0.1"
 dotenv = "0.15.0"
-es-fluent = { git = "https://github.com/stayhydated/es-fluent.git" }
-es-fluent-build = { git = "https://github.com/stayhydated/es-fluent.git" }
-es-fluent-manager-core = { git = "https://github.com/stayhydated/es-fluent.git" }
-es-fluent-manager-singleton = { git = "https://github.com/stayhydated/es-fluent.git" }
+es-fluent = "0.2.2"
+es-fluent-build = "0.2.2"
+es-fluent-manager-embedded = "0.2.2"
 fluent-bundle = "0.15.3"
 futures = "0.3.31"
 garde = "0.22.0"
 getset = "0.1.5"
-gpui = { git = "https://github.com/zed-industries/zed.git" }
+gpui = "0.2.0"
 gpui-component = { git = "https://github.com/longbridge/gpui-component.git" }
 gpui-storybook = { path = "crates/gpui-storybook", version = "0.1.0" }
 gpui-storybook-core = { path = "crates/gpui-storybook-core", version = "0.1.0" }
