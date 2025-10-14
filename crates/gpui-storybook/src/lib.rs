@@ -6,7 +6,11 @@ pub use gpui_storybook_core::gallery::Gallery;
 pub use gpui_storybook_core::i18n::change_locale;
 pub use gpui_storybook_core::story::{Story, StoryContainer, create_new_window};
 
+#[doc(hidden)]
 pub use gpui_storybook_core::registry as __registry;
+
+#[doc(hidden)]
+pub use inventory as __inventory;
 
 pub fn init(cx: &mut ::gpui::App) {
     gpui_storybook_core::story::init(cx);

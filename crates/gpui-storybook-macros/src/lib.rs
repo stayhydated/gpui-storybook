@@ -12,7 +12,7 @@ pub fn story(_args: TokenStream, input: TokenStream) -> TokenStream {
     let expanded = quote! {
         #input_struct
 
-        inventory::submit! {
+        gpui_storybook::__inventory::submit! {
             ::gpui_storybook::__registry::StoryEntry {
                 name: #struct_name_str,
                 create_fn: |window, cx| {
