@@ -6,12 +6,12 @@ license = "Unlicense"
 publish = false
 
 [dependencies]
-gpui = { workspace = true }
-gpui-component = { workspace = true }
-gpui-storybook = { workspace = true }
 es-fluent = { workspace = true }
 es-fluent-lang = { workspace = true }
 es-fluent-manager-embedded = { workspace = true }
+gpui = { workspace = true }
+gpui-component = { workspace = true }
+gpui-storybook = { workspace = true }
 strum = { workspace = true }
 
 [build-dependencies]

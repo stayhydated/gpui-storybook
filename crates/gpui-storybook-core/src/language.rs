@@ -4,7 +4,15 @@ use strum::IntoEnumIterator;
 use unic_langid::LanguageIdentifier;
 
 pub trait Language:
-    'static + Copy + Clone + Send + Sync + IntoEnumIterator + Into<LanguageIdentifier> + FluentDisplay
+    'static
+    + Copy
+    + Clone
+    + Send
+    + Sync
+    + IntoEnumIterator
+    + Into<LanguageIdentifier>
+    + for<'a> From<&'a LanguageIdentifier>
+    + FluentDisplay
 {
 }
 
@@ -16,6 +24,7 @@ impl<T> Language for T where
         + Sync
         + IntoEnumIterator
         + Into<LanguageIdentifier>
+        + for<'a> From<&'a LanguageIdentifier>
         + FluentDisplay
 {
 }

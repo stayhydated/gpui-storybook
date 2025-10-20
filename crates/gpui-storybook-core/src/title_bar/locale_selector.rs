@@ -36,6 +36,8 @@ impl<L: Language> LocaleSelector<L> {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        let new_lang = L::from(&locale.0);
+        cx.set_global(CurrentLanguage(new_lang));
         set_locale(&locale.0.to_string());
         crate::i18n::change_locale(locale.0.clone());
         window.refresh();
@@ -59,9 +61,7 @@ impl<L: Language> Render for LocaleSelector<L> {
                     .popup_menu(move |mut this, _, _| {
                         for lang in L::iter() {
                             let lang_id: LanguageIdentifier = lang.into();
-                            println!("{}", &lang_id);
                             let checked = lang_id == current_language.into();
-                            println!("{}", &current_language.into());
                             this = this.menu_with_check(
                                 lang.to_fluent_string(),
                                 checked,
