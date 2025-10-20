@@ -6,6 +6,8 @@ use gpui::Application;
 use gpui_storybook::{Assets, Gallery};
 use strum::EnumIter;
 
+es_fluent_manager_embedded::define_i18n_module!();
+
 #[es_fluent_language]
 #[derive(Clone, Copy, Debug, EnumIter, EsFluent, PartialEq)]
 pub enum Languages {}
