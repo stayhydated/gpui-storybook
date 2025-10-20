@@ -1,3 +1,8 @@
+use crate::{
+    language::{CurrentLanguage, Language},
+    story::SelectLocale,
+};
+use es_fluent::ToFluentString as _;
 use gpui::{
     Context, Corner, FocusHandle, InteractiveElement as _, IntoElement, ParentElement as _, Render,
     Window, div,
@@ -5,21 +10,22 @@ use gpui::{
 use gpui_component::{
     IconName, Sizable as _,
     button::{Button, ButtonVariants as _},
-    locale,
     popup_menu::PopupMenuExt as _,
     set_locale,
 };
+use std::marker::PhantomData;
+use unic_langid::LanguageIdentifier;
 
-use crate::story::SelectLocale;
-
-pub struct LocaleSelector {
+pub struct LocaleSelector<L: Language> {
     focus_handle: FocusHandle,
+    _phantom: PhantomData<L>,
 }
 
-impl LocaleSelector {
+impl<L: Language> LocaleSelector<L> {
     pub fn new(_: &mut Window, cx: &mut Context<Self>) -> Self {
         Self {
             focus_handle: cx.focus_handle(),
+            _phantom: PhantomData,
         }
     }
 
@@ -27,18 +33,20 @@ impl LocaleSelector {
         &mut self,
         locale: &SelectLocale,
         window: &mut Window,
-        _: &mut Context<Self>,
+        cx: &mut Context<Self>,
     ) {
-        set_locale(&locale.0);
-        crate::i18n::change_locale(&locale.0).unwrap();
+        let new_lang = L::from(&locale.0);
+        cx.set_global(CurrentLanguage(new_lang));
+        set_locale(&locale.0.to_string());
+        crate::i18n::change_locale(locale.0.clone());
         window.refresh();
     }
 }
 
-impl Render for LocaleSelector {
+impl<L: Language> Render for LocaleSelector<L> {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let focus_handle = self.focus_handle.clone();
-        let locale = locale().to_string();
+        let current_language = cx.global::<CurrentLanguage<L>>().0;
 
         div()
             .id("locale-selector")
@@ -49,22 +57,17 @@ impl Render for LocaleSelector {
                     .small()
                     .ghost()
                     .icon(IconName::Globe)
-                    .popup_menu(move |this, _, _| {
-                        this.menu_with_check(
-                            "English",
-                            locale == "en",
-                            Box::new(SelectLocale("en".into())),
-                        )
-                        .menu_with_check(
-                            "Français",
-                            locale == "fr",
-                            Box::new(SelectLocale("fr".into())),
-                        )
-                        .menu_with_check(
-                            "简体中文",
-                            locale == "zh-CN",
-                            Box::new(SelectLocale("zh-CN".into())),
-                        )
+                    .popup_menu(move |mut this, _, _| {
+                        for lang in L::iter() {
+                            let lang_id: LanguageIdentifier = lang.into();
+                            let checked = lang_id == current_language.into();
+                            this = this.menu_with_check(
+                                lang.to_fluent_string(),
+                                checked,
+                                Box::new(SelectLocale(lang_id)),
+                            );
+                        }
+                        this
                     })
                     .anchor(Corner::TopRight),
             )

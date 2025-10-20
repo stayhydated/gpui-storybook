@@ -278,10 +278,10 @@ impl Panel for StoryContainer {
 
     fn set_active(&mut self, active: bool, _window: &mut Window, cx: &mut App) {
         println!("panel: {} active: {}", self.name, active);
-        if let Some(on_active) = self.on_active {
-            if let Some(story) = self.story.clone() {
-                on_active(story, active, _window, cx);
-            }
+        if let Some(on_active) = self.on_active
+            && let Some(story) = self.story.clone()
+        {
+            on_active(story, active, _window, cx);
         }
     }
 

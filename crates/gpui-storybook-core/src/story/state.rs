@@ -1,5 +1,6 @@
 use gpui::{Action, App, AppContext as _, Entity, Global, SharedString, actions};
 use gpui_component::scroll::ScrollbarShow;
+use unic_langid::LanguageIdentifier;
 
 use serde::Deserialize;
 
@@ -9,7 +10,7 @@ pub struct SelectScrollbarShow(pub ScrollbarShow);
 
 #[derive(Action, Clone, Deserialize, Eq, PartialEq)]
 #[action(namespace = story, no_json)]
-pub struct SelectLocale(pub SharedString);
+pub struct SelectLocale(pub LanguageIdentifier);
 
 #[derive(Action, Clone, Deserialize, Eq, PartialEq)]
 #[action(namespace = story, no_json)]

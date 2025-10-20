@@ -1,8 +1,12 @@
+use es_fluent::{EsFluent, ToFluentString as _};
 use gpui::*;
-use gpui_component::{
-    StyledExt,
-    button::{Button, ButtonVariants},
-};
+use gpui_component::StyledExt as _;
+
+#[derive(EsFluent)]
+enum Story2Items {
+    Title,
+    Hi,
+}
 
 #[gpui_storybook::story]
 pub struct HelloWorld2 {
@@ -17,7 +21,7 @@ impl Focusable for HelloWorld2 {
 
 impl gpui_storybook::Story for HelloWorld2 {
     fn title() -> String {
-        "Hello World2".to_owned()
+        Story2Items::Title.to_fluent_string()
     }
     fn new_view(window: &mut Window, cx: &mut App) -> Entity<impl Render + Focusable> {
         Self::view(window, cx)
@@ -44,12 +48,6 @@ impl Render for HelloWorld2 {
             .items_center()
             .justify_center()
             .text_center()
-            .child("Hello, World2!")
-            .child(
-                Button::new("ok")
-                    .primary()
-                    .label("Let's Go!")
-                    .on_click(|_, _, _| println!("Clicked!")),
-            )
+            .child(Story2Items::Hi.to_fluent_string())
     }
 }
