@@ -14,7 +14,6 @@ use gpui_component::{
     set_locale,
 };
 use std::marker::PhantomData;
-use strum::IntoEnumIterator as _;
 use unic_langid::LanguageIdentifier;
 
 pub struct LocaleSelector<L: Language> {

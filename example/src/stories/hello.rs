@@ -1,7 +1,7 @@
 use gpui::*;
 use gpui_component::{
-    StyledExt,
-    button::{Button, ButtonVariants},
+    StyledExt as _,
+    button::{Button, ButtonVariants as _},
 };
 
 #[gpui_storybook::story]

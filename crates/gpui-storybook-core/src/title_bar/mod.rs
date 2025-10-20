@@ -74,9 +74,9 @@ impl<L: Language> AppTitleBar<L> {
     /// todo: fix to new api
     fn set_theme_color(
         &mut self,
-        color: Option<Hsla>,
+        _color: Option<Hsla>,
         _window: &mut Window,
-        cx: &mut Context<Self>,
+        _cx: &mut Context<Self>,
     ) {
         // if let Some(color) = color {
         //     let theme = cx.global_mut::<Theme>();

@@ -1,10 +1,10 @@
 mod stories;
 
-use es_fluent::{EsFluent, ToFluentString as _};
-use es_fluent_lang::{LanguageIdentifier, es_fluent_language};
+use es_fluent::EsFluent;
+use es_fluent_lang::es_fluent_language;
 use gpui::Application;
 use gpui_storybook::{Assets, Gallery};
-use strum::{EnumIter, IntoEnumIterator as _};
+use strum::EnumIter;
 
 #[es_fluent_language]
 #[derive(Clone, Copy, Debug, EnumIter, EsFluent, PartialEq)]
