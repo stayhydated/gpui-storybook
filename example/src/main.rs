@@ -1,10 +1,10 @@
 mod stories;
 
-use es_fluent::EsFluent;
-use es_fluent_lang::es_fluent_language;
+use es_fluent::{EsFluent, ToFluentString as _};
+use es_fluent_lang::{LanguageIdentifier, es_fluent_language};
 use gpui::Application;
 use gpui_storybook::{Assets, Gallery};
-use strum::EnumIter;
+use strum::{EnumIter, IntoEnumIterator as _};
 
 #[es_fluent_language]
 #[derive(Clone, Copy, Debug, EnumIter, EsFluent, PartialEq)]
@@ -16,11 +16,11 @@ fn main() {
 
     app.run(move |app_cx| {
         gpui_component::init(app_cx);
-        gpui_storybook::init(app_cx);
+        gpui_storybook::init_with_language(Languages::default(), app_cx);
         gpui_storybook::change_locale(Languages::default());
         app_cx.activate(true);
 
-        gpui_storybook::create_new_window(
+        gpui_storybook::create_new_window::<Languages, _, _>(
             &format!("{} - Stories", env!("CARGO_PKG_NAME")),
             move |window, cx| {
                 let all_stories = gpui_storybook::generate_stories(window, cx);

@@ -1,6 +1,7 @@
 mod locale_selector;
 
 use self::locale_selector::LocaleSelector;
+use crate::language::Language;
 use gpui::{
     AnyElement, App, AppContext as _, ClickEvent, Context, Corner, Entity, Hsla,
     InteractiveElement as _, IntoElement, MouseButton, ParentElement as _, Render, SharedString,
@@ -13,17 +14,18 @@ use gpui_component::{
     color_picker::{ColorPicker, ColorPickerEvent, ColorPickerState},
     scroll::ScrollbarShow,
 };
-use std::rc::Rc;
+use std::{marker::PhantomData, rc::Rc};
 
-pub struct AppTitleBar {
+pub struct AppTitleBar<L: Language> {
     title: SharedString,
-    locale_selector: Entity<LocaleSelector>,
+    locale_selector: Entity<LocaleSelector<L>>,
     theme_color: Entity<ColorPickerState>,
     child: Rc<dyn Fn(&mut Window, &mut App) -> AnyElement>,
     _subscriptions: Vec<Subscription>,
+    _phantom: PhantomData<L>,
 }
 
-impl AppTitleBar {
+impl<L: Language> AppTitleBar<L> {
     pub fn new(
         title: impl Into<SharedString>,
         window: &mut Window,
@@ -56,6 +58,7 @@ impl AppTitleBar {
             theme_color,
             child: Rc::new(|_, _| div().into_any_element()),
             _subscriptions,
+            _phantom: PhantomData,
         }
     }
 
@@ -72,7 +75,7 @@ impl AppTitleBar {
     fn set_theme_color(
         &mut self,
         color: Option<Hsla>,
-        window: &mut Window,
+        _window: &mut Window,
         cx: &mut Context<Self>,
     ) {
         // if let Some(color) = color {
@@ -96,7 +99,7 @@ impl AppTitleBar {
     }
 }
 
-impl Render for AppTitleBar {
+impl<L: Language> Render for AppTitleBar<L> {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let notifications_count = window.notifications(cx).len();
 

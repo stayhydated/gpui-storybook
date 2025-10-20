@@ -2815,6 +2815,7 @@ dependencies = [
  "rust-embed",
  "serde",
  "serde_json",
+ "strum 0.27.2",
  "tracing-subscriber",
  "unic-langid",
 ]
