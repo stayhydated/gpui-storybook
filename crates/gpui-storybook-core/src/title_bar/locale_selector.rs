@@ -9,6 +9,7 @@ use gpui_component::{
     popup_menu::PopupMenuExt as _,
     set_locale,
 };
+use unic_langid::langid;
 
 use crate::story::SelectLocale;
 
@@ -29,8 +30,8 @@ impl LocaleSelector {
         window: &mut Window,
         _: &mut Context<Self>,
     ) {
-        set_locale(&locale.0);
-        crate::i18n::change_locale(&locale.0).unwrap();
+        set_locale(&locale.0.to_string());
+        crate::i18n::change_locale(locale.0.clone());
         window.refresh();
     }
 }
@@ -53,17 +54,17 @@ impl Render for LocaleSelector {
                         this.menu_with_check(
                             "English",
                             locale == "en",
-                            Box::new(SelectLocale("en".into())),
+                            Box::new(SelectLocale(langid!("en"))),
                         )
                         .menu_with_check(
                             "Français",
                             locale == "fr",
-                            Box::new(SelectLocale("fr".into())),
+                            Box::new(SelectLocale(langid!("fr"))),
                         )
                         .menu_with_check(
                             "简体中文",
                             locale == "zh-CN",
-                            Box::new(SelectLocale("zh-CN".into())),
+                            Box::new(SelectLocale(langid!("zh-CN"))),
                         )
                     })
                     .anchor(Corner::TopRight),

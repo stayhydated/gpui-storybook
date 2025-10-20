@@ -19,7 +19,7 @@ rust-embed = { workspace = true }
 serde = { features = [ "derive" ], workspace = true }
 serde_json = { workspace = true }
 tracing-subscriber = { features = [ "env-filter" ], workspace = true }
-unic-langid = { workspace = true }
+unic-langid = { workspace = true, features = ["serde"] }
 
 [build-dependencies]
 es-fluent-build = { workspace = true }

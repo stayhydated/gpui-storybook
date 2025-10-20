@@ -1,7 +1,14 @@
 mod stories;
 
+use es_fluent::EsFluent;
+use es_fluent_lang::es_fluent_language;
 use gpui::Application;
 use gpui_storybook::{Assets, Gallery};
+use strum::EnumIter;
+
+#[es_fluent_language]
+#[derive(Clone, Copy, Debug, EnumIter, EsFluent, PartialEq)]
+pub enum Languages {}
 
 fn main() {
     let app = Application::new().with_assets(Assets);
@@ -10,7 +17,7 @@ fn main() {
     app.run(move |app_cx| {
         gpui_component::init(app_cx);
         gpui_storybook::init(app_cx);
-        gpui_storybook::change_locale("en").unwrap();
+        gpui_storybook::change_locale(Languages::default());
         app_cx.activate(true);
 
         gpui_storybook::create_new_window(
