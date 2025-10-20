@@ -1,7 +1,6 @@
 mod locale_selector;
 
 use self::locale_selector::LocaleSelector;
-use crate::language::Language;
 use gpui::{
     AnyElement, App, AppContext as _, ClickEvent, Context, Corner, Entity, Hsla,
     InteractiveElement as _, IntoElement, MouseButton, ParentElement as _, Render, SharedString,
@@ -14,18 +13,17 @@ use gpui_component::{
     color_picker::{ColorPicker, ColorPickerEvent, ColorPickerState},
     scroll::ScrollbarShow,
 };
-use std::{marker::PhantomData, rc::Rc};
+use std::rc::Rc;
 
-pub struct AppTitleBar<L: Language> {
+pub struct AppTitleBar {
     title: SharedString,
-    locale_selector: Entity<LocaleSelector<L>>,
+    locale_selector: Entity<LocaleSelector>,
     theme_color: Entity<ColorPickerState>,
     child: Rc<dyn Fn(&mut Window, &mut App) -> AnyElement>,
     _subscriptions: Vec<Subscription>,
-    _phantom: PhantomData<L>,
 }
 
-impl<L: Language> AppTitleBar<L> {
+impl AppTitleBar {
     pub fn new(
         title: impl Into<SharedString>,
         window: &mut Window,
@@ -58,7 +56,6 @@ impl<L: Language> AppTitleBar<L> {
             theme_color,
             child: Rc::new(|_, _| div().into_any_element()),
             _subscriptions,
-            _phantom: PhantomData,
         }
     }
 
@@ -99,7 +96,7 @@ impl<L: Language> AppTitleBar<L> {
     }
 }
 
-impl<L: Language> Render for AppTitleBar<L> {
+impl Render for AppTitleBar {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let notifications_count = window.notifications(cx).len();
 

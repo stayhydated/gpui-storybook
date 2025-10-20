@@ -1,13 +1,12 @@
-use crate::{language::Language, title_bar::AppTitleBar};
+use crate::title_bar::AppTitleBar;
 use gpui::{
     AnyView, App, AppContext as _, Bounds, Context, Entity, IntoElement, ParentElement as _,
     Render, SharedString, Styled as _, Window, WindowBounds, WindowKind, WindowOptions, div, px,
     size,
 };
 use gpui_component::{Root, TitleBar, v_flex};
-use std::marker::PhantomData;
 
-pub fn create_new_window<L: Language, F, E>(title: &str, crate_view_fn: F, cx: &mut App)
+pub fn create_new_window<F, E>(title: &str, crate_view_fn: F, cx: &mut App)
 where
     E: Into<AnyView>,
     F: FnOnce(&mut Window, &mut App) -> E + Send + 'static,
@@ -40,7 +39,7 @@ where
         let window = cx
             .open_window(options, |window, cx| {
                 let view = crate_view_fn(window, cx);
-                let root = cx.new(|cx| StoryRoot::<L>::new(title.clone(), view, window, cx));
+                let root = cx.new(|cx| StoryRoot::new(title.clone(), view, window, cx));
 
                 cx.new(|cx| Root::new(root.into(), window, cx))
             })
@@ -58,13 +57,12 @@ where
     .detach();
 }
 
-struct StoryRoot<L: Language> {
-    title_bar: Entity<AppTitleBar<L>>,
+struct StoryRoot {
+    title_bar: Entity<AppTitleBar>,
     view: AnyView,
-    _phantom: PhantomData<L>,
 }
 
-impl<L: Language> StoryRoot<L> {
+impl StoryRoot {
     pub fn new(
         title: impl Into<SharedString>,
         view: impl Into<AnyView>,
@@ -75,12 +73,11 @@ impl<L: Language> StoryRoot<L> {
         Self {
             title_bar,
             view: view.into(),
-            _phantom: PhantomData,
         }
     }
 }
 
-impl<L: Language> Render for StoryRoot<L> {
+impl Render for StoryRoot {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let drawer_layer = Root::render_drawer_layer(window, cx);
         let modal_layer = Root::render_modal_layer(window, cx);

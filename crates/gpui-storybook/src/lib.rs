@@ -1,6 +1,8 @@
 #[cfg(feature = "macros")]
 pub use gpui_storybook_macros::*;
 
+use gpui_storybook_core::locale::LocaleStore;
+
 pub use gpui_storybook_core::{
     assets::Assets,
     gallery::Gallery,
@@ -24,6 +26,9 @@ pub fn init(cx: &mut ::gpui::App) {
 
 pub fn init_with_language<L: Language>(language: L, cx: &mut ::gpui::App) {
     cx.set_global(CurrentLanguage(language));
+    cx.set_global(
+        Box::new(gpui_storybook_core::locale::LocaleManager::<L>::new()) as Box<dyn LocaleStore>,
+    );
     init(cx);
 }
 
