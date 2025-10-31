@@ -1,4 +1,5 @@
 [workspace]
+default-members = [ "example" ]
 members = [
   "crates/gpui-storybook",
   "crates/gpui-storybook-core",
