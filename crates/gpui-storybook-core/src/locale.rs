@@ -1,5 +1,5 @@
 use crate::language::Language;
-use es_fluent::ToFluentString;
+use es_fluent::ToFluentString as _;
 use gpui::{App, Global};
 use std::marker::PhantomData;
 use unic_langid::LanguageIdentifier;
