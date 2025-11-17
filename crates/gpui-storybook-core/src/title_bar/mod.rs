@@ -7,7 +7,7 @@ use gpui::{
     Styled as _, Subscription, Window, div, prelude::FluentBuilder as _,
 };
 use gpui_component::{
-    ActiveTheme as _, ContextModal as _, IconName, Sizable as _, Theme, ThemeMode, TitleBar,
+    ActiveTheme as _, IconName, Sizable as _, Theme, ThemeMode, TitleBar, WindowExt as _,
     badge::Badge,
     button::{Button, ButtonVariants as _},
     color_picker::{ColorPicker, ColorPickerEvent, ColorPickerState},

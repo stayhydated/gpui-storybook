@@ -41,7 +41,7 @@ where
                 let view = crate_view_fn(window, cx);
                 let root = cx.new(|cx| StoryRoot::new(title.clone(), view, window, cx));
 
-                cx.new(|cx| Root::new(root.into(), window, cx))
+                cx.new(|cx| Root::new(root, window, cx))
             })
             .expect("failed to open window");
 
@@ -79,8 +79,8 @@ impl StoryRoot {
 
 impl Render for StoryRoot {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let drawer_layer = Root::render_drawer_layer(window, cx);
-        let modal_layer = Root::render_modal_layer(window, cx);
+        let sheet_layer = Root::render_sheet_layer(window, cx);
+        let dialog_layer = Root::render_dialog_layer(window, cx);
         let notification_layer = Root::render_notification_layer(window, cx);
 
         div()
@@ -91,8 +91,8 @@ impl Render for StoryRoot {
                     .child(self.title_bar.clone())
                     .child(div().flex_1().overflow_hidden().child(self.view.clone())),
             )
-            .children(drawer_layer)
-            .children(modal_layer)
-            .child(div().absolute().top_8().children(notification_layer))
+            .children(sheet_layer)
+            .children(dialog_layer)
+            .children(notification_layer)
     }
 }
