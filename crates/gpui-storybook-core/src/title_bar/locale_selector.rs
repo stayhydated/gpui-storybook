@@ -6,7 +6,7 @@ use gpui::{
 use gpui_component::{
     IconName, Sizable as _,
     button::{Button, ButtonVariants as _},
-    popup_menu::PopupMenuExt as _,
+    menu::DropdownMenu as _,
 };
 
 pub struct LocaleSelector {
@@ -49,7 +49,7 @@ impl Render for LocaleSelector {
                     .small()
                     .ghost()
                     .icon(IconName::Globe)
-                    .popup_menu(move |mut this, _, _| {
+                    .dropdown_menu(move |mut this, _, _| {
                         for (name, lang_id) in &available_locales {
                             let checked = *lang_id == current_language;
                             this = this.menu_with_check(

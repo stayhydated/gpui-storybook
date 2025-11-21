@@ -1,4 +1,7 @@
-use super::state::{AppState, Quit, ToggleSearch};
+use super::{
+    state::{AppState, Quit, ToggleSearch},
+    themes,
+};
 use crate::i18n;
 use gpui::{App, KeyBinding, Menu, MenuItem, OsAction};
 use gpui_component::input::{Copy, Cut, Paste, Redo, Undo};
@@ -16,6 +19,7 @@ pub fn init(cx: &mut App) {
     i18n::init();
     gpui_component::init(cx);
     AppState::init(cx);
+    themes::init(cx);
 
     cx.bind_keys([
         KeyBinding::new("/", ToggleSearch, None),

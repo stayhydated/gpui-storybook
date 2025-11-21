@@ -1,26 +1,22 @@
 mod locale_selector;
 
 use self::locale_selector::LocaleSelector;
+use crate::story::themes::{SwitchTheme, SwitchThemeMode};
 use gpui::{
-    AnyElement, App, AppContext as _, ClickEvent, Context, Corner, Entity, Hsla,
-    InteractiveElement as _, IntoElement, MouseButton, ParentElement as _, Render, SharedString,
-    Styled as _, Subscription, Window, div, prelude::FluentBuilder as _,
+    AnyElement, App, AppContext as _, Context, Entity, InteractiveElement as _, IntoElement,
+    MouseButton, ParentElement as _, Render, SharedString, Styled as _, Window, div,
 };
 use gpui_component::{
-    ActiveTheme as _, ContextModal as _, IconName, Sizable as _, Theme, ThemeMode, TitleBar,
-    badge::Badge,
+    ActiveTheme as _, IconName, Sizable as _, ThemeMode, ThemeRegistry, TitleBar,
     button::{Button, ButtonVariants as _},
-    color_picker::{ColorPicker, ColorPickerEvent, ColorPickerState},
-    scroll::ScrollbarShow,
+    menu::DropdownMenu as _,
 };
 use std::rc::Rc;
 
 pub struct AppTitleBar {
     title: SharedString,
     locale_selector: Entity<LocaleSelector>,
-    theme_color: Entity<ColorPickerState>,
     child: Rc<dyn Fn(&mut Window, &mut App) -> AnyElement>,
-    _subscriptions: Vec<Subscription>,
 }
 
 impl AppTitleBar {
@@ -31,31 +27,10 @@ impl AppTitleBar {
     ) -> Self {
         let locale_selector = cx.new(|cx| LocaleSelector::new(window, cx));
 
-        if cx.should_auto_hide_scrollbars() {
-            Theme::global_mut(cx).scrollbar_show = ScrollbarShow::Scrolling;
-        } else {
-            Theme::global_mut(cx).scrollbar_show = ScrollbarShow::Hover;
-        }
-
-        let theme_color =
-            cx.new(|cx| ColorPickerState::new(window, cx).default_value(cx.theme().secondary));
-
-        let _subscriptions = vec![cx.subscribe_in(
-            &theme_color,
-            window,
-            |this, _, ev: &ColorPickerEvent, window, cx| match ev {
-                ColorPickerEvent::Change(color) => {
-                    this.set_theme_color(*color, window, cx);
-                },
-            },
-        )];
-
         Self {
             title: title.into(),
             locale_selector,
-            theme_color,
             child: Rc::new(|_, _| div().into_any_element()),
-            _subscriptions,
         }
     }
 
@@ -67,38 +42,15 @@ impl AppTitleBar {
         self.child = Rc::new(move |window, cx| f(window, cx).into_any_element());
         self
     }
-
-    /// todo: fix to new api
-    fn set_theme_color(
-        &mut self,
-        _color: Option<Hsla>,
-        _window: &mut Window,
-        _cx: &mut Context<Self>,
-    ) {
-        // if let Some(color) = color {
-        //     let theme = cx.global_mut::<Theme>();
-        //     theme.apply_color(color);
-        //     self.theme_color.update(cx, |state, cx| {
-        //         state.set_value(color, window, cx);
-        //     });
-        //     window.refresh();
-        // }
-    }
-
-    fn change_color_mode(&mut self, _: &ClickEvent, window: &mut Window, cx: &mut Context<Self>) {
-        let mode = match cx.theme().mode.is_dark() {
-            true => ThemeMode::Light,
-            false => ThemeMode::Dark,
-        };
-
-        Theme::change(mode, None, cx);
-        self.set_theme_color(self.theme_color.read(cx).value(), window, cx);
-    }
 }
 
 impl Render for AppTitleBar {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let notifications_count = window.notifications(cx).len();
+        let registry = ThemeRegistry::global(cx);
+        let mut dropdown_theme_names: Vec<_> = registry.themes().keys().cloned().collect();
+        dropdown_theme_names.sort();
+        let dropdown_current_theme = cx.theme().theme_name().clone();
+        let dropdown_is_dark = cx.theme().mode.is_dark();
 
         TitleBar::new()
             .child(div().flex().items_center().child(self.title.clone()))
@@ -112,45 +64,35 @@ impl Render for AppTitleBar {
                     .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                     .child((self.child.clone())(window, cx))
                     .child(
-                        ColorPicker::new(&self.theme_color)
+                        Button::new("theme-menu")
                             .small()
-                            .anchor(Corner::TopRight)
-                            .icon(IconName::Palette),
-                    )
-                    .child(
-                        Button::new("theme-mode")
-                            .map(|this| {
-                                if cx.theme().mode.is_dark() {
-                                    this.icon(IconName::Sun)
-                                } else {
-                                    this.icon(IconName::Moon)
+                            .ghost()
+                            .icon(IconName::Palette)
+                            .dropdown_menu(move |mut this, _, _| {
+                                this = this.label("Theme");
+                                for theme_name in &dropdown_theme_names {
+                                    let checked = theme_name == &dropdown_current_theme;
+                                    this = this.menu_with_check(
+                                        theme_name.clone(),
+                                        checked,
+                                        Box::new(SwitchTheme(theme_name.clone())),
+                                    );
                                 }
-                            })
-                            .small()
-                            .ghost()
-                            .on_click(cx.listener(Self::change_color_mode)),
-                    )
-                    .child(self.locale_selector.clone())
-                    .child(
-                        Button::new("github")
-                            .icon(IconName::GitHub)
-                            .small()
-                            .ghost()
-                            .on_click(|_, _, cx| {
-                                cx.open_url("https://github.com/longbridge/gpui-component")
+                                this.separator()
+                                    .label("Mode")
+                                    .menu_with_check(
+                                        "Light",
+                                        !dropdown_is_dark,
+                                        Box::new(SwitchThemeMode(ThemeMode::Light)),
+                                    )
+                                    .menu_with_check(
+                                        "Dark",
+                                        dropdown_is_dark,
+                                        Box::new(SwitchThemeMode(ThemeMode::Dark)),
+                                    )
                             }),
                     )
-                    .child(
-                        div().relative().child(
-                            Badge::new().count(notifications_count).max(99).child(
-                                Button::new("bell")
-                                    .small()
-                                    .ghost()
-                                    .compact()
-                                    .icon(IconName::Bell),
-                            ),
-                        ),
-                    ),
+                    .child(self.locale_selector.clone()),
             )
     }
 }

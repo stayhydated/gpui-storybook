@@ -8,10 +8,9 @@ use serde::{Deserialize, Serialize};
 
 use gpui_component::{
     ActiveTheme as _,
-    context_menu::ContextMenuExt,
     dock::{Panel, PanelControl, PanelEvent, PanelInfo, PanelState, TitleStyle},
     h_flex,
-    popup_menu::PopupMenu,
+    menu::PopupMenu,
     v_flex,
 };
 
@@ -90,8 +89,6 @@ impl RenderOnce for StorySection {
             )
     }
 }
-
-impl ContextMenuExt for StorySection {}
 
 pub struct StoryContainer {
     focus_handle: gpui::FocusHandle,
@@ -285,7 +282,7 @@ impl Panel for StoryContainer {
         }
     }
 
-    fn popup_menu(&self, menu: PopupMenu, _window: &Window, _cx: &App) -> PopupMenu {
+    fn dropdown_menu(&self, menu: PopupMenu, _window: &Window, _cx: &App) -> PopupMenu {
         menu.menu("Info", Box::new(ShowPanelInfo))
     }
 
