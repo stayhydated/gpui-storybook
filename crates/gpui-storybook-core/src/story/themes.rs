@@ -25,15 +25,19 @@ pub fn init(cx: &mut App) {
     let json = std::fs::read_to_string(STATE_FILE).unwrap_or_default();
     let state = serde_json::from_str::<State>(&json).unwrap_or_default();
 
-    if let Err(err) = ThemeRegistry::watch_dir(PathBuf::from("./themes"), cx, move |cx| {
-        if let Some(theme) = ThemeRegistry::global(cx)
-            .themes()
-            .get(&state.theme)
-            .cloned()
-        {
-            Theme::global_mut(cx).apply_config(&theme);
-        }
-    }) {
+    if let Err(err) = ThemeRegistry::watch_dir(
+        PathBuf::from("./crates/gpui-storybook-core/assets/themes"),
+        cx,
+        move |cx| {
+            if let Some(theme) = ThemeRegistry::global(cx)
+                .themes()
+                .get(&state.theme)
+                .cloned()
+            {
+                Theme::global_mut(cx).apply_config(&theme);
+            }
+        },
+    ) {
         eprintln!("Failed to watch themes directory: {}", err);
     }
 
