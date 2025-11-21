@@ -1,6 +1,7 @@
 mod components;
 mod init;
 mod state;
+pub mod themes;
 mod window;
 
 pub use self::state::{
