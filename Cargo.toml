@@ -36,7 +36,7 @@ futures = "0.3.31"
 garde = "0.22.0"
 getset = "0.1.5"
 gpui = "0.2.2"
-gpui-component = "0.4.0"
+gpui-component = "0.4.1"
 gpui-storybook = { path = "crates/gpui-storybook", version = "0.1.0" }
 gpui-storybook-core = { path = "crates/gpui-storybook-core", version = "0.1.0" }
 gpui-storybook-macros = { path = "crates/gpui-storybook-macros", version = "0.1.0" }
