@@ -14,7 +14,7 @@
 
 ## Examples
 
-see [examples](https://github.com/stayhydated/gpui-storybook/tree/master/examples)
+see [example](https://github.com/stayhydated/gpui-storybook/tree/master/example)
 
 ## Acknowledgements
 
