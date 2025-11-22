@@ -3,7 +3,7 @@ name: Release-plz
 on:
   push:
     branches:
-      - fuck-off-for-now-until-gpui-is-published
+      - master
 
 jobs:
   release-plz-release:

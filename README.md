@@ -1,1 +1,13 @@
-todo: see if this could be placed in [gpui-component](https://github.com/longbridge/gpui-component)
+[![Build Status](https://github.com/stayhydated/gpui-storybook/actions/workflows/ci.yml/badge.svg)](https://github.com/stayhydated/gpui-storybook/actions/workflows/ci.yml)
+[![Docs](https://docs.rs/gpui-storybook/badge.svg)](https://docs.rs/gpui-storybook/)
+[![Crates.io](https://img.shields.io/crates/v/gpui-storybook.svg)](https://crates.io/crates/gpui-storybook)
+
+Storybook for gpui
+
+## Currently Supported components
+
+Compatibility of `gpui-storybook` versions:
+
+| `gpui-storybook` | `gpui-component` | `gpui`  |
+| :--------------- | :--------------- | :------ |
+| `0.4.0`          | `0.4.1`          | `0.2.2` |
