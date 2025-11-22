@@ -1,17 +1,22 @@
+# GPUI Storybook
+
 [![Build Status](https://github.com/stayhydated/gpui-storybook/actions/workflows/ci.yml/badge.svg)](https://github.com/stayhydated/gpui-storybook/actions/workflows/ci.yml)
 [![Docs](https://docs.rs/gpui-storybook/badge.svg)](https://docs.rs/gpui-storybook/)
 [![Crates.io](https://img.shields.io/crates/v/gpui-storybook.svg)](https://crates.io/crates/gpui-storybook)
 
-Storybook for gpui
+`gpui-storybook` provides a streamlined environment for building UI components for [GPUI](https://www.gpui.rs/) applications. It allows you to visualize different states of your components, toggle internationalization (i18n) locales, and organize your UI library without launching your full application.
 
-## Currently Supported components
-
-Compatibility of `gpui-storybook` versions:
+## Compatibility
 
 | `gpui-storybook` | `gpui-component` | `gpui`  |
 | :--------------- | :--------------- | :------ |
 | `0.4.0`          | `0.4.1`          | `0.2.2` |
 
-Most of the code was inspired by the story section of [gpui-component](https://github.com/longbridge/gpui-component/tree/main/crates/story)
+## Examples
+see [examples](https://github.com/stayhydated/gpui-storybook/tree/master/examples)
 
-Wouldn't mind transferring ownership, see related [discussion](https://github.com/longbridge/gpui-component/discussions/1473)
+## Acknowledgements
+
+This project is heavily inspired by the story section of [gpui-component](https://github.com/longbridge/gpui-component/tree/main/crates/story).
+
+See related discussion on ownership transfer [here](https://github.com/longbridge/gpui-component/discussions/1473).

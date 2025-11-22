@@ -1,5 +1,5 @@
 [package]
-name = "gpui-storybook-example"
+name = "gpui-storybook-example-i18n"
 version.workspace = true
 edition.workspace = true
 license = "Unlicense"
