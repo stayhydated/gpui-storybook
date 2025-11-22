@@ -1,2 +1,2 @@
-assets_dir = "../assets/i18n"
+assets_dir = "assets/i18n"
 fallback_language = "en"

@@ -12,15 +12,14 @@ pub trait LocaleStore: Send + Sync {
 
 impl Global for Box<dyn LocaleStore> {}
 
+#[derive(Default)]
 pub struct LocaleManager<L: Language> {
     _phantom: PhantomData<L>,
 }
 
 impl<L: Language> LocaleManager<L> {
     pub fn new() -> Self {
-        Self {
-            _phantom: PhantomData,
-        }
+        Self::default()
     }
 }
 

@@ -13,6 +13,7 @@
 | `0.4.0`          | `0.4.1`          | `0.2.2` |
 
 ## Examples
+
 see [examples](https://github.com/stayhydated/gpui-storybook/tree/master/examples)
 
 ## Acknowledgements
