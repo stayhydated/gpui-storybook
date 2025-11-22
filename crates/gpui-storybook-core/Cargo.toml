@@ -1,10 +1,14 @@
 [package]
 name = "gpui-storybook-core"
+description = """
+Core crate for gpui-storybook
+"""
 edition.workspace = true
 license.workspace = true
-repository.workspace = true
+publish.workspace = true
 version.workspace = true
-publish = false
+repository.workspace = true
+readme.workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
