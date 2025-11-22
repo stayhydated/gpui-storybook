@@ -11,3 +11,7 @@ Compatibility of `gpui-storybook` versions:
 | `gpui-storybook` | `gpui-component` | `gpui`  |
 | :--------------- | :--------------- | :------ |
 | `0.4.0`          | `0.4.1`          | `0.2.2` |
+
+Most of the code was inspired by the story section of [gpui-component](https://github.com/longbridge/gpui-component/tree/main/crates/story)
+
+Wouldn't mind transferring ownership, see related [discussion](https://github.com/longbridge/gpui-component/discussions/1473)
