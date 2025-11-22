@@ -13,6 +13,7 @@ pub trait Language:
     + Into<LanguageIdentifier>
     + for<'a> From<&'a LanguageIdentifier>
     + FluentDisplay
+    + Default
 {
 }
 
@@ -26,6 +27,7 @@ impl<T> Language for T where
         + Into<LanguageIdentifier>
         + for<'a> From<&'a LanguageIdentifier>
         + FluentDisplay
+        + Default
 {
 }
 
