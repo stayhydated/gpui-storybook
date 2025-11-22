@@ -1,11 +1,10 @@
 [workspace]
-default-members = [ "examples/i18n" ]
+default-members = [ "example" ]
 members = [
   "crates/gpui-storybook",
   "crates/gpui-storybook-core",
   "crates/gpui-storybook-macros",
-  "examples/i18n",
-  "examples/simple",
+  "example",
 ]
 resolver = "3"
 

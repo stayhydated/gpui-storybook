@@ -2739,7 +2739,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "gpui-storybook-example-i18n"
+name = "gpui-storybook-example"
 version = "0.4.0"
 dependencies = [
  "es-fluent",
@@ -2750,17 +2750,6 @@ dependencies = [
  "gpui-component",
  "gpui-storybook",
  "log",
- "rust-embed",
- "strum 0.27.2",
-]
-
-[[package]]
-name = "gpui-storybook-example-simple"
-version = "0.4.0"
-dependencies = [
- "gpui",
- "gpui-component",
- "gpui-storybook",
  "rust-embed",
  "strum 0.27.2",
 ]
