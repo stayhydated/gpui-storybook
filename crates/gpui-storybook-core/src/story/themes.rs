@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 const STATE_FILE: &str = "target/state.json";
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 struct State {
     theme: SharedString,
     scrollbar_show: Option<ScrollbarShow>,
