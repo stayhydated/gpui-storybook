@@ -8,3 +8,6 @@ fmt:
 
 p-lib-forms:
   cargo run -p prototyping
+
+test-publish:
+  cargo publish --workspace --dry-run --allow-dirty
