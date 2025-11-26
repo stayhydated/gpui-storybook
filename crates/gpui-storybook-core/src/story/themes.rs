@@ -5,6 +5,7 @@ use gpui_component::{ActiveTheme as _, Theme, ThemeMode, ThemeRegistry, scroll::
 use serde::{Deserialize, Serialize};
 
 const STATE_FILE: &str = "target/state.json";
+const THEMES_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/themes");
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 struct State {
@@ -26,7 +27,7 @@ pub fn init(cx: &mut App) {
     let state = serde_json::from_str::<State>(&json).unwrap_or_default();
 
     if let Err(err) = ThemeRegistry::watch_dir(
-        PathBuf::from("./crates/gpui-storybook-core/assets/themes"),
+        PathBuf::from(THEMES_DIR),
         cx,
         move |cx| {
             if let Some(theme) = ThemeRegistry::global(cx)
