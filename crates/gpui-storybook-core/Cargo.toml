@@ -17,6 +17,7 @@ es-fluent = { workspace = true }
 es-fluent-manager-embedded = { workspace = true }
 gpui = { workspace = true }
 gpui-component = { workspace = true }
+gpui-component-assets = { workspace = true }
 inventory = { workspace = true }
 proc-macro2 = { workspace = true }
 quote = { workspace = true }
