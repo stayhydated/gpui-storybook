@@ -9,6 +9,7 @@ publish.workspace = true
 version.workspace = true
 repository.workspace = true
 readme.workspace = true
+include = ["src/**/*", "assets/**/*", "i18n.toml", "build.rs"]
 
 [dependencies]
 anyhow = { workspace = true }
