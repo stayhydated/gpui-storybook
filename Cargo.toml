@@ -15,7 +15,7 @@ publish = true
 readme = "README.md"
 repository = "https://github.com/stayhydated/gpui-storybook"
 rust-version = "1.88"
-version = "0.4.1"
+version = "0.4.2"
 
 [workspace.dependencies]
 anyhow = "1.0.96"
@@ -38,9 +38,9 @@ getset = "0.1.5"
 gpui = "0.2.2"
 gpui-component = "0.4.2"
 gpui-component-assets = "0.4.2"
-gpui-storybook = { path = "crates/gpui-storybook", version = "0.4.1" }
-gpui-storybook-core = { path = "crates/gpui-storybook-core", version = "0.4.1" }
-gpui-storybook-macros = { path = "crates/gpui-storybook-macros", version = "0.4.1" }
+gpui-storybook = { path = "crates/gpui-storybook", version = "0.4.2" }
+gpui-storybook-core = { path = "crates/gpui-storybook-core", version = "0.4.2" }
+gpui-storybook-macros = { path = "crates/gpui-storybook-macros", version = "0.4.2" }
 heck = "0.5.0"
 inventory = "0.3.20"
 itertools = "0.14.0"
