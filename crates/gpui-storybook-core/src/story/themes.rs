@@ -26,20 +26,22 @@ pub fn init(cx: &mut App) {
     let json = std::fs::read_to_string(STATE_FILE).unwrap_or_default();
     let state = serde_json::from_str::<State>(&json).unwrap_or_default();
 
-    if let Err(err) = ThemeRegistry::watch_dir(
-        PathBuf::from(THEMES_DIR),
-        cx,
-        move |cx| {
-            if let Some(theme) = ThemeRegistry::global(cx)
-                .themes()
-                .get(&state.theme)
-                .cloned()
-            {
-                Theme::global_mut(cx).apply_config(&theme);
+    #[cfg(debug_assertions)]
+    {
+        let themes_dir = PathBuf::from(THEMES_DIR);
+        if themes_dir.exists() {
+            if let Err(err) = ThemeRegistry::watch_dir(themes_dir, cx, move |cx| {
+                if let Some(theme) = ThemeRegistry::global(cx)
+                    .themes()
+                    .get(&state.theme)
+                    .cloned()
+                {
+                    Theme::global_mut(cx).apply_config(&theme);
+                }
+            }) {
+                eprintln!("Failed to watch themes directory: {}", err);
             }
-        },
-    ) {
-        eprintln!("Failed to watch themes directory: {}", err);
+        }
     }
 
     if let Some(scrollbar_show) = state.scrollbar_show {
