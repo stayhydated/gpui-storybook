@@ -2713,7 +2713,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-storybook"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "gpui",
@@ -2729,7 +2729,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-storybook-core"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "es-fluent",
@@ -2752,7 +2752,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-storybook-example"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "es-fluent",
  "es-fluent-build",
@@ -2768,7 +2768,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-storybook-macros"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "gpui-storybook-core",
  "heck 0.5.0",
