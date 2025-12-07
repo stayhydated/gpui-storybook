@@ -29,8 +29,8 @@ pub fn init(cx: &mut App) {
     #[cfg(debug_assertions)]
     {
         let themes_dir = PathBuf::from(THEMES_DIR);
-        if themes_dir.exists() {
-            if let Err(err) = ThemeRegistry::watch_dir(themes_dir, cx, move |cx| {
+        if themes_dir.exists()
+            && let Err(err) = ThemeRegistry::watch_dir(themes_dir, cx, move |cx| {
                 if let Some(theme) = ThemeRegistry::global(cx)
                     .themes()
                     .get(&state.theme)
@@ -38,9 +38,9 @@ pub fn init(cx: &mut App) {
                 {
                     Theme::global_mut(cx).apply_config(&theme);
                 }
-            }) {
-                eprintln!("Failed to watch themes directory: {}", err);
-            }
+            })
+        {
+            eprintln!("Failed to watch themes directory: {}", err);
         }
     }
 

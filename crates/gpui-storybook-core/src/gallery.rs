@@ -5,10 +5,10 @@ use gpui::prelude::{
 };
 use gpui::{App, AppContext as _, ClickEvent, Entity, Subscription, Window, div, px, relative};
 use gpui_component::{
-    ActiveTheme as _, Icon, IconName, h_flex,
+    ActiveTheme as _, h_flex,
     input::{Input, InputEvent, InputState},
     resizable::{h_resizable, resizable_panel},
-    sidebar::{Sidebar, SidebarHeader, SidebarMenu, SidebarMenuItem},
+    sidebar::{Sidebar, SidebarMenu, SidebarMenuItem},
     v_flex,
 };
 
@@ -175,71 +175,20 @@ impl Render for Gallery {
                             .border_width(px(0.))
                             .collapsed(self.collapsed)
                             .header(
-                                v_flex()
-                                    .w_full()
-                                    .gap_4()
-                                    .child(
-                                        SidebarHeader::new()
-                                            .w_full()
-                                            .child(
-                                                div()
-                                                    .flex()
-                                                    .items_center()
-                                                    .justify_center()
-                                                    .rounded(cx.theme().radius)
-                                                    .bg(cx.theme().primary)
-                                                    .text_color(cx.theme().primary_foreground)
-                                                    .size_8()
-                                                    .flex_shrink_0()
-                                                    .when(!self.collapsed, |this| {
-                                                        this.child(Icon::new(
-                                                            IconName::GalleryVerticalEnd,
-                                                        ))
-                                                    })
-                                                    .when(self.collapsed, |this| {
-                                                        this.size_4()
-                                                            .bg(cx.theme().transparent)
-                                                            .text_color(cx.theme().foreground)
-                                                            .child(Icon::new(
-                                                                IconName::GalleryVerticalEnd,
-                                                            ))
-                                                    })
-                                                    .rounded_lg(),
-                                            )
-                                            .when(!self.collapsed, |this| {
-                                                this.child(
-                                                    v_flex()
-                                                        .gap_0()
-                                                        .text_sm()
-                                                        .flex_1()
-                                                        .line_height(relative(1.25))
-                                                        .overflow_hidden()
-                                                        .text_ellipsis()
-                                                        .child("GPUI Component")
-                                                        .child(
-                                                            div()
-                                                                .text_color(
-                                                                    cx.theme().muted_foreground,
-                                                                )
-                                                                .child("Gallery")
-                                                                .text_xs(),
-                                                        ),
-                                                )
-                                            }),
-                                    )
-                                    .child(
-                                        div()
-                                            .bg(cx.theme().sidebar_border)
-                                            .px_1()
-                                            .rounded_full()
-                                            .flex_1()
-                                            .mx_1()
-                                            .child(
-                                                Input::new(&self.search_input)
-                                                    .appearance(false)
-                                                    .cleanable(true),
-                                            ),
-                                    ),
+                                v_flex().w_full().child(
+                                    div()
+                                        .bg(cx.theme().sidebar_border)
+                                        .px_1()
+                                        .rounded_full()
+                                        .flex_1()
+                                        .mx_1()
+                                        .gap_4()
+                                        .child(
+                                            Input::new(&self.search_input)
+                                                .appearance(false)
+                                                .cleanable(true),
+                                        ),
+                                ),
                             )
                             .child(SidebarMenu::new().children(
                                 filtered_stories.iter().enumerate().map(
