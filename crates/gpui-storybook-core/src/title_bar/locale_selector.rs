@@ -1,4 +1,4 @@
-use crate::{locale::LocaleStore, story::SelectLocale};
+use crate::{actions::SelectLocale, locale::LocaleStore};
 use gpui::{
     BorrowAppContext as _, Context, Corner, FocusHandle, InteractiveElement as _, IntoElement,
     ParentElement as _, Render, Window, div,

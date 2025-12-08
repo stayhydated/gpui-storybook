@@ -1,7 +1,9 @@
+mod font_size_selector;
 mod locale_selector;
 
 use self::locale_selector::LocaleSelector;
 use crate::story::themes::{SwitchTheme, SwitchThemeMode};
+use font_size_selector::FontSizeSelector;
 use gpui::{
     AnyElement, App, AppContext as _, Context, Entity, InteractiveElement as _, IntoElement,
     MouseButton, ParentElement as _, Render, SharedString, Styled as _, Window, div,
@@ -15,6 +17,7 @@ use std::rc::Rc;
 
 pub struct AppTitleBar {
     title: SharedString,
+    font_size_selector: Entity<FontSizeSelector>,
     locale_selector: Entity<LocaleSelector>,
     child: Rc<dyn Fn(&mut Window, &mut App) -> AnyElement>,
 }
@@ -25,10 +28,12 @@ impl AppTitleBar {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
+        let font_size_selector = cx.new(|cx| FontSizeSelector::new(window, cx));
         let locale_selector = cx.new(|cx| LocaleSelector::new(window, cx));
 
         Self {
             title: title.into(),
+            font_size_selector,
             locale_selector,
             child: Rc::new(|_, _| div().into_any_element()),
         }
@@ -92,6 +97,7 @@ impl Render for AppTitleBar {
                                     )
                             }),
                     )
+                    .child(self.font_size_selector.clone())
                     .child(self.locale_selector.clone()),
             )
     }
