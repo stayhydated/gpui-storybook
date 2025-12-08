@@ -21,5 +21,9 @@ proc-macro2 = { workspace = true }
 quote = { workspace = true }
 syn = { features = [ "full" ], workspace = true }
 
+[dev-dependencies]
+insta = { workspace = true }
+prettyplease = { workspace = true }
+
 [lints]
 workspace = true
