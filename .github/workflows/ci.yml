@@ -1,15 +1,62 @@
 name: ci
 
 on:
+  pull_request:
   push:
-    branches:
-      - master
+    branches: [master]
+
+env:
+  CARGO_TERM_COLOR: always
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Setup mold
+        uses: rui314/setup-mold@v1
+
+      - name: Run tests
+        run: cargo test --workspace --all-features
+
+  fmt:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Setup mold
+        uses: rui314/setup-mold@v1
+
+      - name: Check formatting
+        run: cargo fmt --check
+
+  clippy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - name: Setup mold
+        uses: rui314/setup-mold@v1
+
+      - name: Lint code
+        run: cargo clippy --workspace --all-features
+
   release-plz-release:
     name: Release-plz release
     runs-on: ubuntu-latest
-    if: ${{ github.repository_owner == 'stayhydated' }}
+    needs: [test, fmt, clippy]
+    if: ${{ github.repository_owner == 'stayhydated' && github.event_name == 'push' }}
     permissions:
       contents: write
     steps:
@@ -34,7 +81,8 @@ jobs:
   release-plz-pr:
     name: Release-plz PR
     runs-on: ubuntu-latest
-    if: ${{ github.repository_owner == 'stayhydated' }}
+    needs: [test, fmt, clippy]
+    if: ${{ github.repository_owner == 'stayhydated' && github.event_name == 'push' }}
     permissions:
       pull-requests: write
       contents: write
