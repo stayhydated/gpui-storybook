@@ -1,8 +1,8 @@
-use super::{
-    state::{AppState, Quit, ToggleSearch},
-    themes,
+use super::{state::AppState, themes};
+use crate::{
+    actions::{Quit, ToggleSearch},
+    i18n,
 };
-use crate::i18n;
 use gpui::{App, KeyBinding, Menu, MenuItem, OsAction};
 use gpui_component::input::{Copy, Cut, Paste, Redo, Undo};
 use tracing_subscriber::{layer::SubscriberExt as _, util::SubscriberInitExt as _};

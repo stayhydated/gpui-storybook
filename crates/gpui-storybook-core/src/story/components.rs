@@ -239,7 +239,7 @@ impl Panel for StoryContainer {
         "StoryContainer"
     }
 
-    fn title(&self, _window: &Window, _cx: &App) -> AnyElement {
+    fn title(&mut self, _window: &mut Window, _cx: &mut gpui::Context<Self>) -> impl IntoElement {
         if let Some(title_fn) = &self.title_fn {
             title_fn().into_any_element()
         } else {
@@ -269,11 +269,11 @@ impl Panel for StoryContainer {
             .contains(&self.name)
     }
 
-    fn set_zoomed(&mut self, zoomed: bool, _window: &mut Window, _cx: &mut App) {
+    fn set_zoomed(&mut self, zoomed: bool, _window: &mut Window, _cx: &mut gpui::Context<Self>) {
         println!("panel: {} zoomed: {}", self.name, zoomed);
     }
 
-    fn set_active(&mut self, active: bool, _window: &mut Window, cx: &mut App) {
+    fn set_active(&mut self, active: bool, _window: &mut Window, cx: &mut gpui::Context<Self>) {
         println!("panel: {} active: {}", self.name, active);
         if let Some(on_active) = self.on_active
             && let Some(story) = self.story.clone()
@@ -282,7 +282,12 @@ impl Panel for StoryContainer {
         }
     }
 
-    fn dropdown_menu(&self, menu: PopupMenu, _window: &Window, _cx: &App) -> PopupMenu {
+    fn dropdown_menu(
+        &mut self,
+        menu: PopupMenu,
+        _window: &mut Window,
+        _cx: &mut gpui::Context<Self>,
+    ) -> PopupMenu {
         menu.menu("Info", Box::new(ShowPanelInfo))
     }
 

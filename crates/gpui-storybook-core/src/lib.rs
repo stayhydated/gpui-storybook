@@ -1,3 +1,4 @@
+pub mod actions;
 pub mod assets;
 pub mod gallery;
 pub mod i18n;

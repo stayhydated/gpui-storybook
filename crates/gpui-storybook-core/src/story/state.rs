@@ -1,30 +1,9 @@
-use gpui::{Action, App, AppContext as _, Entity, Global, SharedString, actions};
-use gpui_component::scroll::ScrollbarShow;
-use unic_langid::LanguageIdentifier;
-
-use serde::Deserialize;
-
-#[derive(Action, Clone, Deserialize, Eq, PartialEq)]
-#[action(namespace = story, no_json)]
-pub struct SelectScrollbarShow(pub ScrollbarShow);
-
-#[derive(Action, Clone, Deserialize, Eq, PartialEq)]
-#[action(namespace = story, no_json)]
-pub struct SelectLocale(pub LanguageIdentifier);
-
-#[derive(Action, Clone, Deserialize, Eq, PartialEq)]
-#[action(namespace = story, no_json)]
-pub struct SelectFont(pub usize);
-
-#[derive(Action, Clone, Deserialize, Eq, PartialEq)]
-#[action(namespace = story, no_json)]
-pub struct SelectRadius(pub usize);
-
-actions!(story, [Quit, Open, CloseWindow, ToggleSearch]);
+use gpui::{App, AppContext as _, Entity, Global, SharedString};
 
 pub struct AppState {
     pub invisible_panels: Entity<Vec<SharedString>>,
 }
+
 impl AppState {
     pub(crate) fn init(cx: &mut App) {
         let state = Self {
