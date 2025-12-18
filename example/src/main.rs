@@ -17,9 +17,12 @@ fn main() {
     let name_arg = std::env::args().nth(1);
 
     app.run(move |app_cx| {
-        gpui_component::init(app_cx);
         gpui_storybook::init(Languages::default(), app_cx);
         gpui_storybook::change_locale(Languages::default());
+
+        let http_client = std::sync::Arc::new(reqwest_client::ReqwestClient::new());
+        app_cx.set_http_client(http_client);
+
         app_cx.activate(true);
 
         gpui_storybook::create_new_window(

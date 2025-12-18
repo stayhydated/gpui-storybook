@@ -5,17 +5,8 @@ use crate::{
 };
 use gpui::{App, KeyBinding, Menu, MenuItem, OsAction};
 use gpui_component::input::{Copy, Cut, Paste, Redo, Undo};
-use tracing_subscriber::{layer::SubscriberExt as _, util::SubscriberInitExt as _};
 
 pub fn init(cx: &mut App) {
-    tracing_subscriber::registry()
-        .with(tracing_subscriber::fmt::layer())
-        .with(
-            tracing_subscriber::EnvFilter::from_default_env()
-                .add_directive("gpui_component=trace".parse().unwrap()),
-        )
-        .init();
-
     i18n::init();
     gpui_component::init(cx);
     AppState::init(cx);
