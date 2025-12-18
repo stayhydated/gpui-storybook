@@ -1,7 +1,7 @@
 use gpui::{
     AnyElement, AnyView, App, AppContext as _, Div, Entity, EventEmitter, Focusable, Hsla,
     InteractiveElement as _, IntoElement, ParentElement, Render, RenderOnce, SharedString,
-    StyleRefinement, Styled, Window, actions, prelude::FluentBuilder as _, rems,
+    StyleRefinement, Styled, Window, actions, div, prelude::FluentBuilder as _, rems,
 };
 
 use serde::{Deserialize, Serialize};
@@ -13,7 +13,6 @@ use gpui_component::{
     h_flex,
     menu::PopupMenu,
     scroll::ScrollableElement as _,
-    v_flex,
 };
 
 use super::state::AppState;
@@ -335,20 +334,13 @@ impl Focusable for StoryContainer {
 }
 impl Render for StoryContainer {
     fn render(&mut self, _: &mut Window, _cx: &mut gpui::Context<Self>) -> impl IntoElement {
-        v_flex()
+        div()
             .id("story-container")
             .size_full()
             .overflow_y_scrollbar()
             .track_focus(&self.focus_handle)
             .when_some(self.story.clone(), |this, story| {
-                this.child(
-                    v_flex()
-                        .id("story-children")
-                        .w_full()
-                        .flex_1()
-                        .p_4()
-                        .child(story),
-                )
+                this.child(div().size_full().p_4().child(story))
             })
     }
 }
