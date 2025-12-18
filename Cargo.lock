@@ -1591,6 +1591,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "deunicode"
+version = "1.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "abd57806937c9cc163efc8ea3910e00a62e2aeb0b8119f1793a978088f8f6b04"
+
+[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2112,6 +2118,17 @@ dependencies = [
  "rayon-core",
  "smallvec",
  "zune-inflate",
+]
+
+[[package]]
+name = "fake"
+version = "4.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f2b0902eb36fbab51c14eda1c186bda119fcff91e5e4e7fc2dd2077298197ce8"
+dependencies = [
+ "deunicode",
+ "either",
+ "rand 0.9.2",
 ]
 
 [[package]]
@@ -2880,12 +2897,16 @@ dependencies = [
  "es-fluent-build",
  "es-fluent-lang",
  "es-fluent-manager-embedded",
+ "fake",
  "gpui",
  "gpui-component",
  "gpui-storybook",
  "log",
+ "rand 0.8.5",
  "reqwest_client",
  "rust-embed",
+ "serde",
+ "serde_json",
  "strum 0.27.2",
 ]
 
