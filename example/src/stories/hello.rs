@@ -13,7 +13,7 @@ enum StoryItems {
     ButtonOnClick,
 }
 
-#[gpui_storybook::story]
+#[gpui_storybook::story("hello")]
 pub struct HelloWorld {
     focus_handle: FocusHandle,
 }

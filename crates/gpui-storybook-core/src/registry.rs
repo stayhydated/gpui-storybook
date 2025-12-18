@@ -3,6 +3,7 @@ use crate::story::StoryContainer;
 /// Entry type for story registration
 pub struct StoryEntry {
     pub name: &'static str,
+    pub section: Option<&'static str>,
     pub create_fn: fn(&mut ::gpui::Window, &mut ::gpui::App) -> ::gpui::Entity<StoryContainer>,
 }
 

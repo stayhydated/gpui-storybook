@@ -1,12 +1,39 @@
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
-use syn::{ItemFn, ItemStruct};
+use syn::{ItemFn, ItemStruct, LitStr, Token, parse::Parse, parse::ParseStream};
 
-fn story_impl(_args: TokenStream2, input: TokenStream2) -> TokenStream2 {
+struct StoryArgs {
+    section: Option<String>,
+}
+
+impl Parse for StoryArgs {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        if input.is_empty() {
+            return Ok(StoryArgs { section: None });
+        }
+
+        let section_lit: LitStr = input.parse()?;
+
+        // Handle optional trailing comma
+        let _ = input.parse::<Token![,]>();
+
+        Ok(StoryArgs {
+            section: Some(section_lit.value()),
+        })
+    }
+}
+
+fn story_impl(args: TokenStream2, input: TokenStream2) -> TokenStream2 {
+    let args: StoryArgs = syn::parse2(args).expect("failed to parse story macro arguments");
     let input_struct: ItemStruct = syn::parse2(input).expect("story macro expects a struct");
     let struct_name = &input_struct.ident;
     let struct_name_str = struct_name.to_string();
+
+    let section_value = match &args.section {
+        Some(s) => quote! { Some(#s) },
+        None => quote! { None },
+    };
 
     quote! {
         #input_struct
@@ -14,6 +41,7 @@ fn story_impl(_args: TokenStream2, input: TokenStream2) -> TokenStream2 {
         gpui_storybook::__inventory::submit! {
             ::gpui_storybook::__registry::StoryEntry {
                 name: #struct_name_str,
+                section: #section_value,
                 create_fn: |window, cx| {
                     ::gpui_storybook::StoryContainer::panel::<#struct_name>(window, cx)
                 },
@@ -23,9 +51,15 @@ fn story_impl(_args: TokenStream2, input: TokenStream2) -> TokenStream2 {
 }
 
 /// Attribute macro to register a story struct
+///
+/// Optionally accepts a section name as a string argument:
+/// ```ignore
+/// #[story("Components")]
+/// pub struct ButtonStory;
+/// ```
 #[proc_macro_attribute]
-pub fn story(_args: TokenStream, input: TokenStream) -> TokenStream {
-    story_impl(_args.into(), input.into()).into()
+pub fn story(args: TokenStream, input: TokenStream) -> TokenStream {
+    story_impl(args.into(), input.into()).into()
 }
 
 fn story_init_impl(_args: TokenStream2, input: TokenStream2) -> TokenStream2 {
@@ -71,6 +105,20 @@ mod tests {
         let expanded = story_impl(TokenStream2::new(), input);
         assert_snapshot!(
             "story_attribute_generates_registry_entry",
+            snapshot_tokens(expanded)
+        );
+    }
+
+    #[test]
+    fn story_with_section_generates_registry_entry() {
+        let args = quote! { "Components" };
+        let input = quote! {
+            pub struct ButtonStory;
+        };
+
+        let expanded = story_impl(args, input);
+        assert_snapshot!(
+            "story_attribute_with_section_generates_registry_entry",
             snapshot_tokens(expanded)
         );
     }

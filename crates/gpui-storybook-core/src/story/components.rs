@@ -1,7 +1,7 @@
 use gpui::{
     AnyElement, AnyView, App, AppContext as _, Div, Entity, EventEmitter, Focusable, Hsla,
-    InteractiveElement as _, IntoElement, ParentElement, Render, RenderOnce, SharedString, Styled,
-    Window, actions, prelude::FluentBuilder as _, rems,
+    InteractiveElement as _, IntoElement, ParentElement, Render, RenderOnce, SharedString,
+    StyleRefinement, Styled, Window, actions, prelude::FluentBuilder as _, rems,
 };
 
 use serde::{Deserialize, Serialize};
@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use gpui_component::{
     ActiveTheme as _,
     dock::{Panel, PanelControl, PanelEvent, PanelInfo, PanelState, TitleStyle},
+    group_box::{GroupBox, GroupBoxVariants as _},
     h_flex,
     menu::PopupMenu,
     scroll::ScrollableElement as _,
@@ -22,31 +23,37 @@ actions!(story, [ShowPanelInfo]);
 #[derive(IntoElement)]
 pub struct StorySection {
     base: Div,
-    title: AnyElement,
+    title: SharedString,
+    sub_title: Vec<AnyElement>,
     children: Vec<AnyElement>,
 }
 
 impl StorySection {
+    pub fn sub_title(mut self, sub_title: impl IntoElement) -> Self {
+        self.sub_title.push(sub_title.into_any_element());
+        self
+    }
+
     #[allow(unused)]
-    fn max_w_md(mut self) -> Self {
+    pub fn max_w_md(mut self) -> Self {
         self.base = self.base.max_w(rems(48.));
         self
     }
 
     #[allow(unused)]
-    fn max_w_lg(mut self) -> Self {
+    pub fn max_w_lg(mut self) -> Self {
         self.base = self.base.max_w(rems(64.));
         self
     }
 
     #[allow(unused)]
-    fn max_w_xl(mut self) -> Self {
+    pub fn max_w_xl(mut self) -> Self {
         self.base = self.base.max_w(rems(80.));
         self
     }
 
     #[allow(unused)]
-    fn max_w_2xl(mut self) -> Self {
+    pub fn max_w_2xl(mut self) -> Self {
         self.base = self.base.max_w(rems(96.));
         self
     }
@@ -66,34 +73,46 @@ impl Styled for StorySection {
 
 impl RenderOnce for StorySection {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
-        v_flex()
-            .gap_2()
-            .mb_5()
-            .w_full()
-            .child(
+        GroupBox::new()
+            .id(self.title.clone())
+            .outline()
+            .title(
                 h_flex()
                     .justify_between()
                     .w_full()
                     .gap_4()
-                    .child(self.title),
+                    .child(self.title)
+                    .children(self.sub_title),
             )
-            .child(
-                v_flex()
-                    .p_4()
+            .content_style(
+                StyleRefinement::default()
+                    .rounded(cx.theme().radius_lg)
                     .overflow_x_hidden()
-                    .border_1()
-                    .border_color(cx.theme().border)
-                    .rounded_lg()
                     .items_center()
-                    .justify_center()
-                    .child(self.base.children(self.children)),
+                    .justify_center(),
             )
+            .child(self.base.children(self.children))
+    }
+}
+
+pub fn section(title: impl Into<SharedString>) -> StorySection {
+    StorySection {
+        title: title.into(),
+        sub_title: vec![],
+        base: h_flex()
+            .flex_wrap()
+            .justify_center()
+            .items_center()
+            .w_full()
+            .gap_4(),
+        children: vec![],
     }
 }
 
 pub struct StoryContainer {
     focus_handle: gpui::FocusHandle,
     pub name: SharedString,
+    pub section: Option<SharedString>,
     pub title_bg: Option<Hsla>,
     pub description: SharedString,
     width: Option<gpui::Pixels>,
@@ -158,6 +177,7 @@ impl StoryContainer {
         Self {
             focus_handle,
             name: "".into(),
+            section: None,
             title_bg: None,
             description: "".into(),
             width: None,
@@ -170,6 +190,11 @@ impl StoryContainer {
             title_fn: None,
             description_fn: None,
         }
+    }
+
+    pub fn section(mut self, section: impl Into<SharedString>) -> Self {
+        self.section = Some(section.into());
+        self
     }
 
     pub fn panel<S: Story>(window: &mut Window, cx: &mut App) -> Entity<Self> {
