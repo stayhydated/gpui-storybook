@@ -1,2 +1,2 @@
-pub mod hello;
-pub mod hello2;
+pub mod button_story;
+pub mod table_story;

@@ -15,6 +15,10 @@ gpui-storybook = { workspace = true }
 rust-embed = { workspace = true }
 strum = { workspace = true }
 reqwest_client = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+fake = { workspace = true }
+rand = { workspace = true }
 
 [build-dependencies]
 es-fluent-build = { workspace = true }
