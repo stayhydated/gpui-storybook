@@ -33,6 +33,14 @@ pub fn generate_stories(
     cx: &mut ::gpui::App,
 ) -> Vec<::gpui::Entity<StoryContainer>> {
     inventory::iter::<__registry::StoryEntry>()
-        .map(|entry| (entry.create_fn)(window, cx))
+        .map(|entry| {
+            let container = (entry.create_fn)(window, cx);
+            if let Some(section) = entry.section {
+                container.update(cx, |c, _| {
+                    c.section = Some(section.into());
+                });
+            }
+            container
+        })
         .collect()
 }

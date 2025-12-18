@@ -4,7 +4,7 @@ expression: snapshot_tokens(expanded)
 ---
 pub struct ButtonStory;
 gpui_storybook::__inventory::submit! {
-    ::gpui_storybook::__registry::StoryEntry { name : "ButtonStory", create_fn : |
-    window, cx | { ::gpui_storybook::StoryContainer::panel:: < ButtonStory > (window, cx)
-    }, }
+    ::gpui_storybook::__registry::StoryEntry { name : "ButtonStory", section : None,
+    create_fn : | window, cx | { ::gpui_storybook::StoryContainer::panel:: < ButtonStory
+    > (window, cx) }, }
 }

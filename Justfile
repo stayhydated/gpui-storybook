@@ -6,8 +6,12 @@ fmt:
     cargo fmt
     taplo fmt
 
+lint:
+    cargo clippy --workspace --all-features
+    cargo machete
+
 p-lib-forms:
-  cargo run -p prototyping
+    cargo run -p prototyping
 
 test-publish:
-  ES_FLUENT_SKIP_BUILD=true cargo publish --workspace --dry-run --allow-dirty
+    ES_FLUENT_SKIP_BUILD=true cargo publish --workspace --dry-run --allow-dirty

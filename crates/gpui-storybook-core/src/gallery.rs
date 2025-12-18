@@ -3,14 +3,17 @@ use gpui::prelude::{
     Context, FluentBuilder as _, InteractiveElement as _, IntoElement, ParentElement as _, Render,
     StatefulInteractiveElement as _, Styled as _,
 };
-use gpui::{App, AppContext as _, ClickEvent, Entity, Subscription, Window, div, px, relative};
+use gpui::{
+    App, AppContext as _, ClickEvent, Entity, SharedString, Subscription, Window, div, px, relative,
+};
 use gpui_component::{
     ActiveTheme as _, h_flex,
     input::{Input, InputEvent, InputState},
     resizable::{h_resizable, resizable_panel},
-    sidebar::{Sidebar, SidebarMenu, SidebarMenuItem},
+    sidebar::{Sidebar, SidebarGroup, SidebarMenu, SidebarMenuItem},
     v_flex,
 };
+use std::collections::BTreeMap;
 
 pub struct Gallery {
     stories: Vec<Entity<StoryContainer>>,
@@ -190,38 +193,66 @@ impl Render for Gallery {
                                         ),
                                 ),
                             )
-                            .child(SidebarMenu::new().children(
-                                filtered_stories.iter().enumerate().map(
-                                    |(idx_in_filtered, story_entity_in_filtered)| {
-                                        let story_data = story_entity_in_filtered.read(cx);
-                                        let name = if let Some(title_fn) = &story_data.title_fn {
-                                            title_fn().into()
-                                        } else {
-                                            story_data.name.clone()
-                                        };
-                                        let is_active = ui_active_index_in_filtered_list
-                                            == Some(idx_in_filtered);
+                            .children({
+                                // Group stories by section
+                                let mut sections: BTreeMap<
+                                    Option<SharedString>,
+                                    Vec<(usize, Entity<StoryContainer>)>,
+                                > = BTreeMap::new();
 
-                                        let story_entity_for_click =
-                                            story_entity_in_filtered.clone();
+                                for (idx_in_filtered, story_entity) in
+                                    filtered_stories.iter().enumerate()
+                                {
+                                    let section = story_entity.read(cx).section.clone();
+                                    sections
+                                        .entry(section)
+                                        .or_default()
+                                        .push((idx_in_filtered, story_entity.clone()));
+                                }
 
-                                        SidebarMenuItem::new(name).active(is_active).on_click(
-                                            cx.listener(
-                                                move |this, _: &ClickEvent, _, cx_listener| {
-                                                    if let Some(original_idx) = this
-                                                        .stories
-                                                        .iter()
-                                                        .position(|s| s == &story_entity_for_click)
-                                                    {
-                                                        this.active_index = Some(original_idx);
-                                                    }
-                                                    cx_listener.notify();
-                                                },
-                                            ),
-                                        )
-                                    },
-                                ),
-                            )),
+                                // Build sidebar groups with menus
+                                sections
+                                    .into_iter()
+                                    .map(|(section, stories_in_section)| {
+                                        let menu_items: Vec<_> = stories_in_section
+                                            .into_iter()
+                                            .map(|(idx_in_filtered, story_entity_in_filtered)| {
+                                                let story_data = story_entity_in_filtered.read(cx);
+                                                let name =
+                                                    if let Some(title_fn) = &story_data.title_fn {
+                                                        title_fn().into()
+                                                    } else {
+                                                        story_data.name.clone()
+                                                    };
+                                                let is_active = ui_active_index_in_filtered_list
+                                                    == Some(idx_in_filtered);
+
+                                                let story_entity_for_click =
+                                                    story_entity_in_filtered.clone();
+
+                                                SidebarMenuItem::new(name)
+                                                    .active(is_active)
+                                                    .on_click(cx.listener(
+                                                    move |this, _: &ClickEvent, _, cx_listener| {
+                                                        if let Some(original_idx) =
+                                                            this.stories.iter().position(|s| {
+                                                                s == &story_entity_for_click
+                                                            })
+                                                        {
+                                                            this.active_index = Some(original_idx);
+                                                        }
+                                                        cx_listener.notify();
+                                                    },
+                                                ))
+                                            })
+                                            .collect();
+
+                                        let menu = SidebarMenu::new().children(menu_items);
+
+                                        SidebarGroup::new(section.unwrap_or_default()).child(menu)
+                                    })
+                                    .collect::<Vec<_>>()
+                            }),
                     ),
             )
             .child(
