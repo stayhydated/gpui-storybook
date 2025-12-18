@@ -2790,16 +2790,10 @@ dependencies = [
 name = "gpui-storybook"
 version = "0.5.0"
 dependencies = [
- "anyhow",
  "gpui",
- "gpui-component",
  "gpui-storybook-core",
  "gpui-storybook-macros",
  "inventory",
- "rust-embed",
- "serde",
- "serde_json",
- "tracing-subscriber",
 ]
 
 [[package]]
@@ -2815,8 +2809,6 @@ dependencies = [
  "gpui-component-assets",
  "inventory",
  "log",
- "proc-macro2",
- "quote",
  "rust-embed",
  "serde",
  "serde_json",
@@ -2845,8 +2837,6 @@ dependencies = [
 name = "gpui-storybook-macros"
 version = "0.5.0"
 dependencies = [
- "gpui-storybook-core",
- "heck 0.5.0",
  "insta",
  "inventory",
  "prettyplease",

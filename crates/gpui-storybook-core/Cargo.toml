@@ -19,8 +19,6 @@ gpui = { workspace = true }
 gpui-component = { workspace = true }
 gpui-component-assets = { workspace = true }
 inventory = { workspace = true }
-proc-macro2 = { workspace = true }
-quote = { workspace = true }
 rust-embed = { workspace = true }
 serde = { features = [ "derive" ], workspace = true }
 serde_json = { workspace = true }

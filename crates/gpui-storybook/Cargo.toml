@@ -15,16 +15,10 @@ default = [ "macros" ]
 macros = [ "dep:gpui-storybook-macros" ]
 
 [dependencies]
-anyhow = { workspace = true }
 gpui = { workspace = true }
-gpui-component = { workspace = true }
 gpui-storybook-core = { workspace = true }
 gpui-storybook-macros = { optional = true, workspace = true }
 inventory = { workspace = true }
-rust-embed = { workspace = true }
-serde = { features = [ "derive" ], workspace = true }
-serde_json = { workspace = true }
-tracing-subscriber = { features = [ "env-filter" ], workspace = true }
 
 [lints]
 workspace = true
