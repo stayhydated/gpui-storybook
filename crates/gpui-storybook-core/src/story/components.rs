@@ -1,7 +1,7 @@
 use gpui::{
     AnyElement, AnyView, App, AppContext as _, Div, Entity, EventEmitter, Focusable, Hsla,
-    InteractiveElement as _, IntoElement, ParentElement, Render, RenderOnce, SharedString,
-    StatefulInteractiveElement as _, Styled, Window, actions, prelude::FluentBuilder as _, rems,
+    InteractiveElement as _, IntoElement, ParentElement, Render, RenderOnce, SharedString, Styled,
+    Window, actions, prelude::FluentBuilder as _, rems,
 };
 
 use serde::{Deserialize, Serialize};
@@ -11,6 +11,7 @@ use gpui_component::{
     dock::{Panel, PanelControl, PanelEvent, PanelInfo, PanelState, TitleStyle},
     h_flex,
     menu::PopupMenu,
+    scroll::ScrollableElement as _,
     v_flex,
 };
 
@@ -312,7 +313,7 @@ impl Render for StoryContainer {
         v_flex()
             .id("story-container")
             .size_full()
-            .overflow_y_scroll()
+            .overflow_y_scrollbar()
             .track_focus(&self.focus_handle)
             .when_some(self.story.clone(), |this, story| {
                 this.child(
