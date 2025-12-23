@@ -1881,9 +1881,9 @@ dependencies = [
 
 [[package]]
 name = "es-fluent"
-version = "0.2.10"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9fb1cf5e320cc1fb3249d34ded95e64c32fd694ff4b6e361061edef97f5464f8"
+checksum = "e238e3ae7bb352601d91eedbb11b64050384b4baba0d72ad91c20da63f8ad3b6"
 dependencies = [
  "es-fluent-derive",
  "es-fluent-manager-core",
@@ -1896,9 +1896,9 @@ dependencies = [
 
 [[package]]
 name = "es-fluent-build"
-version = "0.2.10"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1ae9a48d4c1a0afef5d1441792e8c9f92f047ac1fdfaf7f511e79e5a5a09f77"
+checksum = "35b89639e8a7cbe16ffa1204f5088803b89a9a2967f68fe58ee890800a4fc3a5"
 dependencies = [
  "cargo_metadata",
  "es-fluent-generate",
@@ -1910,9 +1910,9 @@ dependencies = [
 
 [[package]]
 name = "es-fluent-core"
-version = "0.2.10"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "35254a7e2fdd7bb216aadaf9a5b42f74d480b1c69e902f19e00c0cac7f22dd88"
+checksum = "a57a8023c269ae6437525da9ee27a311f21b88251c580f5b353edd43dc846fd8"
 dependencies = [
  "bon",
  "darling",
@@ -1931,9 +1931,9 @@ dependencies = [
 
 [[package]]
 name = "es-fluent-derive"
-version = "0.2.10"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a08d122a7cf2b6e6b4fdeac2b8fe622d0816d6818e9b1c46b4e42e3057fd29c"
+checksum = "927559383dccd859ffe3d5b708db22e21b5210feb9459783ac6ebc3d528f112a"
 dependencies = [
  "darling",
  "es-fluent-core",
@@ -1948,9 +1948,9 @@ dependencies = [
 
 [[package]]
 name = "es-fluent-generate"
-version = "0.2.10"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "64d224b11b228ab478691d25ba8bc46f179dd12a22957817f9ea3014b8324691"
+checksum = "1a8950735d82c405d7a76cde653e20c69ce854c4ddea742c1ba7a17f0ab70048"
 dependencies = [
  "clap",
  "es-fluent-core",
@@ -1962,9 +1962,9 @@ dependencies = [
 
 [[package]]
 name = "es-fluent-lang"
-version = "0.2.10"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b29be9d683b1bbcf4b636db7d756c5c269098611e6c34fc1c0844590fd2da6f"
+checksum = "b3838093743c917d778d6410bcef6870f6575f7ece9b6ea254ba24d5f163ea75"
 dependencies = [
  "es-fluent-lang-macro",
  "es-fluent-manager-core",
@@ -1976,9 +1976,9 @@ dependencies = [
 
 [[package]]
 name = "es-fluent-lang-macro"
-version = "0.2.10"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cf737df91018482323036ca9796de259cf8a7abeae71baf693d29a28b87b19a2"
+checksum = "769ebda61c4de905b87152761e7da539885f29b1bd7fa96f6a63fd1ad054b6b1"
 dependencies = [
  "es-fluent-toml",
  "heck 0.5.0",
@@ -1991,9 +1991,9 @@ dependencies = [
 
 [[package]]
 name = "es-fluent-manager-core"
-version = "0.2.10"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "19a06eefdcbe3100a29b1754ce7c49334b215aacc76c3df941c1144d69974176"
+checksum = "74fe5eff18b5fb678c457d27afa9a5b3b86cb9665731c8f821ecd909acc9b4e7"
 dependencies = [
  "anyhow",
  "fluent-bundle",
@@ -2006,9 +2006,9 @@ dependencies = [
 
 [[package]]
 name = "es-fluent-manager-embedded"
-version = "0.2.10"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "52964390eb43ad971347ca9f31a71a8016cbd4d4d94e84a98dc13776dfe5a039"
+checksum = "23eaab41ec262075eb952caf4b64c97b8b0886e767beaae2e3351b771ad6a980"
 dependencies = [
  "es-fluent",
  "es-fluent-manager-core",
@@ -2019,9 +2019,9 @@ dependencies = [
 
 [[package]]
 name = "es-fluent-manager-macros"
-version = "0.2.10"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "45f36160a1d37c592aae0052f727354a81c7dde370256814e75c735465e8e15f"
+checksum = "13546ea7ba49f71dbf88bf49f75897538b8510ff78dbff09dc8c348d12c02713"
 dependencies = [
  "es-fluent-toml",
  "heck 0.5.0",
@@ -2032,9 +2032,9 @@ dependencies = [
 
 [[package]]
 name = "es-fluent-sc-parser"
-version = "0.2.10"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6aeaf11064495ab2bf389ad4ee1dc94e1460da60cc1d0e49163b927420c2a733"
+checksum = "4c5c5a93386ed317e7c0932eafc3ccc496a63193a963928296f2ddd9b136440f"
 dependencies = [
  "bon",
  "darling",
@@ -2049,9 +2049,9 @@ dependencies = [
 
 [[package]]
 name = "es-fluent-toml"
-version = "0.2.10"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2e1fee3355becb85eb8d818101147a8781a1e449ec6c74a4c85e34530bce4ac"
+checksum = "63fa8a65c7f0f333bce49d95d32daefdacd07c06d38d058d492ba6e4b6167862"
 dependencies = [
  "serde",
  "thiserror 2.0.17",
