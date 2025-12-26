@@ -6,6 +6,9 @@ use strum::EnumIter;
 
 es_fluent_manager_embedded::define_i18n_module!();
 
+#[allow(unused_imports)]
+use gpui_storybook_example::*;
+
 #[es_fluent_language]
 #[derive(Clone, Copy, Debug, EnumIter, EsFluent, PartialEq)]
 pub enum Languages {}
