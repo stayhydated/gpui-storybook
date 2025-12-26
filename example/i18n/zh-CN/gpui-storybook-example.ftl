@@ -1,4 +1,4 @@
-## Story2Items
+## StoryItems
 
 story_items-Hi = 你好
-story_items-Title = 标题 2
+story_items-Title = 标题
