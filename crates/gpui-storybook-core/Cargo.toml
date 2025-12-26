@@ -26,9 +26,5 @@ strum = { features = [ "derive" ], workspace = true }
 tracing-subscriber = { features = [ "env-filter" ], workspace = true }
 unic-langid = { features = [ "serde" ], workspace = true }
 
-[build-dependencies]
-es-fluent-build = { workspace = true }
-log = { workspace = true }
-
 [lints]
 workspace = true

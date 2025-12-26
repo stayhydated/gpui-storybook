@@ -27,10 +27,9 @@ crate-paths = "0.1.0"
 darling = "0.20.10"
 derive_more = "2.0.1"
 dotenv = "0.15.0"
-es-fluent = "0.3.0"
-es-fluent-build = "0.3.0"
-es-fluent-lang = "0.3.0"
-es-fluent-manager-embedded = "0.3.0"
+es-fluent = "0.4.1"
+es-fluent-lang = "0.4.1"
+es-fluent-manager-embedded = "0.4.1"
 fluent-bundle = "0.15.3"
 gpui = { git = "https://github.com/zed-industries/zed" }
 gpui-component = { git = "https://github.com/longbridge/gpui-component" }
