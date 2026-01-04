@@ -11,6 +11,11 @@ use gpui_component::{
     h_flex, v_flex,
 };
 
+#[gpui_storybook::story_init]
+pub fn button_story_init(_cx: &mut App) {
+    println!("ButtonStory init function called!");
+}
+
 #[gpui_storybook::story("components")]
 pub struct ButtonStory {
     focus_handle: gpui::FocusHandle,

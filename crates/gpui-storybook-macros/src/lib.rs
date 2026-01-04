@@ -45,6 +45,8 @@ fn story_impl(args: TokenStream2, input: TokenStream2) -> TokenStream2 {
                 create_fn: |window, cx| {
                     ::gpui_storybook::StoryContainer::panel::<#struct_name>(window, cx)
                 },
+                file: ::std::file!(),
+                line: ::std::line!(),
             }
         }
     }
@@ -65,13 +67,17 @@ pub fn story(args: TokenStream, input: TokenStream) -> TokenStream {
 fn story_init_impl(_args: TokenStream2, input: TokenStream2) -> TokenStream2 {
     let input_fn: ItemFn = syn::parse2(input).expect("story_init macro expects a function");
     let fn_name = &input_fn.sig.ident;
+    let fn_name_str = fn_name.to_string();
 
     quote! {
         #input_fn
 
-        inventory::submit! {
+        gpui_storybook::__inventory::submit! {
             ::gpui_storybook::__registry::InitEntry {
                 init_fn: #fn_name,
+                fn_name: #fn_name_str,
+                file: ::std::file!(),
+                line: ::std::line!(),
             }
         }
     }
