@@ -4,13 +4,13 @@ use gpui::{
 };
 
 use gpui_component::{
-    ActiveTheme,
-    group_box::{GroupBox, GroupBoxVariants},
+    ActiveTheme as _,
+    group_box::{GroupBox, GroupBoxVariants as _},
     h_flex,
 };
 use serde::Deserialize;
 
-#[derive(Clone, Action, PartialEq, Eq, Deserialize)]
+#[derive(Action, Clone, Deserialize, Eq, PartialEq)]
 #[action(namespace = button_story, no_json)]
 pub enum ButtonAction {
     Disabled,

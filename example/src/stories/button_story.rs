@@ -1,11 +1,11 @@
 use gpui::{
-    App, AppContext as _, Axis, ClickEvent, Context, Entity, Focusable, InteractiveElement,
-    IntoElement, ParentElement, Render, Styled, Window, prelude::FluentBuilder, px,
+    App, AppContext as _, Axis, ClickEvent, Context, Entity, Focusable, InteractiveElement as _,
+    IntoElement, ParentElement as _, Render, Styled as _, Window, prelude::FluentBuilder as _, px,
 };
 
 use crate::section::{ButtonAction, section};
 use gpui_component::{
-    ActiveTheme, Disableable as _, Icon, IconName, Selectable as _, Sizable as _, Theme,
+    ActiveTheme as _, Disableable as _, Icon, IconName, Selectable as _, Sizable as _, Theme,
     button::{Button, ButtonCustomVariant, ButtonGroup, ButtonVariants as _},
     checkbox::Checkbox,
     h_flex, v_flex,
@@ -16,7 +16,7 @@ pub fn button_story_init(_cx: &mut App) {
     println!("ButtonStory init function called!");
 }
 
-#[gpui_storybook::story("components")]
+#[gpui_storybook::story(crate::StorySection::Buttons)]
 pub struct ButtonStory {
     focus_handle: gpui::FocusHandle,
     disabled: bool,

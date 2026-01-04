@@ -51,10 +51,36 @@ pub fn generate_stories(
         }
     );
 
-    inventory::iter::<__registry::StoryEntry>()
+    // Collect and sort stories
+    let mut entries: Vec<_> = inventory::iter::<__registry::StoryEntry>().collect();
+
+    entries.sort_by(|a, b| {
+        // First sort by section_order (if both have it)
+        match (a.section_order, b.section_order) {
+            (Some(order_a), Some(order_b)) => {
+                // Both have order, compare by order then by name
+                order_a.cmp(&order_b).then_with(|| a.name.cmp(b.name))
+            },
+            (Some(_), None) => std::cmp::Ordering::Less, // With order comes before without
+            (None, Some(_)) => std::cmp::Ordering::Greater, // Without order comes after with
+            (None, None) => {
+                // Neither has order, sort by section name (if present) then by story name
+                match (&a.section, &b.section) {
+                    (Some(sec_a), Some(sec_b)) => sec_a.cmp(sec_b).then_with(|| a.name.cmp(b.name)),
+                    (Some(_), None) => std::cmp::Ordering::Less,
+                    (None, Some(_)) => std::cmp::Ordering::Greater,
+                    (None, None) => a.name.cmp(b.name),
+                }
+            },
+        }
+    });
+
+    entries
+        .into_iter()
         .map(|entry| {
             let section_info = entry
                 .section
+                .as_ref()
                 .map(|s| format!(", section: \"{}\"", s))
                 .unwrap_or_default();
 

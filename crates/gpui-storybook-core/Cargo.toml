@@ -16,10 +16,10 @@ anyhow = { workspace = true }
 es-fluent = { workspace = true }
 es-fluent-manager-embedded = { workspace = true }
 gpui = { workspace = true }
-gpui-component = { workspace = true, features = ["inspector"] }
+gpui-component = { features = [ "inspector" ], workspace = true }
 gpui-component-assets = { workspace = true }
 inventory = { workspace = true }
-rust-embed = { workspace = true, features = ["interpolate-folder-path"] }
+rust-embed = { features = [ "interpolate-folder-path" ], workspace = true }
 serde = { features = [ "derive" ], workspace = true }
 serde_json = { workspace = true }
 strum = { features = [ "derive" ], workspace = true }

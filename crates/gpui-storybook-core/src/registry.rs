@@ -4,6 +4,7 @@ use crate::story::StoryContainer;
 pub struct StoryEntry {
     pub name: &'static str,
     pub section: Option<&'static str>,
+    pub section_order: Option<usize>,
     pub create_fn: fn(&mut ::gpui::Window, &mut ::gpui::App) -> ::gpui::Entity<StoryContainer>,
     pub file: &'static str,
     pub line: u32,
