@@ -4,7 +4,7 @@ use std::{
     time::{self, Duration},
 };
 
-use fake::Fake;
+use fake::Fake as _;
 use gpui::{
     Action, AnyElement, App, AppContext, ClickEvent, Context, Div, Entity, Focusable,
     InteractiveElement, IntoElement, ParentElement, Render, SharedString, Stateful,
@@ -25,15 +25,15 @@ use gpui_component::{
 };
 use serde::{Deserialize, Serialize};
 
-#[derive(Action, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Action, Clone, Deserialize, Eq, PartialEq)]
 #[action(namespace = table_story, no_json)]
 struct ChangeSize(Size);
 
-#[derive(Action, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Action, Clone, Deserialize, Eq, PartialEq)]
 #[action(namespace = table_story, no_json)]
 struct OpenDetail(usize);
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 struct Counter {
     symbol: SharedString,
     market: SharedString,
@@ -616,7 +616,7 @@ impl TableDelegate for StockTableDelegate {
     }
 }
 
-#[gpui_storybook::story("components")]
+#[gpui_storybook::story(crate::StorySection::Tables)]
 pub struct TableStory {
     table: Entity<TableState<StockTableDelegate>>,
     num_stocks_input: Entity<InputState>,

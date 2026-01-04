@@ -3,8 +3,13 @@ use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::{ItemFn, ItemStruct, LitStr, Token, parse::Parse, parse::ParseStream};
 
+enum SectionArg {
+    StringLiteral(String),
+    EnumVariant(syn::Path),
+}
+
 struct StoryArgs {
-    section: Option<String>,
+    section: Option<SectionArg>,
 }
 
 impl Parse for StoryArgs {
@@ -13,13 +18,23 @@ impl Parse for StoryArgs {
             return Ok(StoryArgs { section: None });
         }
 
-        let section_lit: LitStr = input.parse()?;
+        // Try to parse as string literal first
+        if input.peek(LitStr) {
+            let section_lit: LitStr = input.parse()?;
+            // Handle optional trailing comma
+            let _ = input.parse::<Token![,]>();
+            return Ok(StoryArgs {
+                section: Some(SectionArg::StringLiteral(section_lit.value())),
+            });
+        }
 
+        // Otherwise try to parse as path (enum variant)
+        let path: syn::Path = input.parse()?;
         // Handle optional trailing comma
         let _ = input.parse::<Token![,]>();
 
         Ok(StoryArgs {
-            section: Some(section_lit.value()),
+            section: Some(SectionArg::EnumVariant(path)),
         })
     }
 }
@@ -30,9 +45,21 @@ fn story_impl(args: TokenStream2, input: TokenStream2) -> TokenStream2 {
     let struct_name = &input_struct.ident;
     let struct_name_str = struct_name.to_string();
 
-    let section_value = match &args.section {
-        Some(s) => quote! { Some(#s) },
-        None => quote! { None },
+    let (section_value, section_order) = match &args.section {
+        Some(SectionArg::StringLiteral(s)) => (quote! { Some(#s) }, quote! { None }),
+        Some(SectionArg::EnumVariant(path)) => {
+            // Extract just the variant name from the path (last segment)
+            let variant_name = path
+                .segments
+                .last()
+                .map(|seg| seg.ident.to_string())
+                .unwrap_or_else(|| quote!(#path).to_string());
+            (
+                quote! { Some(#variant_name) },
+                quote! { Some(#path as usize) },
+            )
+        },
+        None => (quote! { None }, quote! { None }),
     };
 
     quote! {
@@ -42,9 +69,12 @@ fn story_impl(args: TokenStream2, input: TokenStream2) -> TokenStream2 {
             ::gpui_storybook::__registry::StoryEntry {
                 name: #struct_name_str,
                 section: #section_value,
+                section_order: #section_order,
                 create_fn: |window, cx| {
                     ::gpui_storybook::StoryContainer::panel::<#struct_name>(window, cx)
                 },
+                file: ::std::file!(),
+                line: ::std::line!(),
             }
         }
     }
@@ -52,9 +82,14 @@ fn story_impl(args: TokenStream2, input: TokenStream2) -> TokenStream2 {
 
 /// Attribute macro to register a story struct
 ///
-/// Optionally accepts a section name as a string argument:
+/// Optionally accepts a section name as a string literal or enum variant:
 /// ```ignore
+/// // String literal (sorted alphabetically by section name)
 /// #[story("Components")]
+/// pub struct ButtonStory;
+///
+/// // Enum variant (sorted by enum discriminant order)
+/// #[story(StorySection::Components)]
 /// pub struct ButtonStory;
 /// ```
 #[proc_macro_attribute]
@@ -65,13 +100,17 @@ pub fn story(args: TokenStream, input: TokenStream) -> TokenStream {
 fn story_init_impl(_args: TokenStream2, input: TokenStream2) -> TokenStream2 {
     let input_fn: ItemFn = syn::parse2(input).expect("story_init macro expects a function");
     let fn_name = &input_fn.sig.ident;
+    let fn_name_str = fn_name.to_string();
 
     quote! {
         #input_fn
 
-        inventory::submit! {
+        gpui_storybook::__inventory::submit! {
             ::gpui_storybook::__registry::InitEntry {
                 init_fn: #fn_name,
+                fn_name: #fn_name_str,
+                file: ::std::file!(),
+                line: ::std::line!(),
             }
         }
     }

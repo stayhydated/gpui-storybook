@@ -19,6 +19,7 @@ gpui = { workspace = true }
 gpui-storybook-core = { workspace = true }
 gpui-storybook-macros = { optional = true, workspace = true }
 inventory = { workspace = true }
+tracing = { workspace = true }
 
 [lints]
 workspace = true
