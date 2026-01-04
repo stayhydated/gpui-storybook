@@ -23,7 +23,6 @@ rust-embed = { features = [ "interpolate-folder-path" ], workspace = true }
 serde = { features = [ "derive" ], workspace = true }
 serde_json = { workspace = true }
 strum = { features = [ "derive" ], workspace = true }
-tracing-subscriber = { features = [ "env-filter" ], workspace = true }
 unic-langid = { features = [ "serde" ], workspace = true }
 
 [lints]
