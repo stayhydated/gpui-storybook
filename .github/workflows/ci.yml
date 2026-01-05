@@ -52,58 +52,57 @@ jobs:
       - name: Lint code
         run: cargo clippy --workspace --all-features
 
-  release-plz-release:
-    name: Release-plz release
-    runs-on: ubuntu-latest
-    needs: [test, fmt, clippy]
-    if: ${{ github.repository_owner == 'stayhydated' && github.event_name == 'push' }}
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.RELEASE_PLZ_TOKEN }}
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-      - name: Setup mold
-        uses: rui314/setup-mold@v1
-      - name: Run release-plz
-        uses: release-plz/action@v0.5
-        with:
-          command: release
-        env:
-          GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN }}
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-          ES_FLUENT_SKIP_BUILD: true
+  # release-plz-release:
+  #   name: Release-plz release
+  #   runs-on: ubuntu-latest
+  #   needs: [test, fmt, clippy]
+  #   if: ${{ github.repository_owner == 'stayhydated' && github.event_name == 'push' }}
+  #   permissions:
+  #     contents: write
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v6
+  #       with:
+  #         fetch-depth: 0
+  #         token: ${{ secrets.RELEASE_PLZ_TOKEN }}
+  #     - name: Install Rust toolchain
+  #       uses: dtolnay/rust-toolchain@stable
+  #     - name: Setup mold
+  #       uses: rui314/setup-mold@v1
+  #     - name: Run release-plz
+  #       uses: release-plz/action@v0.5
+  #       with:
+  #         command: release
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN }}
+  #         CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
-  release-plz-pr:
-    name: Release-plz PR
-    runs-on: ubuntu-latest
-    needs: [test, fmt, clippy]
-    if: ${{ github.repository_owner == 'stayhydated' && github.event_name == 'push' }}
-    permissions:
-      pull-requests: write
-      contents: write
-    concurrency:
-      group: release-plz-${{ github.ref }}
-      cancel-in-progress: false
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.RELEASE_PLZ_TOKEN }}
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-      - name: Setup mold
-        uses: rui314/setup-mold@v1
+  # release-plz-pr:
+  #   name: Release-plz PR
+  #   runs-on: ubuntu-latest
+  #   needs: [test, fmt, clippy]
+  #   if: ${{ github.repository_owner == 'stayhydated' && github.event_name == 'push' }}
+  #   permissions:
+  #     pull-requests: write
+  #     contents: write
+  #   concurrency:
+  #     group: release-plz-${{ github.ref }}
+  #     cancel-in-progress: false
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v6
+  #       with:
+  #         fetch-depth: 0
+  #         token: ${{ secrets.RELEASE_PLZ_TOKEN }}
+  #     - name: Install Rust toolchain
+  #       uses: dtolnay/rust-toolchain@stable
+  #     - name: Setup mold
+  #       uses: rui314/setup-mold@v1
 
-      - name: Run release-plz
-        uses: release-plz/action@v0.5
-        with:
-          command: release-pr
-        env:
-          GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN }}
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+  #     - name: Run release-plz
+  #       uses: release-plz/action@v0.5
+  #       with:
+  #         command: release-pr
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN }}
+  #         CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}

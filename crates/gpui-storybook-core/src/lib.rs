@@ -1,4 +1,5 @@
 pub mod actions;
+pub mod app_menus;
 pub mod assets;
 pub mod gallery;
 pub mod i18n;
