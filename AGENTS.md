@@ -1,1 +1,1 @@
-ignore all folders matching "**/__crate_paths/**"
+ignore all folders matching "**/\_\_crate_paths/**"
