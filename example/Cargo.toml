@@ -6,7 +6,7 @@ license = "Unlicense"
 publish = false
 
 [dependencies]
-es-fluent = { workspace = true }
+es-fluent = { workspace = true, features = ["derive"] }
 es-fluent-lang = { workspace = true }
 es-fluent-manager-embedded = { workspace = true }
 gpui = { workspace = true }

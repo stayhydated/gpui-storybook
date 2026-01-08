@@ -3,13 +3,14 @@ name = "gpui-storybook-core"
 description = """
 Core crate for gpui-storybook
 """
+version.workspace = true
+rust-version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
-version.workspace = true
 repository.workspace = true
-readme.workspace = true
-include = [ "src/**/*", "assets/**/*", "i18n.toml", "build.rs" ]
+readme = "README.md"
+include = [ "src/**/*", "assets/**/*", "i18n.toml" ]
 
 [dependencies]
 anyhow = { workspace = true }
