@@ -10,6 +10,9 @@
 
 | `gpui-storybook` | `gpui-component` |
 | :--------------- | :--------------- |
+| **git** | |
+| `master` | `main` |
+| **crates.io** | |
 | `0.5.x` | `0.5.x` |
 
 ## Examples
