@@ -3,7 +3,7 @@ use gpui::{
     Window, div, px,
 };
 use gpui_component::{
-    ActiveTheme as _, IconName, PixelsExt, Side, Sizable as _, Theme,
+    ActiveTheme as _, IconName, PixelsExt as _, Side, Sizable as _, Theme,
     button::{Button, ButtonVariants as _},
     menu::DropdownMenu as _,
     scroll::ScrollbarShow,

@@ -3,34 +3,28 @@ name = "gpui-storybook-core"
 description = """
 Core crate for gpui-storybook
 """
+version.workspace = true
+rust-version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
-version.workspace = true
 repository.workspace = true
-readme.workspace = true
-include = [ "src/**/*", "assets/**/*", "i18n.toml", "build.rs" ]
+readme = "README.md"
+include = [ "src/**/*", "assets/**/*", "i18n.toml" ]
 
 [dependencies]
 anyhow = { workspace = true }
 es-fluent = { workspace = true }
 es-fluent-manager-embedded = { workspace = true }
 gpui = { workspace = true }
-gpui-component = { workspace = true }
+gpui-component = { features = [ "inspector" ], workspace = true }
 gpui-component-assets = { workspace = true }
 inventory = { workspace = true }
-proc-macro2 = { workspace = true }
-quote = { workspace = true }
-rust-embed = { workspace = true }
+rust-embed = { features = [ "interpolate-folder-path" ], workspace = true }
 serde = { features = [ "derive" ], workspace = true }
 serde_json = { workspace = true }
 strum = { features = [ "derive" ], workspace = true }
-tracing-subscriber = { features = [ "env-filter" ], workspace = true }
 unic-langid = { features = [ "serde" ], workspace = true }
-
-[build-dependencies]
-es-fluent-build = { workspace = true }
-log = { workspace = true }
 
 [lints]
 workspace = true

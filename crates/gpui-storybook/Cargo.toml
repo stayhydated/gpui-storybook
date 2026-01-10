@@ -3,28 +3,24 @@ name = "gpui-storybook"
 description = """
 The gpui-storybook crate
 """
+version.workspace = true
+rust-version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
-version.workspace = true
 repository.workspace = true
-readme.workspace = true
+readme = "README.md"
 
 [features]
 default = [ "macros" ]
 macros = [ "dep:gpui-storybook-macros" ]
 
 [dependencies]
-anyhow = { workspace = true }
 gpui = { workspace = true }
-gpui-component = { workspace = true }
 gpui-storybook-core = { workspace = true }
 gpui-storybook-macros = { optional = true, workspace = true }
 inventory = { workspace = true }
-rust-embed = { workspace = true }
-serde = { features = [ "derive" ], workspace = true }
-serde_json = { workspace = true }
-tracing-subscriber = { features = [ "env-filter" ], workspace = true }
+tracing = { workspace = true }
 
 [lints]
 workspace = true

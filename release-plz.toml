@@ -1,3 +1,0 @@
-[workspace]
-changelog_update = false
-semver_check = false

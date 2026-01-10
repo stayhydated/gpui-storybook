@@ -1,19 +1,14 @@
 use es_fluent::{EsFluent, ToFluentString as _};
 use gpui::*;
-use gpui_component::{
-    StyledExt as _,
-    button::{Button, ButtonVariants as _},
-};
+use gpui_component::StyledExt as _;
 
 #[derive(EsFluent)]
 enum StoryItems {
     Title,
-    SubTitle,
-    ButtonLabel,
-    ButtonOnClick,
+    Hi,
 }
 
-#[gpui_storybook::story]
+#[gpui_storybook::story("aaaaaaaaaaa")]
 pub struct HelloWorld {
     focus_handle: FocusHandle,
 }
@@ -53,14 +48,6 @@ impl Render for HelloWorld {
             .items_center()
             .justify_center()
             .text_center()
-            .child(StoryItems::SubTitle.to_fluent_string())
-            .child(
-                Button::new("ok")
-                    .primary()
-                    .label(StoryItems::ButtonLabel.to_fluent_string())
-                    .on_click(|_, _, _| {
-                        println!("{}", StoryItems::ButtonOnClick.to_fluent_string())
-                    }),
-            )
+            .child(StoryItems::Hi.to_fluent_string())
     }
 }
