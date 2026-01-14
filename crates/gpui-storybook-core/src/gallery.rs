@@ -173,7 +173,8 @@ impl Render for Gallery {
                     .size(px(255.))
                     .size_range(px(200.)..px(320.))
                     .child(
-                        Sidebar::left()
+                        Sidebar::new("sidebar-gallery")
+                            .side(gpui_component::Side::Left)
                             .w(relative(1.))
                             .border_0()
                             .collapsed(self.collapsed)
