@@ -7,12 +7,17 @@ fmt:
     taplo fmt
     uvx mdformat .
 
-lint:
-    cargo clippy --workspace --all-features
-    cargo machete
+clippy:
+    cargo clippy --workspace --all-features --exclude gpui-storybook-example
 
-p-lib-forms:
-    cargo run -p prototyping
+check:
+    cargo check --workspace --all-features --exclude gpui-storybook-example
+
+test:
+    cargo test --workspace --all-features
 
 test-publish:
     cargo publish --workspace --dry-run --allow-dirty
+
+test-docs:
+    cargo doc --workspace --all-features --no-deps --open

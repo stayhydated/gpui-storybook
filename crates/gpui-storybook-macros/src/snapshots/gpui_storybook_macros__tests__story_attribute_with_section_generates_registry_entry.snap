@@ -5,6 +5,7 @@ expression: snapshot_tokens(expanded)
 pub struct ButtonStory;
 gpui_storybook::__inventory::submit! {
     ::gpui_storybook::__registry::StoryEntry { name : "ButtonStory", section :
-    Some("Components"), create_fn : | window, cx | {
-    ::gpui_storybook::StoryContainer::panel:: < ButtonStory > (window, cx) }, }
+    Some("Components"), section_order : None, create_fn : | window, cx | {
+    ::gpui_storybook::StoryContainer::panel:: < ButtonStory > (window, cx) }, file :
+    ::std::file!(), line : ::std::line!(), }
 }

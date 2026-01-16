@@ -3,6 +3,7 @@ source: crates/gpui-storybook-macros/src/lib.rs
 expression: snapshot_tokens(expanded)
 ---
 pub fn setup() {}
-inventory::submit! {
-    ::gpui_storybook::__registry::InitEntry { init_fn : setup, }
+gpui_storybook::__inventory::submit! {
+    ::gpui_storybook::__registry::InitEntry { init_fn : setup, fn_name : "setup", file :
+    ::std::file!(), line : ::std::line!(), }
 }

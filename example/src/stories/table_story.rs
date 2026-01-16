@@ -4,11 +4,11 @@ use std::{
     time::{self, Duration},
 };
 
-use fake::Fake as _;
+use fake::Fake;
 use gpui::{
     Action, AnyElement, App, AppContext, ClickEvent, Context, Div, Entity, Focusable,
     InteractiveElement, IntoElement, ParentElement, Render, SharedString, Stateful,
-    StatefulInteractiveElement, Styled, Subscription, Task, TextAlign, Timer, Window, div,
+    StatefulInteractiveElement, Styled, Subscription, Task, TextAlign, Window, div,
     prelude::FluentBuilder as _,
 };
 use gpui_component::{
@@ -208,14 +208,18 @@ impl StockTableDelegate {
                 Column::new("id", "ID")
                     .width(60.)
                     .fixed(ColumnFixed::Left)
-                    .resizable(false),
+                    .resizable(true)
+                    .min_width(40.)
+                    .max_width(100.),
                 Column::new("market", "Market")
                     .width(60.)
                     .fixed(ColumnFixed::Left)
-                    .resizable(false),
+                    .resizable(true)
+                    .min_width(50.),
                 Column::new("name", "Name")
                     .width(180.)
-                    .fixed(ColumnFixed::Left),
+                    .fixed(ColumnFixed::Left)
+                    .max_width(300.),
                 Column::new("symbol", "Symbol")
                     .width(100.)
                     .fixed(ColumnFixed::Left)
@@ -585,7 +589,7 @@ impl TableDelegate for StockTableDelegate {
 
         self._load_task = cx.spawn(async move |view, cx| {
             // Simulate network request, delay 1s to load data.
-            Timer::after(Duration::from_secs(1)).await;
+            cx.background_executor().timer(Duration::from_secs(1)).await;
 
             _ = cx.update(|cx| {
                 let _ = view.update(cx, |view, _| {
@@ -616,7 +620,6 @@ impl TableDelegate for StockTableDelegate {
     }
 }
 
-#[gpui_storybook::story(crate::StorySection::Tables)]
 pub struct TableStory {
     table: Entity<TableState<StockTableDelegate>>,
     num_stocks_input: Entity<InputState>,
@@ -674,7 +677,9 @@ impl TableStory {
 
         let _load_task = cx.spawn(async move |this, cx| {
             loop {
-                Timer::after(time::Duration::from_millis(33)).await;
+                cx.background_executor()
+                    .timer(time::Duration::from_millis(33))
+                    .await;
 
                 this.update(cx, |this, cx| {
                     if !this.refresh_data {
@@ -778,6 +783,13 @@ impl TableStory {
         });
     }
 
+    fn toggle_row_selection(&mut self, checked: &bool, _: &mut Window, cx: &mut Context<Self>) {
+        self.table.update(cx, |table, cx| {
+            table.row_selectable = *checked;
+            cx.notify();
+        });
+    }
+
     fn toggle_stripe(&mut self, checked: &bool, _: &mut Window, cx: &mut Context<Self>) {
         self.stripe = *checked;
         cx.notify();
@@ -861,6 +873,12 @@ impl Render for TableStory {
                             .label("Column Selectable")
                             .selected(table.col_selectable)
                             .on_click(cx.listener(Self::toggle_col_selection)),
+                    )
+                    .child(
+                        Checkbox::new("row-selection")
+                            .label("Row Selectable")
+                            .selected(table.row_selectable)
+                            .on_click(cx.listener(Self::toggle_row_selection)),
                     )
                     .child(
                         Checkbox::new("fixed")
