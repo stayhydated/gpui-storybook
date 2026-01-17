@@ -1768,32 +1768,52 @@ dependencies = [
 
 [[package]]
 name = "es-fluent"
-version = "0.5.3"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c502889bd75eb8ea00a64f4d47725b0d1045acb57ab9a52c4651a2164aa2ab9"
+checksum = "2b16c3a3309d9d7dfd6883b7ddbe3b2f8e5d79abe580359987e4d5e0d025f36b"
 dependencies = [
- "es-fluent-core",
+ "arc-swap",
+ "bon",
  "es-fluent-derive",
+ "es-fluent-derive-core",
  "es-fluent-manager-core",
  "fluent-bundle",
  "inventory",
  "rust-embed",
+ "serde",
+ "strum 0.27.2",
  "tracing",
  "unic-langid",
 ]
 
 [[package]]
-name = "es-fluent-core"
-version = "0.5.3"
+name = "es-fluent-derive"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab4cb5f3f1ccdb2c15a4711776b3820b8e8bc502286fd261cae2e4723476c64d"
+checksum = "82c7fb1d3ad8a039843d7f79f4544e09744f4066f541e0263b52ff385ae2f54b"
+dependencies = [
+ "darling",
+ "es-fluent-derive-core",
+ "getset",
+ "heck 0.5.0",
+ "proc-macro-error2",
+ "proc-macro2",
+ "quote",
+ "strum 0.27.2",
+ "syn 2.0.114",
+]
+
+[[package]]
+name = "es-fluent-derive-core"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "021364e05db2daadc90945962e985c06808e38022dac3ef0965f9a4b71589213"
 dependencies = [
  "bon",
  "darling",
  "derive_more 2.1.1",
  "getset",
  "heck 0.5.0",
- "inventory",
  "proc-macro-error2",
  "proc-macro2",
  "quote",
@@ -1804,27 +1824,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "es-fluent-derive"
-version = "0.5.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8259565865ed22cc92fdc200304a8b59fba1ded92756227ac9c5eae7aa8e09dd"
-dependencies = [
- "darling",
- "es-fluent-core",
- "getset",
- "heck 0.5.0",
- "proc-macro-error2",
- "proc-macro2",
- "quote",
- "strum 0.27.2",
- "syn 2.0.114",
-]
-
-[[package]]
 name = "es-fluent-lang"
-version = "0.5.3"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "20df83497bb3452c7c2f03b72ae9f69eef483393ac3b9e53c275e9067b87e661"
+checksum = "35d2f42dd3573d315c0b27c13a992e31ec5d15843a34d1ad51e45899c3ac6802"
 dependencies = [
  "es-fluent-lang-macro",
  "es-fluent-manager-core",
@@ -1836,9 +1839,9 @@ dependencies = [
 
 [[package]]
 name = "es-fluent-lang-macro"
-version = "0.5.3"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eeff7847a687d63f5d1b498440ea90fe8f8128dd56c27e1f8bdccfcc13988b96"
+checksum = "006f454c13a3991c27d5143f2bce5846360a75f2f86bb36d1015fd1c58db5de7"
 dependencies = [
  "es-fluent-toml",
  "heck 0.5.0",
@@ -1851,9 +1854,9 @@ dependencies = [
 
 [[package]]
 name = "es-fluent-manager-core"
-version = "0.5.3"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a3de3dd9df4d054187a5d3306d52045676e411b2fa0293fd391731b677dc60b8"
+checksum = "842db0eb503d58da2d1a774eee6c54d960b7bb5b723fa3baaf59c57caa2749d3"
 dependencies = [
  "anyhow",
  "fluent-bundle",
@@ -1866,10 +1869,11 @@ dependencies = [
 
 [[package]]
 name = "es-fluent-manager-embedded"
-version = "0.5.3"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e9fccf468bda1ff129750b4f1eb8295eb8e6ff9eda72f74f4bc37394ad31d31"
+checksum = "cadb9470e437fb26c93b681179131bfd4efdbf3cda80e2273f08e13c93a56e43"
 dependencies = [
+ "arc-swap",
  "es-fluent",
  "es-fluent-manager-core",
  "es-fluent-manager-macros",
@@ -1879,10 +1883,11 @@ dependencies = [
 
 [[package]]
 name = "es-fluent-manager-macros"
-version = "0.5.3"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb66bbc43005855a2dc673408fa7b2155b46e096b76d2b3b4baca6ed587b707e"
+checksum = "122e595bbce6796859eb12412a2cafda633ed1a95d43432bceb03e42c2a54dc9"
 dependencies = [
+ "darling",
  "es-fluent-toml",
  "heck 0.5.0",
  "proc-macro2",
@@ -1892,9 +1897,9 @@ dependencies = [
 
 [[package]]
 name = "es-fluent-toml"
-version = "0.5.3"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "819a930d52db8fa52c151fa0cd717afe80facb0362c94b9dee5a2b95b35c45e3"
+checksum = "6e71c2d562e516769d4bf5a83b23c2d9bce5843599bae85641a207bb472a628b"
 dependencies = [
  "serde",
  "thiserror 2.0.17",
