@@ -620,6 +620,7 @@ impl TableDelegate for StockTableDelegate {
     }
 }
 
+#[gpui_storybook::story(crate::StorySection::Tables)]
 pub struct TableStory {
     table: Entity<TableState<StockTableDelegate>>,
     num_stocks_input: Entity<InputState>,
