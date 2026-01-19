@@ -25,6 +25,9 @@ jobs:
       - name: Setup mold
         uses: rui314/setup-mold@v1
 
+      - name: Install Linux dependencies
+        uses: ./.github/actions/install-linux-deps
+
       - name: Run tests
         run: cargo test --workspace --all-features
 
@@ -57,5 +60,8 @@ jobs:
       - name: Setup mold
         uses: rui314/setup-mold@v1
 
+      - name: Install Linux dependencies
+        uses: ./.github/actions/install-linux-deps
+
       - name: Lint code
-        run: cargo clippy --workspace --all-features --exclude cosmic-example -- -D warnings
+        run: cargo clippy --workspace --all-features
