@@ -1,0 +1,39 @@
+name: Install Linux dependencies
+description: Installs the dependencies necessary to build es-fluent on Linux.
+inputs:
+  alsa:
+    description: Install alsa (libasound2-dev)
+    required: false
+    default: "true"
+  udev:
+    description: Install udev (libudev-dev)
+    required: false
+    default: "true"
+  wayland:
+    description: Install Wayland (libwayland-dev)
+    required: false
+    default: "true"
+  xkb:
+    description: Install xkb (libxkbcommon-dev)
+    required: false
+    default: "true"
+  xkb_x11:
+    description: Install xkb-x11 (libxkbcommon-x11-dev)
+    required: false
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - name: Install Linux dependencies
+      shell: bash
+      if: ${{ runner.os == 'linux' }}
+      run: >
+        sudo apt-get update
+
+        sudo apt-get install --no-install-recommends
+        ${{ fromJSON(inputs.alsa) && 'libasound2-dev' || '' }}
+        ${{ fromJSON(inputs.udev) && 'libudev-dev' || '' }}
+        ${{ fromJSON(inputs.wayland) && 'libwayland-dev' || '' }}
+        ${{ fromJSON(inputs.xkb) && 'libxkbcommon-dev' || '' }}
+        ${{ fromJSON(inputs.xkb_x11) && 'libxkbcommon-x11-dev' || '' }}
