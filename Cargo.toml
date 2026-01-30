@@ -1,5 +1,5 @@
 [workspace]
-default-members = [ "example" ]
+default-members = ["example"]
 members = [
   "crates/gpui-storybook",
   "crates/gpui-storybook-core",
@@ -27,9 +27,9 @@ crate-paths = "0.2"
 darling = "0.23"
 derive_more = "2.1"
 dotenv = "0.15"
-es-fluent = "0.6"
-es-fluent-lang = "0.6"
-es-fluent-manager-embedded = "0.6"
+es-fluent = "0.7"
+es-fluent-lang = "0.7"
+es-fluent-manager-embedded = "0.7"
 fake = "4.4"
 fluent-bundle = "0.16"
 gpui = { git = "https://github.com/zed-industries/zed" }
