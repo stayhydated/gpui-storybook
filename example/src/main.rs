@@ -25,7 +25,6 @@ fn main() {
     let name_arg = std::env::args().nth(1);
 
     app.run(move |app_cx| {
-        gpui_component::init(app_cx);
         gpui_storybook::init(Languages::default(), app_cx);
         gpui_storybook::change_locale(Languages::default());
 
