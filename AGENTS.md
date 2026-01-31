@@ -1,6 +1,6 @@
 # Project Overview
 
-ignore all folders matching "**/__crate_paths/**"
+ignore all folders matching "**/\_\_crate_paths/**"
 
 `gpui-storybook` is a storybook-style workspace for building and inspecting GPUI components. It focuses on:
 

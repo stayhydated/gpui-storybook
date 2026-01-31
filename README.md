@@ -95,6 +95,7 @@ pub struct CardStory;
 ## Themes and appearance
 
 The storybook window exposes theme and appearance controls:
+
 - Light/dark mode and theme selection.
 - Font size, radius, and scrollbar visibility.
 - Theme selection and scrollbar visibility persist to `target/state.json` (font size and radius are session-only).
@@ -102,6 +103,7 @@ The storybook window exposes theme and appearance controls:
 ## Localization
 
 `gpui-storybook` wires locale selection into es-fluent and gpui-component:
+
 - Implement `Language` with `strum::EnumIter` and `FluentDisplay`.
 - Call `gpui_storybook::init` once to register the locale manager.
 - Call `gpui_storybook::change_locale` after `init` (and whenever you switch languages).
@@ -109,6 +111,7 @@ The storybook window exposes theme and appearance controls:
 ## Assets
 
 `gpui_storybook::Assets` merges:
+
 - Local embedded assets from `crates/gpui-storybook-core/assets`.
 - `gpui-component` icon assets under the `icons/` prefix.
 
