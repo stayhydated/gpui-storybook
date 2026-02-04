@@ -1775,7 +1775,7 @@ dependencies = [
 [[package]]
 name = "es-fluent"
 version = "0.8.0"
-source = "git+https://github.com/stayhydated/es-fluent?branch=proper-locales#2fb7ee5ade55682b0e129893fbe1159ac189f307"
+source = "git+https://github.com/stayhydated/es-fluent#fc5b8bf718ce83d64386b53c4cf585924e3b445e"
 dependencies = [
  "arc-swap",
  "bon",
@@ -1794,7 +1794,7 @@ dependencies = [
 [[package]]
 name = "es-fluent-derive"
 version = "0.8.0"
-source = "git+https://github.com/stayhydated/es-fluent?branch=proper-locales#2fb7ee5ade55682b0e129893fbe1159ac189f307"
+source = "git+https://github.com/stayhydated/es-fluent#fc5b8bf718ce83d64386b53c4cf585924e3b445e"
 dependencies = [
  "darling",
  "es-fluent-derive-core",
@@ -1810,7 +1810,7 @@ dependencies = [
 [[package]]
 name = "es-fluent-derive-core"
 version = "0.8.0"
-source = "git+https://github.com/stayhydated/es-fluent?branch=proper-locales#2fb7ee5ade55682b0e129893fbe1159ac189f307"
+source = "git+https://github.com/stayhydated/es-fluent#fc5b8bf718ce83d64386b53c4cf585924e3b445e"
 dependencies = [
  "anyhow",
  "bon",
@@ -1835,7 +1835,7 @@ dependencies = [
 [[package]]
 name = "es-fluent-lang"
 version = "0.8.0"
-source = "git+https://github.com/stayhydated/es-fluent?branch=proper-locales#2fb7ee5ade55682b0e129893fbe1159ac189f307"
+source = "git+https://github.com/stayhydated/es-fluent#fc5b8bf718ce83d64386b53c4cf585924e3b445e"
 dependencies = [
  "es-fluent-lang-macro",
  "es-fluent-manager-core",
@@ -1849,7 +1849,7 @@ dependencies = [
 [[package]]
 name = "es-fluent-lang-macro"
 version = "0.8.0"
-source = "git+https://github.com/stayhydated/es-fluent?branch=proper-locales#2fb7ee5ade55682b0e129893fbe1159ac189f307"
+source = "git+https://github.com/stayhydated/es-fluent#fc5b8bf718ce83d64386b53c4cf585924e3b445e"
 dependencies = [
  "es-fluent-toml",
  "heck 0.5.0",
@@ -1863,7 +1863,7 @@ dependencies = [
 [[package]]
 name = "es-fluent-manager-core"
 version = "0.8.0"
-source = "git+https://github.com/stayhydated/es-fluent?branch=proper-locales#2fb7ee5ade55682b0e129893fbe1159ac189f307"
+source = "git+https://github.com/stayhydated/es-fluent#fc5b8bf718ce83d64386b53c4cf585924e3b445e"
 dependencies = [
  "anyhow",
  "es-fluent-derive-core",
@@ -1879,7 +1879,7 @@ dependencies = [
 [[package]]
 name = "es-fluent-manager-embedded"
 version = "0.8.0"
-source = "git+https://github.com/stayhydated/es-fluent?branch=proper-locales#2fb7ee5ade55682b0e129893fbe1159ac189f307"
+source = "git+https://github.com/stayhydated/es-fluent#fc5b8bf718ce83d64386b53c4cf585924e3b445e"
 dependencies = [
  "arc-swap",
  "es-fluent",
@@ -1892,7 +1892,7 @@ dependencies = [
 [[package]]
 name = "es-fluent-manager-macros"
 version = "0.8.0"
-source = "git+https://github.com/stayhydated/es-fluent?branch=proper-locales#2fb7ee5ade55682b0e129893fbe1159ac189f307"
+source = "git+https://github.com/stayhydated/es-fluent#fc5b8bf718ce83d64386b53c4cf585924e3b445e"
 dependencies = [
  "darling",
  "es-fluent-toml",
@@ -1905,7 +1905,7 @@ dependencies = [
 [[package]]
 name = "es-fluent-toml"
 version = "0.8.0"
-source = "git+https://github.com/stayhydated/es-fluent?branch=proper-locales#2fb7ee5ade55682b0e129893fbe1159ac189f307"
+source = "git+https://github.com/stayhydated/es-fluent#fc5b8bf718ce83d64386b53c4cf585924e3b445e"
 dependencies = [
  "serde",
  "thiserror 2.0.17",
