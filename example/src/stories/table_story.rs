@@ -47,7 +47,7 @@ static INCREMENT_ID: LazyLock<std::sync::Mutex<usize>> = LazyLock::new(|| std::s
 impl Counter {
     fn random() -> Self {
         let len = ALL_COUNTERS.len();
-        let ix = rand::random::<usize>() % len;
+        let ix = rand::random::<u32>() as usize % len;
         ALL_COUNTERS[ix].clone()
     }
 
