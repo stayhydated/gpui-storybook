@@ -6,7 +6,7 @@ license = "Unlicense"
 publish = false
 
 [dependencies]
-es-fluent = { features = [ "derive" ], workspace = true }
+es-fluent = { features = ["derive"], workspace = true }
 es-fluent-lang = { workspace = true }
 es-fluent-manager-embedded = { workspace = true }
 gpui = { workspace = true }
@@ -19,10 +19,13 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 fake = { workspace = true }
 rand = { workspace = true }
-tracing-subscriber = { features = [ "env-filter" ], workspace = true }
+tracing-subscriber = { features = ["env-filter"], workspace = true }
+
+[build-dependencies]
+es-fluent = { features = ["build"], workspace = true }
 
 [lints]
 workspace = true
 
 [package.metadata.cargo-machete]
-ignored = [ "rust-embed" ]
+ignored = ["rust-embed"]
