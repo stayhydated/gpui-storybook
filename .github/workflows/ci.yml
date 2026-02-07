@@ -84,10 +84,5 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: dtolnay/rust-toolchain@stable
-
-      - name: Install cargo-machete
-        run: cargo install --locked cargo-machete
-
-      - name: Run cargo-machete
-        run: cargo machete
+      - name: Machete
+        uses: bnjbvr/cargo-machete@main
