@@ -10,10 +10,11 @@ pub trait Language:
     + Send
     + Sync
     + IntoEnumIterator
-    + Into<LanguageIdentifier>
-    + for<'a> From<&'a LanguageIdentifier>
+    + TryInto<LanguageIdentifier>
+    + TryFrom<LanguageIdentifier>
     + FluentDisplay
     + Default
+    + std::fmt::Debug
 {
 }
 
@@ -24,10 +25,11 @@ impl<T> Language for T where
         + Send
         + Sync
         + IntoEnumIterator
-        + Into<LanguageIdentifier>
-        + for<'a> From<&'a LanguageIdentifier>
+        + TryInto<LanguageIdentifier>
+        + TryFrom<LanguageIdentifier>
         + FluentDisplay
         + Default
+        + std::fmt::Debug
 {
 }
 

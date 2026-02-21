@@ -26,16 +26,20 @@ impl<L: Language> LocaleManager<L> {
 impl<L: Language> LocaleStore for LocaleManager<L> {
     fn available_locales(&self) -> Vec<(String, LanguageIdentifier)> {
         L::iter()
-            .map(|l| (l.to_fluent_string(), l.into()))
+            .map(|l| (l.to_fluent_string(), l.try_into().ok().unwrap()))
             .collect()
     }
 
     fn current_locale(&self, cx: &App) -> LanguageIdentifier {
-        cx.global::<crate::language::CurrentLanguage<L>>().0.into()
+        cx.global::<crate::language::CurrentLanguage<L>>()
+            .0
+            .try_into()
+            .ok()
+            .unwrap()
     }
 
     fn set_current_locale(&self, locale: LanguageIdentifier, cx: &mut App) {
-        let new_lang = L::from(&locale);
+        let new_lang = L::try_from(locale.clone()).ok().unwrap();
         cx.set_global(crate::language::CurrentLanguage(new_lang));
         gpui_component::set_locale(&locale.to_string());
         crate::i18n::change_locale(locale);

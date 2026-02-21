@@ -17,7 +17,10 @@ pub use gpui_storybook_core::registry as __registry;
 #[doc(hidden)]
 pub use inventory as __inventory;
 
-pub fn init<L: Language>(language: L, cx: &mut ::gpui::App) {
+pub fn init<L>(language: L, cx: &mut ::gpui::App)
+where
+    L: Language,
+{
     cx.set_global(CurrentLanguage(language));
     cx.set_global(
         Box::new(gpui_storybook_core::locale::LocaleManager::<L>::new()) as Box<dyn LocaleStore>,
