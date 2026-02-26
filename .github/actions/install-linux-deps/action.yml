@@ -21,6 +21,10 @@ inputs:
     description: Install xkb-x11 (libxkbcommon-x11-dev)
     required: false
     default: "true"
+  libgtk_3_dev:
+    description: Install libgtk-3-dev (libgtk-3-dev)
+    required: false
+    default: "true"
 
 runs:
   using: composite
@@ -37,3 +41,4 @@ runs:
         ${{ fromJSON(inputs.wayland) && 'libwayland-dev' || '' }}
         ${{ fromJSON(inputs.xkb) && 'libxkbcommon-dev' || '' }}
         ${{ fromJSON(inputs.xkb_x11) && 'libxkbcommon-x11-dev' || '' }}
+        ${{ fromJSON(inputs.libgtk_3_dev) && 'libgtk-3-dev' || '' }}
