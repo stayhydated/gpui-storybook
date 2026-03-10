@@ -129,12 +129,12 @@ cargo run -p gpui-storybook-example
 
 ## Compatibility
 
-| `gpui-storybook` | `gpui-component` |
-| :--------------- | :--------------- |
+| `gpui-storybook` | `gpui-component` | `gpui` |
+| :--------------- | :--------------- | :--------------------------------------------- |
 | **git** | |
-| `master` | `main` |
+| `master` | `main` | rev `3da9adc4e7b5d65a7e07582a164b644a188fefd2` |
 | **crates.io** | |
-| `0.5.x` | `0.5.x` |
+| `0.5.x` | `0.5.x` | |
 
 ## Acknowledgements
 
