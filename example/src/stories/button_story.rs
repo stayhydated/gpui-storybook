@@ -1,19 +1,26 @@
 use gpui::{
-    App, AppContext as _, Axis, ClickEvent, Context, Entity, Focusable, InteractiveElement as _,
-    IntoElement, ParentElement as _, Render, Styled as _, Window, prelude::FluentBuilder as _, px,
+    Action, App, AppContext as _, Axis, ClickEvent, Context, Entity, Focusable, InteractiveElement,
+    IntoElement, ParentElement as _, Render, Styled as _, Window, prelude::FluentBuilder, px,
 };
 
-use crate::section::{ButtonAction, section};
+use crate::section::section;
 use gpui_component::{
-    ActiveTheme as _, Disableable as _, Icon, IconName, Selectable as _, Sizable as _, Theme,
+    ActiveTheme, Disableable as _, Icon, IconName, Selectable as _, Sizable as _, Theme,
     button::{Button, ButtonCustomVariant, ButtonGroup, ButtonVariants as _},
     checkbox::Checkbox,
-    h_flex, v_flex,
+    h_flex,
+    progress::ProgressCircle,
+    v_flex,
 };
+use serde::Deserialize;
 
-#[gpui_storybook::story_init]
-pub fn button_story_init(_cx: &mut App) {
-    println!("ButtonStory init function called!");
+#[derive(Action, Clone, Deserialize, Eq, PartialEq)]
+#[action(namespace = button_story, no_json)]
+enum ButtonAction {
+    Disabled,
+    Loading,
+    Selected,
+    Compact,
 }
 
 #[gpui_storybook::story(crate::StorySection::Buttons)]
@@ -77,8 +84,7 @@ impl Render for ButtonStory {
 
         let custom_variant = ButtonCustomVariant::new(cx)
             .color(cx.theme().magenta)
-            .foreground(cx.theme().primary_foreground)
-            .border(cx.theme().magenta)
+            .foreground(cx.theme().magenta)
             .hover(cx.theme().magenta.opacity(0.1))
             .active(cx.theme().magenta);
 
@@ -147,9 +153,19 @@ impl Render for ButtonStory {
                 section("Normal Button")
                     .max_w_lg()
                     .child(
+                        Button::new("button-0")
+                            .label("Default")
+                            .disabled(disabled)
+                            .selected(selected)
+                            .loading(loading)
+                            .when(compact, |this| this.compact())
+                            .on_click(Self::on_click)
+                            .on_hover(Self::on_hover),
+                    )
+                    .child(
                         Button::new("button-1")
                             .primary()
-                            .label("Primary Button")
+                            .label("Primary")
                             .disabled(disabled)
                             .selected(selected)
                             .loading(loading)
@@ -159,7 +175,8 @@ impl Render for ButtonStory {
                     )
                     .child(
                         Button::new("button-2")
-                            .label("Secondary Button")
+                            .secondary()
+                            .label("Secondary")
                             .disabled(disabled)
                             .selected(selected)
                             .loading(loading)
@@ -170,7 +187,7 @@ impl Render for ButtonStory {
                     .child(
                         Button::new("button-4")
                             .danger()
-                            .label("Danger Button")
+                            .label("Danger")
                             .disabled(disabled)
                             .selected(selected)
                             .loading(loading)
@@ -181,7 +198,7 @@ impl Render for ButtonStory {
                     .child(
                         Button::new("button-4-warning")
                             .warning()
-                            .label("Warning Button")
+                            .label("Warning")
                             .disabled(disabled)
                             .selected(selected)
                             .loading(loading)
@@ -192,7 +209,7 @@ impl Render for ButtonStory {
                     .child(
                         Button::new("button-4-success")
                             .success()
-                            .label("Success Button")
+                            .label("Success")
                             .disabled(disabled)
                             .selected(selected)
                             .loading(loading)
@@ -203,7 +220,7 @@ impl Render for ButtonStory {
                     .child(
                         Button::new("button-5-info")
                             .info()
-                            .label("Info Button")
+                            .label("Info")
                             .disabled(disabled)
                             .selected(selected)
                             .loading(loading)
@@ -214,7 +231,7 @@ impl Render for ButtonStory {
                     .child(
                         Button::new("button-5-ghost")
                             .ghost()
-                            .label("Ghost Button")
+                            .label("Ghost")
                             .disabled(disabled)
                             .selected(selected)
                             .loading(loading)
@@ -225,7 +242,7 @@ impl Render for ButtonStory {
                     .child(
                         Button::new("button-5-link")
                             .link()
-                            .label("Link Button")
+                            .label("Link")
                             .disabled(disabled)
                             .selected(selected)
                             .loading(loading)
@@ -236,7 +253,7 @@ impl Render for ButtonStory {
                     .child(
                         Button::new("button-5-text")
                             .text()
-                            .label("Text Button")
+                            .label("Text")
                             .disabled(disabled)
                             .selected(selected)
                             .loading(loading)
@@ -249,7 +266,7 @@ impl Render for ButtonStory {
                 section("Button with Icon")
                     .child(
                         Button::new("button-icon-1")
-                            .primary()
+                            .outline()
                             .label("Confirm")
                             .icon(IconName::Check)
                             .disabled(disabled)
@@ -260,6 +277,7 @@ impl Render for ButtonStory {
                     )
                     .child(
                         Button::new("button-icon-2")
+                            .outline()
                             .label("Abort")
                             .icon(IconName::Close)
                             .disabled(disabled)
@@ -270,6 +288,7 @@ impl Render for ButtonStory {
                     )
                     .child(
                         Button::new("button-icon-3")
+                            .outline()
                             .label("Maximize")
                             .icon(Icon::new(IconName::Maximize))
                             .disabled(disabled)
@@ -280,7 +299,6 @@ impl Render for ButtonStory {
                     )
                     .child(
                         Button::new("button-icon-4")
-                            .primary()
                             .child(
                                 h_flex()
                                     .items_center()
@@ -330,6 +348,40 @@ impl Render for ButtonStory {
                     ),
             )
             .child(
+                section("With Progress").child(
+                    h_flex()
+                        .gap_4()
+                        .child(
+                            Button::new("progress-button-1")
+                                .primary()
+                                .large()
+                                .icon(
+                                    ProgressCircle::new("circle-progress-1")
+                                        .color(cx.theme().primary_foreground)
+                                        .value(25.),
+                                )
+                                .label("Installing..."),
+                        )
+                        .child(
+                            Button::new("progress-button-2")
+                                .icon(ProgressCircle::new("circle-progress-2").value(35.))
+                                .label("Installing..."),
+                        )
+                        .child(
+                            Button::new("progress-button-3")
+                                .small()
+                                .icon(ProgressCircle::new("circle-progress-3").value(68.))
+                                .label("Installing..."),
+                        )
+                        .child(
+                            Button::new("progress-button-4")
+                                .xsmall()
+                                .icon(ProgressCircle::new("circle-progress-4").value(85.))
+                                .label("Installing..."),
+                        ),
+                ),
+            )
+            .child(
                 section("Outline Button")
                     .max_w_lg()
                     .child(
@@ -346,7 +398,7 @@ impl Render for ButtonStory {
                     .child(
                         Button::new("button-outline-2")
                             .outline()
-                            .label("Secondary Button")
+                            .label("Normal Button")
                             .disabled(disabled)
                             .selected(selected)
                             .loading(loading)
@@ -447,7 +499,17 @@ impl Render for ButtonStory {
                     )
                     .child(
                         Button::new("button-outline-2")
-                            .outline()
+                            .label("Default Button")
+                            .dropdown_caret(true)
+                            .disabled(disabled)
+                            .selected(selected)
+                            .loading(loading)
+                            .when(compact, |this| this.compact())
+                            .on_click(Self::on_click),
+                    )
+                    .child(
+                        Button::new("button-outline-2")
+                            .secondary()
                             .label("Secondary Button")
                             .dropdown_caret(true)
                             .disabled(disabled)

@@ -15,6 +15,7 @@ use gpui_component::{
 
 use crate::section::section;
 
+#[gpui_storybook::story(crate::StorySection::Tables)]
 pub struct TableStory {
     focus_handle: FocusHandle,
     size: Size,

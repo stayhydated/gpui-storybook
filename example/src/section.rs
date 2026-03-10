@@ -1,6 +1,6 @@
 use gpui::{
-    Action, AnyElement, App, Div, IntoElement, ParentElement, RenderOnce, SharedString,
-    StyleRefinement, Styled, Window, rems,
+    AnyElement, App, Div, IntoElement, ParentElement, RenderOnce, SharedString, StyleRefinement,
+    Styled, Window, rems,
 };
 
 use gpui_component::{
@@ -8,16 +8,6 @@ use gpui_component::{
     group_box::{GroupBox, GroupBoxVariants as _},
     h_flex,
 };
-use serde::Deserialize;
-
-#[derive(Action, Clone, Deserialize, Eq, PartialEq)]
-#[action(namespace = button_story, no_json)]
-pub enum ButtonAction {
-    Disabled,
-    Loading,
-    Selected,
-    Compact,
-}
 
 #[derive(IntoElement)]
 pub struct StorySection {
