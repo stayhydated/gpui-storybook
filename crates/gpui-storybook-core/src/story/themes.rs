@@ -25,6 +25,8 @@ impl Default for State {
 pub fn init(cx: &mut App) {
     let json = std::fs::read_to_string(STATE_FILE).unwrap_or_default();
     let state = serde_json::from_str::<State>(&json).unwrap_or_default();
+    let saved_theme = state.theme.clone();
+    let saved_theme_for_watch = saved_theme.clone();
 
     #[cfg(debug_assertions)]
     {
@@ -33,7 +35,7 @@ pub fn init(cx: &mut App) {
             && let Err(err) = ThemeRegistry::watch_dir(themes_dir, cx, move |cx| {
                 if let Some(theme) = ThemeRegistry::global(cx)
                     .themes()
-                    .get(&state.theme)
+                    .get(&saved_theme_for_watch)
                     .cloned()
                 {
                     Theme::global_mut(cx).apply_config(&theme);
@@ -42,6 +44,15 @@ pub fn init(cx: &mut App) {
         {
             eprintln!("Failed to watch themes directory: {}", err);
         }
+    }
+
+    // Restore the previously selected theme on startup.
+    if let Some(theme) = ThemeRegistry::global(cx)
+        .themes()
+        .get(&saved_theme)
+        .cloned()
+    {
+        Theme::global_mut(cx).apply_config(&theme);
     }
 
     if let Some(scrollbar_show) = state.scrollbar_show {
@@ -56,7 +67,11 @@ pub fn init(cx: &mut App) {
         };
 
         if let Ok(json) = serde_json::to_string_pretty(&snapshot) {
-            let _ = std::fs::write(STATE_FILE, json);
+            let state_path = std::path::Path::new(STATE_FILE);
+            if let Some(parent) = state_path.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            let _ = std::fs::write(state_path, json);
         }
     })
     .detach();
