@@ -1,8 +1,8 @@
 use crate::title_bar::AppTitleBar;
 use gpui::{
-    AnyView, App, AppContext as _, Bounds, Context, Entity, IntoElement, ParentElement as _,
-    Render, SharedString, Styled as _, Window, WindowBounds, WindowKind, WindowOptions, div, px,
-    size,
+    AnyView, App, AppContext as _, Bounds, Context, Entity, FocusHandle, Focusable,
+    InteractiveElement as _, IntoElement, ParentElement as _, Render, SharedString, Styled as _,
+    Window, WindowBounds, WindowKind, WindowOptions, div, px, size,
 };
 use gpui_component::{Root, TitleBar, v_flex};
 
@@ -41,6 +41,11 @@ where
                 let view = crate_view_fn(window, cx);
                 let root = cx.new(|cx| StoryRoot::new(title.clone(), view, window, cx));
 
+                let focus_handle = root.focus_handle(cx);
+                window.defer(cx, move |window, cx| {
+                    focus_handle.focus(window, cx);
+                });
+
                 cx.new(|cx| Root::new(root, window, cx))
             })
             .expect("failed to open window");
@@ -58,6 +63,7 @@ where
 }
 
 struct StoryRoot {
+    focus_handle: FocusHandle,
     title_bar: Entity<AppTitleBar>,
     view: AnyView,
 }
@@ -71,9 +77,16 @@ impl StoryRoot {
     ) -> Self {
         let title_bar = cx.new(|cx| AppTitleBar::new(title, window, cx));
         Self {
+            focus_handle: cx.focus_handle(),
             title_bar,
             view: view.into(),
         }
+    }
+}
+
+impl Focusable for StoryRoot {
+    fn focus_handle(&self, _: &App) -> FocusHandle {
+        self.focus_handle.clone()
     }
 }
 
@@ -83,16 +96,20 @@ impl Render for StoryRoot {
         let dialog_layer = Root::render_dialog_layer(window, cx);
         let notification_layer = Root::render_notification_layer(window, cx);
 
-        div()
-            .size_full()
-            .child(
-                v_flex()
-                    .size_full()
-                    .child(self.title_bar.clone())
-                    .child(div().flex_1().overflow_hidden().child(self.view.clone())),
-            )
-            .children(sheet_layer)
-            .children(dialog_layer)
-            .children(notification_layer)
+        div().id("story-root").size_full().child(
+            v_flex()
+                .size_full()
+                .child(self.title_bar.clone())
+                .child(
+                    div()
+                        .track_focus(&self.focus_handle)
+                        .flex_1()
+                        .overflow_hidden()
+                        .child(self.view.clone()),
+                )
+                .children(sheet_layer)
+                .children(dialog_layer)
+                .children(notification_layer),
+        )
     }
 }
