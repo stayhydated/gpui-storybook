@@ -16,7 +16,7 @@ struct State {
 impl Default for State {
     fn default() -> Self {
         Self {
-            theme: SharedString::from("Default Light"),
+            theme: SharedString::from("Default Dark"),
             scrollbar_show: None,
         }
     }
