@@ -132,7 +132,7 @@ cargo run -p gpui-storybook-example
 | `gpui-storybook` | `gpui-component` | `gpui` |
 | :--------------- | :--------------- | :--------------------------------------------- |
 | **git** | |
-| `master` | `main` | rev `3da9adc4e7b5d65a7e07582a164b644a188fefd2` |
+| `master` | `main` | rev `e0881e38f91b87623795208615ca466415d1970e` |
 | **crates.io** | |
 | `0.5.x` | `0.5.x` | |
 

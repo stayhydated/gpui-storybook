@@ -1,5 +1,5 @@
 [workspace]
-default-members = [ "example" ]
+default-members = ["example"]
 members = [
   "crates/gpui-storybook",
   "crates/gpui-storybook-core",
@@ -24,7 +24,7 @@ darling = "0.23"
 es-fluent = "0.14"
 es-fluent-lang = "0.14"
 es-fluent-manager-embedded = "0.14"
-gpui = { git = "https://github.com/zed-industries/zed", rev = "3da9adc4e7b5d65a7e07582a164b644a188fefd2" }
+gpui = { git = "https://github.com/zed-industries/zed", rev = "e0881e38f91b87623795208615ca466415d1970e" }
 gpui-component = { git = "https://github.com/longbridge/gpui-component" }
 gpui-component-assets = { git = "https://github.com/longbridge/gpui-component" }
 gpui-storybook = { path = "crates/gpui-storybook", version = "0.5.0" }
@@ -35,7 +35,7 @@ gpui_platform = { features = [
   "x11",
   "wayland",
   "runtime_shaders",
-], git = "https://github.com/zed-industries/zed", rev = "3da9adc4e7b5d65a7e07582a164b644a188fefd2" }
+], git = "https://github.com/zed-industries/zed", rev = "e0881e38f91b87623795208615ca466415d1970e" }
 heck = "0.5"
 insta = "1.46"
 inventory = "0.3"
@@ -43,7 +43,7 @@ itertools = "0.14"
 prettyplease = "0.2"
 proc-macro2 = "1.0"
 quote = "1.0"
-reqwest_client = { git = "https://github.com/zed-industries/zed", rev = "3da9adc4e7b5d65a7e07582a164b644a188fefd2" }
+reqwest_client = { git = "https://github.com/zed-industries/zed", rev = "e0881e38f91b87623795208615ca466415d1970e" }
 rust-embed = "8.11"
 serde = "1.0"
 serde_json = "1.0"
@@ -57,7 +57,7 @@ unic-langid = "0.9"
 unicode-segmentation = "1.12"
 
 [replace]
-"https://github.com/zed-industries/zed#gpui@0.2.2" = { git = "https://github.com/zed-industries/zed", rev = "3da9adc4e7b5d65a7e07582a164b644a188fefd2" }
+"https://github.com/zed-industries/zed#gpui@0.2.2" = { git = "https://github.com/zed-industries/zed", rev = "e0881e38f91b87623795208615ca466415d1970e" }
 
 [workspace.lints.rust]
 unexpected_cfgs = { level = "deny" }
