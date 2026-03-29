@@ -14,7 +14,7 @@ use gpui_component::{
     ActiveTheme as _, IconName, Root, Sizable as _, TitleBar,
     button::{Button, ButtonVariants as _},
     dock::{
-        ClosePanel, DockArea, DockAreaState, DockEvent, DockItem, DockPlacement, Panel,
+        AnyDrag, ClosePanel, DockArea, DockAreaState, DockEvent, DockItem, DockPlacement, Panel,
         PanelControl, PanelEvent, PanelInfo, ToggleZoom, register_panel,
     },
     input::{Input, InputEvent, InputState},
@@ -48,6 +48,11 @@ const STATE_FILE: &str = "storybook-docks.json";
 struct DockAreaTab {
     id: &'static str,
     version: usize,
+}
+
+#[derive(Clone)]
+struct DragStory {
+    story_klass: SharedString,
 }
 
 fn value_contains_story_klass(value: &serde_json::Value, story_klass: &str) -> bool {
@@ -161,6 +166,33 @@ impl StorySidebar {
             }
         }
     }
+
+    fn open_story_by_klass(
+        dock_area: gpui::WeakEntity<DockArea>,
+        story_klass: SharedString,
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        if let Some(story) = inventory::iter::<StoryEntry>()
+            .find(|entry| entry.name == story_klass.as_ref())
+            .map(|entry| {
+                let panel = (entry.create_fn)(window, cx);
+                if let Some(section) = entry.section {
+                    panel.update(cx, |c, _| {
+                        c.section = Some(section.into());
+                    });
+                }
+                panel
+            })
+        {
+            Self::open_story(
+                dock_area,
+                story.into(),
+                window,
+                cx,
+            );
+        }
+    }
 }
 
 impl Panel for StorySidebar {
@@ -260,6 +292,11 @@ impl Render for StorySidebar {
                                 };
 
                                 let story_for_click = story_entity.clone();
+                                let story_klass_for_drag = story_entity
+                                    .read(cx)
+                                    .story_klass
+                                    .clone()
+                                    .unwrap_or_default();
 
                                 let dock_area_for_click = self.dock_area.clone();
                                 SidebarMenuItem::new(name).on_click(cx.listener(
@@ -276,6 +313,9 @@ impl Render for StorySidebar {
                                         });
                                     },
                                 ))
+                                .drag_data(DragStory {
+                                    story_klass: story_klass_for_drag.clone(),
+                                })
                             })
                             .collect();
 
@@ -321,7 +361,22 @@ impl StoryWorkspace {
             window,
             |this, dock_area, ev: &DockEvent, window, cx| match ev {
                 DockEvent::LayoutChanged => this.save_layout(dock_area, window, cx),
-                _ => {},
+                DockEvent::DragDrop(item) => {
+                    let any_drag: &AnyDrag = item;
+                    if let Some(drag_story) = any_drag
+                        .value
+                        .as_ref()
+                        .downcast_ref::<DragStory>()
+                        .cloned()
+                    {
+                        StorySidebar::open_story_by_klass(
+                            dock_area.downgrade(),
+                            drag_story.story_klass,
+                            window,
+                            cx,
+                        );
+                    }
+                }
             },
         )
         .detach();
