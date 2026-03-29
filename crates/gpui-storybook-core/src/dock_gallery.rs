@@ -50,6 +50,29 @@ struct DockAreaTab {
     version: usize,
 }
 
+fn value_contains_story_klass(value: &serde_json::Value, story_klass: &str) -> bool {
+    match value {
+        serde_json::Value::Object(map) => {
+            map.get("story_klass")
+                .and_then(serde_json::Value::as_str)
+                .is_some_and(|klass| klass == story_klass)
+                || map
+                    .values()
+                    .any(|child| value_contains_story_klass(child, story_klass))
+        }
+        serde_json::Value::Array(items) => items
+            .iter()
+            .any(|item| value_contains_story_klass(item, story_klass)),
+        _ => false,
+    }
+}
+
+fn layout_contains_story_klass(layout: &DockAreaState, story_klass: &str) -> bool {
+    serde_json::to_value(layout)
+        .map(|value| value_contains_story_klass(&value, story_klass))
+        .unwrap_or(false)
+}
+
 /// Sidebar panel for navigating stories
 pub struct StorySidebar {
     focus_handle: FocusHandle,
@@ -88,8 +111,13 @@ impl StorySidebar {
     }
 
     /// Open a story panel - creates a new panel instance in the center dock.
-    fn open_story(&self, story: &Entity<StoryContainer>, window: &mut Window, cx: &mut App) {
-        let Some(dock_area) = self.dock_area.upgrade() else {
+    fn open_story(
+        dock_area: gpui::WeakEntity<DockArea>,
+        story: Entity<StoryContainer>,
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        let Some(dock_area) = dock_area.upgrade() else {
             return;
         };
 
@@ -97,10 +125,16 @@ impl StorySidebar {
         let Some(story_klass) = story_data.story_klass.clone() else {
             return;
         };
+        let story_klass_str = story_klass.as_ref();
+
+        let layout = dock_area.read(cx).dump(cx);
+        if layout_contains_story_klass(&layout, story_klass_str) {
+            return;
+        }
 
         // Create a new panel instance
         for entry in inventory::iter::<StoryEntry>() {
-            if entry.name == story_klass.as_ref() {
+            if entry.name == story_klass_str {
                 let new_panel = (entry.create_fn)(window, cx);
                 if let Some(section) = entry.section {
                     new_panel.update(cx, |c, _| {
@@ -220,9 +254,19 @@ impl Render for StorySidebar {
 
                                 let story_for_click = story_entity.clone();
 
+                                let dock_area_for_click = self.dock_area.clone();
                                 SidebarMenuItem::new(name).on_click(cx.listener(
-                                    move |this, _: &ClickEvent, window, cx| {
-                                        this.open_story(&story_for_click, window, cx);
+                                    move |_, _: &ClickEvent, window, cx| {
+                                        let dock_area_for_open = dock_area_for_click.clone();
+                                        let story_for_open = story_for_click.clone();
+                                        window.defer(cx, move |window, cx| {
+                                            Self::open_story(
+                                                dock_area_for_open.clone(),
+                                                story_for_open.clone(),
+                                                window,
+                                                cx,
+                                            );
+                                        });
                                     },
                                 ))
                             })
@@ -463,6 +507,15 @@ impl StoryWorkspace {
     ) {
         // Get available stories from the registry
         let entries: Vec<_> = inventory::iter::<StoryEntry>().collect();
+        if entries.is_empty() {
+            return;
+        }
+
+        let layout = self.dock_area.read(cx).dump(cx);
+        let entries: Vec<_> = entries
+            .into_iter()
+            .filter(|entry| !layout_contains_story_klass(&layout, entry.name))
+            .collect();
         if entries.is_empty() {
             return;
         }
