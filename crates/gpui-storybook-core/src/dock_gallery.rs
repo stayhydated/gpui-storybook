@@ -127,8 +127,15 @@ impl StorySidebar {
         };
         let story_klass_str = story_klass.as_ref();
 
-        let layout = dock_area.read(cx).dump(cx);
-        if layout_contains_story_klass(&layout, story_klass_str) {
+        if dock_area.update(cx, |dock_area, cx| {
+            dock_area.activate_panel_where(window, cx, |panel_state| {
+                panel_state.panel_name == "StoryContainer"
+                    && matches!(
+                        &panel_state.info,
+                        PanelInfo::Panel(value) if value_contains_story_klass(value, story_klass_str)
+                    )
+            })
+        }) {
             return;
         }
 
