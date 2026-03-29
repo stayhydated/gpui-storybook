@@ -48,12 +48,19 @@ impl Gallery {
                         .stories
                         .iter()
                         .filter(|story| {
-                            let title = if let Some(title_fn) = &story.read(cx_window).title_fn {
+                            let story_data = story.read(cx_window);
+                            let title = if let Some(title_fn) = &story_data.title_fn {
                                 title_fn()
                             } else {
-                                story.read(cx_window).name.to_string()
+                                story_data.name.to_string()
                             };
+                            let section = story_data
+                                .section
+                                .as_ref()
+                                .map(|s| s.to_string())
+                                .unwrap_or_default();
                             title.to_lowercase().contains(&query)
+                                || section.to_lowercase().contains(&query)
                         })
                         .cloned()
                         .collect();
@@ -126,12 +133,18 @@ impl Render for Gallery {
             .stories
             .iter()
             .filter(|story| {
-                let title = if let Some(title_fn) = &story.read(cx).title_fn {
+                let story_data = story.read(cx);
+                let title = if let Some(title_fn) = &story_data.title_fn {
                     title_fn()
                 } else {
-                    story.read(cx).name.to_string()
+                    story_data.name.to_string()
                 };
-                title.to_lowercase().contains(&query)
+                let section = story_data
+                    .section
+                    .as_ref()
+                    .map(|s| s.to_string())
+                    .unwrap_or_default();
+                title.to_lowercase().contains(&query) || section.to_lowercase().contains(&query)
             })
             .cloned()
             .collect();
