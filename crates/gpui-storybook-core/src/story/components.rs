@@ -1,13 +1,15 @@
 use gpui::{
-    AnyElement, AnyView, App, AppContext as _, Div, Entity, EventEmitter, Focusable, Hsla,
-    InteractiveElement as _, IntoElement, ParentElement, Render, RenderOnce, SharedString,
+    AnyElement, AnyView, App, AppContext as _, ClickEvent, Div, Entity, EventEmitter, Focusable,
+    Hsla, InteractiveElement as _, IntoElement, ParentElement, Render, RenderOnce, SharedString,
     StyleRefinement, Styled, Window, actions, div, prelude::FluentBuilder as _, rems,
 };
 
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 use gpui_component::{
-    ActiveTheme as _,
+    ActiveTheme as _, IconName, Sizable as _,
+    button::{Button, ButtonVariants as _},
     dock::{Panel, PanelControl, PanelEvent, PanelInfo, PanelState, TitleStyle},
     group_box::{GroupBox, GroupBoxVariants as _},
     h_flex,
@@ -116,9 +118,11 @@ pub struct StoryContainer {
     pub description: SharedString,
     width: Option<gpui::Pixels>,
     height: Option<gpui::Pixels>,
+    tab_panel: Option<gpui::WeakEntity<gpui_component::dock::TabPanel>>,
     story: Option<AnyView>,
-    story_klass: Option<SharedString>,
+    pub story_klass: Option<SharedString>,
     closable: bool,
+    is_active: bool,
     zoomable: Option<PanelControl>,
     on_active: Option<fn(AnyView, bool, &mut Window, &mut App)>,
     pub title_fn: Option<Box<dyn Fn() -> String>>,
@@ -181,9 +185,11 @@ impl StoryContainer {
             description: "".into(),
             width: None,
             height: None,
+            tab_panel: None,
             story: None,
             story_klass: None,
             closable: true,
+            is_active: false,
             zoomable: Some(PanelControl::default()),
             on_active: None,
             title_fn: None,
@@ -265,11 +271,45 @@ impl Panel for StoryContainer {
     }
 
     fn title(&mut self, _window: &mut Window, _cx: &mut gpui::Context<Self>) -> impl IntoElement {
-        if let Some(title_fn) = &self.title_fn {
+        let tab_panel = self.tab_panel.clone();
+        let story_panel = _cx.entity().downgrade();
+        let title = if let Some(title_fn) = &self.title_fn {
             title_fn().into_any_element()
         } else {
             self.name.clone().into_any_element()
-        }
+        };
+
+        h_flex()
+            .items_center()
+            .gap_1()
+            .child(title)
+            .when(self.closable && self.is_active, |this| {
+                this.child(
+                    Button::new(format!(
+                        "close-story-tab-{}",
+                        self.story_klass.clone().unwrap_or_default()
+                    ))
+                    .icon(IconName::Close)
+                    .xsmall()
+                    .ghost()
+                    .tab_stop(false)
+                    .on_click(
+                        move |_: &ClickEvent, window: &mut Window, cx: &mut App| {
+                            cx.stop_propagation();
+                            let Some(tab_panel) = tab_panel.clone().and_then(|tab| tab.upgrade())
+                            else {
+                                return;
+                            };
+                            let Some(story_panel) = story_panel.upgrade() else {
+                                return;
+                            };
+                            tab_panel.update(cx, |tab_panel, cx| {
+                                tab_panel.remove_panel(Arc::new(story_panel.clone()), window, cx);
+                            });
+                        },
+                    ),
+                )
+            })
     }
 
     fn title_style(&self, cx: &App) -> Option<TitleStyle> {
@@ -300,11 +340,26 @@ impl Panel for StoryContainer {
 
     fn set_active(&mut self, active: bool, _window: &mut Window, cx: &mut gpui::Context<Self>) {
         println!("panel: {} active: {}", self.name, active);
+        self.is_active = active;
         if let Some(on_active) = self.on_active
             && let Some(story) = self.story.clone()
         {
             on_active(story, active, _window, cx);
         }
+    }
+
+    fn on_added_to(
+        &mut self,
+        tab_panel: gpui::WeakEntity<gpui_component::dock::TabPanel>,
+        _window: &mut Window,
+        _cx: &mut gpui::Context<Self>,
+    ) {
+        self.tab_panel = Some(tab_panel);
+    }
+
+    fn on_removed(&mut self, _window: &mut Window, _cx: &mut gpui::Context<Self>) {
+        self.tab_panel = None;
+        self.is_active = false;
     }
 
     fn dropdown_menu(

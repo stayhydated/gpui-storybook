@@ -59,10 +59,6 @@ impl gpui_storybook::Story for ButtonStory {
         "Button".into()
     }
 
-    fn closable() -> bool {
-        false
-    }
-
     fn new_view(window: &mut Window, cx: &mut App) -> Entity<impl Render + Focusable> {
         Self::view(window, cx)
     }

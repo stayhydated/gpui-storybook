@@ -1,41 +1,20 @@
-use crate::title_bar::AppTitleBar;
+use crate::{title_bar::AppTitleBar, window_options::default_storybook_window_options};
 use gpui::{
-    AnyView, App, AppContext as _, Bounds, Context, Entity, FocusHandle, Focusable,
+    AnyView, App, AppContext as _, Context, Entity, FocusHandle, Focusable,
     InteractiveElement as _, IntoElement, ParentElement as _, Render, SharedString, Styled as _,
-    Window, WindowBounds, WindowKind, WindowOptions, div, px, size,
+    Window, div,
 };
-use gpui_component::{Root, TitleBar, v_flex};
+use gpui_component::{Root, v_flex};
 
 pub fn create_new_window<F, E>(title: &str, crate_view_fn: F, cx: &mut App)
 where
     E: Into<AnyView>,
     F: FnOnce(&mut Window, &mut App) -> E + Send + 'static,
 {
-    let mut window_size = size(px(1600.0), px(1200.0));
-    if let Some(display) = cx.primary_display() {
-        let display_size = display.bounds().size;
-        window_size.width = window_size.width.min(display_size.width * 0.85);
-        window_size.height = window_size.height.min(display_size.height * 0.85);
-    }
-    let window_bounds = Bounds::centered(None, window_size, cx);
+    let options = default_storybook_window_options(cx);
     let title = SharedString::from(title.to_string());
 
     cx.spawn(async move |cx| {
-        let options = WindowOptions {
-            window_bounds: Some(WindowBounds::Windowed(window_bounds)),
-            titlebar: Some(TitleBar::title_bar_options()),
-            window_min_size: Some(gpui::Size {
-                width: px(640.),
-                height: px(480.),
-            }),
-            kind: WindowKind::Normal,
-            #[cfg(target_os = "linux")]
-            window_background: gpui::WindowBackgroundAppearance::Transparent,
-            #[cfg(target_os = "linux")]
-            window_decorations: Some(gpui::WindowDecorations::Client),
-            ..Default::default()
-        };
-
         let window = cx
             .open_window(options, |window, cx| {
                 let view = crate_view_fn(window, cx);

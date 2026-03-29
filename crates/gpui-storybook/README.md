@@ -21,6 +21,14 @@ Disable default features if you want the runtime without macros:
 gpui-storybook = { version = "0.5", default-features = false }
 ```
 
+`create_dock_window` / `StoryWorkspace` are exposed by the `dock` feature (enabled by default).
+To use runtime + dock but no macros:
+
+```toml
+[dependencies]
+gpui-storybook = { version = "0.5", default-features = false, features = ["dock"] }
+```
+
 ## Usage
 
 ```rust
