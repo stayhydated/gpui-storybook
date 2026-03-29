@@ -1,6 +1,7 @@
 pub mod actions;
 pub mod app_menus;
 pub mod assets;
+pub mod dock_gallery;
 pub mod gallery;
 pub mod i18n;
 pub mod language;

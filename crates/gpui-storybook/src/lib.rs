@@ -5,6 +5,7 @@ use gpui_storybook_core::locale::LocaleStore;
 
 pub use gpui_storybook_core::{
     assets::Assets,
+    dock_gallery::{StoryWorkspace, create_dock_window, register_story_panels},
     gallery::Gallery,
     i18n::change_locale,
     language::{CurrentLanguage, Language},
@@ -26,6 +27,7 @@ where
         Box::new(gpui_storybook_core::locale::LocaleManager::<L>::new()) as Box<dyn LocaleStore>,
     );
     gpui_storybook_core::story::init(cx);
+    register_story_panels(cx);
 
     let global_init_count = inventory::iter::<__registry::InitEntry>().count();
     if global_init_count > 0 {
