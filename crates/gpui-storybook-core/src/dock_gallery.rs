@@ -1,43 +1,32 @@
 use crate::{
     registry::StoryEntry,
-    story::{AppState, StoryContainer, StoryState},
+    story::{StoryContainer, StoryState},
     title_bar::AppTitleBar,
 };
 use anyhow::{Context as _, Result};
 use gpui::{
-    App, AppContext as _, Bounds, ClickEvent, Context, Corner, Edges, Entity, EventEmitter,
-    FocusHandle, Focusable, InteractiveElement as _, IntoElement, ParentElement as _, Render,
-    SharedString, Styled as _, Subscription, Task, Window, WindowBounds, WindowKind, WindowOptions,
-    actions, div, px, relative, size,
+    App, AppContext as _, Bounds, ClickEvent, Context, Edges, Entity, EventEmitter, FocusHandle,
+    Focusable, InteractiveElement as _, IntoElement, ParentElement as _, Render, SharedString,
+    Styled as _, Subscription, Task, Window, WindowBounds, WindowKind, WindowOptions, actions, div,
+    px, relative, size,
 };
 use gpui_component::{
-    ActiveTheme as _, IconName, Root, Sizable as _, TitleBar,
-    button::{Button, ButtonVariants as _},
+    ActiveTheme as _, Root, TitleBar,
     dock::{
         AnyDrag, ClosePanel, DockArea, DockAreaState, DockEvent, DockItem, DockPlacement, Panel,
-        PanelControl, PanelEvent, PanelInfo, ToggleZoom, register_panel,
+        PanelControl, PanelEvent, PanelInfo, PanelView, ToggleZoom, register_panel,
     },
     input::{Input, InputEvent, InputState},
-    menu::DropdownMenu,
     sidebar::{Sidebar, SidebarGroup, SidebarMenu, SidebarMenuItem},
     v_flex,
 };
-use serde::Deserialize;
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
-
-#[derive(gpui::Action, Clone, PartialEq, Eq, Deserialize)]
-#[action(namespace = story, no_json)]
-pub struct AddPanel(DockPlacement);
-
-#[derive(gpui::Action, Clone, PartialEq, Eq, Deserialize)]
-#[action(namespace = story, no_json)]
-pub struct TogglePanelVisible(SharedString);
 
 actions!(story, [ToggleDockToggleButton, ResetLayout, ToggleSidebar]);
 
 const MAIN_DOCK_AREA: DockAreaTab = DockAreaTab {
     id: "storybook-main-dock",
-    version: 4, // Bumped version for draggable/droppable center layout
+    version: 5, // Bumped version to remove sidebar tab title row
 };
 
 #[cfg(debug_assertions)]
@@ -64,18 +53,12 @@ fn value_contains_story_klass(value: &serde_json::Value, story_klass: &str) -> b
                 || map
                     .values()
                     .any(|child| value_contains_story_klass(child, story_klass))
-        }
+        },
         serde_json::Value::Array(items) => items
             .iter()
             .any(|item| value_contains_story_klass(item, story_klass)),
         _ => false,
     }
-}
-
-fn layout_contains_story_klass(layout: &DockAreaState, story_klass: &str) -> bool {
-    serde_json::to_value(layout)
-        .map(|value| value_contains_story_klass(&value, story_klass))
-        .unwrap_or(false)
 }
 
 /// Sidebar panel for navigating stories
@@ -185,12 +168,7 @@ impl StorySidebar {
                 panel
             })
         {
-            Self::open_story(
-                dock_area,
-                story.into(),
-                window,
-                cx,
-            );
+            Self::open_story(dock_area, story.into(), window, cx);
         }
     }
 }
@@ -299,8 +277,8 @@ impl Render for StorySidebar {
                                     .unwrap_or_default();
 
                                 let dock_area_for_click = self.dock_area.clone();
-                                SidebarMenuItem::new(name).on_click(cx.listener(
-                                    move |_, _: &ClickEvent, window, cx| {
+                                SidebarMenuItem::new(name)
+                                    .on_click(cx.listener(move |_, _: &ClickEvent, window, cx| {
                                         let dock_area_for_open = dock_area_for_click.clone();
                                         let story_for_open = story_for_click.clone();
                                         window.defer(cx, move |window, cx| {
@@ -311,11 +289,10 @@ impl Render for StorySidebar {
                                                 cx,
                                             );
                                         });
-                                    },
-                                ))
-                                .drag_data(DragStory {
-                                    story_klass: story_klass_for_drag.clone(),
-                                })
+                                    }))
+                                    .drag_data(DragStory {
+                                        story_klass: story_klass_for_drag.clone(),
+                                    })
                             })
                             .collect();
 
@@ -363,11 +340,8 @@ impl StoryWorkspace {
                 DockEvent::LayoutChanged => this.save_layout(dock_area, window, cx),
                 DockEvent::DragDrop(item) => {
                     let any_drag: &AnyDrag = item;
-                    if let Some(drag_story) = any_drag
-                        .value
-                        .as_ref()
-                        .downcast_ref::<DragStory>()
-                        .cloned()
+                    if let Some(drag_story) =
+                        any_drag.value.as_ref().downcast_ref::<DragStory>().cloned()
                     {
                         StorySidebar::open_story_by_klass(
                             dock_area.downgrade(),
@@ -376,7 +350,7 @@ impl StoryWorkspace {
                             cx,
                         );
                     }
-                }
+                },
             },
         )
         .detach();
@@ -392,43 +366,7 @@ impl StoryWorkspace {
         })
         .detach();
 
-        let title_bar = cx.new(|cx| {
-            AppTitleBar::new("Storybook", window, cx).child({
-                move |_, cx| {
-                    Button::new("add-panel")
-                        .icon(IconName::LayoutDashboard)
-                        .small()
-                        .ghost()
-                        .dropdown_menu({
-                            let _invisible_panels = AppState::global(cx).invisible_panels.clone();
-
-                            move |menu, _, _cx| {
-                                menu.menu(
-                                    "Add Panel to Center",
-                                    Box::new(AddPanel(DockPlacement::Center)),
-                                )
-                                .separator()
-                                .menu("Add Panel to Left", Box::new(AddPanel(DockPlacement::Left)))
-                                .menu(
-                                    "Add Panel to Right",
-                                    Box::new(AddPanel(DockPlacement::Right)),
-                                )
-                                .menu(
-                                    "Add Panel to Bottom",
-                                    Box::new(AddPanel(DockPlacement::Bottom)),
-                                )
-                                .separator()
-                                .menu("Reset Layout", Box::new(ResetLayout))
-                                .menu(
-                                    "Toggle Dock Button Visibility",
-                                    Box::new(ToggleDockToggleButton),
-                                )
-                            }
-                        })
-                        .anchor(Corner::TopRight)
-                }
-            })
-        });
+        let title_bar = cx.new(|cx| AppTitleBar::new("Storybook", window, cx));
 
         Self {
             dock_area,
@@ -536,10 +474,11 @@ impl StoryWorkspace {
         window: &mut Window,
         cx: &mut App,
     ) -> DockItem {
-        let sidebar =
-            cx.new(|cx| StorySidebar::new(stories.to_vec(), dock_area.clone(), window, cx));
+        let sidebar: Arc<dyn PanelView> = Arc::new(
+            cx.new(|cx| StorySidebar::new(stories.to_vec(), dock_area.clone(), window, cx)),
+        );
 
-        DockItem::tab(sidebar, dock_area, window, cx)
+        DockItem::panel(sidebar)
     }
 
     fn build_center_layout(
@@ -550,7 +489,12 @@ impl StoryWorkspace {
     ) -> DockItem {
         // Wrap center tabs in a split so TabPanel gets a parent StackPanel.
         // This enables tab drag/drop and split indicators.
-        DockItem::v_split(vec![DockItem::tabs(vec![], dock_area, window, cx)], dock_area, window, cx)
+        DockItem::v_split(
+            vec![DockItem::tabs(vec![], dock_area, window, cx)],
+            dock_area,
+            window,
+            cx,
+        )
     }
 
     pub fn view(
@@ -559,60 +503,6 @@ impl StoryWorkspace {
         cx: &mut App,
     ) -> Entity<Self> {
         cx.new(|cx| Self::new(stories, window, cx))
-    }
-
-    fn on_action_add_panel(
-        &mut self,
-        action: &AddPanel,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        // Get available stories from the registry
-        let entries: Vec<_> = inventory::iter::<StoryEntry>().collect();
-        if entries.is_empty() {
-            return;
-        }
-
-        let layout = self.dock_area.read(cx).dump(cx);
-        let entries: Vec<_> = entries
-            .into_iter()
-            .filter(|entry| !layout_contains_story_klass(&layout, entry.name))
-            .collect();
-        if entries.is_empty() {
-            return;
-        }
-
-        // Pick a story to add (use time-based pseudo-random)
-        let idx = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_nanos() as usize)
-            .unwrap_or(0)
-            % entries.len();
-        let entry = entries[idx];
-        let panel = (entry.create_fn)(window, cx);
-
-        self.dock_area.update(cx, |dock_area, cx| {
-            dock_area.add_panel(Arc::new(panel), action.0, None, window, cx);
-        });
-    }
-
-    fn on_action_toggle_panel_visible(
-        &mut self,
-        action: &TogglePanelVisible,
-        _: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        let panel_name = action.0.clone();
-        let invisible_panels = AppState::global(cx).invisible_panels.clone();
-        invisible_panels.update(cx, |names, cx| {
-            if names.contains(&panel_name) {
-                names.retain(|id| id != &panel_name);
-            } else {
-                names.push(panel_name);
-            }
-            cx.notify();
-        });
-        cx.notify();
     }
 
     fn on_action_toggle_dock_toggle_button(
@@ -657,8 +547,6 @@ impl Render for StoryWorkspace {
 
         div()
             .id("story-workspace")
-            .on_action(cx.listener(Self::on_action_add_panel))
-            .on_action(cx.listener(Self::on_action_toggle_panel_visible))
             .on_action(cx.listener(Self::on_action_toggle_dock_toggle_button))
             .on_action(cx.listener(Self::on_action_reset_layout))
             .relative()
