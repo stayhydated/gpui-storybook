@@ -2,16 +2,16 @@ use crate::{
     registry::StoryEntry,
     story::{StoryContainer, StoryState},
     title_bar::AppTitleBar,
+    window_options::default_storybook_window_options,
 };
 use anyhow::{Context as _, Result};
 use gpui::{
-    App, AppContext as _, Bounds, ClickEvent, Context, Edges, Entity, EventEmitter, FocusHandle,
-    Focusable, InteractiveElement as _, IntoElement, ParentElement as _, Render, SharedString,
-    Styled as _, Subscription, Task, Window, WindowBounds, WindowKind, WindowOptions, actions, div,
-    px, relative, size,
+    App, AppContext as _, ClickEvent, Context, Edges, Entity, EventEmitter, FocusHandle, Focusable,
+    InteractiveElement as _, IntoElement, ParentElement as _, Render, SharedString, Styled as _,
+    Subscription, Task, Window, actions, div, px, relative,
 };
 use gpui_component::{
-    ActiveTheme as _, Root, TitleBar,
+    ActiveTheme as _, Root,
     dock::{
         AnyDrag, ClosePanel, DockArea, DockAreaState, DockEvent, DockItem, DockPlacement, Panel,
         PanelControl, PanelEvent, PanelInfo, PanelView, ToggleZoom, register_panel,
@@ -81,6 +81,7 @@ impl StorySidebar {
             cx.new(|cx_input| InputState::new(window, cx_input).placeholder("Search..."));
 
         let subscriptions = vec![
+            #[allow(clippy::single_match)]
             cx.subscribe(&search_input, |_this, _, event, cx| match event {
                 InputEvent::Change => {
                     cx.notify();
@@ -130,12 +131,7 @@ impl StorySidebar {
         // Create a new panel instance
         for entry in inventory::iter::<StoryEntry>() {
             if entry.name == story_klass_str {
-                let new_panel = (entry.create_fn)(window, cx);
-                if let Some(section) = entry.section {
-                    new_panel.update(cx, |c, _| {
-                        c.section = Some(section.into());
-                    });
-                }
+                let new_panel = Self::create_story_from_entry(entry, window, cx);
                 dock_area.update(cx, |dock_area, cx| {
                     dock_area.add_panel(
                         Arc::new(new_panel),
@@ -150,25 +146,38 @@ impl StorySidebar {
         }
     }
 
+    fn create_story_from_entry(
+        entry: &StoryEntry,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Entity<StoryContainer> {
+        let panel = (entry.create_fn)(window, cx);
+        if let Some(section) = entry.section {
+            panel.update(cx, |c, _| {
+                c.section = Some(section.into());
+            });
+        }
+        panel
+    }
+
+    fn create_story_by_klass(
+        story_klass: &str,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Option<Entity<StoryContainer>> {
+        inventory::iter::<StoryEntry>()
+            .find(|entry| entry.name == story_klass)
+            .map(|entry| Self::create_story_from_entry(entry, window, cx))
+    }
+
     fn open_story_by_klass(
         dock_area: gpui::WeakEntity<DockArea>,
         story_klass: SharedString,
         window: &mut Window,
         cx: &mut App,
     ) {
-        if let Some(story) = inventory::iter::<StoryEntry>()
-            .find(|entry| entry.name == story_klass.as_ref())
-            .map(|entry| {
-                let panel = (entry.create_fn)(window, cx);
-                if let Some(section) = entry.section {
-                    panel.update(cx, |c, _| {
-                        c.section = Some(section.into());
-                    });
-                }
-                panel
-            })
-        {
-            Self::open_story(dock_area, story.into(), window, cx);
+        if let Some(story) = Self::create_story_by_klass(story_klass.as_ref(), window, cx) {
+            Self::open_story(dock_area, story, window, cx);
         }
     }
 }
@@ -576,21 +585,13 @@ pub fn register_story_panels(cx: &mut App) {
 
             if let Some(story_state) =
                 panel_value.and_then(|v| serde_json::from_value::<StoryState>(v).ok())
+                && let Some(container) = StorySidebar::create_story_by_klass(
+                    story_state.story_klass.as_ref(),
+                    window,
+                    cx,
+                )
             {
-                let story_klass = &story_state.story_klass;
-
-                // Find the story entry that matches the saved class
-                for entry in inventory::iter::<StoryEntry>() {
-                    if entry.name == story_klass.as_ref() {
-                        let container = (entry.create_fn)(window, cx);
-                        if let Some(section) = entry.section {
-                            container.update(cx, |c, _| {
-                                c.section = Some(section.into());
-                            });
-                        }
-                        return Box::new(container);
-                    }
-                }
+                return Box::new(container);
             }
 
             // Fallback: create an empty container with the panel name
@@ -611,15 +612,7 @@ pub fn register_story_panels(cx: &mut App) {
             let entries: Vec<_> = inventory::iter::<StoryEntry>().collect();
             let stories: Vec<Entity<StoryContainer>> = entries
                 .iter()
-                .map(|entry| {
-                    let container = (entry.create_fn)(window, cx);
-                    if let Some(section) = entry.section {
-                        container.update(cx, |c, _| {
-                            c.section = Some(section.into());
-                        });
-                    }
-                    container
-                })
+                .map(|entry| StorySidebar::create_story_from_entry(entry, window, cx))
                 .collect();
 
             Box::new(cx.new(|cx| StorySidebar::new(stories, dock_area, window, cx)))
@@ -633,13 +626,7 @@ where
     E: Into<gpui::AnyView>,
     F: FnOnce(&mut Window, &mut App) -> E + Send + 'static,
 {
-    let mut window_size = size(px(1600.0), px(1200.0));
-    if let Some(display) = cx.primary_display() {
-        let display_size = display.bounds().size;
-        window_size.width = window_size.width.min(display_size.width * 0.85);
-        window_size.height = window_size.height.min(display_size.height * 0.85);
-    }
-    let window_bounds = Bounds::centered(None, window_size, cx);
+    let options = default_storybook_window_options(cx);
     let title = SharedString::from(title.to_string());
 
     cx.bind_keys(vec![
@@ -648,21 +635,6 @@ where
     ]);
 
     cx.spawn(async move |cx| {
-        let options = WindowOptions {
-            window_bounds: Some(WindowBounds::Windowed(window_bounds)),
-            titlebar: Some(TitleBar::title_bar_options()),
-            window_min_size: Some(gpui::Size {
-                width: px(640.),
-                height: px(480.),
-            }),
-            kind: WindowKind::Normal,
-            #[cfg(target_os = "linux")]
-            window_background: gpui::WindowBackgroundAppearance::Transparent,
-            #[cfg(target_os = "linux")]
-            window_decorations: Some(gpui::WindowDecorations::Client),
-            ..Default::default()
-        };
-
         let window = cx
             .open_window(options, |window, cx| {
                 let view = create_view_fn(window, cx);

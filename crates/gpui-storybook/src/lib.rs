@@ -3,9 +3,12 @@ pub use gpui_storybook_macros::*;
 
 use gpui_storybook_core::locale::LocaleStore;
 
+#[cfg(feature = "dock")]
+pub use gpui_storybook_core::dock_gallery::{
+    StoryWorkspace, create_dock_window, register_story_panels,
+};
 pub use gpui_storybook_core::{
     assets::Assets,
-    dock_gallery::{StoryWorkspace, create_dock_window, register_story_panels},
     gallery::Gallery,
     i18n::change_locale,
     language::{CurrentLanguage, Language},
@@ -27,6 +30,7 @@ where
         Box::new(gpui_storybook_core::locale::LocaleManager::<L>::new()) as Box<dyn LocaleStore>,
     );
     gpui_storybook_core::story::init(cx);
+    #[cfg(feature = "dock")]
     register_story_panels(cx);
 
     let global_init_count = inventory::iter::<__registry::InitEntry>().count();

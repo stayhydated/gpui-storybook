@@ -5,13 +5,19 @@ edition.workspace = true
 license = "Unlicense"
 publish = false
 
+[features]
+default = [  ]
+dock = [ "gpui-storybook/dock" ]
+
 [dependencies]
 es-fluent = { features = [ "derive" ], workspace = true }
 es-fluent-lang = { workspace = true }
 es-fluent-manager-embedded = { workspace = true }
 gpui = { workspace = true }
 gpui-component = { workspace = true }
-gpui-storybook = { workspace = true }
+gpui-storybook = { default-features = false, features = [
+  "macros",
+], path = "../crates/gpui-storybook", version = "0.5.0" }
 rust-embed = { workspace = true }
 strum = { workspace = true }
 reqwest_client = { workspace = true }

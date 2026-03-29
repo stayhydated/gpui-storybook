@@ -1,6 +1,10 @@
 use es_fluent::EsFluent;
 use es_fluent_lang::es_fluent_language;
-use gpui_storybook::{Assets, StoryWorkspace};
+use gpui_storybook::Assets;
+#[cfg(not(feature = "dock"))]
+use gpui_storybook::Gallery;
+#[cfg(feature = "dock")]
+use gpui_storybook::StoryWorkspace;
 use strum::EnumIter;
 
 es_fluent_manager_embedded::define_i18n_module!();
@@ -31,6 +35,17 @@ fn main() {
 
         app_cx.activate(true);
 
+        #[cfg(not(feature = "dock"))]
+        gpui_storybook::create_new_window(
+            &format!("{} - Stories", env!("CARGO_PKG_NAME")),
+            move |window, cx| {
+                let all_stories = gpui_storybook::generate_stories(window, cx);
+                Gallery::view(all_stories, None, window, cx)
+            },
+            app_cx,
+        );
+
+        #[cfg(feature = "dock")]
         gpui_storybook::create_dock_window(
             &format!("{} - Stories", env!("CARGO_PKG_NAME")),
             move |window, cx| {

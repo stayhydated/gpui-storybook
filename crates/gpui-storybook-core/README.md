@@ -14,6 +14,13 @@ Most users should depend on `gpui-storybook` instead, which re-exports the types
 gpui-storybook-core = "0.5"
 ```
 
+The dock workspace API (`dock_gallery`, `create_dock_window`) is behind the `dock` feature.
+It is enabled by default:
+
+```toml
+gpui-storybook-core = { version = "0.5", features = ["dock"] }
+```
+
 ## Usage
 
 ```rust

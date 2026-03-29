@@ -11,20 +11,27 @@ A storybook-style workspace for building and inspecting GPUI components, with bu
 - Gallery UI with search, sections, and active story focus.
 - `Story` trait and `StoryContainer` wrapper for consistent rendering.
 - Attribute macros to register stories and global init hooks.
-- Theme switching and appearance controls (mode, font size, radius, scrollbar).
-- Locale management wired to es-fluent and gpui-component.
-- Asset loading that merges local assets with gpui-component icons.
 
-## Installation
+## Compatibility
 
-```toml
-[dependencies]
-gpui = { git = "https://github.com/zed-industries/zed" }
-gpui-component = { git = "https://github.com/longbridge/gpui-component" }
-gpui-storybook = "0.5"
+| `gpui-storybook` | `gpui-component` | `gpui` |
+| :--------------- | :--------------- | :--------------------------------------------- |
+| **git** | |
+| `master` | `main` | rev `e30720a781ad5e4bee9ab6e5c9f228baffef466c` |
+| **crates.io** | |
+| `0.5.x` | `0.5.x` | |
+
+## Example app
+
+```bash
+cargo run
 ```
 
-The default feature set enables the story registration macros. Disable `default-features` if you want the runtime only.
+with dock layout
+
+```bash
+cargo run --features dock
+```
 
 ## Quick start
 
@@ -45,8 +52,6 @@ fn main() {
     });
 }
 ```
-
-`gpui_storybook::init` runs `gpui_component::init` and the storybook runtime setup for you.
 
 ## Registering stories
 
@@ -91,50 +96,6 @@ enum StorySection {
 #[gpui_storybook::story(StorySection::Components)]
 pub struct CardStory;
 ```
-
-## Themes and appearance
-
-The storybook window exposes theme and appearance controls:
-
-- Light/dark mode and theme selection.
-- Font size, radius, and scrollbar visibility.
-- Theme selection and scrollbar visibility persist to `target/state.json` (font size and radius are session-only).
-
-## Localization
-
-`gpui-storybook` wires locale selection into es-fluent and gpui-component:
-
-- Implement `Language` with `strum::EnumIter` and `FluentDisplay`.
-- Call `gpui_storybook::init` once to register the locale manager.
-- Call `gpui_storybook::change_locale` after `init` (and whenever you switch languages).
-
-## Assets
-
-`gpui_storybook::Assets` merges:
-
-- Local embedded assets from `crates/gpui-storybook-core/assets`.
-- `gpui-component` icon assets under the `icons/` prefix.
-
-## Example app
-
-```bash
-cargo run -p gpui-storybook-example
-```
-
-## Crate layout
-
-- `gpui-storybook`: Public API and re-exports.
-- `gpui-storybook-core`: Gallery UI, story panels, theming, i18n, assets.
-- `gpui-storybook-macros`: Proc macros for `#[story]` and `#[story_init]`.
-
-## Compatibility
-
-| `gpui-storybook` | `gpui-component` | `gpui` |
-| :--------------- | :--------------- | :--------------------------------------------- |
-| **git** | |
-| `master` | `main` | rev `e0881e38f91b87623795208615ca466415d1970e` |
-| **crates.io** | |
-| `0.5.x` | `0.5.x` | |
 
 ## Acknowledgements
 
