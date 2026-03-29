@@ -8,9 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use gpui_component::{
-    ActiveTheme as _,
-    IconName,
-    Sizable as _,
+    ActiveTheme as _, IconName, Sizable as _,
     button::{Button, ButtonVariants as _},
     dock::{Panel, PanelControl, PanelEvent, PanelInfo, PanelState, TitleStyle},
     group_box::{GroupBox, GroupBoxVariants as _},
@@ -295,18 +293,21 @@ impl Panel for StoryContainer {
                     .xsmall()
                     .ghost()
                     .tab_stop(false)
-                    .on_click(move |_: &ClickEvent, window: &mut Window, cx: &mut App| {
-                        cx.stop_propagation();
-                        let Some(tab_panel) = tab_panel.clone().and_then(|tab| tab.upgrade()) else {
-                            return;
-                        };
-                        let Some(story_panel) = story_panel.upgrade() else {
-                            return;
-                        };
-                        tab_panel.update(cx, |tab_panel, cx| {
-                            tab_panel.remove_panel(Arc::new(story_panel.clone()), window, cx);
-                        });
-                    }),
+                    .on_click(
+                        move |_: &ClickEvent, window: &mut Window, cx: &mut App| {
+                            cx.stop_propagation();
+                            let Some(tab_panel) = tab_panel.clone().and_then(|tab| tab.upgrade())
+                            else {
+                                return;
+                            };
+                            let Some(story_panel) = story_panel.upgrade() else {
+                                return;
+                            };
+                            tab_panel.update(cx, |tab_panel, cx| {
+                                tab_panel.remove_panel(Arc::new(story_panel.clone()), window, cx);
+                            });
+                        },
+                    ),
                 )
             })
     }
