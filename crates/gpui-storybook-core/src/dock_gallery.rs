@@ -1,6 +1,6 @@
 use crate::{
     registry::StoryEntry,
-    story::{StoryContainer, StoryState},
+    story::{StoryContainer, StoryState, reveal_story_panel},
     title_bar::AppTitleBar,
     window_options::default_storybook_window_options,
 };
@@ -13,14 +13,19 @@ use gpui::{
 use gpui_component::{
     ActiveTheme as _, Root,
     dock::{
-        AnyDrag, ClosePanel, DockArea, DockAreaState, DockEvent, DockItem, DockPlacement, Panel,
+        ClosePanel, DockArea, DockAreaState, DockEvent, DockItem, DockPlacement, Panel,
         PanelControl, PanelEvent, PanelInfo, PanelView, ToggleZoom, register_panel,
     },
     input::{Input, InputEvent, InputState},
-    sidebar::{Sidebar, SidebarGroup, SidebarMenu, SidebarMenuItem},
+    sidebar::{Sidebar, SidebarGroup},
     v_flex,
 };
-use std::{collections::BTreeMap, sync::Arc, time::Duration};
+use gpui_storybook_components::{StoryDrag, StorySidebarItem};
+use std::{
+    collections::BTreeMap,
+    sync::{Arc, LazyLock, Mutex},
+    time::Duration,
+};
 
 actions!(story, [ToggleDockToggleButton, ResetLayout, ToggleSidebar]);
 
@@ -39,27 +44,8 @@ struct DockAreaTab {
     version: usize,
 }
 
-#[derive(Clone)]
-struct DragStory {
-    story_klass: SharedString,
-}
-
-fn value_contains_story_klass(value: &serde_json::Value, story_klass: &str) -> bool {
-    match value {
-        serde_json::Value::Object(map) => {
-            map.get("story_klass")
-                .and_then(serde_json::Value::as_str)
-                .is_some_and(|klass| klass == story_klass)
-                || map
-                    .values()
-                    .any(|child| value_contains_story_klass(child, story_klass))
-        },
-        serde_json::Value::Array(items) => items
-            .iter()
-            .any(|item| value_contains_story_klass(item, story_klass)),
-        _ => false,
-    }
-}
+static STORY_PANELS: LazyLock<Mutex<BTreeMap<String, gpui::WeakEntity<StoryContainer>>>> =
+    LazyLock::new(|| Mutex::new(BTreeMap::new()));
 
 /// Sidebar panel for navigating stories
 pub struct StorySidebar {
@@ -99,7 +85,7 @@ impl StorySidebar {
         }
     }
 
-    /// Open a story panel - creates a new panel instance in the center dock.
+    /// Open a story panel and reveal it if it is already mounted in a tab.
     fn open_story(
         dock_area: gpui::WeakEntity<DockArea>,
         story: Entity<StoryContainer>,
@@ -110,40 +96,20 @@ impl StorySidebar {
             return;
         };
 
-        let story_data = story.read(cx);
-        let Some(story_klass) = story_data.story_klass.clone() else {
-            return;
-        };
-        let story_klass_str = story_klass.as_ref();
-
-        if dock_area.update(cx, |dock_area, cx| {
-            dock_area.activate_panel_where(window, cx, |panel_state| {
-                panel_state.panel_name == "StoryContainer"
-                    && matches!(
-                        &panel_state.info,
-                        PanelInfo::Panel(value) if value_contains_story_klass(value, story_klass_str)
-                    )
-            })
-        }) {
+        if reveal_story_panel(&story, window, cx) {
             return;
         }
 
-        // Create a new panel instance
-        for entry in inventory::iter::<StoryEntry>() {
-            if entry.name == story_klass_str {
-                let new_panel = Self::create_story_from_entry(entry, window, cx);
-                dock_area.update(cx, |dock_area, cx| {
-                    dock_area.add_panel(
-                        Arc::new(new_panel),
-                        DockPlacement::Center,
-                        None,
-                        window,
-                        cx,
-                    );
-                });
-                return;
-            }
-        }
+        let panel: Arc<dyn PanelView> = Arc::new(story);
+        dock_area.update(cx, |dock_area, cx| {
+            // Keep the declarative DockItem tree synced with runtime state before adding.
+            // This avoids stale split children on gpui-component/main.
+            let state = dock_area.dump(cx);
+            let _ = dock_area.load(state, window, cx);
+
+            dock_area.remove_panel_from_all_docks(panel.clone(), window, cx);
+            dock_area.add_panel(panel, DockPlacement::Center, None, window, cx);
+        });
     }
 
     fn create_story_from_entry(
@@ -151,12 +117,17 @@ impl StorySidebar {
         window: &mut Window,
         cx: &mut App,
     ) -> Entity<StoryContainer> {
+        if let Some(story) = Self::find_story_by_klass(entry.name) {
+            return story;
+        }
+
         let panel = (entry.create_fn)(window, cx);
         if let Some(section) = entry.section {
             panel.update(cx, |c, _| {
                 c.section = Some(section.into());
             });
         }
+        Self::register_story(&panel, cx);
         panel
     }
 
@@ -170,13 +141,39 @@ impl StorySidebar {
             .map(|entry| Self::create_story_from_entry(entry, window, cx))
     }
 
+    fn register_story(story: &Entity<StoryContainer>, cx: &App) {
+        let Some(story_klass) = story.read(cx).story_klass.clone() else {
+            return;
+        };
+
+        if let Ok(mut registry) = STORY_PANELS.lock() {
+            registry.insert(story_klass.to_string(), story.downgrade());
+        }
+    }
+
+    fn register_stories(stories: &[Entity<StoryContainer>], cx: &App) {
+        for story in stories {
+            Self::register_story(story, cx);
+        }
+    }
+
+    fn find_story_by_klass(story_klass: &str) -> Option<Entity<StoryContainer>> {
+        let mut registry = STORY_PANELS.lock().ok()?;
+        if let Some(story) = registry.get(story_klass).and_then(|story| story.upgrade()) {
+            return Some(story);
+        }
+
+        registry.remove(story_klass);
+        None
+    }
+
     fn open_story_by_klass(
         dock_area: gpui::WeakEntity<DockArea>,
-        story_klass: SharedString,
+        story_klass: &str,
         window: &mut Window,
         cx: &mut App,
     ) {
-        if let Some(story) = Self::create_story_by_klass(story_klass.as_ref(), window, cx) {
+        if let Some(story) = Self::create_story_by_klass(story_klass, window, cx) {
             Self::open_story(dock_area, story, window, cx);
         }
     }
@@ -277,17 +274,13 @@ impl Render for StorySidebar {
                                 } else {
                                     story_data.name.clone()
                                 };
+                                let story_klass_for_drag =
+                                    story_data.story_klass.clone().unwrap_or_default();
 
                                 let story_for_click = story_entity.clone();
-                                let story_klass_for_drag = story_entity
-                                    .read(cx)
-                                    .story_klass
-                                    .clone()
-                                    .unwrap_or_default();
-
                                 let dock_area_for_click = self.dock_area.clone();
-                                SidebarMenuItem::new(name)
-                                    .on_click(cx.listener(move |_, _: &ClickEvent, window, cx| {
+                                StorySidebarItem::new(name, story_klass_for_drag).on_click(
+                                    cx.listener(move |_, _: &ClickEvent, window, cx| {
                                         let dock_area_for_open = dock_area_for_click.clone();
                                         let story_for_open = story_for_click.clone();
                                         window.defer(cx, move |window, cx| {
@@ -298,16 +291,12 @@ impl Render for StorySidebar {
                                                 cx,
                                             );
                                         });
-                                    }))
-                                    .drag_data(DragStory {
-                                        story_klass: story_klass_for_drag.clone(),
-                                    })
+                                    }),
+                                )
                             })
                             .collect();
 
-                        let menu = SidebarMenu::new().children(menu_items);
-
-                        SidebarGroup::new(section.unwrap_or_default()).child(menu)
+                        SidebarGroup::new(section.unwrap_or_default()).children(menu_items)
                     })
                     .collect::<Vec<_>>(),
             )
@@ -331,6 +320,7 @@ impl StoryWorkspace {
         let dock_area =
             cx.new(|cx| DockArea::new(MAIN_DOCK_AREA.id, Some(MAIN_DOCK_AREA.version), window, cx));
         let weak_dock_area = dock_area.downgrade();
+        StorySidebar::register_stories(&stories, cx);
 
         // Try to load saved layout, fall back to default
         match Self::load_layout(dock_area.clone(), window, cx) {
@@ -345,21 +335,10 @@ impl StoryWorkspace {
         cx.subscribe_in(
             &dock_area,
             window,
-            |this, dock_area, ev: &DockEvent, window, cx| match ev {
-                DockEvent::LayoutChanged => this.save_layout(dock_area, window, cx),
-                DockEvent::DragDrop(item) => {
-                    let any_drag: &AnyDrag = item;
-                    if let Some(drag_story) =
-                        any_drag.value.as_ref().downcast_ref::<DragStory>().cloned()
-                    {
-                        StorySidebar::open_story_by_klass(
-                            dock_area.downgrade(),
-                            drag_story.story_klass,
-                            window,
-                            cx,
-                        );
-                    }
-                },
+            |this, dock_area, ev: &DockEvent, window, cx| {
+                if matches!(ev, DockEvent::LayoutChanged) {
+                    this.save_layout(dock_area, window, cx);
+                }
             },
         )
         .detach();
@@ -537,6 +516,7 @@ impl StoryWorkspace {
         let entries: Vec<_> = inventory::iter::<StoryEntry>().collect();
         let stories: Vec<Entity<StoryContainer>> =
             entries.iter().map(|e| (e.create_fn)(window, cx)).collect();
+        StorySidebar::register_stories(&stories, cx);
 
         let weak_dock_area = self.dock_area.downgrade();
         Self::reset_default_layout(weak_dock_area, &stories, window, cx);
@@ -558,6 +538,14 @@ impl Render for StoryWorkspace {
             .id("story-workspace")
             .on_action(cx.listener(Self::on_action_toggle_dock_toggle_button))
             .on_action(cx.listener(Self::on_action_reset_layout))
+            .on_drop(cx.listener(|this, drag: &StoryDrag, window, cx| {
+                StorySidebar::open_story_by_klass(
+                    this.dock_area.downgrade(),
+                    drag.story_klass(),
+                    window,
+                    cx,
+                );
+            }))
             .relative()
             .size_full()
             .flex()

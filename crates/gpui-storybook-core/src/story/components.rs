@@ -10,7 +10,7 @@ use std::sync::Arc;
 use gpui_component::{
     ActiveTheme as _, IconName, Sizable as _,
     button::{Button, ButtonVariants as _},
-    dock::{Panel, PanelControl, PanelEvent, PanelInfo, PanelState, TitleStyle},
+    dock::{Panel, PanelControl, PanelEvent, PanelInfo, PanelState, PanelView, TitleStyle},
     group_box::{GroupBox, GroupBoxVariants as _},
     h_flex,
     menu::PopupMenu,
@@ -379,6 +379,33 @@ impl Panel for StoryContainer {
         state.info = PanelInfo::panel(story_state.to_value());
         state
     }
+}
+
+pub fn reveal_story_panel(
+    story: &Entity<StoryContainer>,
+    window: &mut Window,
+    cx: &mut App,
+) -> bool {
+    let (is_active, tab_panel) = {
+        let story = story.read(cx);
+        (story.is_active, story.tab_panel.clone())
+    };
+
+    if is_active {
+        return true;
+    }
+
+    let Some(tab_panel) = tab_panel.and_then(|tab| tab.upgrade()) else {
+        return false;
+    };
+
+    let panel: Arc<dyn PanelView> = Arc::new(story.clone());
+    tab_panel.update(cx, |tab_panel, cx| {
+        tab_panel.remove_panel(panel.clone(), window, cx);
+        tab_panel.add_panel(panel, window, cx);
+    });
+
+    true
 }
 
 impl EventEmitter<PanelEvent> for StoryContainer {}

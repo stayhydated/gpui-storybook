@@ -6,5 +6,7 @@ mod window;
 
 pub use self::state::AppState;
 pub use self::window::create_new_window;
-pub use components::{ContainerEvent, Story, StoryContainer, StorySection, StoryState, section};
+pub use components::{
+    ContainerEvent, Story, StoryContainer, StorySection, StoryState, reveal_story_panel, section,
+};
 pub use init::init;
