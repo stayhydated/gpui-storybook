@@ -8,7 +8,7 @@ use anyhow::{Context as _, Result};
 use gpui::{
     App, AppContext as _, ClickEvent, Context, Edges, Entity, EntityId, EventEmitter, FocusHandle,
     Focusable, InteractiveElement as _, IntoElement, ParentElement as _, Render, SharedString,
-    Styled as _, Subscription, Task, Window, actions, div, px, relative,
+    Styled as _, Subscription, Window, actions, div, px, relative,
 };
 use gpui_component::{
     ActiveTheme as _, Root,
@@ -23,8 +23,8 @@ use gpui_component::{
 use gpui_storybook_components::{StoryDrag, StorySidebarItem};
 use std::{
     collections::BTreeMap,
+    path::Path,
     sync::{Arc, LazyLock, Mutex},
-    time::Duration,
 };
 
 actions!(story, [ToggleDockToggleButton, ResetLayout, ToggleSidebar]);
@@ -49,6 +49,83 @@ type StoryPanelRegistries = BTreeMap<EntityId, StoryPanelMap>;
 
 static STORY_PANELS: LazyLock<Mutex<StoryPanelRegistries>> =
     LazyLock::new(|| Mutex::new(BTreeMap::new()));
+
+struct DockLayoutStore;
+
+impl DockLayoutStore {
+    fn sanitize_state_json(value: &mut serde_json::Value) {
+        match value {
+            serde_json::Value::Object(map) => {
+                for child in map.values_mut() {
+                    Self::sanitize_state_json(child);
+                }
+
+                let is_tab_panel = map
+                    .get("panel_name")
+                    .and_then(serde_json::Value::as_str)
+                    .is_some_and(|name| name == "TabPanel");
+                if !is_tab_panel {
+                    return;
+                }
+
+                if let Some(info) = map.get_mut("info")
+                    && info
+                        .as_object()
+                        .and_then(|info| info.get("panel"))
+                        .is_some_and(serde_json::Value::is_null)
+                {
+                    *info = serde_json::json!({
+                        "tabs": {
+                            "active_index": 0
+                        }
+                    });
+                }
+            },
+            serde_json::Value::Array(items) => {
+                for item in items {
+                    Self::sanitize_state_json(item);
+                }
+            },
+            _ => {},
+        }
+    }
+
+    fn to_json(state: &DockAreaState) -> Result<String> {
+        let mut state_json = serde_json::to_value(state)?;
+        Self::sanitize_state_json(&mut state_json);
+        Ok(serde_json::to_string_pretty(&state_json)?)
+    }
+
+    fn sanitize_state(state: DockAreaState) -> Result<DockAreaState> {
+        let mut state_json = serde_json::to_value(state)?;
+        Self::sanitize_state_json(&mut state_json);
+        Ok(serde_json::from_value(state_json)?)
+    }
+
+    fn from_json(json: &str) -> Result<DockAreaState> {
+        let mut state_json = serde_json::from_str::<serde_json::Value>(json)?;
+        Self::sanitize_state_json(&mut state_json);
+        Ok(serde_json::from_value::<DockAreaState>(state_json)?)
+    }
+
+    fn save_to_path(path: &str, state: &DockAreaState) -> Result<()> {
+        let json = Self::to_json(state)?;
+        let path_ref = Path::new(path);
+        if let Some(parent) = path_ref.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+
+        let tmp_path = format!("{path}.tmp");
+        std::fs::write(&tmp_path, json)?;
+        std::fs::rename(&tmp_path, path)?;
+        Ok(())
+    }
+
+    fn load_from_path(path: &str) -> Result<DockAreaState> {
+        let json = std::fs::read_to_string(path)?;
+        Self::from_json(&json)
+    }
+}
 
 /// Sidebar panel for navigating stories
 pub struct StorySidebar {
@@ -104,15 +181,21 @@ impl StorySidebar {
         }
 
         let panel: Arc<dyn PanelView> = Arc::new(story);
-        dock_area.update(cx, |dock_area, cx| {
+        let state = dock_area.update(cx, |dock_area, cx| {
             // Keep the declarative DockItem tree synced with runtime state before adding.
             // This avoids stale split children on gpui-component/main.
             let state = dock_area.dump(cx);
-            let _ = dock_area.load(state, window, cx);
+            if let Ok(state) = DockLayoutStore::sanitize_state(state) {
+                let _ = dock_area.load(state, window, cx);
+            }
 
-            dock_area.remove_panel_from_all_docks(panel.clone(), window, cx);
             dock_area.add_panel(panel, DockPlacement::Center, None, window, cx);
+            dock_area.dump(cx)
         });
+
+        if let Err(err) = DockLayoutStore::save_to_path(STATE_FILE, &state) {
+            eprintln!("failed to save dock layout after open to {STATE_FILE}: {err:#}");
+        }
     }
 
     fn create_story_from_entry(
@@ -332,7 +415,6 @@ pub struct StoryWorkspace {
     dock_area: Entity<DockArea>,
     last_layout_state: Option<DockAreaState>,
     toggle_button_visible: bool,
-    _save_layout_task: Option<Task<()>>,
 }
 
 impl StoryWorkspace {
@@ -371,9 +453,11 @@ impl StoryWorkspace {
             let dock_area = dock_area.clone();
             move |_, cx| {
                 let state = dock_area.read(cx).dump(cx);
-                cx.background_executor().spawn(async move {
-                    let _ = Self::save_state(&state);
-                })
+                async move {
+                    if let Err(err) = Self::save_state(&state) {
+                        eprintln!("failed to save dock layout on quit to {STATE_FILE}: {err:#}");
+                    }
+                }
             }
         })
         .detach();
@@ -385,42 +469,33 @@ impl StoryWorkspace {
             title_bar,
             last_layout_state: None,
             toggle_button_visible: true,
-            _save_layout_task: None,
         }
     }
 
     fn save_layout(
         &mut self,
         dock_area: &Entity<DockArea>,
-        window: &mut Window,
+        _: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let dock_area = dock_area.clone();
-        self._save_layout_task = Some(cx.spawn_in(window, async move |this, window| {
-            window
-                .background_executor()
-                .timer(Duration::from_secs(5))
-                .await;
+        let state = dock_area.read(cx).dump(cx);
 
-            _ = this.update_in(window, move |this, _, cx| {
-                let dock_area = dock_area.read(cx);
-                let state = dock_area.dump(cx);
+        if Some(&state) == self.last_layout_state.as_ref() {
+            return;
+        }
 
-                let last_layout_state = this.last_layout_state.clone();
-                if Some(&state) == last_layout_state.as_ref() {
-                    return;
-                }
-
-                let _ = Self::save_state(&state);
-                this.last_layout_state = Some(state);
-            });
-        }));
+        match Self::save_state(&state) {
+            Ok(()) => {
+                self.last_layout_state = Some(state);
+            },
+            Err(err) => {
+                eprintln!("failed to save dock layout to {STATE_FILE}: {err:#}");
+            },
+        }
     }
 
     fn save_state(state: &DockAreaState) -> Result<()> {
-        let json = serde_json::to_string_pretty(state)?;
-        std::fs::write(STATE_FILE, json)?;
-        Ok(())
+        DockLayoutStore::save_to_path(STATE_FILE, state)
     }
 
     fn load_layout(
@@ -428,8 +503,7 @@ impl StoryWorkspace {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Result<()> {
-        let json = std::fs::read_to_string(STATE_FILE)?;
-        let state = serde_json::from_str::<DockAreaState>(&json)?;
+        let state = DockLayoutStore::load_from_path(STATE_FILE)?;
 
         // Check if the saved layout version matches
         if state.version != Some(MAIN_DOCK_AREA.version) {
