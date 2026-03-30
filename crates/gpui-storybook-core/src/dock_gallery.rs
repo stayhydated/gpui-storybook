@@ -6,9 +6,9 @@ use crate::{
 };
 use anyhow::{Context as _, Result};
 use gpui::{
-    App, AppContext as _, ClickEvent, Context, Edges, Entity, EventEmitter, FocusHandle, Focusable,
-    InteractiveElement as _, IntoElement, ParentElement as _, Render, SharedString, Styled as _,
-    Subscription, Task, Window, actions, div, px, relative,
+    App, AppContext as _, ClickEvent, Context, Edges, Entity, EntityId, EventEmitter, FocusHandle,
+    Focusable, InteractiveElement as _, IntoElement, ParentElement as _, Render, SharedString,
+    Styled as _, Subscription, Task, Window, actions, div, px, relative,
 };
 use gpui_component::{
     ActiveTheme as _, Root,
@@ -44,7 +44,10 @@ struct DockAreaTab {
     version: usize,
 }
 
-static STORY_PANELS: LazyLock<Mutex<BTreeMap<String, gpui::WeakEntity<StoryContainer>>>> =
+type StoryPanelMap = BTreeMap<String, gpui::WeakEntity<StoryContainer>>;
+type StoryPanelRegistries = BTreeMap<EntityId, StoryPanelMap>;
+
+static STORY_PANELS: LazyLock<Mutex<StoryPanelRegistries>> =
     LazyLock::new(|| Mutex::new(BTreeMap::new()));
 
 /// Sidebar panel for navigating stories
@@ -114,10 +117,11 @@ impl StorySidebar {
 
     fn create_story_from_entry(
         entry: &StoryEntry,
+        dock_area: &gpui::WeakEntity<DockArea>,
         window: &mut Window,
         cx: &mut App,
     ) -> Entity<StoryContainer> {
-        if let Some(story) = Self::find_story_by_klass(entry.name) {
+        if let Some(story) = Self::find_story_by_klass(dock_area, entry.name) {
             return story;
         }
 
@@ -127,43 +131,63 @@ impl StorySidebar {
                 c.section = Some(section.into());
             });
         }
-        Self::register_story(&panel, cx);
+        Self::register_story(dock_area, &panel, cx);
         panel
     }
 
     fn create_story_by_klass(
         story_klass: &str,
+        dock_area: &gpui::WeakEntity<DockArea>,
         window: &mut Window,
         cx: &mut App,
     ) -> Option<Entity<StoryContainer>> {
         inventory::iter::<StoryEntry>()
             .find(|entry| entry.name == story_klass)
-            .map(|entry| Self::create_story_from_entry(entry, window, cx))
+            .map(|entry| Self::create_story_from_entry(entry, dock_area, window, cx))
     }
 
-    fn register_story(story: &Entity<StoryContainer>, cx: &App) {
+    fn register_story(
+        dock_area: &gpui::WeakEntity<DockArea>,
+        story: &Entity<StoryContainer>,
+        cx: &App,
+    ) {
         let Some(story_klass) = story.read(cx).story_klass.clone() else {
             return;
         };
 
-        if let Ok(mut registry) = STORY_PANELS.lock() {
+        if let Ok(mut registries) = STORY_PANELS.lock() {
+            let registry = registries.entry(dock_area.entity_id()).or_default();
             registry.insert(story_klass.to_string(), story.downgrade());
         }
     }
 
-    fn register_stories(stories: &[Entity<StoryContainer>], cx: &App) {
+    fn register_stories(
+        dock_area: &gpui::WeakEntity<DockArea>,
+        stories: &[Entity<StoryContainer>],
+        cx: &App,
+    ) {
         for story in stories {
-            Self::register_story(story, cx);
+            Self::register_story(dock_area, story, cx);
         }
     }
 
-    fn find_story_by_klass(story_klass: &str) -> Option<Entity<StoryContainer>> {
-        let mut registry = STORY_PANELS.lock().ok()?;
+    fn find_story_by_klass(
+        dock_area: &gpui::WeakEntity<DockArea>,
+        story_klass: &str,
+    ) -> Option<Entity<StoryContainer>> {
+        let mut registries = STORY_PANELS.lock().ok()?;
+        let dock_area_id = dock_area.entity_id();
+        let registry = registries.get_mut(&dock_area_id)?;
+
         if let Some(story) = registry.get(story_klass).and_then(|story| story.upgrade()) {
             return Some(story);
         }
 
         registry.remove(story_klass);
+        if registry.is_empty() {
+            registries.remove(&dock_area_id);
+        }
+
         None
     }
 
@@ -173,7 +197,7 @@ impl StorySidebar {
         window: &mut Window,
         cx: &mut App,
     ) {
-        if let Some(story) = Self::create_story_by_klass(story_klass, window, cx) {
+        if let Some(story) = Self::create_story_by_klass(story_klass, &dock_area, window, cx) {
             Self::open_story(dock_area, story, window, cx);
         }
     }
@@ -320,7 +344,7 @@ impl StoryWorkspace {
         let dock_area =
             cx.new(|cx| DockArea::new(MAIN_DOCK_AREA.id, Some(MAIN_DOCK_AREA.version), window, cx));
         let weak_dock_area = dock_area.downgrade();
-        StorySidebar::register_stories(&stories, cx);
+        StorySidebar::register_stories(&weak_dock_area, &stories, cx);
 
         // Try to load saved layout, fall back to default
         match Self::load_layout(dock_area.clone(), window, cx) {
@@ -516,7 +540,7 @@ impl StoryWorkspace {
         let entries: Vec<_> = inventory::iter::<StoryEntry>().collect();
         let stories: Vec<Entity<StoryContainer>> =
             entries.iter().map(|e| (e.create_fn)(window, cx)).collect();
-        StorySidebar::register_stories(&stories, cx);
+        StorySidebar::register_stories(&self.dock_area.downgrade(), &stories, cx);
 
         let weak_dock_area = self.dock_area.downgrade();
         Self::reset_default_layout(weak_dock_area, &stories, window, cx);
@@ -563,7 +587,7 @@ pub fn register_story_panels(cx: &mut App) {
     register_panel(
         cx,
         "StoryContainer",
-        |_dock_area, state, info, window, cx| {
+        |dock_area, state, info, window, cx| {
             // Try to recreate the story from saved state
             // Extract the panel info value from the Panel variant
             let panel_value = match info {
@@ -575,6 +599,7 @@ pub fn register_story_panels(cx: &mut App) {
                 panel_value.and_then(|v| serde_json::from_value::<StoryState>(v).ok())
                 && let Some(container) = StorySidebar::create_story_by_klass(
                     story_state.story_klass.as_ref(),
+                    &dock_area,
                     window,
                     cx,
                 )
@@ -600,7 +625,7 @@ pub fn register_story_panels(cx: &mut App) {
             let entries: Vec<_> = inventory::iter::<StoryEntry>().collect();
             let stories: Vec<Entity<StoryContainer>> = entries
                 .iter()
-                .map(|entry| StorySidebar::create_story_from_entry(entry, window, cx))
+                .map(|entry| StorySidebar::create_story_from_entry(entry, &dock_area, window, cx))
                 .collect();
 
             Box::new(cx.new(|cx| StorySidebar::new(stories, dock_area, window, cx)))
