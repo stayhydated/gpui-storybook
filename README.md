@@ -9,8 +9,7 @@ A storybook-style workspace for building and inspecting GPUI components, with bu
 ## Features
 
 - Gallery UI with search, sections, and active story focus.
-- `Story` trait and `StoryContainer` wrapper for consistent rendering.
-- Attribute macros to register stories and global init hooks.
+- Attribute macros to register stories and global init hooks and `Story` trait.
 
 ## Compatibility
 
