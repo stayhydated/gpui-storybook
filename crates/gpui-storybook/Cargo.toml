@@ -12,7 +12,8 @@ repository.workspace = true
 readme = "README.md"
 
 [features]
-default = [ "macros" ]
+default = [ "macros", "dock" ]
+dock = [ "gpui-storybook-core/dock" ]
 macros = [ "dep:gpui-storybook-macros" ]
 
 [dependencies]
