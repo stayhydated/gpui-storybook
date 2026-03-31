@@ -11,3 +11,4 @@ pub mod registry;
 pub mod story;
 pub mod title_bar;
 mod window_options;
+pub mod window_view;

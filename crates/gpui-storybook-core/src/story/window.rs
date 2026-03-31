@@ -1,4 +1,7 @@
-use crate::{title_bar::AppTitleBar, window_options::default_storybook_window_options};
+use crate::{
+    title_bar::AppTitleBar, window_options::default_storybook_window_options,
+    window_view::SimpleWindowView,
+};
 use gpui::{
     AnyView, App, AppContext as _, Context, Entity, FocusHandle, Focusable,
     InteractiveElement as _, IntoElement, ParentElement as _, Render, SharedString, Styled as _,
@@ -8,7 +11,7 @@ use gpui_component::{Root, v_flex};
 
 pub fn create_new_window<F, E>(title: &str, crate_view_fn: F, cx: &mut App)
 where
-    E: Into<AnyView>,
+    E: SimpleWindowView,
     F: FnOnce(&mut Window, &mut App) -> E + Send + 'static,
 {
     let options = default_storybook_window_options(cx);
