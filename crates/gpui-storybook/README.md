@@ -1,35 +1,38 @@
-# gpui-storybook
+# GPUI Storybook
 
+[![Build Status](https://github.com/stayhydated/gpui-storybook/actions/workflows/ci.yml/badge.svg)](https://github.com/stayhydated/gpui-storybook/actions/workflows/ci.yml)
 [![Docs](https://docs.rs/gpui-storybook/badge.svg)](https://docs.rs/gpui-storybook/)
 [![Crates.io](https://img.shields.io/crates/v/gpui-storybook.svg)](https://crates.io/crates/gpui-storybook)
 
-`gpui-storybook` is the user-facing crate for a storybook-style GPUI workflow. It re-exports the runtime types and (by default) the proc macros for registering stories.
+A storybook-style workspace for building and inspecting GPUI components, with built-in theming, i18n, and a searchable gallery.
 
-## Installation
+## Features
 
-```toml
-[dependencies]
-gpui = { git = "https://github.com/zed-industries/zed" }
-gpui-component = { git = "https://github.com/longbridge/gpui-component" }
-gpui-storybook = "0.5"
+- Gallery UI with sidebar search, dock, and active story focus.
+- Attribute macros to register stories and global init hooks and `Story` trait.
+
+## Compatibility
+
+| `gpui-storybook` | `gpui-component` | `gpui` |
+| :--------------- | :--------------- | :--------------------------------------------- |
+| **git** | |
+| `master` | `main` | rev `e30720a781ad5e4bee9ab6e5c9f228baffef466c` |
+| **crates.io** | |
+| `0.5.x` | `0.5.x` | |
+
+## Example app
+
+```bash
+cargo run
 ```
 
-Disable default features if you want the runtime without macros:
+with dock layout
 
-```toml
-[dependencies]
-gpui-storybook = { version = "0.5", default-features = false }
+```bash
+cargo run --features dock
 ```
 
-`create_dock_window` / `StoryWorkspace` are exposed by the `dock` feature (enabled by default).
-To use runtime + dock but no macros:
-
-```toml
-[dependencies]
-gpui-storybook = { version = "0.5", default-features = false, features = ["dock"] }
-```
-
-## Usage
+## Quick start
 
 ```rust
 use gpui::Application;
@@ -49,14 +52,26 @@ fn main() {
 }
 ```
 
-`gpui_storybook::init` runs `gpui_component::init` and the storybook runtime setup for you.
-
 ## Registering stories
 
 ```rust
+use gpui::{App, Focusable, Render, Window};
+
 #[gpui_storybook::story("Components")]
 pub struct ButtonStory;
+
+impl gpui_storybook::Story for ButtonStory {
+    fn title() -> String {
+        "Button".into()
+    }
+
+    fn new_view(window: &mut Window, cx: &mut App) -> gpui::Entity<impl Render + Focusable> {
+        Self::view(window, cx)
+    }
+}
 ```
+
+Use `#[gpui_storybook::story_init]` to register global setup functions that should run once per app:
 
 ```rust
 #[gpui_storybook::story_init]
@@ -65,9 +80,9 @@ fn register_icons(cx: &mut gpui::App) {
 }
 ```
 
-## Sections
+## Organizing sections
 
-Use string literals or enum variants to group stories. Enum variants provide stable ordering by discriminant:
+Sections can be string literals or enum variants. Enum variants are ordered by discriminant to produce stable section ordering:
 
 ```rust
 #[derive(Clone, Copy)]
@@ -80,3 +95,9 @@ enum StorySection {
 #[gpui_storybook::story(StorySection::Components)]
 pub struct CardStory;
 ```
+
+## Acknowledgements
+
+This project is heavily inspired by the story section of [gpui-component](https://github.com/longbridge/gpui-component/tree/main/crates/story).
+
+See related discussion on ownership transfer [here](https://github.com/longbridge/gpui-component/discussions/1473).

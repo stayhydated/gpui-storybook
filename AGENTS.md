@@ -42,3 +42,10 @@ ignore all folders matching "**/\_\_crate_paths/**"
 - **Checks**: `cargo check --workspace --all-features --exclude gpui-storybook-example`.
 - **Tests**: `cargo test --workspace --all-features`.
 - **Example app**: `cargo run -p gpui-storybook-example`.
+
+## Skills
+
+| Item | Link to llms.txt | Link to llms-full.txt | Purpose |
+| --------- | ------------------------------------------------ | ----------------------------------------------------- | ------------------- |
+| **Crate** | | | |
+| es-fluent | https://stayhydated.github.io/es-fluent/llms.txt | https://stayhydated.github.io/es-fluent/llms-full.txt | i18n |
