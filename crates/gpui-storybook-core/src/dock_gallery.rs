@@ -627,7 +627,7 @@ impl StoryWorkspace {
     }
 }
 
-impl DockWindowView for gpui::Entity<StoryWorkspace> {}
+impl DockWindowView for StoryWorkspace {}
 
 impl Render for StoryWorkspace {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
@@ -711,10 +711,10 @@ pub fn register_story_panels(cx: &mut App) {
 }
 
 /// Create a new dock-based storybook window
-pub fn create_dock_window<F, E>(title: &str, create_view_fn: F, cx: &mut App)
+pub fn create_dock_window<F, V>(title: &str, create_view_fn: F, cx: &mut App)
 where
-    E: DockWindowView,
-    F: FnOnce(&mut Window, &mut App) -> E + Send + 'static,
+    V: DockWindowView,
+    F: FnOnce(&mut Window, &mut App) -> Entity<V> + Send + 'static,
 {
     let options = default_storybook_window_options(cx);
     let title = SharedString::from(title.to_string());

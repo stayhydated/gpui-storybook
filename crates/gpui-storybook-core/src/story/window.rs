@@ -9,10 +9,10 @@ use gpui::{
 };
 use gpui_component::{Root, v_flex};
 
-pub fn create_new_window<F, E>(title: &str, crate_view_fn: F, cx: &mut App)
+pub fn create_new_window<F, V>(title: &str, crate_view_fn: F, cx: &mut App)
 where
-    E: SimpleWindowView,
-    F: FnOnce(&mut Window, &mut App) -> E + Send + 'static,
+    V: SimpleWindowView,
+    F: FnOnce(&mut Window, &mut App) -> Entity<V> + Send + 'static,
 {
     let options = default_storybook_window_options(cx);
     let title = SharedString::from(title.to_string());
