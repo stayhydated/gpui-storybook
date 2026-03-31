@@ -125,6 +125,8 @@ impl Gallery {
     }
 }
 
+impl crate::window_view::SimpleWindowView for gpui::Entity<Gallery> {}
+
 impl Render for Gallery {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let query = self.search_input.read(cx).value().trim().to_lowercase();

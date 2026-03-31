@@ -7,12 +7,15 @@ use gpui_storybook_core::locale::LocaleStore;
 pub use gpui_storybook_core::dock_gallery::{
     StoryWorkspace, create_dock_window, register_story_panels,
 };
+#[cfg(feature = "dock")]
+pub use gpui_storybook_core::window_view::DockWindowView;
 pub use gpui_storybook_core::{
     assets::Assets,
     gallery::Gallery,
     i18n::change_locale,
     language::{CurrentLanguage, Language},
     story::{Story, StoryContainer, create_new_window},
+    window_view::SimpleWindowView,
 };
 
 #[doc(hidden)]

@@ -3,6 +3,7 @@ use crate::{
     story::{StoryContainer, StoryState, reveal_story_panel},
     title_bar::AppTitleBar,
     window_options::default_storybook_window_options,
+    window_view::DockWindowView,
 };
 use anyhow::{Context as _, Result};
 use gpui::{
@@ -626,6 +627,8 @@ impl StoryWorkspace {
     }
 }
 
+impl DockWindowView for gpui::Entity<StoryWorkspace> {}
+
 impl Render for StoryWorkspace {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let sheet_layer = Root::render_sheet_layer(window, cx);
@@ -710,7 +713,7 @@ pub fn register_story_panels(cx: &mut App) {
 /// Create a new dock-based storybook window
 pub fn create_dock_window<F, E>(title: &str, create_view_fn: F, cx: &mut App)
 where
-    E: Into<gpui::AnyView>,
+    E: DockWindowView,
     F: FnOnce(&mut Window, &mut App) -> E + Send + 'static,
 {
     let options = default_storybook_window_options(cx);

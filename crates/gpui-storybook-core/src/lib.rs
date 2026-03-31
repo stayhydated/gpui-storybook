@@ -10,4 +10,5 @@ pub mod locale;
 pub mod registry;
 pub mod story;
 pub mod title_bar;
+pub mod window_view;
 mod window_options;
