@@ -66,12 +66,14 @@ fn build_menus(title: impl Into<SharedString>, cx: &App) -> Vec<Menu> {
                     MenuItem::action("Dark", SwitchThemeMode(ThemeMode::Dark))
                         .checked(mode.is_dark()),
                 ],
+                disabled: false,
             }),
             theme_menu(cx),
             language_menu(cx),
             MenuItem::Separator,
             MenuItem::action("Quit", Quit),
         ],
+        disabled: false,
     }]
 }
 
@@ -88,6 +90,7 @@ fn theme_menu(cx: &App) -> MenuItem {
                     .checked(checked)
             })
             .collect(),
+        disabled: false,
     })
 }
 
@@ -105,5 +108,6 @@ fn language_menu(cx: &App) -> MenuItem {
                 MenuItem::action(name, SelectLocale(lang_id.clone())).checked(checked)
             })
             .collect(),
+        disabled: false,
     })
 }

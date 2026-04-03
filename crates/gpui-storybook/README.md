@@ -16,7 +16,7 @@ A storybook-style workspace for building and inspecting GPUI components, with bu
 | `gpui-storybook` | `gpui-component` | `gpui` |
 | :--------------- | :--------------- | :--------------------------------------------- |
 | **git** | |
-| `master` | `main` | rev `e30720a781ad5e4bee9ab6e5c9f228baffef466c` |
+| `master` | `main` | rev `15d8660748b508b3525d3403e5d172f1a557bfa5` |
 | **crates.io** | |
 | `0.5.x` | `0.5.x` | |
 

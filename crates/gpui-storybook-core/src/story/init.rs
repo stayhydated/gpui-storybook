@@ -25,6 +25,7 @@ pub fn init(cx: &mut App) {
         Menu {
             name: "GPUI App".into(),
             items: vec![MenuItem::action("Quit", Quit)],
+            disabled: false,
         },
         Menu {
             name: "Edit".into(),
@@ -36,10 +37,12 @@ pub fn init(cx: &mut App) {
                 MenuItem::os_action("Copy", Copy, OsAction::Copy),
                 MenuItem::os_action("Paste", Paste, OsAction::Paste),
             ],
+            disabled: false,
         },
         Menu {
             name: "Window".into(),
             items: vec![],
+            disabled: false,
         },
     ]);
     cx.activate(true);
