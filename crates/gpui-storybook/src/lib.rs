@@ -2,6 +2,10 @@
 pub use gpui_storybook_macros::*;
 
 use gpui_storybook_core::locale::LocaleStore;
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 #[cfg(feature = "dock")]
 pub use gpui_storybook_core::dock_gallery::{
@@ -23,6 +27,83 @@ pub use gpui_storybook_core::registry as __registry;
 
 #[doc(hidden)]
 pub use inventory as __inventory;
+
+struct ResolvedStoryEntry {
+    entry: &'static __registry::StoryEntry,
+    section: Option<String>,
+}
+
+fn load_storybook_config(
+    entry: &__registry::StoryEntry,
+) -> Option<gpui_storybook_toml::StorybookToml> {
+    match gpui_storybook_toml::load_from_dir(entry.crate_dir) {
+        Ok(config) => config,
+        Err(err) => {
+            tracing::warn!(
+                "Failed to load storybook.toml for crate '{}' ({}): {}",
+                entry.crate_name,
+                entry.crate_dir,
+                err
+            );
+            None
+        },
+    }
+}
+
+fn load_storybook_config_from_working_directory() -> Option<gpui_storybook_toml::StorybookToml> {
+    let mut current = std::env::current_dir().ok()?;
+    loop {
+        match gpui_storybook_toml::load_from_dir(&current) {
+            Ok(Some(config)) => return Some(config),
+            Ok(None) => {},
+            Err(err) => {
+                tracing::warn!(
+                    "Failed to load storybook.toml from working directory '{}' path '{}': {}",
+                    std::env::current_dir()
+                        .ok()
+                        .as_deref()
+                        .unwrap_or_else(|| Path::new("<unknown>"))
+                        .display(),
+                    current.display(),
+                    err
+                );
+                return None;
+            },
+        }
+
+        if !current.pop() {
+            break;
+        }
+    }
+
+    None
+}
+
+fn current_binary_name() -> Option<String> {
+    let argv0 = std::env::args_os().next()?;
+    PathBuf::from(argv0)
+        .file_stem()
+        .map(|stem| stem.to_string_lossy().to_string())
+}
+
+fn load_runtime_storybook_config(
+    all_entries: &[&'static __registry::StoryEntry],
+    crate_configs: &mut HashMap<&'static str, Option<gpui_storybook_toml::StorybookToml>>,
+) -> Option<gpui_storybook_toml::StorybookToml> {
+    if let Some(bin_name) = current_binary_name()
+        && let Some(entry) = all_entries
+            .iter()
+            .copied()
+            .find(|entry| entry.crate_name == bin_name)
+    {
+        return crate_configs
+            .entry(entry.crate_dir)
+            .or_insert_with(|| load_storybook_config(entry))
+            .clone();
+    }
+
+    load_storybook_config_from_working_directory()
+}
 
 pub fn init<L>(language: L, cx: &mut ::gpui::App)
 where
@@ -63,25 +144,87 @@ pub fn generate_stories(
         }
     );
 
-    // Collect and sort stories
-    let mut entries: Vec<_> = inventory::iter::<__registry::StoryEntry>().collect();
+    let all_entries: Vec<_> = inventory::iter::<__registry::StoryEntry>().collect();
+    let mut crate_configs: HashMap<&'static str, Option<gpui_storybook_toml::StorybookToml>> =
+        HashMap::new();
+    let runtime_config = load_runtime_storybook_config(&all_entries, &mut crate_configs);
+
+    if let Some(runtime_config) = runtime_config.as_ref()
+        && let Some(group) = runtime_config.group()
+    {
+        tracing::info!(
+            "Using runtime storybook.toml with group '{}' and allow {:?}",
+            group,
+            runtime_config.allow.as_ref()
+        );
+    }
+
+    let mut entries: Vec<_> = all_entries
+        .into_iter()
+        .filter_map(|entry| {
+            let config = crate_configs
+                .entry(entry.crate_dir)
+                .or_insert_with(|| load_storybook_config(entry));
+
+            let section = config
+                .as_ref()
+                .and_then(gpui_storybook_toml::StorybookToml::group)
+                .or(entry.section);
+
+            if let Some(runtime_config) = runtime_config.as_ref()
+                && !runtime_config.allows_group(section)
+            {
+                tracing::debug!(
+                    "Skipping story '{}' from crate '{}' because group '{:?}' is not listed in runtime allow",
+                    entry.name,
+                    entry.crate_name,
+                    section
+                );
+                return None;
+            }
+
+            if let Some(runtime_config) = runtime_config.as_ref()
+                && runtime_config.is_story_disabled(entry.name)
+            {
+                tracing::debug!(
+                    "Skipping story '{}' from crate '{}' because it is listed in runtime disable_story",
+                    entry.name,
+                    entry.crate_name
+                );
+                return None;
+            }
+
+            let section = section.map(str::to_string);
+
+            Some(ResolvedStoryEntry { entry, section })
+        })
+        .collect();
+
+    tracing::info!(
+        "Collected {} story(ies) after storybook.toml filtering",
+        entries.len()
+    );
 
     entries.sort_by(|a, b| {
         // First sort by section_order (if both have it)
-        match (a.section_order, b.section_order) {
+        match (a.entry.section_order, b.entry.section_order) {
             (Some(order_a), Some(order_b)) => {
                 // Both have order, compare by order then by name
-                order_a.cmp(&order_b).then_with(|| a.name.cmp(b.name))
+                order_a
+                    .cmp(&order_b)
+                    .then_with(|| a.entry.name.cmp(b.entry.name))
             },
             (Some(_), None) => std::cmp::Ordering::Less, // With order comes before without
             (None, Some(_)) => std::cmp::Ordering::Greater, // Without order comes after with
             (None, None) => {
                 // Neither has order, sort by section name (if present) then by story name
                 match (&a.section, &b.section) {
-                    (Some(sec_a), Some(sec_b)) => sec_a.cmp(sec_b).then_with(|| a.name.cmp(b.name)),
+                    (Some(sec_a), Some(sec_b)) => sec_a
+                        .cmp(sec_b)
+                        .then_with(|| a.entry.name.cmp(b.entry.name)),
                     (Some(_), None) => std::cmp::Ordering::Less,
                     (None, Some(_)) => std::cmp::Ordering::Greater,
-                    (None, None) => a.name.cmp(b.name),
+                    (None, None) => a.entry.name.cmp(b.entry.name),
                 }
             },
         }
@@ -89,23 +232,24 @@ pub fn generate_stories(
 
     entries
         .into_iter()
-        .map(|entry| {
-            let section_info = entry
+        .map(|resolved| {
+            let section_info = resolved
                 .section
                 .as_ref()
                 .map(|s| format!(", section: \"{}\"", s))
                 .unwrap_or_default();
 
             tracing::info!(
-                "Story: {}{} ({}:{})",
-                entry.name,
+                "Story: {}{} ({}:{}) [{}]",
+                resolved.entry.name,
                 section_info,
-                entry.file,
-                entry.line
+                resolved.entry.file,
+                resolved.entry.line,
+                resolved.entry.crate_name
             );
 
-            let container = (entry.create_fn)(window, cx);
-            if let Some(section) = entry.section {
+            let container = (resolved.entry.create_fn)(window, cx);
+            if let Some(section) = resolved.section {
                 container.update(cx, |c, _| {
                     c.section = Some(section.into());
                 });

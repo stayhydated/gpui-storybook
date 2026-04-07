@@ -96,6 +96,23 @@ enum StorySection {
 pub struct CardStory;
 ```
 
+## Crate-level story discovery config
+
+You can add a `storybook.toml` file to a crate root to control what `generate_stories` includes from that crate:
+
+```toml
+group = "UI Kit"
+allow = ["UI Kit"]
+disable_story = ["CardStory"]
+```
+
+- `group`: Required section/group name when `storybook.toml` exists; applied to all stories in that crate.
+- `allow`: Optional list of allowed group identifiers for the current app/runtime.
+- omit `allow`: Allows only the config's own `group`.
+- `allow = ["*"]`: Includes all groups.
+- `allow = []`: Includes none.
+- `disable_story`: Optional per-story denylist by story struct name.
+
 ## Acknowledgements
 
 This project is heavily inspired by the story section of [gpui-component](https://github.com/longbridge/gpui-component/tree/main/crates/story).
