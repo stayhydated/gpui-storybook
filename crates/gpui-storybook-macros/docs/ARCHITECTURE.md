@@ -9,7 +9,7 @@
 - `#[story]` registers a story struct as a `StoryEntry`:
   - Accepts no argument, a string literal section name, or an enum variant path.
   - For enum variants, the last path segment is used as the section label and the discriminant is used as `section_order`.
-  - Emits an `inventory::submit!` block with file/line metadata and a `StoryContainer::panel` factory.
+  - Emits an `inventory::submit!` block with crate metadata (`CARGO_PKG_NAME`, `CARGO_MANIFEST_DIR`), file/line metadata, and a `StoryContainer::panel` factory.
 - `#[story_init]` registers an initialization function as an `InitEntry`:
   - Emits an `inventory::submit!` block with the function pointer and file/line metadata.
 

@@ -7,7 +7,7 @@
 ## Key entry points
 
 - `init`: Registers the current language and locale manager, then delegates to the core story initialization. It also executes any global init hooks registered via the inventory system.
-- `generate_stories`: Collects `StoryEntry` inventory records, sorts them by section and order, constructs `StoryContainer` entities, and applies section metadata.
+- `generate_stories`: Collects `StoryEntry` inventory records, applies optional per-crate `storybook.toml` filtering (`allow`) and grouping (`group`), sorts by section/order, then constructs `StoryContainer` entities.
 - `create_new_window`: Re-export from the core crate for creating the storybook window.
 
 ## Data flow
@@ -27,5 +27,6 @@
 
 - `gpui-storybook-core` provides the runtime.
 - `gpui-storybook-macros` is optional and re-exported behind the `macros` feature.
+- `gpui-storybook-toml` parses crate-local discovery config from `storybook.toml`.
 - `inventory` backs registration and discovery.
 - `tracing` logs discovery details.

@@ -6,6 +6,8 @@ pub struct StoryEntry {
     pub section: Option<&'static str>,
     pub section_order: Option<usize>,
     pub create_fn: fn(&mut ::gpui::Window, &mut ::gpui::App) -> ::gpui::Entity<StoryContainer>,
+    pub crate_name: &'static str,
+    pub crate_dir: &'static str,
     pub file: &'static str,
     pub line: u32,
 }

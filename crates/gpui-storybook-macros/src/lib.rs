@@ -73,6 +73,8 @@ fn story_impl(args: TokenStream2, input: TokenStream2) -> TokenStream2 {
                 create_fn: |window, cx| {
                     ::gpui_storybook::StoryContainer::panel::<#struct_name>(window, cx)
                 },
+                crate_name: ::std::env!("CARGO_PKG_NAME"),
+                crate_dir: ::std::env!("CARGO_MANIFEST_DIR"),
                 file: ::std::file!(),
                 line: ::std::line!(),
             }
