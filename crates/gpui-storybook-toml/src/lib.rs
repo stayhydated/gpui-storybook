@@ -35,9 +35,7 @@ impl StorybookToml {
     }
 
     pub fn group(&self) -> Option<&str> {
-        Some(self.group.as_str())
-            .map(str::trim)
-            .filter(|group| !group.is_empty())
+        Some(str::trim(self.group.as_str())).filter(|group| !group.is_empty())
     }
 }
 
