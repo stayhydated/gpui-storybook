@@ -106,7 +106,8 @@ allow = ["ButtonStory", "CardStory"]
 ```
 
 - `group`: Required section/group name when `storybook.toml` exists; applied to all stories in that crate.
-- `allow`: Story struct names to include.
+- `allow`: Optional list of story struct names or group names to include.
+- omit `allow`: Includes all stories from that crate.
 - `allow = ["*"]`: Includes all stories from that crate.
 - `allow = []`: Includes none from that crate.
 

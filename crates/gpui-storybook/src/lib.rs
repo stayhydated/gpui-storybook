@@ -95,8 +95,13 @@ pub fn generate_stories(
                 .entry(entry.crate_dir)
                 .or_insert_with(|| load_storybook_config(entry));
 
+            let section = config
+                .as_ref()
+                .and_then(gpui_storybook_toml::StorybookToml::group)
+                .or(entry.section);
+
             if let Some(config) = config.as_ref()
-                && !config.allows(entry.name)
+                && !config.allows(entry.name, section)
             {
                 tracing::debug!(
                     "Skipping story '{}' from crate '{}' because it is not listed in allow",
@@ -106,11 +111,7 @@ pub fn generate_stories(
                 return None;
             }
 
-            let section = config
-                .as_ref()
-                .and_then(gpui_storybook_toml::StorybookToml::group)
-                .or(entry.section)
-                .map(str::to_string);
+            let section = section.map(str::to_string);
 
             Some(ResolvedStoryEntry { entry, section })
         })

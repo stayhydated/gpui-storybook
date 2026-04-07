@@ -8,14 +8,20 @@ pub const STORYBOOK_TOML_FILE_NAME: &str = "storybook.toml";
 pub struct StorybookToml {
     pub group: String,
     #[serde(default)]
-    pub allow: Vec<String>,
+    pub allow: Option<Vec<String>>,
 }
 
 impl StorybookToml {
-    pub fn allows(&self, story_name: &str) -> bool {
-        self.allow
-            .iter()
-            .any(|allowed_story| allowed_story == "*" || allowed_story == story_name)
+    pub fn allows(&self, story_name: &str, group: Option<&str>) -> bool {
+        let Some(allow_list) = self.allow.as_ref() else {
+            return true;
+        };
+
+        allow_list.iter().any(|allowed| {
+            allowed == "*"
+                || allowed == story_name
+                || group.is_some_and(|group_name| allowed == group_name)
+        })
     }
 
     pub fn group(&self) -> Option<&str> {
@@ -120,8 +126,8 @@ mod tests {
                 .expect("valid config should parse")
                 .expect("config should exist");
 
-            assert!(config.allows("ButtonStory"));
-            assert!(config.allows("TableStory"));
+            assert!(config.allows("ButtonStory", config.group()));
+            assert!(config.allows("TableStory", config.group()));
             assert_eq!(config.group(), Some("Examples"));
         });
     }
@@ -139,14 +145,14 @@ mod tests {
                 .expect("valid config should parse")
                 .expect("config should exist");
 
-            assert!(config.allows("ButtonStory"));
-            assert!(config.allows("HelloStory"));
-            assert!(!config.allows("TableStory"));
+            assert!(config.allows("ButtonStory", config.group()));
+            assert!(config.allows("HelloStory", config.group()));
+            assert!(!config.allows("TableStory", config.group()));
         });
     }
 
     #[test]
-    fn allow_defaults_to_empty_when_not_provided() {
+    fn allow_defaults_to_all_when_not_provided() {
         with_temp_dir(|dir| {
             std::fs::write(dir.join(STORYBOOK_TOML_FILE_NAME), "group = \"Examples\"\n")
                 .expect("should write config file");
@@ -155,8 +161,8 @@ mod tests {
                 .expect("valid config should parse")
                 .expect("config should exist");
 
-            assert_eq!(config.allow, Vec::<String>::new());
-            assert!(!config.allows("ButtonStory"));
+            assert_eq!(config.allow, None);
+            assert!(config.allows("ButtonStory", config.group()));
         });
     }
 
@@ -173,8 +179,26 @@ mod tests {
                 .expect("valid config should parse")
                 .expect("config should exist");
 
-            assert!(!config.allows("ButtonStory"));
-            assert!(!config.allows("AnyStory"));
+            assert!(!config.allows("ButtonStory", config.group()));
+            assert!(!config.allows("AnyStory", config.group()));
+        });
+    }
+
+    #[test]
+    fn group_name_in_allow_list_includes_story() {
+        with_temp_dir(|dir| {
+            std::fs::write(
+                dir.join(STORYBOOK_TOML_FILE_NAME),
+                "group = \"Examples\"\nallow = [\"Examples\"]\n",
+            )
+            .expect("should write config file");
+
+            let config = load_from_dir(dir)
+                .expect("valid config should parse")
+                .expect("config should exist");
+
+            assert!(config.allows("ButtonStory", config.group()));
+            assert!(!config.allows("ButtonStory", Some("OtherGroup")));
         });
     }
 
