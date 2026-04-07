@@ -1,0 +1,3 @@
+# allow = []
+group = "gpui-storybook-example"
+# disable_story = ["TableStory"]

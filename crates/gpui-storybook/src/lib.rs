@@ -101,10 +101,21 @@ pub fn generate_stories(
                 .or(entry.section);
 
             if let Some(config) = config.as_ref()
-                && !config.allows(entry.name, section)
+                && !config.allows_group(section)
             {
                 tracing::debug!(
-                    "Skipping story '{}' from crate '{}' because it is not listed in allow",
+                    "Skipping story '{}' from crate '{}' because group is not listed in allow",
+                    entry.name,
+                    entry.crate_name
+                );
+                return None;
+            }
+
+            if let Some(config) = config.as_ref()
+                && config.is_story_disabled(entry.name)
+            {
+                tracing::debug!(
+                    "Skipping story '{}' from crate '{}' because it is listed in disable_story",
                     entry.name,
                     entry.crate_name
                 );

@@ -9,19 +9,25 @@ pub struct StorybookToml {
     pub group: String,
     #[serde(default)]
     pub allow: Option<Vec<String>>,
+    #[serde(default)]
+    pub disable_story: Vec<String>,
 }
 
 impl StorybookToml {
-    pub fn allows(&self, story_name: &str, group: Option<&str>) -> bool {
+    pub fn allows_group(&self, group: Option<&str>) -> bool {
         let Some(allow_list) = self.allow.as_ref() else {
             return true;
         };
 
-        allow_list.iter().any(|allowed| {
-            allowed == "*"
-                || allowed == story_name
-                || group.is_some_and(|group_name| allowed == group_name)
-        })
+        allow_list
+            .iter()
+            .any(|allowed| allowed == "*" || group.is_some_and(|group_name| allowed == group_name))
+    }
+
+    pub fn is_story_disabled(&self, story_name: &str) -> bool {
+        self.disable_story
+            .iter()
+            .any(|disabled| disabled == story_name)
     }
 
     pub fn group(&self) -> Option<&str> {
@@ -126,18 +132,17 @@ mod tests {
                 .expect("valid config should parse")
                 .expect("config should exist");
 
-            assert!(config.allows("ButtonStory", config.group()));
-            assert!(config.allows("TableStory", config.group()));
+            assert!(config.allows_group(config.group()));
             assert_eq!(config.group(), Some("Examples"));
         });
     }
 
     #[test]
-    fn allow_list_filters_to_explicit_story_names() {
+    fn allow_list_filters_to_explicit_groups() {
         with_temp_dir(|dir| {
             std::fs::write(
                 dir.join(STORYBOOK_TOML_FILE_NAME),
-                "group = \"Examples\"\nallow = [\"ButtonStory\", \"HelloStory\"]\n",
+                "group = \"Examples\"\nallow = [\"Examples\", \"Other\"]\n",
             )
             .expect("should write config file");
 
@@ -145,9 +150,8 @@ mod tests {
                 .expect("valid config should parse")
                 .expect("config should exist");
 
-            assert!(config.allows("ButtonStory", config.group()));
-            assert!(config.allows("HelloStory", config.group()));
-            assert!(!config.allows("TableStory", config.group()));
+            assert!(config.allows_group(config.group()));
+            assert!(!config.allows_group(Some("Unlisted")));
         });
     }
 
@@ -162,7 +166,7 @@ mod tests {
                 .expect("config should exist");
 
             assert_eq!(config.allow, None);
-            assert!(config.allows("ButtonStory", config.group()));
+            assert!(config.allows_group(config.group()));
         });
     }
 
@@ -179,13 +183,12 @@ mod tests {
                 .expect("valid config should parse")
                 .expect("config should exist");
 
-            assert!(!config.allows("ButtonStory", config.group()));
-            assert!(!config.allows("AnyStory", config.group()));
+            assert!(!config.allows_group(config.group()));
         });
     }
 
     #[test]
-    fn group_name_in_allow_list_includes_story() {
+    fn group_name_in_allow_list_includes_group() {
         with_temp_dir(|dir| {
             std::fs::write(
                 dir.join(STORYBOOK_TOML_FILE_NAME),
@@ -197,8 +200,26 @@ mod tests {
                 .expect("valid config should parse")
                 .expect("config should exist");
 
-            assert!(config.allows("ButtonStory", config.group()));
-            assert!(!config.allows("ButtonStory", Some("OtherGroup")));
+            assert!(config.allows_group(config.group()));
+            assert!(!config.allows_group(Some("OtherGroup")));
+        });
+    }
+
+    #[test]
+    fn disable_story_filters_specific_story_names() {
+        with_temp_dir(|dir| {
+            std::fs::write(
+                dir.join(STORYBOOK_TOML_FILE_NAME),
+                "group = \"Examples\"\ndisable_story = [\"ButtonStory\"]\n",
+            )
+            .expect("should write config file");
+
+            let config = load_from_dir(dir)
+                .expect("valid config should parse")
+                .expect("config should exist");
+
+            assert!(config.is_story_disabled("ButtonStory"));
+            assert!(!config.is_story_disabled("TableStory"));
         });
     }
 

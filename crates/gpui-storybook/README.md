@@ -102,14 +102,16 @@ You can add a `storybook.toml` file to a crate root to control what `generate_st
 
 ```toml
 group = "UI Kit"
-allow = ["ButtonStory", "CardStory"]
+allow = ["UI Kit"]
+disable_story = ["CardStory"]
 ```
 
 - `group`: Required section/group name when `storybook.toml` exists; applied to all stories in that crate.
-- `allow`: Optional list of story struct names or group names to include.
+- `allow`: Optional list of allowed group identifiers.
 - omit `allow`: Includes all stories from that crate.
 - `allow = ["*"]`: Includes all stories from that crate.
 - `allow = []`: Includes none from that crate.
+- `disable_story`: Optional per-story denylist by story struct name.
 
 ## Acknowledgements
 

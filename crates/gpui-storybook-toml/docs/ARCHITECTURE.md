@@ -7,13 +7,15 @@
 ## Config schema
 
 - `group` (required string when file exists): Overrides the section/group assigned to every discovered story in that crate.
-- `allow` (optional string array): Story struct names or group names allowed for that crate.
-  - Omitted `allow` includes all stories in the crate.
+- `allow` (optional string array): Allowed group identifiers.
+  - Omitted `allow` includes all groups.
   - `allow = ["*"]` includes all stories.
   - `allow = []` includes none.
+- `disable_story` (optional string array): Per-story denylist by story struct name.
 
 ## API
 
 - `load_from_dir`: Reads `<crate-dir>/storybook.toml` and returns `Option<StorybookToml>`.
-- `StorybookToml::allows`: Evaluates the allowlist for an individual story name and group.
+- `StorybookToml::allows_group`: Evaluates the group allowlist.
+- `StorybookToml::is_story_disabled`: Evaluates per-story denylist membership.
 - `StorybookToml::group`: Returns a trimmed non-empty group name.
