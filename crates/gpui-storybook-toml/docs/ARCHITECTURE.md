@@ -8,7 +8,7 @@
 
 - `group` (required string when file exists): Overrides the section/group assigned to every discovered story in that crate.
 - `allow` (optional string array): Allowed group identifiers.
-  - Omitted `allow` includes all groups.
+  - Omitted `allow` allows only the config's own `group`.
   - `allow = ["*"]` includes all stories.
   - `allow = []` includes none.
 - `disable_story` (optional string array): Per-story denylist by story struct name.

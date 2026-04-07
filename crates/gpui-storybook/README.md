@@ -107,10 +107,10 @@ disable_story = ["CardStory"]
 ```
 
 - `group`: Required section/group name when `storybook.toml` exists; applied to all stories in that crate.
-- `allow`: Optional list of allowed group identifiers.
-- omit `allow`: Includes all stories from that crate.
-- `allow = ["*"]`: Includes all stories from that crate.
-- `allow = []`: Includes none from that crate.
+- `allow`: Optional list of allowed group identifiers for the current app/runtime.
+- omit `allow`: Allows only the config's own `group`.
+- `allow = ["*"]`: Includes all groups.
+- `allow = []`: Includes none.
 - `disable_story`: Optional per-story denylist by story struct name.
 
 ## Acknowledgements

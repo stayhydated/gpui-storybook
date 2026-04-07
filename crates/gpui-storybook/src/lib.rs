@@ -2,7 +2,10 @@
 pub use gpui_storybook_macros::*;
 
 use gpui_storybook_core::locale::LocaleStore;
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 #[cfg(feature = "dock")]
 pub use gpui_storybook_core::dock_gallery::{
@@ -47,6 +50,61 @@ fn load_storybook_config(
     }
 }
 
+fn load_storybook_config_from_working_directory() -> Option<gpui_storybook_toml::StorybookToml> {
+    let mut current = std::env::current_dir().ok()?;
+    loop {
+        match gpui_storybook_toml::load_from_dir(&current) {
+            Ok(Some(config)) => return Some(config),
+            Ok(None) => {},
+            Err(err) => {
+                tracing::warn!(
+                    "Failed to load storybook.toml from working directory '{}' path '{}': {}",
+                    std::env::current_dir()
+                        .ok()
+                        .as_deref()
+                        .unwrap_or_else(|| Path::new("<unknown>"))
+                        .display(),
+                    current.display(),
+                    err
+                );
+                return None;
+            },
+        }
+
+        if !current.pop() {
+            break;
+        }
+    }
+
+    None
+}
+
+fn current_binary_name() -> Option<String> {
+    let argv0 = std::env::args_os().next()?;
+    PathBuf::from(argv0)
+        .file_stem()
+        .map(|stem| stem.to_string_lossy().to_string())
+}
+
+fn load_runtime_storybook_config(
+    all_entries: &[&'static __registry::StoryEntry],
+    crate_configs: &mut HashMap<&'static str, Option<gpui_storybook_toml::StorybookToml>>,
+) -> Option<gpui_storybook_toml::StorybookToml> {
+    if let Some(bin_name) = current_binary_name()
+        && let Some(entry) = all_entries
+            .iter()
+            .copied()
+            .find(|entry| entry.crate_name == bin_name)
+    {
+        return crate_configs
+            .entry(entry.crate_dir)
+            .or_insert_with(|| load_storybook_config(entry))
+            .clone();
+    }
+
+    load_storybook_config_from_working_directory()
+}
+
 pub fn init<L>(language: L, cx: &mut ::gpui::App)
 where
     L: Language,
@@ -86,10 +144,23 @@ pub fn generate_stories(
         }
     );
 
+    let all_entries: Vec<_> = inventory::iter::<__registry::StoryEntry>().collect();
     let mut crate_configs: HashMap<&'static str, Option<gpui_storybook_toml::StorybookToml>> =
         HashMap::new();
+    let runtime_config = load_runtime_storybook_config(&all_entries, &mut crate_configs);
 
-    let mut entries: Vec<_> = inventory::iter::<__registry::StoryEntry>()
+    if let Some(runtime_config) = runtime_config.as_ref()
+        && let Some(group) = runtime_config.group()
+    {
+        tracing::info!(
+            "Using runtime storybook.toml with group '{}' and allow {:?}",
+            group,
+            runtime_config.allow.as_ref()
+        );
+    }
+
+    let mut entries: Vec<_> = all_entries
+        .into_iter()
         .filter_map(|entry| {
             let config = crate_configs
                 .entry(entry.crate_dir)
@@ -100,22 +171,23 @@ pub fn generate_stories(
                 .and_then(gpui_storybook_toml::StorybookToml::group)
                 .or(entry.section);
 
-            if let Some(config) = config.as_ref()
-                && !config.allows_group(section)
+            if let Some(runtime_config) = runtime_config.as_ref()
+                && !runtime_config.allows_group(section)
             {
                 tracing::debug!(
-                    "Skipping story '{}' from crate '{}' because group is not listed in allow",
+                    "Skipping story '{}' from crate '{}' because group '{:?}' is not listed in runtime allow",
                     entry.name,
-                    entry.crate_name
+                    entry.crate_name,
+                    section
                 );
                 return None;
             }
 
-            if let Some(config) = config.as_ref()
-                && config.is_story_disabled(entry.name)
+            if let Some(runtime_config) = runtime_config.as_ref()
+                && runtime_config.is_story_disabled(entry.name)
             {
                 tracing::debug!(
-                    "Skipping story '{}' from crate '{}' because it is listed in disable_story",
+                    "Skipping story '{}' from crate '{}' because it is listed in runtime disable_story",
                     entry.name,
                     entry.crate_name
                 );

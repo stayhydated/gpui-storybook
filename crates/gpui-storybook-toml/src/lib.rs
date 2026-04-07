@@ -15,13 +15,17 @@ pub struct StorybookToml {
 
 impl StorybookToml {
     pub fn allows_group(&self, group: Option<&str>) -> bool {
+        let group = group.map(str::trim).filter(|group| !group.is_empty());
+        let self_group = self.group();
+
         let Some(allow_list) = self.allow.as_ref() else {
-            return true;
+            return matches!((group, self_group), (Some(group), Some(self_group)) if group == self_group);
         };
 
-        allow_list
-            .iter()
-            .any(|allowed| allowed == "*" || group.is_some_and(|group_name| allowed == group_name))
+        allow_list.iter().any(|allowed| {
+            let allowed = allowed.trim();
+            allowed == "*" || group.is_some_and(|group_name| allowed == group_name)
+        })
     }
 
     pub fn is_story_disabled(&self, story_name: &str) -> bool {
@@ -156,7 +160,7 @@ mod tests {
     }
 
     #[test]
-    fn allow_defaults_to_all_when_not_provided() {
+    fn allow_defaults_to_self_group_when_not_provided() {
         with_temp_dir(|dir| {
             std::fs::write(dir.join(STORYBOOK_TOML_FILE_NAME), "group = \"Examples\"\n")
                 .expect("should write config file");
@@ -167,6 +171,7 @@ mod tests {
 
             assert_eq!(config.allow, None);
             assert!(config.allows_group(config.group()));
+            assert!(!config.allows_group(Some("OtherGroup")));
         });
     }
 
