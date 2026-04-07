@@ -25,6 +25,18 @@ inputs:
     description: Install fontconfig (libfontconfig1-dev)
     required: false
     default: "true"
+  glib:
+    description: Install glib (libglib2.0-dev)
+    required: false
+    default: "true"
+  gtk3:
+    description: Install gtk3 (libgtk-3-dev)
+    required: false
+    default: "true"
+  pkg_config:
+    description: Install pkg-config
+    required: false
+    default: "true"
 
 runs:
   using: composite
@@ -42,3 +54,6 @@ runs:
         ${{ fromJSON(inputs.xkb) && 'libxkbcommon-dev' || '' }}
         ${{ fromJSON(inputs.xkb_x11) && 'libxkbcommon-x11-dev' || '' }}
         ${{ fromJSON(inputs.fontconfig) && 'libfontconfig1-dev' || '' }}
+        ${{ fromJSON(inputs.glib) && 'libglib2.0-dev' || '' }}
+        ${{ fromJSON(inputs.gtk3) && 'libgtk-3-dev' || '' }}
+        ${{ fromJSON(inputs.pkg_config) && 'pkg-config' || '' }}
