@@ -1,0 +1,58 @@
+---
+source: crates/gpui-storybook-macros/src/lib.rs
+expression: snapshot_tokens(expanded)
+---
+struct __ButtonChipComponentStoryView {
+    focus_handle: ::gpui::FocusHandle,
+}
+impl __ButtonChipComponentStoryView {
+    fn view(_window: &mut ::gpui::Window, cx: &mut ::gpui::App) -> ::gpui::Entity<Self> {
+        ::gpui::AppContext::new(
+            cx,
+            |cx| Self {
+                focus_handle: cx.focus_handle(),
+            },
+        )
+    }
+}
+impl ::gpui::Focusable for __ButtonChipComponentStoryView {
+    fn focus_handle(&self, _cx: &::gpui::App) -> ::gpui::FocusHandle {
+        self.focus_handle.clone()
+    }
+}
+impl ::gpui::Render for __ButtonChipComponentStoryView {
+    fn render(
+        &mut self,
+        window: &mut ::gpui::Window,
+        cx: &mut ::gpui::Context<Self>,
+    ) -> impl ::gpui::IntoElement {
+        let _ = &self.focus_handle;
+        let _ = window;
+        let _ = cx;
+        <ButtonChip as ::std::default::Default>::default()
+    }
+}
+impl ::gpui_storybook::Story for __ButtonChipComponentStoryView {
+    fn klass() -> &'static str {
+        "ButtonChip"
+    }
+    fn title() -> ::std::string::String {
+        ("Button Chip").into()
+    }
+    fn description() -> ::std::string::String {
+        ("").into()
+    }
+    fn new_view(
+        window: &mut ::gpui::Window,
+        cx: &mut ::gpui::App,
+    ) -> ::gpui::Entity<impl ::gpui::Render + ::gpui::Focusable> {
+        Self::view(window, cx)
+    }
+}
+gpui_storybook::__inventory::submit! {
+    ::gpui_storybook::__registry::StoryEntry { name : "ButtonChip", section :
+    Some("Components"), section_order : None, create_fn : | window, cx | {
+    ::gpui_storybook::StoryContainer::panel:: < __ButtonChipComponentStoryView > (window,
+    cx) }, crate_name : ::std::env!("CARGO_PKG_NAME"), crate_dir :
+    ::std::env!("CARGO_MANIFEST_DIR"), file : ::std::file!(), line : ::std::line!(), }
+}

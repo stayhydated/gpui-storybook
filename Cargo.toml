@@ -1,12 +1,13 @@
 [workspace]
-default-members = [ "example" ]
+default-members = [ "examples/story" ]
 members = [
   "crates/gpui-storybook",
   "crates/gpui-storybook-components",
   "crates/gpui-storybook-core",
   "crates/gpui-storybook-macros",
   "crates/gpui-storybook-toml",
-  "example",
+  "examples/story",
+  "examples/component",
 ]
 resolver = "3"
 

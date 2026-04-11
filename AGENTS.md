@@ -1,6 +1,6 @@
 # Project Overview
 
-ignore all folders matching "**/\_\_crate_paths/**"
+ignore all folders matching "**/__crate_paths__/**"
 
 `gpui-storybook` is a storybook-style workspace for building and inspecting GPUI components. It focuses on:
 
@@ -16,9 +16,10 @@ ignore all folders matching "**/\_\_crate_paths/**"
 | `gpui-storybook` | [Architecture](crates/gpui-storybook/docs/ARCHITECTURE.md) | Facade crate, entry point, and story discovery. |
 | `gpui-storybook-core` | [Architecture](crates/gpui-storybook-core/docs/ARCHITECTURE.md) | UI runtime: gallery, story panels, theming, i18n, assets. |
 | **Macros** | | |
-| `gpui-storybook-macros` | [Architecture](crates/gpui-storybook-macros/docs/ARCHITECTURE.md) | Proc macros for story registration and init hooks. |
+| `gpui-storybook-macros` | [Architecture](crates/gpui-storybook-macros/docs/ARCHITECTURE.md) | Proc macros for story registration, component-derived registration, and init hooks. |
 | **Examples** | | |
-| `gpui-storybook-example` | | End-to-end sample app and stories. |
+| `gpui-storybook-example-story` | | Story-struct example app using `#[story]`. |
+| `gpui-storybook-example-component` | | Component-attached example app using `#[derive(ComponentStory)]`. |
 
 ## Crate Descriptions
 
@@ -29,19 +30,22 @@ ignore all folders matching "**/\_\_crate_paths/**"
 
 ### Macros
 
-- **`gpui-storybook-macros`**: Provides `#[story]` and `#[story_init]` macros that register inventory entries at compile time.
+- **`gpui-storybook-macros`**: Provides `#[story]`, `#[derive(ComponentStory)]`, and `#[story_init]` macros that register inventory entries at compile time.
 
 ### Examples
 
-- **`gpui-storybook-example`**: Demonstrates a full GPUI app wired to the storybook runtime, including language setup.
+- **`gpui-storybook-example-story`**: Demonstrates the explicit story-struct workflow.
+- **`gpui-storybook-example-component`**: Demonstrates attaching story registration directly to the component type.
 
 ## Development
 
 - **Rust**: Use `cargo` for building, testing, and running Rust code.
 - **Formatting**: `cargo fmt` and `taplo fmt` for TOML.
-- **Checks**: `cargo check --workspace --all-features --exclude gpui-storybook-example`.
+- **Checks**: `cargo check --workspace --all-features --exclude gpui-storybook-example-story --exclude gpui-storybook-example-component`.
 - **Tests**: `cargo test --workspace --all-features`.
-- **Example app**: `cargo run -p gpui-storybook-example`.
+- **Example apps**:
+  - `cargo run -p gpui-storybook-example-story`
+  - `cargo run -p gpui-storybook-example-component`
 
 ## Skills
 

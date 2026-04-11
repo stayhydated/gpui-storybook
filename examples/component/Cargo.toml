@@ -1,5 +1,5 @@
 [package]
-name = "gpui-storybook-example"
+name = "gpui-storybook-example-component"
 version.workspace = true
 edition.workspace = true
 license = "Unlicense"
@@ -16,12 +16,12 @@ es-fluent-manager-embedded = { workspace = true }
 gpui = { workspace = true }
 gpui-component = { workspace = true }
 gpui-storybook = { workspace = true }
-rust-embed = { workspace = true }
-strum = { workspace = true }
-reqwest_client = { workspace = true }
-serde = { workspace = true }
-tracing-subscriber = { features = [ "env-filter" ], workspace = true }
 gpui_platform = { workspace = true }
+reqwest_client = { workspace = true }
+rust-embed = { workspace = true }
+serde = { workspace = true }
+strum = { workspace = true }
+tracing-subscriber = { features = [ "env-filter" ], workspace = true }
 
 [build-dependencies]
 es-fluent = { features = [ "build" ], workspace = true }

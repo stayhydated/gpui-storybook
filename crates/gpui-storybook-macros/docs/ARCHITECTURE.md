@@ -10,13 +10,22 @@
   - Accepts no argument, a string literal section name, or an enum variant path.
   - For enum variants, the last path segment is used as the section label and the discriminant is used as `section_order`.
   - Emits an `inventory::submit!` block with crate metadata (`CARGO_PKG_NAME`, `CARGO_MANIFEST_DIR`), file/line metadata, and a `StoryContainer::panel` factory.
+- `#[derive(ComponentStory)]` turns a component type into a registered story via a generated wrapper:
+  - Targets non-generic structs.
+  - Reads `#[storybook(title = ..., description = ..., section = ..., example = ...)]` helper attributes.
+  - `title` and `description` accept expressions that convert into `String`.
+  - Generates a hidden wrapper view that implements `Story`, `Render`, and `Focusable`.
+  - The wrapper renders either `example = ...` or `<Component as Default>::default()` and registers that wrapper in inventory under the component type name.
 - `#[story_init]` registers an initialization function as an `InitEntry`:
   - Emits an `inventory::submit!` block with the function pointer and file/line metadata.
 
 ## Parsing and expansion
 
-- `StoryArgs` parses the attribute argument into either a string literal or a `syn::Path`.
-- `story_impl` and `story_init_impl` expand the input items and append the registration blocks.
+- `StoryArgs` parses `#[story(...)]` arguments into either a string literal or a `syn::Path`.
+- `ComponentStoryArgs` parses `#[storybook(...)]` helper attributes for the derive macro.
+- Shared registration helpers build the final `StoryEntry` token stream so the attribute and derive macros stay aligned.
+- `component_story_impl` generates the internal wrapper type plus the final registration block.
+- `story_impl` and `story_init_impl` expand input items and append their registration blocks.
 
 ## Tests
 
