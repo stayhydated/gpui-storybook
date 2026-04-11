@@ -5,7 +5,7 @@ pub mod themes;
 mod window;
 
 pub use self::state::AppState;
-pub use self::window::create_new_window;
+pub use self::window::{create_new_window, create_new_window_with_ui};
 pub use components::{
     ContainerEvent, Story, StoryContainer, StorySection, StoryState, reveal_story_panel, section,
 };

@@ -18,7 +18,8 @@ pub use gpui_storybook_core::{
     gallery::Gallery,
     i18n::change_locale,
     language::{CurrentLanguage, Language},
-    story::{Story, StoryContainer, create_new_window},
+    story::{Story, StoryContainer, create_new_window, create_new_window_with_ui},
+    storybook_window_ui::{StorybookWindow, StorybookWindowUi},
     window_view::SimpleWindowView,
 };
 

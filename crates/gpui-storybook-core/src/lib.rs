@@ -9,6 +9,7 @@ pub mod language;
 pub mod locale;
 pub mod registry;
 pub mod story;
+pub mod storybook_window_ui;
 pub mod title_bar;
 mod window_options;
 pub mod window_view;

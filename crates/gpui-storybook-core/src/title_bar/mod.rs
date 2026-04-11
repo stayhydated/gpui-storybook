@@ -9,6 +9,8 @@ use gpui::{
 use gpui_component::{TitleBar, menu::AppMenuBar};
 use std::rc::Rc;
 
+use crate::storybook_window_ui::StorybookWindowUi;
+
 pub struct AppTitleBar {
     app_menu_bar: Entity<AppMenuBar>,
     font_size_selector: Entity<FontSizeSelector>,
@@ -18,16 +20,19 @@ pub struct AppTitleBar {
 impl AppTitleBar {
     pub fn new(
         title: impl Into<SharedString>,
+        ui: StorybookWindowUi,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
-        let app_menu_bar = app_menus::init(title, cx);
+        let app_menu_bar = app_menus::init(title, ui.app_menu_items.clone(), cx);
         let font_size_selector = cx.new(|cx| FontSizeSelector::new(window, cx));
 
         Self {
             app_menu_bar,
             font_size_selector,
-            child: Rc::new(|_, _| div().into_any_element()),
+            child: ui
+                .title_bar_items
+                .unwrap_or_else(|| Rc::new(|_, _| div().into_any_element())),
         }
     }
 
