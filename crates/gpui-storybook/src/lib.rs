@@ -31,6 +31,7 @@ pub use inventory as __inventory;
 
 struct ResolvedStoryEntry {
     entry: &'static __registry::StoryEntry,
+    group: Option<String>,
     section: Option<String>,
 }
 
@@ -106,6 +107,43 @@ fn load_runtime_storybook_config(
     load_storybook_config_from_working_directory()
 }
 
+fn resolve_story_entry(
+    entry: &'static __registry::StoryEntry,
+    crate_group: Option<&str>,
+    runtime_config: Option<&gpui_storybook_toml::StorybookToml>,
+) -> Option<ResolvedStoryEntry> {
+    let filter_group = crate_group.or(entry.section);
+
+    if let Some(runtime_config) = runtime_config
+        && !runtime_config.allows_group(filter_group)
+    {
+        tracing::debug!(
+            "Skipping story '{}' from crate '{}' because group '{:?}' is not listed in runtime allow",
+            entry.name,
+            entry.crate_name,
+            filter_group
+        );
+        return None;
+    }
+
+    if let Some(runtime_config) = runtime_config
+        && runtime_config.is_story_disabled(entry.name)
+    {
+        tracing::debug!(
+            "Skipping story '{}' from crate '{}' because it is listed in runtime disable_story",
+            entry.name,
+            entry.crate_name
+        );
+        return None;
+    }
+
+    Some(ResolvedStoryEntry {
+        entry,
+        group: crate_group.map(str::to_string),
+        section: entry.section.map(str::to_string),
+    })
+}
+
 pub fn init<L>(language: L, cx: &mut ::gpui::App)
 where
     L: Language,
@@ -167,37 +205,13 @@ pub fn generate_stories(
                 .entry(entry.crate_dir)
                 .or_insert_with(|| load_storybook_config(entry));
 
-            let section = config
-                .as_ref()
-                .and_then(gpui_storybook_toml::StorybookToml::group)
-                .or(entry.section);
-
-            if let Some(runtime_config) = runtime_config.as_ref()
-                && !runtime_config.allows_group(section)
-            {
-                tracing::debug!(
-                    "Skipping story '{}' from crate '{}' because group '{:?}' is not listed in runtime allow",
-                    entry.name,
-                    entry.crate_name,
-                    section
-                );
-                return None;
-            }
-
-            if let Some(runtime_config) = runtime_config.as_ref()
-                && runtime_config.is_story_disabled(entry.name)
-            {
-                tracing::debug!(
-                    "Skipping story '{}' from crate '{}' because it is listed in runtime disable_story",
-                    entry.name,
-                    entry.crate_name
-                );
-                return None;
-            }
-
-            let section = section.map(str::to_string);
-
-            Some(ResolvedStoryEntry { entry, section })
+            resolve_story_entry(
+                entry,
+                config
+                    .as_ref()
+                    .and_then(gpui_storybook_toml::StorybookToml::group),
+                runtime_config.as_ref(),
+            )
         })
         .collect();
 
@@ -239,23 +253,102 @@ pub fn generate_stories(
                 .as_ref()
                 .map(|s| format!(", section: \"{}\"", s))
                 .unwrap_or_default();
+            let group_info = resolved
+                .group
+                .as_ref()
+                .map(|group| format!(", group: \"{}\"", group))
+                .unwrap_or_default();
 
             tracing::info!(
-                "Story: {}{} ({}:{}) [{}]",
+                "Story: {}{}{} ({}:{}) [{}]",
                 resolved.entry.name,
                 section_info,
+                group_info,
                 resolved.entry.file,
                 resolved.entry.line,
                 resolved.entry.crate_name
             );
 
             let container = (resolved.entry.create_fn)(window, cx);
-            if let Some(section) = resolved.section {
-                container.update(cx, |c, _| {
-                    c.section = Some(section.into());
-                });
-            }
+            container.update(cx, |c, _| {
+                c.group = resolved.group.clone().map(Into::into);
+                c.section = resolved.section.clone().map(Into::into);
+            });
             container
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn unused_create_fn(
+        _: &mut ::gpui::Window,
+        _: &mut ::gpui::App,
+    ) -> ::gpui::Entity<StoryContainer> {
+        unreachable!("story creation is not used in these tests");
+    }
+
+    static SECTIONED_ENTRY: __registry::StoryEntry = __registry::StoryEntry {
+        name: "SectionedStory",
+        section: Some("Notes"),
+        section_order: None,
+        create_fn: unused_create_fn,
+        crate_name: "component-example",
+        crate_dir: "/tmp/component-example",
+        file: "examples/component/src/components/field_notes.rs",
+        line: 10,
+    };
+
+    static UNSECTIONED_ENTRY: __registry::StoryEntry = __registry::StoryEntry {
+        name: "UnsectionedStory",
+        section: None,
+        section_order: None,
+        create_fn: unused_create_fn,
+        crate_name: "component-example",
+        crate_dir: "/tmp/component-example",
+        file: "examples/component/src/components/field_notes.rs",
+        line: 42,
+    };
+
+    fn runtime_config(allow: &[&str]) -> gpui_storybook_toml::StorybookToml {
+        gpui_storybook_toml::StorybookToml {
+            group: "storybook-app".into(),
+            allow: Some(allow.iter().map(|group| (*group).to_string()).collect()),
+            disable_story: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn crate_group_filters_without_overwriting_declared_section() {
+        let resolved = resolve_story_entry(
+            &SECTIONED_ENTRY,
+            Some("gpui-storybook-example-component"),
+            Some(&runtime_config(&["gpui-storybook-example-component"])),
+        )
+        .expect("crate group should satisfy runtime allow");
+
+        assert_eq!(
+            resolved.group.as_deref(),
+            Some("gpui-storybook-example-component")
+        );
+        assert_eq!(resolved.section.as_deref(), Some("Notes"));
+    }
+
+    #[test]
+    fn unsectioned_stories_keep_crate_group_without_faking_a_section() {
+        let resolved = resolve_story_entry(
+            &UNSECTIONED_ENTRY,
+            Some("gpui-storybook-example-component"),
+            Some(&runtime_config(&["gpui-storybook-example-component"])),
+        )
+        .expect("crate group should satisfy runtime allow");
+
+        assert_eq!(
+            resolved.group.as_deref(),
+            Some("gpui-storybook-example-component")
+        );
+        assert_eq!(resolved.section.as_deref(), None);
+    }
 }

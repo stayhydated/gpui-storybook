@@ -154,7 +154,7 @@ allow = ["UI Kit"]
 disable_story = ["CardStory"]
 ```
 
-- `group`: Required section/group name when `storybook.toml` exists; applied to all stories in that crate.
+- `group`: Required runtime discovery group when `storybook.toml` exists; used for `allow` matching and as the top-level sidebar bucket without overwriting a story's declared section beneath it.
 - `allow`: Optional list of allowed group identifiers for the current app/runtime.
 - omit `allow`: Allows only the config's own `group`.
 - `allow = ["*"]`: Includes all groups.

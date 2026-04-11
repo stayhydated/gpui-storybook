@@ -7,7 +7,7 @@
 ## Key entry points
 
 - `init`: Registers the current language and locale manager, then delegates to the core story initialization. It also executes any global init hooks registered via the inventory system.
-- `generate_stories`: Collects `StoryEntry` inventory records, resolves each entry's group from its crate-local `storybook.toml`, then applies runtime `storybook.toml` filtering (`allow`, `disable_story`) before sorting by section/order and constructing `StoryContainer` entities.
+- `generate_stories`: Collects `StoryEntry` inventory records, resolves each entry's runtime filter group from its crate-local `storybook.toml`, preserves the story-defined section beneath that top-level group when present, then applies runtime `storybook.toml` filtering (`allow`, `disable_story`) before sorting and constructing `StoryContainer` entities.
 - `create_new_window`: Re-export from the core crate for creating the storybook window.
 
 ## Data flow

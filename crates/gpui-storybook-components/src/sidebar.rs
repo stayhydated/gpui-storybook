@@ -51,6 +51,8 @@ pub struct StorySidebarItem {
     active: bool,
     collapsed: bool,
     disabled: bool,
+    indented: bool,
+    section_heading: bool,
 }
 
 impl StorySidebarItem {
@@ -62,6 +64,8 @@ impl StorySidebarItem {
             active: false,
             collapsed: false,
             disabled: false,
+            indented: false,
+            section_heading: false,
         }
     }
 
@@ -80,6 +84,16 @@ impl StorySidebarItem {
 
     pub fn disable(mut self, disable: bool) -> Self {
         self.disabled = disable;
+        self
+    }
+
+    pub fn indented(mut self, indented: bool) -> Self {
+        self.indented = indented;
+        self
+    }
+
+    pub fn section_heading(mut self, section_heading: bool) -> Self {
+        self.section_heading = section_heading;
         self
     }
 }
@@ -117,6 +131,7 @@ impl SidebarItem for StorySidebarItem {
                 .gap_x_2()
                 .rounded(cx.theme().radius)
                 .text_sm()
+                .when(self.indented && !self.collapsed, |this| this.pl_6())
                 .when(is_hoverable, |this| {
                     this.hover(|this| {
                         this.bg(cx.theme().sidebar_accent.opacity(0.8))
@@ -128,9 +143,15 @@ impl SidebarItem for StorySidebarItem {
                         .bg(cx.theme().sidebar_accent)
                         .text_color(cx.theme().sidebar_accent_foreground)
                 })
+                .when(self.section_heading, |this| {
+                    this.h_6()
+                        .text_xs()
+                        .font_medium()
+                        .text_color(cx.theme().muted_foreground)
+                })
                 .when(self.collapsed, |this| this.justify_center())
                 .when(!self.collapsed, |this| {
-                    this.h_7().child(
+                    this.when(!self.section_heading, |this| this.h_7()).child(
                         h_flex()
                             .flex_1()
                             .gap_x_2()

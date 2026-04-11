@@ -24,7 +24,7 @@
 ## Story rendering
 
 - `Story` defines how a story constructs its view and metadata.
-- `StoryContainer` wraps story views into a `Panel` implementation, stores metadata (title, description, section), and forwards active/visible state.
+- `StoryContainer` wraps story views into a `Panel` implementation, stores metadata (title, description, top-level group, section), and forwards active/visible state.
 - `StorySection` is a helper element for grouping story content in the UI.
 - `Gallery` owns the list of story containers, groups them by section, and renders the active story.
 

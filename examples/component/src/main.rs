@@ -39,7 +39,7 @@ fn main() {
         gpui_storybook::create_new_window(
             &format!("{} - Stories", env!("CARGO_PKG_NAME")),
             move |window, cx| {
-                // Stories are filtered/grouped by examples/component/storybook.toml.
+                // Stories are filtered by examples/component/storybook.toml.
                 let all_stories = gpui_storybook::generate_stories(window, cx);
                 Gallery::view(all_stories, None, window, cx)
             },
@@ -50,7 +50,7 @@ fn main() {
         gpui_storybook::create_dock_window(
             &format!("{} - Stories", env!("CARGO_PKG_NAME")),
             move |window, cx| {
-                // Stories are filtered/grouped by examples/component/storybook.toml.
+                // Stories are filtered by examples/component/storybook.toml.
                 let all_stories = gpui_storybook::generate_stories(window, cx);
 
                 StoryWorkspace::view(all_stories, window, cx)

@@ -333,18 +333,33 @@ impl Render for StorySidebar {
                     .as_ref()
                     .map(|s| s.to_string())
                     .unwrap_or_default();
-                title.to_lowercase().contains(&query) || section.to_lowercase().contains(&query)
+                let group = story_data
+                    .group
+                    .as_ref()
+                    .map(|s| s.to_string())
+                    .unwrap_or_default();
+                title.to_lowercase().contains(&query)
+                    || group.to_lowercase().contains(&query)
+                    || section.to_lowercase().contains(&query)
             })
             .cloned()
             .collect();
 
-        // Group stories by section
-        let mut sections: BTreeMap<Option<SharedString>, Vec<Entity<StoryContainer>>> =
-            BTreeMap::new();
+        // Group stories by crate group, then optional section.
+        let mut groups: BTreeMap<
+            Option<SharedString>,
+            BTreeMap<Option<SharedString>, Vec<Entity<StoryContainer>>>,
+        > = BTreeMap::new();
 
         for story_entity in filtered_stories.iter() {
-            let section = story_entity.read(cx).section.clone();
-            sections
+            let (group, section) = {
+                let story_data = story_entity.read(cx);
+                (story_data.sidebar_group(), story_data.sidebar_section())
+            };
+
+            groups
+                .entry(group)
+                .or_default()
                 .entry(section)
                 .or_default()
                 .push(story_entity.clone());
@@ -371,41 +386,59 @@ impl Render for StorySidebar {
                 ),
             )
             .children(
-                sections
+                groups
                     .into_iter()
-                    .map(|(section, stories_in_section)| {
-                        let menu_items: Vec<_> = stories_in_section
+                    .map(|(group, sections_in_group)| {
+                        let menu_items: Vec<_> = sections_in_group
                             .into_iter()
-                            .map(|story_entity| {
-                                let story_data = story_entity.read(cx);
-                                let name = if let Some(title_fn) = &story_data.title_fn {
-                                    title_fn().into()
-                                } else {
-                                    story_data.name.clone()
-                                };
-                                let story_klass_for_drag =
-                                    story_data.story_klass.clone().unwrap_or_default();
+                            .flat_map(|(section, stories_in_section)| {
+                                let mut items = Vec::new();
+                                let has_section = section.is_some();
 
-                                let story_for_click = story_entity.clone();
-                                let dock_area_for_click = self.dock_area.clone();
-                                StorySidebarItem::new(name, story_klass_for_drag).on_click(
-                                    cx.listener(move |_, _: &ClickEvent, window, cx| {
-                                        let dock_area_for_open = dock_area_for_click.clone();
-                                        let story_for_open = story_for_click.clone();
-                                        window.defer(cx, move |window, cx| {
-                                            Self::open_story(
-                                                dock_area_for_open.clone(),
-                                                story_for_open.clone(),
-                                                window,
-                                                cx,
-                                            );
-                                        });
-                                    }),
-                                )
+                                if let Some(section) = section {
+                                    items.push(
+                                        StorySidebarItem::new(section, "")
+                                            .disable(true)
+                                            .section_heading(true),
+                                    );
+                                }
+
+                                items.extend(stories_in_section.into_iter().map(|story_entity| {
+                                    let story_data = story_entity.read(cx);
+                                    let name = if let Some(title_fn) = &story_data.title_fn {
+                                        title_fn().into()
+                                    } else {
+                                        story_data.name.clone()
+                                    };
+                                    let story_klass_for_drag =
+                                        story_data.story_klass.clone().unwrap_or_default();
+
+                                    let story_for_click = story_entity.clone();
+                                    let dock_area_for_click = self.dock_area.clone();
+                                    StorySidebarItem::new(name, story_klass_for_drag)
+                                        .indented(has_section)
+                                        .on_click(cx.listener(
+                                            move |_, _: &ClickEvent, window, cx| {
+                                                let dock_area_for_open =
+                                                    dock_area_for_click.clone();
+                                                let story_for_open = story_for_click.clone();
+                                                window.defer(cx, move |window, cx| {
+                                                    Self::open_story(
+                                                        dock_area_for_open.clone(),
+                                                        story_for_open.clone(),
+                                                        window,
+                                                        cx,
+                                                    );
+                                                });
+                                            },
+                                        ))
+                                }));
+
+                                items
                             })
                             .collect();
 
-                        SidebarGroup::new(section.unwrap_or_default()).children(menu_items)
+                        SidebarGroup::new(group.unwrap_or_default()).children(menu_items)
                     })
                     .collect::<Vec<_>>(),
             )
