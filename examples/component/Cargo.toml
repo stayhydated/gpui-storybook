@@ -19,7 +19,6 @@ gpui-storybook = { workspace = true }
 gpui_platform = { workspace = true }
 reqwest_client = { workspace = true }
 rust-embed = { workspace = true }
-serde = { workspace = true }
 strum = { workspace = true }
 tracing-subscriber = { features = [ "env-filter" ], workspace = true }
 

@@ -2964,7 +2964,6 @@ dependencies = [
  "gpui_platform",
  "reqwest_client",
  "rust-embed",
- "serde",
  "strum 0.28.0",
  "tracing-subscriber",
 ]
