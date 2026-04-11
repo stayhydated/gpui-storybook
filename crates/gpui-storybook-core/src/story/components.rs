@@ -113,6 +113,7 @@ pub fn section(title: impl Into<SharedString>) -> StorySection {
 pub struct StoryContainer {
     focus_handle: gpui::FocusHandle,
     pub name: SharedString,
+    pub group: Option<SharedString>,
     pub section: Option<SharedString>,
     pub title_bg: Option<Hsla>,
     pub description: SharedString,
@@ -180,6 +181,7 @@ impl StoryContainer {
         Self {
             focus_handle,
             name: "".into(),
+            group: None,
             section: None,
             title_bg: None,
             description: "".into(),
@@ -200,6 +202,22 @@ impl StoryContainer {
     pub fn section(mut self, section: impl Into<SharedString>) -> Self {
         self.section = Some(section.into());
         self
+    }
+
+    pub fn group(mut self, group: impl Into<SharedString>) -> Self {
+        self.group = Some(group.into());
+        self
+    }
+
+    pub fn sidebar_group(&self) -> Option<SharedString> {
+        self.group.clone().or(self.section.clone())
+    }
+
+    pub fn sidebar_section(&self) -> Option<SharedString> {
+        match (&self.group, &self.section) {
+            (Some(group), Some(section)) if group != section => Some(section.clone()),
+            _ => None,
+        }
     }
 
     pub fn panel<S: Story>(window: &mut Window, cx: &mut App) -> Entity<Self> {

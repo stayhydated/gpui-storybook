@@ -8,10 +8,14 @@ fmt:
     uvx mdformat .
 
 clippy:
-    cargo clippy --workspace --all-features --exclude gpui-storybook-example
+    cargo clippy --workspace --all-features \
+        --exclude gpui-storybook-example-story \
+        --exclude gpui-storybook-example-component
 
 check:
-    cargo check --workspace --all-features --exclude gpui-storybook-example
+    cargo check --workspace --all-features \
+        --exclude gpui-storybook-example-story \
+        --exclude gpui-storybook-example-component
 
 test:
     cargo test --workspace --all-features

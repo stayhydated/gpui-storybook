@@ -6,7 +6,7 @@
 
 ## Config schema
 
-- `group` (required string when file exists): Overrides the section/group assigned to every discovered story in that crate.
+- `group` (required string when file exists): Assigns the crate's runtime discovery group for `allow` filtering and top-level sidebar grouping. It does not overwrite a story's declared section within that group.
 - `allow` (optional string array): Allowed group identifiers.
   - Omitted `allow` allows only the config's own `group`.
   - `allow = ["*"]` includes all stories.

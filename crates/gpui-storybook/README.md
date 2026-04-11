@@ -9,7 +9,8 @@ A storybook-style workspace for building and inspecting GPUI components, with bu
 ## Features
 
 - Gallery UI with sidebar search, dock, and active story focus.
-- Attribute macros to register stories and global init hooks and `Story` trait.
+- Proc macros for attribute-based story registration, component-attached registration, and global init hooks.
+- `Story` trait for full control when a component needs custom story behavior.
 
 ## Compatibility
 
@@ -20,16 +21,25 @@ A storybook-style workspace for building and inspecting GPUI components, with bu
 | **crates.io** | |
 | `0.5.x` | `0.5.x` | |
 
-## Example app
+## Example apps
+
+Story-struct pattern:
 
 ```bash
-cargo run
+cargo run -p gpui-storybook-example-story
 ```
 
-with dock layout
+Component-derived pattern:
 
 ```bash
-cargo run --features dock
+cargo run -p gpui-storybook-example-component
+```
+
+With dock layout:
+
+```bash
+cargo run -p gpui-storybook-example-story --features dock
+cargo run -p gpui-storybook-example-component --features dock
 ```
 
 ## Quick start
@@ -52,7 +62,7 @@ fn main() {
 }
 ```
 
-## Registering stories
+## Registering stories with `#[story]`
 
 ```rust
 use gpui::{App, Focusable, Render, Window};
@@ -70,6 +80,40 @@ impl gpui_storybook::Story for ButtonStory {
     }
 }
 ```
+
+## Registering components directly with `ComponentStory`
+
+```rust
+use gpui::{App, IntoElement, RenderOnce, Window};
+
+#[derive(IntoElement, gpui_storybook::ComponentStory)]
+#[storybook(
+    title = "Welcome Card",
+    section = crate::StorySection::Intro,
+    example = WelcomeCard::example(),
+)]
+pub struct WelcomeCard {
+    title: gpui::SharedString,
+}
+
+impl WelcomeCard {
+    pub fn example() -> Self {
+        Self {
+            title: "Component Registration".into(),
+        }
+    }
+}
+
+impl RenderOnce for WelcomeCard {
+    fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
+        self.title
+    }
+}
+```
+
+`ComponentStory` generates the wrapper `Story`, `Render`, and `Focusable` implementations that storybook needs. The component only defines its own component rendering and, when needed, an `example = ...` constructor.
+
+`title` and `description` accept expressions that convert into `String`, so both string literals and `String::from(...)`-style values work.
 
 Use `#[gpui_storybook::story_init]` to register global setup functions that should run once per app:
 
@@ -94,6 +138,10 @@ enum StorySection {
 
 #[gpui_storybook::story(StorySection::Components)]
 pub struct CardStory;
+
+#[derive(gpui::IntoElement, gpui_storybook::ComponentStory)]
+#[storybook(section = StorySection::Patterns, example = PatternCard::example())]
+pub struct PatternCard;
 ```
 
 ## Crate-level story discovery config
@@ -106,12 +154,12 @@ allow = ["UI Kit"]
 disable_story = ["CardStory"]
 ```
 
-- `group`: Required section/group name when `storybook.toml` exists; applied to all stories in that crate.
+- `group`: Required runtime discovery group when `storybook.toml` exists; used for `allow` matching and as the top-level sidebar bucket without overwriting a story's declared section beneath it.
 - `allow`: Optional list of allowed group identifiers for the current app/runtime.
 - omit `allow`: Allows only the config's own `group`.
 - `allow = ["*"]`: Includes all groups.
 - `allow = []`: Includes none.
-- `disable_story`: Optional per-story denylist by story struct name.
+- `disable_story`: Optional per-story denylist by registered story type name.
 
 ## Acknowledgements
 

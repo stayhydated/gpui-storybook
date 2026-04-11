@@ -2952,7 +2952,24 @@ dependencies = [
 ]
 
 [[package]]
-name = "gpui-storybook-example"
+name = "gpui-storybook-example-component"
+version = "0.5.0"
+dependencies = [
+ "es-fluent",
+ "es-fluent-lang",
+ "es-fluent-manager-embedded",
+ "gpui 0.2.2 (git+https://github.com/zed-industries/zed?rev=15d8660748b508b3525d3403e5d172f1a557bfa5)",
+ "gpui-component",
+ "gpui-storybook",
+ "gpui_platform",
+ "reqwest_client",
+ "rust-embed",
+ "strum 0.28.0",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "gpui-storybook-example-story"
 version = "0.5.0"
 dependencies = [
  "es-fluent",
@@ -2973,6 +2990,7 @@ dependencies = [
 name = "gpui-storybook-macros"
 version = "0.5.0"
 dependencies = [
+ "heck 0.5.0",
  "insta",
  "prettyplease",
  "proc-macro2",
