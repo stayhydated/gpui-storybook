@@ -1,6 +1,7 @@
 use crate::{
     registry::StoryEntry,
     story::{StoryContainer, StoryState, reveal_story_panel},
+    storybook_window_ui::StorybookWindowUi,
     title_bar::AppTitleBar,
     window_options::default_storybook_window_options,
     window_view::DockWindowView,
@@ -421,6 +422,7 @@ pub struct StoryWorkspace {
 impl StoryWorkspace {
     pub fn new(
         stories: Vec<Entity<StoryContainer>>,
+        ui: StorybookWindowUi,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
@@ -463,7 +465,7 @@ impl StoryWorkspace {
         })
         .detach();
 
-        let title_bar = cx.new(|cx| AppTitleBar::new("Storybook", window, cx));
+        let title_bar = cx.new(|cx| AppTitleBar::new("Storybook", ui, window, cx));
 
         Self {
             dock_area,
@@ -589,7 +591,16 @@ impl StoryWorkspace {
         window: &mut Window,
         cx: &mut App,
     ) -> Entity<Self> {
-        cx.new(|cx| Self::new(stories, window, cx))
+        Self::view_with_ui(stories, StorybookWindowUi::default(), window, cx)
+    }
+
+    pub fn view_with_ui(
+        stories: Vec<Entity<StoryContainer>>,
+        ui: StorybookWindowUi,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Entity<Self> {
+        cx.new(|cx| Self::new(stories, ui, window, cx))
     }
 
     fn on_action_toggle_dock_toggle_button(

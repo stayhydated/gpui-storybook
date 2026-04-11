@@ -11,7 +11,7 @@ ignore all folders matching "**/\_\_crate_paths/**"
 ## Architecture Documentation Index
 
 | Crate | Link to Architecture Doc | Purpose |
-| --- | --- | --- |
+| ------------------------ | ----------------------------------------------------------------- | --------------------------------------------------------- |
 | **Core** | | |
 | `gpui-storybook` | [Architecture](crates/gpui-storybook/docs/ARCHITECTURE.md) | Facade crate, entry point, and story discovery. |
 | `gpui-storybook-core` | [Architecture](crates/gpui-storybook-core/docs/ARCHITECTURE.md) | UI runtime: gallery, story panels, theming, i18n, assets. |
@@ -46,6 +46,7 @@ ignore all folders matching "**/\_\_crate_paths/**"
 ## Skills
 
 | Item | Link to llms.txt | Link to llms-full.txt | Purpose |
-| --------- | ------------------------------------------------ | ----------------------------------------------------- | ------------------- |
+| -------------- | ---------------------------------------------------- | --------------------------------------------------------- | -------------------------- |
 | **Crate** | | | |
 | es-fluent | https://stayhydated.github.io/es-fluent/llms.txt | https://stayhydated.github.io/es-fluent/llms-full.txt | i18n |
+| gpui-component | https://longbridge.github.io/gpui-component/llms.txt | https://longbridge.github.io/gpui-component/llms-full.txt | gpui radix-like components |

@@ -1,5 +1,7 @@
 use crate::{
-    title_bar::AppTitleBar, window_options::default_storybook_window_options,
+    storybook_window_ui::{StorybookWindow, StorybookWindowUi},
+    title_bar::AppTitleBar,
+    window_options::default_storybook_window_options,
     window_view::SimpleWindowView,
 };
 use gpui::{
@@ -14,14 +16,34 @@ where
     V: SimpleWindowView,
     F: FnOnce(&mut Window, &mut App) -> Entity<V> + Send + 'static,
 {
+    create_new_window_with_ui(
+        title,
+        move |window, cx| StorybookWindow::new(crate_view_fn(window, cx)),
+        cx,
+    );
+}
+
+pub fn create_new_window_with_ui<F, V>(title: &str, create_view_fn: F, cx: &mut App)
+where
+    V: SimpleWindowView,
+    F: FnOnce(&mut Window, &mut App) -> StorybookWindow<V> + Send + 'static,
+{
     let options = default_storybook_window_options(cx);
     let title = SharedString::from(title.to_string());
 
     cx.spawn(async move |cx| {
         let window = cx
             .open_window(options, |window, cx| {
-                let view = crate_view_fn(window, cx);
-                let root = cx.new(|cx| StoryRoot::new(title.clone(), view, window, cx));
+                let storybook_window = create_view_fn(window, cx);
+                let root = cx.new(|cx| {
+                    StoryRoot::new(
+                        title.clone(),
+                        storybook_window.view,
+                        storybook_window.ui,
+                        window,
+                        cx,
+                    )
+                });
 
                 let focus_handle = root.focus_handle(cx);
                 window.defer(cx, move |window, cx| {
@@ -54,10 +76,11 @@ impl StoryRoot {
     pub fn new(
         title: impl Into<SharedString>,
         view: impl Into<AnyView>,
+        ui: StorybookWindowUi,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
-        let title_bar = cx.new(|cx| AppTitleBar::new(title, window, cx));
+        let title_bar = cx.new(|cx| AppTitleBar::new(title, ui, window, cx));
         Self {
             focus_handle: cx.focus_handle(),
             title_bar,

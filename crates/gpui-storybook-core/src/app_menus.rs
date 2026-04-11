@@ -7,21 +7,27 @@ use crate::{
     actions::{Quit, SelectLocale},
     locale::LocaleStore,
     story::themes::{SwitchTheme, SwitchThemeMode},
+    storybook_window_ui::AppMenuItemsBuilder,
 };
 
-pub fn init(title: impl Into<SharedString>, cx: &mut App) -> Entity<AppMenuBar> {
+pub fn init(
+    title: impl Into<SharedString>,
+    extra_items: Option<AppMenuItemsBuilder>,
+    cx: &mut App,
+) -> Entity<AppMenuBar> {
     let app_menu_bar = AppMenuBar::new(cx);
     let title: SharedString = title.into();
-    update_app_menu(title.clone(), app_menu_bar.clone(), cx);
+    update_app_menu(title.clone(), extra_items.clone(), app_menu_bar.clone(), cx);
 
     cx.on_action({
         let title = title.clone();
+        let extra_items = extra_items.clone();
         let app_menu_bar = app_menu_bar.clone();
         move |action: &SelectLocale, cx: &mut App| {
             cx.update_global::<Box<dyn LocaleStore>, _>(|locale_store, cx| {
                 locale_store.set_current_locale(action.0.clone(), cx);
             });
-            update_app_menu(title.clone(), app_menu_bar.clone(), cx);
+            update_app_menu(title.clone(), extra_items.clone(), app_menu_bar.clone(), cx);
             cx.refresh_windows();
         }
     });
@@ -29,9 +35,10 @@ pub fn init(title: impl Into<SharedString>, cx: &mut App) -> Entity<AppMenuBar> 
     // Observe theme changes to update the menu to refresh the checked state
     cx.observe_global::<Theme>({
         let title = title.clone();
+        let extra_items = extra_items.clone();
         let app_menu_bar = app_menu_bar.clone();
         move |cx| {
-            update_app_menu(title.clone(), app_menu_bar.clone(), cx);
+            update_app_menu(title.clone(), extra_items.clone(), app_menu_bar.clone(), cx);
         }
     })
     .detach();
@@ -39,10 +46,15 @@ pub fn init(title: impl Into<SharedString>, cx: &mut App) -> Entity<AppMenuBar> 
     app_menu_bar
 }
 
-fn update_app_menu(title: impl Into<SharedString>, app_menu_bar: Entity<AppMenuBar>, cx: &mut App) {
+fn update_app_menu(
+    title: impl Into<SharedString>,
+    extra_items: Option<AppMenuItemsBuilder>,
+    app_menu_bar: Entity<AppMenuBar>,
+    cx: &mut App,
+) {
     let title: SharedString = title.into();
-    cx.set_menus(build_menus(title.clone(), cx));
-    let menus = build_menus(title, cx)
+    cx.set_menus(build_menus(title.clone(), extra_items.clone(), cx));
+    let menus = build_menus(title, extra_items, cx)
         .into_iter()
         .map(|menu| menu.owned())
         .collect();
@@ -53,26 +65,41 @@ fn update_app_menu(title: impl Into<SharedString>, app_menu_bar: Entity<AppMenuB
     })
 }
 
-fn build_menus(title: impl Into<SharedString>, cx: &App) -> Vec<Menu> {
+fn build_menus(
+    title: impl Into<SharedString>,
+    extra_items: Option<AppMenuItemsBuilder>,
+    cx: &App,
+) -> Vec<Menu> {
     let mode = cx.theme().mode;
+    let mut items = vec![
+        MenuItem::Submenu(Menu {
+            name: "Appearance".into(),
+            items: vec![
+                MenuItem::action("Light", SwitchThemeMode(ThemeMode::Light))
+                    .checked(!mode.is_dark()),
+                MenuItem::action("Dark", SwitchThemeMode(ThemeMode::Dark)).checked(mode.is_dark()),
+            ],
+            disabled: false,
+        }),
+        theme_menu(cx),
+        language_menu(cx),
+    ];
+
+    if let Some(extra_items) = extra_items
+        .as_ref()
+        .map(|build| build(cx))
+        .filter(|items| !items.is_empty())
+    {
+        items.push(MenuItem::Separator);
+        items.extend(extra_items);
+    }
+
+    items.push(MenuItem::Separator);
+    items.push(MenuItem::action("Quit", Quit));
+
     vec![Menu {
         name: title.into(),
-        items: vec![
-            MenuItem::Submenu(Menu {
-                name: "Appearance".into(),
-                items: vec![
-                    MenuItem::action("Light", SwitchThemeMode(ThemeMode::Light))
-                        .checked(!mode.is_dark()),
-                    MenuItem::action("Dark", SwitchThemeMode(ThemeMode::Dark))
-                        .checked(mode.is_dark()),
-                ],
-                disabled: false,
-            }),
-            theme_menu(cx),
-            language_menu(cx),
-            MenuItem::Separator,
-            MenuItem::action("Quit", Quit),
-        ],
+        items,
         disabled: false,
     }]
 }
