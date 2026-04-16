@@ -34,8 +34,6 @@ pub fn init(
 
     // Observe theme changes to update the menu to refresh the checked state
     cx.observe_global::<Theme>({
-        let title = title.clone();
-        let extra_items = extra_items.clone();
         let app_menu_bar = app_menu_bar.clone();
         move |cx| {
             update_app_menu(title.clone(), extra_items.clone(), app_menu_bar.clone(), cx);

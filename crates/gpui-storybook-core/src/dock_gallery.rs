@@ -8,9 +8,9 @@ use crate::{
 };
 use anyhow::{Context as _, Result};
 use gpui::{
-    App, AppContext as _, ClickEvent, Context, Edges, Entity, EntityId, EventEmitter, FocusHandle,
-    Focusable, InteractiveElement as _, IntoElement, ParentElement as _, Render, SharedString,
-    Styled as _, Subscription, Window, actions, div, px, relative,
+    Action, App, AppContext as _, ClickEvent, Context, Edges, Entity, EntityId, EventEmitter,
+    FocusHandle, Focusable, InteractiveElement as _, IntoElement, ParentElement as _, Render,
+    SharedString, Styled as _, Subscription, Window, div, px, relative,
 };
 use gpui_component::{
     ActiveTheme as _, Root,
@@ -29,7 +29,17 @@ use std::{
     sync::{Arc, LazyLock, Mutex},
 };
 
-actions!(story, [ToggleDockToggleButton, ResetLayout, ToggleSidebar]);
+#[derive(Action, Clone, Debug, Default, Eq, PartialEq)]
+#[action(namespace = story)]
+pub struct ToggleDockToggleButton;
+
+#[derive(Action, Clone, Debug, Default, Eq, PartialEq)]
+#[action(namespace = story)]
+pub struct ResetLayout;
+
+#[derive(Action, Clone, Debug, Default, Eq, PartialEq)]
+#[action(namespace = story)]
+pub struct ToggleSidebar;
 
 const MAIN_DOCK_AREA: DockAreaTab = DockAreaTab {
     id: "storybook-main-dock",
@@ -424,8 +434,8 @@ impl Render for StorySidebar {
                                                 let story_for_open = story_for_click.clone();
                                                 window.defer(cx, move |window, cx| {
                                                     Self::open_story(
-                                                        dock_area_for_open.clone(),
-                                                        story_for_open.clone(),
+                                                        dock_area_for_open,
+                                                        story_for_open,
                                                         window,
                                                         cx,
                                                     );
@@ -470,7 +480,7 @@ impl StoryWorkspace {
                 // Layout loaded successfully
             },
             Err(_) => {
-                Self::reset_default_layout(weak_dock_area.clone(), &stories, window, cx);
+                Self::reset_default_layout(weak_dock_area, &stories, window, cx);
             },
         };
 
