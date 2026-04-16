@@ -8,7 +8,7 @@
 
 - `story`: Core story runtime (containers, sections, app state, window creation, and theme handling).
 - `dock_gallery`: Optional dock workspace and persisted layout support behind the `dock` feature.
-- `gallery`: Sidebar + active story rendering with search and section grouping.
+- `gallery`: Sidebar + active story rendering with search and top-level group/section grouping.
 - `title_bar`: Custom title bar with app menu and appearance controls.
 - `app_menus`: Menu construction for theme and language switching.
 - `actions`: Action types used by menus and UI.
@@ -30,8 +30,8 @@
 - `Story` defines how a story constructs its view and metadata.
 - `StoryContainer` wraps story views into a `Panel` implementation, stores metadata (title, description, top-level group, section), and forwards active/visible state.
 - `StorySection` is a helper element for grouping story content in the UI.
-- `Gallery` owns the list of story containers, groups them by section, and renders the active story.
-- `dock_gallery` reuses the same `StoryContainer` data, but exposes stories as dock panels and supports drag-and-drop panel opening.
+- `Gallery` owns the list of story containers, groups them by top-level crate group when present (falling back to section when no group exists), and renders the active story.
+- `dock_gallery` reuses the same `StoryContainer` data, exposes stories as dock panels, and uses the same top-level group plus optional section structure in its sidebar.
 
 ## Theming and persistence
 

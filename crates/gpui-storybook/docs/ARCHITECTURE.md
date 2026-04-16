@@ -7,7 +7,7 @@
 ## Key entry points
 
 - `init`: Registers the current language and locale manager, then delegates to the core story initialization. It also executes any global init hooks registered via the inventory system.
-- `generate_stories`: Collects `StoryEntry` inventory records, resolves each entry's crate-local group from `storybook.toml`, loads the runtime `storybook.toml` either from the current binary crate or by searching upward from the working directory, then applies `allow` and `disable_story` filtering before sorting and constructing `StoryContainer` entities.
+- `generate_stories`: Collects `StoryEntry` inventory records, resolves each entry's optional crate-local group from `storybook.toml`, loads the runtime `storybook.toml` either from the current binary crate or by searching upward from the working directory, then applies `allow` and `disable_story` filtering before sorting and constructing `StoryContainer` entities. `allow` matches the crate group when present and otherwise falls back to the story's declared section.
 - `create_new_window` and `create_new_window_with_ui`: Re-export the standard storybook window helpers from the core crate.
 - `create_dock_window`, `StoryWorkspace`, and `register_story_panels`: Available behind the `dock` feature for the docked workspace.
 
@@ -17,7 +17,7 @@
 1. `#[story]` expects an explicit story view type that implements `gpui_storybook::Story`.
 1. `#[derive(ComponentStory)]` keeps the component type component-focused and generates an internal wrapper story around the component example expression.
 1. App startup calls `gpui_storybook::init`, wiring language, locale, and core runtime setup.
-1. `generate_stories` reads inventory entries, merges crate-local grouping with runtime filtering config, orders them, and returns story containers.
+1. `generate_stories` reads inventory entries, merges optional crate-local grouping with runtime filtering config, preserves any declared story section beneath that group, orders the results, and returns story containers.
 1. `Gallery::view` (core crate) renders the sidebar and active story content.
 
 ## Extension points

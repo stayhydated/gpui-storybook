@@ -6,12 +6,12 @@
 
 ## Config schema
 
-- `group` (required string when file exists): Assigns the crate's runtime discovery group for `allow` filtering and top-level sidebar grouping. It does not overwrite a story's declared section within that group.
-- `allow` (optional string array): Allowed group identifiers.
+- `group` (required string when file exists): Assigns the crate's top-level runtime discovery group for `allow` filtering and sidebar grouping. It does not overwrite a story's declared section within that group.
+- `allow` (optional string array): Allowed top-level group identifiers.
   - Omitted `allow` allows only the config's own `group`.
-  - `allow = ["*"]` includes all stories.
+  - `allow = ["*"]` includes every group.
   - `allow = []` includes none.
-- `disable_story` (optional string array): Per-story denylist by story struct name.
+- `disable_story` (optional string array): Per-story denylist by registered story name.
 
 ## API
 
