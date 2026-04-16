@@ -2,6 +2,18 @@
 
 This example uses the component-attached derive macro with components that are unrelated to the `examples/story` set.
 
+Run it with:
+
+```bash
+cargo run -p gpui-storybook-example-component
+```
+
+Or with the dock workspace:
+
+```bash
+cargo run -p gpui-storybook-example-component --features dock
+```
+
 Current components:
 
 - `WelcomeCard`: an editorial callout card.
@@ -36,5 +48,6 @@ Current config:
 
 ```toml
 group = "gpui-storybook-example-component"
-allow = ["gpui-storybook-example-component"]
 ```
+
+`allow` is intentionally omitted here, so the example includes only its own `group`.

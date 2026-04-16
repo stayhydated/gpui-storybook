@@ -4,22 +4,14 @@
 [![Docs](https://docs.rs/gpui-storybook/badge.svg)](https://docs.rs/gpui-storybook/)
 [![Crates.io](https://img.shields.io/crates/v/gpui-storybook.svg)](https://crates.io/crates/gpui-storybook)
 
-A storybook-style workspace for building and inspecting GPUI components, with built-in theming, i18n, and a searchable gallery.
+A facade crate for building and inspecting GPUI components with a searchable gallery, optional dock layout, built-in theming, and locale switching.
 
 ## Features
 
 - Gallery UI with sidebar search, dock, and active story focus.
 - Proc macros for attribute-based story registration, component-attached registration, and global init hooks.
 - `Story` trait for full control when a component needs custom story behavior.
-
-## Compatibility
-
-| `gpui-storybook` | `gpui-component` | `gpui` |
-| :--------------- | :--------------- | :--------------------------------------------- |
-| **git** | |
-| `master` | `main` | rev `15d8660748b508b3525d3403e5d172f1a557bfa5` |
-| **crates.io** | |
-| `0.5.x` | `0.5.x` | |
+- Crate-local `storybook.toml` support for grouping, allowlists, and disabled stories.
 
 ## Example apps
 
@@ -45,14 +37,21 @@ cargo run -p gpui-storybook-example-component --features dock
 ## Quick start
 
 ```rust
-use gpui::Application;
+use es_fluent::EsFluent;
+use es_fluent_lang::es_fluent_language;
 use gpui_storybook::{Assets, Gallery};
+use strum::EnumIter;
+
+#[es_fluent_language]
+#[derive(Clone, Copy, Debug, EnumIter, EsFluent, PartialEq)]
+pub enum Languages {}
 
 fn main() {
-    let app = Application::new().with_assets(Assets);
+    let app = gpui_platform::application().with_assets(Assets);
 
     app.run(|cx| {
-        gpui_storybook::init(MyLanguage::default(), cx);
+        gpui_storybook::init(Languages::default(), cx);
+        gpui_storybook::change_locale(Languages::default());
 
         gpui_storybook::create_new_window("My App - Stories", |window, cx| {
             let stories = gpui_storybook::generate_stories(window, cx);
@@ -150,16 +149,17 @@ You can add a `storybook.toml` file to a crate root to control what `generate_st
 
 ```toml
 group = "UI Kit"
-allow = ["UI Kit"]
 disable_story = ["CardStory"]
 ```
 
 - `group`: Required runtime discovery group when `storybook.toml` exists; used for `allow` matching and as the top-level sidebar bucket without overwriting a story's declared section beneath it.
 - `allow`: Optional list of allowed group identifiers for the current app/runtime.
-- omit `allow`: Allows only the config's own `group`.
+- Omit `allow`: Allows only the config's own `group`.
 - `allow = ["*"]`: Includes all groups.
 - `allow = []`: Includes none.
 - `disable_story`: Optional per-story denylist by registered story type name.
+
+At runtime, `generate_stories` prefers the `storybook.toml` associated with the current binary crate and falls back to searching upward from the working directory.
 
 ## Acknowledgements
 

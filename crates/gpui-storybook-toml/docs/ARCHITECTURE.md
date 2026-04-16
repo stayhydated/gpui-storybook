@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`gpui-storybook-toml` loads crate-local `storybook.toml` files used by story discovery.
+`gpui-storybook-toml` loads `storybook.toml` files used by story discovery. Callers typically pass either a crate manifest directory or the current working directory.
 
 ## Config schema
 
@@ -19,3 +19,4 @@
 - `StorybookToml::allows_group`: Evaluates the group allowlist.
 - `StorybookToml::is_story_disabled`: Evaluates per-story denylist membership.
 - `StorybookToml::group`: Returns a trimmed non-empty group name.
+- Errors include the file path so the caller can log actionable parse and read failures.

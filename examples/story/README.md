@@ -2,6 +2,18 @@
 
 This example uses the original attribute-based story registration flow.
 
+Run it with:
+
+```bash
+cargo run -p gpui-storybook-example-story
+```
+
+Or with the dock workspace:
+
+```bash
+cargo run -p gpui-storybook-example-story --features dock
+```
+
 Pattern:
 
 ```rust
@@ -23,5 +35,6 @@ Current config:
 
 ```toml
 group = "gpui-storybook-example-story"
-allow = ["gpui-storybook-example-story"]
 ```
+
+`allow` is intentionally omitted here, so the example includes only its own `group`.

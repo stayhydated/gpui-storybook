@@ -10,23 +10,27 @@ ignore all folders matching "**/__crate_paths__/**"
 
 ## Architecture Documentation Index
 
-| Crate | Link to Architecture Doc | Purpose |
-| ------------------------ | ----------------------------------------------------------------- | --------------------------------------------------------- |
-| **Core** | | |
-| `gpui-storybook` | [Architecture](crates/gpui-storybook/docs/ARCHITECTURE.md) | Facade crate, entry point, and story discovery. |
-| `gpui-storybook-core` | [Architecture](crates/gpui-storybook-core/docs/ARCHITECTURE.md) | UI runtime: gallery, story panels, theming, i18n, assets. |
+| Item | Docs | Purpose |
+| -------------------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------- |
+| **Facade and Runtime** | | |
+| `gpui-storybook` | [Architecture](crates/gpui-storybook/docs/ARCHITECTURE.md) | Facade crate, public entry points, and story discovery/filtering. |
+| `gpui-storybook-core` | [Architecture](crates/gpui-storybook-core/docs/ARCHITECTURE.md) | UI runtime: gallery, dock workspace, theming, i18n, assets, and window chrome. |
+| `gpui-storybook-components` | [README](crates/gpui-storybook-components/README.md) | Shared dock-sidebar UI components used by the runtime. |
+| `gpui-storybook-toml` | [Architecture](crates/gpui-storybook-toml/docs/ARCHITECTURE.md) | `storybook.toml` loader and filtering schema. |
 | **Macros** | | |
 | `gpui-storybook-macros` | [Architecture](crates/gpui-storybook-macros/docs/ARCHITECTURE.md) | Proc macros for story registration, component-derived registration, and init hooks. |
 | **Examples** | | |
-| `gpui-storybook-example-story` | | Story-struct example app using `#[story]`. |
-| `gpui-storybook-example-component` | | Component-attached example app using `#[derive(ComponentStory)]`. |
+| `gpui-storybook-example-story` | [README](examples/story/README.md) | Story-struct example app using `#[story]`. |
+| `gpui-storybook-example-component` | [README](examples/component/README.md) | Component-attached example app using `#[derive(ComponentStory)]`. |
 
 ## Crate Descriptions
 
 ### Core Layers
 
 - **`gpui-storybook`**: User-facing library. Re-exports core types and macros, and provides `init` and `generate_stories` entry points.
-- **`gpui-storybook-core`**: Runtime UI. Implements `Gallery`, `StoryContainer`, theming, locale wiring, and asset loading.
+- **`gpui-storybook-core`**: Runtime UI. Implements `Gallery`, dock workspace support, `StoryContainer`, theming, locale wiring, window helpers, and asset loading.
+- **`gpui-storybook-components`**: Shared dock-sidebar widgets (`StorySidebarItem`, `StoryDrag`) used by the runtime.
+- **`gpui-storybook-toml`**: Loads crate-local `storybook.toml` config for grouping, allowlists, and disabled stories.
 
 ### Macros
 
