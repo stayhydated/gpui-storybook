@@ -1,4 +1,4 @@
-use gpui::{Action, actions};
+use gpui::Action;
 use gpui_component::scroll::ScrollbarShow;
 use serde::Deserialize;
 use unic_langid::LanguageIdentifier;
@@ -19,4 +19,18 @@ pub struct SelectFont(pub usize);
 #[action(namespace = story, no_json)]
 pub struct SelectRadius(pub usize);
 
-actions!(story, [Quit, Open, CloseWindow, ToggleSearch]);
+#[derive(Action, Clone, Debug, Default, Eq, PartialEq)]
+#[action(namespace = story)]
+pub struct Quit;
+
+#[derive(Action, Clone, Debug, Default, Eq, PartialEq)]
+#[action(namespace = story)]
+pub struct Open;
+
+#[derive(Action, Clone, Debug, Default, Eq, PartialEq)]
+#[action(namespace = story)]
+pub struct CloseWindow;
+
+#[derive(Action, Clone, Debug, Default, Eq, PartialEq)]
+#[action(namespace = story)]
+pub struct ToggleSearch;

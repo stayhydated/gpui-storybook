@@ -8,9 +8,9 @@ use crate::{
 };
 use anyhow::{Context as _, Result};
 use gpui::{
-    App, AppContext as _, ClickEvent, Context, Edges, Entity, EntityId, EventEmitter, FocusHandle,
-    Focusable, InteractiveElement as _, IntoElement, ParentElement as _, Render, SharedString,
-    Styled as _, Subscription, Window, actions, div, px, relative,
+    Action, App, AppContext as _, ClickEvent, Context, Edges, Entity, EntityId, EventEmitter,
+    FocusHandle, Focusable, InteractiveElement as _, IntoElement, ParentElement as _, Render,
+    SharedString, Styled as _, Subscription, Window, div, px, relative,
 };
 use gpui_component::{
     ActiveTheme as _, Root,
@@ -29,7 +29,17 @@ use std::{
     sync::{Arc, LazyLock, Mutex},
 };
 
-actions!(story, [ToggleDockToggleButton, ResetLayout, ToggleSidebar]);
+#[derive(Action, Clone, Debug, Default, Eq, PartialEq)]
+#[action(namespace = story)]
+pub struct ToggleDockToggleButton;
+
+#[derive(Action, Clone, Debug, Default, Eq, PartialEq)]
+#[action(namespace = story)]
+pub struct ResetLayout;
+
+#[derive(Action, Clone, Debug, Default, Eq, PartialEq)]
+#[action(namespace = story)]
+pub struct ToggleSidebar;
 
 const MAIN_DOCK_AREA: DockAreaTab = DockAreaTab {
     id: "storybook-main-dock",
@@ -48,9 +58,19 @@ struct DockAreaTab {
 
 type StoryPanelMap = BTreeMap<String, gpui::WeakEntity<StoryContainer>>;
 type StoryPanelRegistries = BTreeMap<EntityId, StoryPanelMap>;
+type StorySeedRegistries = BTreeMap<EntityId, Vec<StorySeed>>;
 
 static STORY_PANELS: LazyLock<Mutex<StoryPanelRegistries>> =
     LazyLock::new(|| Mutex::new(BTreeMap::new()));
+static STORY_SEEDS: LazyLock<Mutex<StorySeedRegistries>> =
+    LazyLock::new(|| Mutex::new(BTreeMap::new()));
+
+#[derive(Clone, Debug)]
+struct StorySeed {
+    story_klass: String,
+    group: Option<String>,
+    section: Option<String>,
+}
 
 struct DockLayoutStore;
 
@@ -200,37 +220,6 @@ impl StorySidebar {
         }
     }
 
-    fn create_story_from_entry(
-        entry: &StoryEntry,
-        dock_area: &gpui::WeakEntity<DockArea>,
-        window: &mut Window,
-        cx: &mut App,
-    ) -> Entity<StoryContainer> {
-        if let Some(story) = Self::find_story_by_klass(dock_area, entry.name) {
-            return story;
-        }
-
-        let panel = (entry.create_fn)(window, cx);
-        if let Some(section) = entry.section {
-            panel.update(cx, |c, _| {
-                c.section = Some(section.into());
-            });
-        }
-        Self::register_story(dock_area, &panel, cx);
-        panel
-    }
-
-    fn create_story_by_klass(
-        story_klass: &str,
-        dock_area: &gpui::WeakEntity<DockArea>,
-        window: &mut Window,
-        cx: &mut App,
-    ) -> Option<Entity<StoryContainer>> {
-        inventory::iter::<StoryEntry>()
-            .find(|entry| entry.name == story_klass)
-            .map(|entry| Self::create_story_from_entry(entry, dock_area, window, cx))
-    }
-
     fn register_story(
         dock_area: &gpui::WeakEntity<DockArea>,
         story: &Entity<StoryContainer>,
@@ -254,6 +243,79 @@ impl StorySidebar {
         for story in stories {
             Self::register_story(dock_area, story, cx);
         }
+    }
+
+    fn register_story_seeds(
+        dock_area: &gpui::WeakEntity<DockArea>,
+        stories: &[Entity<StoryContainer>],
+        cx: &App,
+    ) {
+        let seeds = stories
+            .iter()
+            .filter_map(|story| {
+                let story_data = story.read(cx);
+                let story_klass = story_data.story_klass.as_ref()?.to_string();
+
+                Some(StorySeed {
+                    story_klass,
+                    group: story_data.group.as_ref().map(ToString::to_string),
+                    section: story_data.section.as_ref().map(ToString::to_string),
+                })
+            })
+            .collect();
+
+        if let Ok(mut registries) = STORY_SEEDS.lock() {
+            registries.insert(dock_area.entity_id(), seeds);
+        }
+    }
+
+    fn story_seed(dock_area: &gpui::WeakEntity<DockArea>, story_klass: &str) -> Option<StorySeed> {
+        let registries = STORY_SEEDS.lock().ok()?;
+        registries
+            .get(&dock_area.entity_id())?
+            .iter()
+            .find(|seed| seed.story_klass == story_klass)
+            .cloned()
+    }
+
+    fn create_story_by_klass(
+        story_klass: &str,
+        dock_area: &gpui::WeakEntity<DockArea>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Option<Entity<StoryContainer>> {
+        if let Some(story) = Self::find_story_by_klass(dock_area, story_klass) {
+            return Some(story);
+        }
+
+        let story_seed = Self::story_seed(dock_area, story_klass)?;
+        let entry = inventory::iter::<StoryEntry>().find(|entry| entry.name == story_klass)?;
+        let panel = (entry.create_fn)(window, cx);
+        panel.update(cx, |c, _| {
+            c.group = story_seed.group.clone().map(Into::into);
+            c.section = story_seed.section.clone().map(Into::into);
+        });
+        Self::register_story(dock_area, &panel, cx);
+        Some(panel)
+    }
+
+    fn seeded_stories(
+        dock_area: &gpui::WeakEntity<DockArea>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Vec<Entity<StoryContainer>> {
+        let seeds = STORY_SEEDS
+            .lock()
+            .ok()
+            .and_then(|registries| registries.get(&dock_area.entity_id()).cloned())
+            .unwrap_or_default();
+
+        seeds
+            .into_iter()
+            .filter_map(|seed| {
+                Self::create_story_by_klass(&seed.story_klass, dock_area, window, cx)
+            })
+            .collect()
     }
 
     fn find_story_by_klass(
@@ -424,8 +486,8 @@ impl Render for StorySidebar {
                                                 let story_for_open = story_for_click.clone();
                                                 window.defer(cx, move |window, cx| {
                                                     Self::open_story(
-                                                        dock_area_for_open.clone(),
-                                                        story_for_open.clone(),
+                                                        dock_area_for_open,
+                                                        story_for_open,
                                                         window,
                                                         cx,
                                                     );
@@ -462,6 +524,7 @@ impl StoryWorkspace {
         let dock_area =
             cx.new(|cx| DockArea::new(MAIN_DOCK_AREA.id, Some(MAIN_DOCK_AREA.version), window, cx));
         let weak_dock_area = dock_area.downgrade();
+        StorySidebar::register_story_seeds(&weak_dock_area, &stories, cx);
         StorySidebar::register_stories(&weak_dock_area, &stories, cx);
 
         // Try to load saved layout, fall back to default
@@ -470,7 +533,7 @@ impl StoryWorkspace {
                 // Layout loaded successfully
             },
             Err(_) => {
-                Self::reset_default_layout(weak_dock_area.clone(), &stories, window, cx);
+                Self::reset_default_layout(weak_dock_area, &stories, window, cx);
             },
         };
 
@@ -655,13 +718,8 @@ impl StoryWorkspace {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        // Collect stories from the registry
-        let entries: Vec<_> = inventory::iter::<StoryEntry>().collect();
-        let stories: Vec<Entity<StoryContainer>> =
-            entries.iter().map(|e| (e.create_fn)(window, cx)).collect();
-        StorySidebar::register_stories(&self.dock_area.downgrade(), &stories, cx);
-
         let weak_dock_area = self.dock_area.downgrade();
+        let stories = StorySidebar::seeded_stories(&weak_dock_area, window, cx);
         Self::reset_default_layout(weak_dock_area, &stories, window, cx);
 
         // Delete saved state file
@@ -742,12 +800,7 @@ pub fn register_story_panels(cx: &mut App) {
         cx,
         "StorySidebar",
         |dock_area, _state, _info, window, cx| {
-            // Recreate the sidebar with all stories from the registry
-            let entries: Vec<_> = inventory::iter::<StoryEntry>().collect();
-            let stories: Vec<Entity<StoryContainer>> = entries
-                .iter()
-                .map(|entry| StorySidebar::create_story_from_entry(entry, &dock_area, window, cx))
-                .collect();
+            let stories = StorySidebar::seeded_stories(&dock_area, window, cx);
 
             Box::new(cx.new(|cx| StorySidebar::new(stories, dock_area, window, cx)))
         },

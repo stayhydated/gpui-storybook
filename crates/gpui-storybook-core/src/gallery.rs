@@ -349,7 +349,7 @@ impl Render for Gallery {
                             .flex_1()
                             .overflow_y_scroll()
                             .when_some(active_story_to_render, |this, active_story_ref| {
-                                this.child(active_story_ref.clone())
+                                this.child(active_story_ref)
                             }),
                     )
                     .into_any_element(),

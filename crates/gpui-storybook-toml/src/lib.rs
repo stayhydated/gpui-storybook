@@ -80,10 +80,7 @@ pub fn load_from_dir(dir: impl AsRef<Path>) -> Result<Option<StorybookToml>, Sto
         Ok(raw) => raw,
         Err(source) if source.kind() == std::io::ErrorKind::NotFound => return Ok(None),
         Err(source) => {
-            return Err(StorybookTomlError::Read {
-                path: path.to_path_buf(),
-                source,
-            });
+            return Err(StorybookTomlError::Read { path, source });
         },
     };
 

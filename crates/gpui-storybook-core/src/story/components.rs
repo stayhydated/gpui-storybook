@@ -1,7 +1,7 @@
 use gpui::{
-    AnyElement, AnyView, App, AppContext as _, ClickEvent, Div, Entity, EventEmitter, Focusable,
-    Hsla, InteractiveElement as _, IntoElement, ParentElement, Render, RenderOnce, SharedString,
-    StyleRefinement, Styled, Window, actions, div, prelude::FluentBuilder as _, rems,
+    Action, AnyElement, AnyView, App, AppContext as _, ClickEvent, Div, Entity, EventEmitter,
+    Focusable, Hsla, InteractiveElement as _, IntoElement, ParentElement, Render, RenderOnce,
+    SharedString, StyleRefinement, Styled, Window, div, prelude::FluentBuilder as _, rems,
 };
 
 use serde::{Deserialize, Serialize};
@@ -19,7 +19,9 @@ use gpui_component::{
 
 use super::state::AppState;
 
-actions!(story, [ShowPanelInfo]);
+#[derive(Action, Clone, Debug, Default, Eq, PartialEq)]
+#[action(namespace = story)]
+pub struct ShowPanelInfo;
 
 #[derive(IntoElement)]
 pub struct StorySection {
