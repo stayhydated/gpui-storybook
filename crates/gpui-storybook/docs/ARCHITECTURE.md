@@ -17,9 +17,9 @@ This crate is the boundary where compile-time registration metadata becomes runt
 ## Discovery pipeline
 
 1. `#[story]` and `#[derive(ComponentStory)]` expansions submit `gpui_storybook_core::registry::StoryEntry` records into `inventory`.
-2. `#[story_init]` expansions submit `InitEntry` records into the same inventory system.
-3. `init` stores `CurrentLanguage<L>`, installs `LocaleManager<L>` as the `LocaleStore`, delegates runtime startup to `gpui_storybook_core::story::init`, optionally registers dock panels, then executes discovered init hooks.
-4. `generate_stories` iterates all `StoryEntry` records, resolves crate-local config, applies runtime filtering, sorts the surviving entries, and materializes `StoryContainer` entities by calling each entry's `create_fn`.
+1. `#[story_init]` expansions submit `InitEntry` records into the same inventory system.
+1. `init` stores `CurrentLanguage<L>`, installs `LocaleManager<L>` as the `LocaleStore`, delegates runtime startup to `gpui_storybook_core::story::init`, optionally registers dock panels, then executes discovered init hooks.
+1. `generate_stories` iterates all `StoryEntry` records, resolves crate-local config, applies runtime filtering, sorts the surviving entries, and materializes `StoryContainer` entities by calling each entry's `create_fn`.
 
 ## Runtime config resolution
 
@@ -31,8 +31,8 @@ This crate is the boundary where compile-time registration metadata becomes runt
 Runtime config selection is intentionally heuristic:
 
 1. derive the current binary name from `argv[0]`
-2. if a discovered `StoryEntry` has `crate_name == current_binary_name`, reuse that crate's cached config
-3. otherwise walk upward from the current working directory until a `storybook.toml` is found
+1. if a discovered `StoryEntry` has `crate_name == current_binary_name`, reuse that crate's cached config
+1. otherwise walk upward from the current working directory until a `storybook.toml` is found
 
 That behavior lets example apps and workspace-local binaries resolve their own config without requiring explicit configuration wiring.
 
@@ -62,9 +62,9 @@ The UI runtime uses `group` as the outer bucket and `section` as the nested labe
 The final sort order is:
 
 1. `section_order` when both entries have one
-2. ordered sections before unordered sections
-3. section label
-4. story name
+1. ordered sections before unordered sections
+1. section label
+1. story name
 
 `section_order` is produced by macro expansion when a story uses an enum variant section; the discriminant is cast to `usize`.
 

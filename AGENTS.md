@@ -5,8 +5,8 @@ This file is the working guide for contributors and coding agents in the `gpui-s
 Use it to answer three questions quickly:
 
 1. Which crate is the default entry point vs an extension surface vs an internal detail?
-2. Where should user-facing documentation live vs internal architecture notes?
-3. What other examples, READMEs, or config surfaces must move with the same change?
+1. Where should user-facing documentation live vs internal architecture notes?
+1. What other examples, READMEs, or config surfaces must move with the same change?
 
 Ignore all folders matching `**/__crate_paths__/**`.
 
@@ -17,8 +17,8 @@ Ignore all folders matching `**/__crate_paths__/**`.
 Its priorities are:
 
 1. **Fast iteration**: preview component variants without running the full application.
-2. **Organization**: group stories into stable sections and top-level runtime groups.
-3. **Developer experience**: provide built-in theming, locale switching, story registration helpers, and optional docked layouts.
+1. **Organization**: group stories into stable sections and top-level runtime groups.
+1. **Developer experience**: provide built-in theming, locale switching, story registration helpers, and optional docked layouts.
 
 For most application code, start with `crates/gpui-storybook`.
 
@@ -70,10 +70,10 @@ Do not put architecture-only implementation detail into READMEs.
 When changing a public workflow, story registration behavior, `storybook.toml` semantics, dock behavior, or other user-visible runtime behavior:
 
 1. Update the root `README.md`.
-2. Update the affected crate `README.md` files.
-3. Update the matching example `README.md` files when the change affects either registration style.
-4. Update the relevant `docs/ARCHITECTURE.md` files when the internal flow or crate boundaries changed.
-5. Keep these surfaces aligned in the same change unless there is a documented reason not to.
+1. Update the affected crate `README.md` files.
+1. Update the matching example `README.md` files when the change affects either registration style.
+1. Update the relevant `docs/ARCHITECTURE.md` files when the internal flow or crate boundaries changed.
+1. Keep these surfaces aligned in the same change unless there is a documented reason not to.
 
 Additional rules:
 

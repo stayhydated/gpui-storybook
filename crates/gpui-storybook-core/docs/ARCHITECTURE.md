@@ -37,11 +37,11 @@ It owns:
 `gpui_storybook_core::story::init` is the runtime bootstrap sequence used by the facade:
 
 1. initialize embedded i18n through `es_fluent_manager_embedded`
-2. initialize `gpui-component`
-3. install `AppState`
-4. restore persisted theme state and register theme actions
-5. bind common actions such as `/` for search and `cmd-q` for quit
-6. install the base application menus and activate the app
+1. initialize `gpui-component`
+1. install `AppState`
+1. restore persisted theme state and register theme actions
+1. bind common actions such as `/` for search and `cmd-q` for quit
+1. install the base application menus and activate the app
 
 The facade supplies the language-specific `LocaleStore` before calling this function.
 
@@ -50,9 +50,9 @@ The facade supplies the language-specific `LocaleStore` before calling this func
 `Story` is the core runtime contract. `StoryContainer::panel::<S>` turns a story type into a panel entity by:
 
 1. calling `S::new_view(window, cx)`
-2. storing `S::klass()` as `story_klass`
-3. capturing `S::title` and `S::description` as deferred metadata functions
-4. wrapping the rendered view in panel chrome used by both gallery and dock modes
+1. storing `S::klass()` as `story_klass`
+1. capturing `S::title` and `S::description` as deferred metadata functions
+1. wrapping the rendered view in panel chrome used by both gallery and dock modes
 
 The resulting `StoryContainer` carries both runtime metadata (`group`, `section`, `story_klass`) and panel behavior (`Panel`, `PanelView`, focus handling, visibility).
 

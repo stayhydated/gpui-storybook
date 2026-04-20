@@ -9,12 +9,19 @@
 It is built around three goals:
 
 1. Fast iteration with a searchable preview shell.
-2. Stable organization through sections and crate-level groups.
-3. Good developer experience with built-in theming, locale switching, and optional dock layouts.
+1. Stable organization through sections and crate-level groups.
+1. Good developer experience with built-in theming, locale switching, and optional dock layouts.
 
-Most applications should start with [`gpui-storybook`](crates/gpui-storybook/README.md).
+## Compatibility
 
-## Run the examples
+| `gpui-storybook` | `gpui-component` | `gpui` |
+| :---------------- | :--------------- | :------ |
+| **crates.io** | | |
+| `0.5.0` | `0.5.1` | `0.2.2` |
+| **git** | | |
+| `master` | `main` | `15d8660748b508b3525d3403e5d172f1a557bfa5` |
+
+## Examples
 
 Explicit `#[story]` workflow:
 
@@ -178,9 +185,3 @@ disable_story = ["LegacyCardStory"]
 - For `ComponentStory`, the registered story name is the component type name.
 
 At runtime, `generate_stories` prefers the `storybook.toml` that belongs to the current binary crate and falls back to searching upward from the working directory.
-
-## Acknowledgements
-
-This project is heavily inspired by the story section of [gpui-component](https://github.com/longbridge/gpui-component/tree/main/crates/story).
-
-See related discussion on ownership transfer [here](https://github.com/longbridge/gpui-component/discussions/1473).
