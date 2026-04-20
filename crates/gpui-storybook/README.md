@@ -4,26 +4,21 @@
 [![Docs](https://docs.rs/gpui-storybook/badge.svg)](https://docs.rs/gpui-storybook/)
 [![Crates.io](https://img.shields.io/crates/v/gpui-storybook.svg)](https://crates.io/crates/gpui-storybook)
 
-A facade crate for building and inspecting GPUI components with a searchable gallery, optional dock layout, built-in theming, and locale switching.
+`gpui-storybook` is the user-facing facade crate for the workspace.
 
-## Features
+Use it when you want:
 
-- Gallery UI with sidebar search, dock, and active story focus.
-- Proc macros for attribute-based story registration, component-attached registration, and global init hooks.
-- `Story` trait for full control when a component needs custom story behavior.
-- Crate-local `storybook.toml` support for grouping, allowlists, and disabled stories.
+- story discovery and runtime filtering through `generate_stories`
+- the standard gallery window or optional dock workspace
+- `#[story]`, `#[derive(ComponentStory)]`, and `#[story_init]` through one dependency
+- built-in theme, locale, and title-bar wiring
 
-## Example apps
+Most applications should depend on this crate directly.
 
-Story-struct pattern:
+## Run the example apps
 
 ```bash
 cargo run -p gpui-storybook-example-story
-```
-
-Component-derived pattern:
-
-```bash
 cargo run -p gpui-storybook-example-component
 ```
 
@@ -34,9 +29,9 @@ cargo run -p gpui-storybook-example-story --features dock
 cargo run -p gpui-storybook-example-component --features dock
 ```
 
-## Quick start
+## Minimal app shell
 
-```rust
+```rs
 use es_fluent::EsFluent;
 use es_fluent_lang::es_fluent_language;
 use gpui_storybook::{Assets, Gallery};
@@ -51,7 +46,7 @@ fn main() {
 
     app.run(|cx| {
         gpui_storybook::init(Languages::default(), cx);
-        gpui_storybook::change_locale(Languages::default());
+        gpui_storybook::change_locale(Languages::default()).unwrap();
 
         gpui_storybook::create_new_window("My App - Stories", |window, cx| {
             let stories = gpui_storybook::generate_stories(window, cx);
@@ -61,9 +56,18 @@ fn main() {
 }
 ```
 
-## Registering stories with `#[story]`
+Enable the `dock` feature when you want the panel-based workspace:
 
-```rust
+```toml
+[dependencies]
+gpui-storybook = { version = "*", features = ["dock"] }
+```
+
+## Registration styles
+
+### `#[story]` for explicit story types
+
+```rs
 use gpui::{App, Focusable, Render, Window};
 
 #[gpui_storybook::story("Components")]
@@ -80,9 +84,11 @@ impl gpui_storybook::Story for ButtonStory {
 }
 ```
 
-## Registering components directly with `ComponentStory`
+Use this flow when the story needs its own state, focus handling, or wrapper UI.
 
-```rust
+### `#[derive(ComponentStory)]` for component-attached registration
+
+```rs
 use gpui::{App, IntoElement, RenderOnce, Window};
 
 #[derive(IntoElement, gpui_storybook::ComponentStory)]
@@ -110,54 +116,50 @@ impl RenderOnce for WelcomeCard {
 }
 ```
 
-`ComponentStory` generates the wrapper `Story`, `Render`, and `Focusable` implementations that storybook needs. The component only defines its own component rendering and, when needed, an `example = ...` constructor.
+Use this flow when the component should only describe its own example data and render output.
 
-`title` and `description` accept expressions that convert into `String`, so both string literals and `String::from(...)`-style values work.
+### `#[story_init]` for one-time setup
 
-Use `#[gpui_storybook::story_init]` to register global setup functions that should run once per app:
-
-```rust
+```rs
 #[gpui_storybook::story_init]
 fn register_icons(cx: &mut gpui::App) {
     // global setup
 }
 ```
 
-## Organizing sections
+## Sections and ordering
 
-Sections can be string literals or enum variants. Enum variants are ordered by discriminant to produce stable section ordering:
+Both registration styles accept string sections or enum variants. Enum discriminants become the sort order used by discovery:
 
-```rust
+```rs
 #[derive(Clone, Copy)]
+#[repr(usize)]
 enum StorySection {
-    Basics,
-    Components,
-    Patterns,
+    Basics = 1,
+    Components = 2,
+    Patterns = 3,
 }
 
 #[gpui_storybook::story(StorySection::Components)]
 pub struct CardStory;
-
-#[derive(gpui::IntoElement, gpui_storybook::ComponentStory)]
-#[storybook(section = StorySection::Patterns, example = PatternCard::example())]
-pub struct PatternCard;
 ```
 
-## Crate-level story discovery config
+## `storybook.toml`
 
-You can add a `storybook.toml` file to a crate root to control what `generate_stories` includes from that crate:
+Add a `storybook.toml` to a crate root when you want that crate to participate in runtime grouping or filtering:
 
 ```toml
 group = "UI Kit"
-disable_story = ["CardStory"]
+allow = ["UI Kit", "Shared"]
+disable_story = ["LegacyCardStory"]
 ```
 
-- `group`: Required runtime discovery group when `storybook.toml` exists; used for `allow` matching and as the top-level sidebar bucket without overwriting a story's declared section beneath it.
-- `allow`: Optional list of allowed group identifiers for the current app/runtime.
-- Omit `allow`: Allows only the config's own `group`.
-- `allow = ["*"]`: Includes all groups.
-- `allow = []`: Includes none.
-- `disable_story`: Optional per-story denylist by registered story type name.
+- `group` is required when the file exists.
+- Omitting `allow` means "only include this crate's own `group`".
+- `allow = ["*"]` includes every group.
+- `allow = []` includes none.
+- `disable_story` matches the registered story type name.
+- For `ComponentStory`, the registered story name is the component type name.
 
 At runtime, `generate_stories` prefers the `storybook.toml` associated with the current binary crate and falls back to searching upward from the working directory.
 
