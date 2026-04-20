@@ -1,13 +1,14 @@
 use crate::language::Language;
+use anyhow::{Result, anyhow};
 use es_fluent::ToFluentString as _;
 use gpui::{App, Global};
 use std::marker::PhantomData;
 use unic_langid::LanguageIdentifier;
 
 pub trait LocaleStore: Send + Sync {
-    fn available_locales(&self) -> Vec<(String, LanguageIdentifier)>;
-    fn current_locale(&self, cx: &App) -> LanguageIdentifier;
-    fn set_current_locale(&self, locale: LanguageIdentifier, cx: &mut App);
+    fn available_locales(&self) -> Result<Vec<(String, LanguageIdentifier)>>;
+    fn current_locale(&self, cx: &App) -> Result<LanguageIdentifier>;
+    fn set_current_locale(&self, locale: LanguageIdentifier, cx: &mut App) -> Result<()>;
 }
 
 impl Global for Box<dyn LocaleStore> {}
@@ -24,24 +25,38 @@ impl<L: Language> LocaleManager<L> {
 }
 
 impl<L: Language> LocaleStore for LocaleManager<L> {
-    fn available_locales(&self) -> Vec<(String, LanguageIdentifier)> {
+    fn available_locales(&self) -> Result<Vec<(String, LanguageIdentifier)>> {
         L::iter()
-            .map(|l| (l.to_fluent_string(), l.try_into().ok().unwrap()))
+            .map(|language| {
+                let locale = language.try_into().map_err(|_| {
+                    anyhow!("failed to convert language {:?} into a locale", language)
+                })?;
+                Ok((language.to_fluent_string(), locale))
+            })
             .collect()
     }
 
-    fn current_locale(&self, cx: &App) -> LanguageIdentifier {
-        cx.global::<crate::language::CurrentLanguage<L>>()
-            .0
-            .try_into()
-            .ok()
-            .unwrap()
+    fn current_locale(&self, cx: &App) -> Result<LanguageIdentifier> {
+        let current_language = cx.global::<crate::language::CurrentLanguage<L>>().0;
+        current_language.try_into().map_err(|_| {
+            anyhow!(
+                "failed to convert current language {:?} into a locale",
+                current_language
+            )
+        })
     }
 
-    fn set_current_locale(&self, locale: LanguageIdentifier, cx: &mut App) {
-        let new_lang = L::try_from(locale.clone()).ok().unwrap();
+    fn set_current_locale(&self, locale: LanguageIdentifier, cx: &mut App) -> Result<()> {
+        let new_lang = L::try_from(locale.clone()).map_err(|_| {
+            anyhow!("failed to convert locale '{locale}' into an application language")
+        })?;
+        let locale_name = locale.to_string();
+
+        crate::i18n::change_locale(locale)
+            .map_err(|err| anyhow!("failed to change locale to '{locale_name}': {err}"))?;
         cx.set_global(crate::language::CurrentLanguage(new_lang));
-        gpui_component::set_locale(&locale.to_string());
-        crate::i18n::change_locale(locale);
+        gpui_component::set_locale(&locale_name);
+
+        Ok(())
     }
 }

@@ -139,7 +139,8 @@ pub enum ContainerEvent {
 
 pub trait Story: Focusable + Render + Sized {
     fn klass() -> &'static str {
-        std::any::type_name::<Self>().split("::").last().unwrap()
+        let type_name = std::any::type_name::<Self>();
+        type_name.rsplit("::").next().unwrap_or(type_name)
     }
 
     fn title() -> String;
@@ -278,11 +279,6 @@ impl StoryState {
             "story_klass": self.story_klass,
         })
     }
-
-    #[allow(dead_code)]
-    fn from_value(value: serde_json::Value) -> Self {
-        serde_json::from_value(value).unwrap()
-    }
 }
 
 impl Panel for StoryContainer {
@@ -393,10 +389,10 @@ impl Panel for StoryContainer {
 
     fn dump(&self, _cx: &App) -> PanelState {
         let mut state = PanelState::new(self);
-        let story_state = StoryState {
-            story_klass: self.story_klass.clone().unwrap(),
-        };
-        state.info = PanelInfo::panel(story_state.to_value());
+        if let Some(story_klass) = self.story_klass.clone() {
+            let story_state = StoryState { story_klass };
+            state.info = PanelInfo::panel(story_state.to_value());
+        }
         state
     }
 }

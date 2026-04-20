@@ -24,9 +24,14 @@ pub fn init(
         let extra_items = extra_items.clone();
         let app_menu_bar = app_menu_bar.clone();
         move |action: &SelectLocale, cx: &mut App| {
-            cx.update_global::<Box<dyn LocaleStore>, _>(|locale_store, cx| {
-                locale_store.set_current_locale(action.0.clone(), cx);
-            });
+            let selected_locale = action.0.clone();
+            if let Err(err) = cx.update_global::<Box<dyn LocaleStore>, _>(|locale_store, cx| {
+                locale_store.set_current_locale(selected_locale.clone(), cx)
+            }) {
+                tracing::error!("Failed to switch locale to '{}': {err:#}", selected_locale);
+                return;
+            }
+
             update_app_menu(title.clone(), extra_items.clone(), app_menu_bar.clone(), cx);
             cx.refresh_windows();
         }
@@ -121,18 +126,41 @@ fn theme_menu(cx: &App) -> MenuItem {
 
 fn language_menu(cx: &App) -> MenuItem {
     let locale_store = cx.global::<Box<dyn LocaleStore>>();
-    let available_locales = locale_store.available_locales();
-    let current_locale = locale_store.current_locale(cx);
+    let available_locales = match locale_store.available_locales() {
+        Ok(available_locales) => available_locales,
+        Err(err) => {
+            tracing::error!("Failed to load available locales: {err:#}");
+            return disabled_language_menu();
+        },
+    };
+    let current_locale = match locale_store.current_locale(cx) {
+        Ok(current_locale) => Some(current_locale),
+        Err(err) => {
+            tracing::error!("Failed to load current locale: {err:#}");
+            None
+        },
+    };
 
     MenuItem::Submenu(Menu {
         name: "Language".into(),
         items: available_locales
             .iter()
             .map(|(name, lang_id)| {
-                let checked = *lang_id == current_locale;
+                let checked = current_locale
+                    .as_ref()
+                    .map(|current_locale| current_locale == lang_id)
+                    .unwrap_or(false);
                 MenuItem::action(name, SelectLocale(lang_id.clone())).checked(checked)
             })
             .collect(),
-        disabled: false,
+        disabled: available_locales.is_empty(),
+    })
+}
+
+fn disabled_language_menu() -> MenuItem {
+    MenuItem::Submenu(Menu {
+        name: "Language".into(),
+        items: Vec::new(),
+        disabled: true,
     })
 }

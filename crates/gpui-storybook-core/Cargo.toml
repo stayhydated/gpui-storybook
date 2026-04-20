@@ -28,6 +28,7 @@ rust-embed = { features = [ "interpolate-folder-path" ], workspace = true }
 serde = { features = [ "derive" ], workspace = true }
 serde_json = { workspace = true }
 strum = { features = [ "derive" ], workspace = true }
+tracing = { workspace = true }
 unic-langid = { features = [ "serde" ], workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
