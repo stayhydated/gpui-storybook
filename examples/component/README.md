@@ -1,28 +1,31 @@
 # gpui-storybook-example-component
 
-This example uses the component-attached derive macro with components that are unrelated to the `examples/story` set.
+User-facing example app for the component-attached `#[derive(ComponentStory)]` workflow.
 
-Run it with:
+Use this example when the component should own only its own data and rendering, while storybook generates the wrapper view and registration glue.
+
+## Run it
 
 ```bash
 cargo run -p gpui-storybook-example-component
 ```
 
-Or with the dock workspace:
+With the dock workspace:
 
 ```bash
 cargo run -p gpui-storybook-example-component --features dock
 ```
 
-Current components:
+## What to inspect
 
-- `WelcomeCard`: an editorial callout card.
-- `SignalBoard`: a custom dashboard strip.
-- `FieldNotes`: a stack of annotated note cards.
+- `src/main.rs`: app startup, locale initialization, and window creation
+- `src/lib.rs`: shared `StorySection` enum for stable ordering
+- `src/components/*.rs`: components annotated with `#[derive(ComponentStory)]`
+- `storybook.toml`: crate-level runtime group for discovery
 
-Pattern:
+## Core pattern
 
-```rust
+```rs
 use gpui::{IntoElement, RenderOnce};
 
 #[derive(IntoElement, gpui_storybook::ComponentStory)]
@@ -42,12 +45,12 @@ impl RenderOnce for WelcomeCard {
 }
 ```
 
-The derive macro generates the story wrapper, focus handling, and inventory registration. The component crate only defines the component itself and, when needed, an `example = ...` constructor.
+This flow keeps the storybook wrapper out of the component implementation. The component stays focused on its example data and markup.
 
-Current config:
+## Example config
 
 ```toml
 group = "gpui-storybook-example-component"
 ```
 
-`allow` is intentionally omitted here, so the example includes only its own `group`.
+`allow` is intentionally omitted, so the example includes only its own `group`.

@@ -1,10 +1,13 @@
 # gpui-storybook-components
 
-Shared UI components used by the `gpui-storybook` runtime.
+[![Docs](https://docs.rs/gpui-storybook-components/badge.svg)](https://docs.rs/gpui-storybook-components/)
+[![Crates.io](https://img.shields.io/crates/v/gpui-storybook-components.svg)](https://crates.io/crates/gpui-storybook-components)
 
-Currently this crate provides:
+Internal crate with shared dock-sidebar UI pieces used by `gpui-storybook-core`.
 
-- `StorySidebarItem`: sidebar row rendering used by the dock workspace.
-- `StoryDrag`: drag payload view used when dragging stories into the dock layout.
+This crate primarily exists for runtime implementation reuse. Most applications should depend on [`gpui-storybook`](../gpui-storybook/README.md), and lower-level runtime integrations should usually depend on [`gpui-storybook-core`](../gpui-storybook-core/README.md) instead.
 
-This crate is primarily an internal implementation detail for `gpui-storybook-core`.
+Current surface:
+
+- `StorySidebarItem`: dock sidebar row rendering
+- `StoryDrag`: drag preview used when dropping stories into the dock workspace
