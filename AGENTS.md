@@ -4,11 +4,9 @@ This file is the working guide for contributors and coding agents in the `gpui-s
 
 Use it to answer three questions quickly:
 
-1. Which crate is the default entry point vs an extension surface vs an internal detail?
-1. Where should user-facing documentation live vs internal architecture notes?
-1. What other examples, READMEs, or config surfaces must move with the same change?
-
-Ignore all folders matching `**/__crate_paths__/**`.
+1. Where does this documentation belong?
+2. Which crates are public entry points versus integration points versus internals?
+3. What other surfaces must be updated in the same change?
 
 ## Project summary
 
@@ -17,29 +15,29 @@ Ignore all folders matching `**/__crate_paths__/**`.
 Its priorities are:
 
 1. **Fast iteration**: preview component variants without running the full application.
-1. **Organization**: group stories into stable sections and top-level runtime groups.
-1. **Developer experience**: provide built-in theming, locale switching, story registration helpers, and optional docked layouts.
+2. **Organization**: group stories into stable sections and top-level runtime groups.
+3. **Developer experience**: provide built-in theming, locale switching, story registration helpers, and optional docked layouts.
 
 For most application code, start with `crates/gpui-storybook`.
 
 Reach for the example apps when you need to validate or demonstrate the two supported registration styles:
 
-- `examples/story` for explicit `#[story]` + `Story` implementations.
+- `examples/story` for explicit `#[story]` plus `Story` implementations.
 - `examples/component` for `#[derive(ComponentStory)]` on the component itself.
 
 ## Audience labels
 
 These labels describe the crate or surface itself, not the documentation file you are editing:
 
-- **User-facing**: normal entry points for application developers adopting storybook in their app or component workspace.
-- **Public integration**: public crates meant for deeper customization, proc-macro usage, or runtime/config integration, but not usually the default starting point.
-- **Internal**: implementation detail crates and workspace plumbing that most consumers should not depend on directly.
+- **User-facing**: Normal entry points for application developers adopting storybook in their app or component workspace.
+- **Public integration**: Public crates meant for deeper customization, proc-macro usage, or runtime and config integration. These are not usually the default starting point.
+- **Internal**: Implementation detail crates and workspace plumbing that most consumers should not depend on directly.
 
 ## Documentation rules
 
 ### User-facing documentation
 
-These surfaces are user-facing:
+These surfaces are always user-facing:
 
 - the root `README.md`,
 - crate-level `README.md` files,
@@ -60,7 +58,7 @@ Use them for:
 - story discovery and filtering internals,
 - runtime data flow and module boundaries,
 - proc-macro parsing and expansion details,
-- dock/gallery relationships,
+- dock and gallery relationships,
 - design rationale and subsystem responsibilities.
 
 Do not put architecture-only implementation detail into READMEs.
@@ -70,10 +68,10 @@ Do not put architecture-only implementation detail into READMEs.
 When changing a public workflow, story registration behavior, `storybook.toml` semantics, dock behavior, or other user-visible runtime behavior:
 
 1. Update the root `README.md`.
-1. Update the affected crate `README.md` files.
-1. Update the matching example `README.md` files when the change affects either registration style.
-1. Update the relevant `docs/ARCHITECTURE.md` files when the internal flow or crate boundaries changed.
-1. Keep these surfaces aligned in the same change unless there is a documented reason not to.
+2. Update the affected crate `README.md` files.
+3. Update the matching example `README.md` files when the change affects either registration style.
+4. Update the relevant `docs/ARCHITECTURE.md` files when the internal flow or crate boundaries changed.
+5. Keep these surfaces aligned in the same change unless there is a documented reason not to.
 
 Additional rules:
 
@@ -91,12 +89,12 @@ Additional rules:
 - `crates/gpui-storybook`
   Audience: **User-facing**
   Docs: [Architecture](crates/gpui-storybook/docs/ARCHITECTURE.md)
-  Role: workspace facade, default entry point, and public home for `init`, `generate_stories`, window helpers, story discovery/filtering, and optional macro re-exports.
+  Role: workspace facade, default entry point, and public home for `init`, `generate_stories`, window helpers, story discovery and filtering, and optional macro re-exports.
 
 - `examples/story`
   Audience: **User-facing**
   Docs: [README](examples/story/README.md)
-  Role: executable example of the explicit `#[story]` + `Story` trait workflow.
+  Role: executable example of the explicit `#[story]` plus `Story` trait workflow.
 
 - `examples/component`
   Audience: **User-facing**
@@ -134,7 +132,7 @@ Additional rules:
 - Keep READMEs user-facing and task-oriented.
 - Move discovery internals, runtime boundaries, and macro expansion details into `docs/ARCHITECTURE.md`.
 - Prefer example snippets over prose-only explanations.
-- Sync the root README, affected crate README files, and example README files in the same change when the workflow changed.
+- Sync the root `README.md`, affected crate `README.md` files, and example `README.md` files in the same change when the workflow changed.
 
 ### When editing Rust crates
 
@@ -142,6 +140,7 @@ Additional rules:
 - Use `cargo fmt` for Rust formatting and `taplo fmt` for TOML formatting.
 - Keep shared dependency versions in the workspace root `Cargo.toml`.
 - Prefer `workspace = true` for workspace dependencies where applicable.
+- Ignore all folders matching `**/__crate_paths__/**`.
 
 ### When editing story registration or discovery
 
