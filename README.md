@@ -17,7 +17,7 @@ It is built around three goals:
 | `gpui-storybook` | `gpui-component` | `gpui` |
 | :---------------- | :--------------- | :------ |
 | **git** | | |
-| `master` | `main` | `f7d46cf7d02c88d3d71ec495a31d7f19bd5eb96b` |
+| `branch = "master"` | `branch = "main"` | `rev = "f7d46cf7d02c88d3d71ec495a31d7f19bd5eb96b"` |
 
 ## Examples
 
