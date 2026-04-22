@@ -5,8 +5,8 @@ This file is the working guide for contributors and coding agents in the `gpui-s
 Use it to answer three questions quickly:
 
 1. Where does this documentation belong?
-2. Which crates are public entry points versus integration points versus internals?
-3. What other surfaces must be updated in the same change?
+1. Which crates are public entry points versus integration points versus internals?
+1. What other surfaces must be updated in the same change?
 
 ## Project summary
 
@@ -15,8 +15,8 @@ Use it to answer three questions quickly:
 Its priorities are:
 
 1. **Fast iteration**: preview component variants without running the full application.
-2. **Organization**: group stories into stable sections and top-level runtime groups.
-3. **Developer experience**: provide built-in theming, locale switching, story registration helpers, and optional docked layouts.
+1. **Organization**: group stories into stable sections and top-level runtime groups.
+1. **Developer experience**: provide built-in theming, locale switching, story registration helpers, and optional docked layouts.
 
 For most application code, start with `crates/gpui-storybook`.
 
@@ -68,10 +68,10 @@ Do not put architecture-only implementation detail into READMEs.
 When changing a public workflow, story registration behavior, `storybook.toml` semantics, dock behavior, or other user-visible runtime behavior:
 
 1. Update the root `README.md`.
-2. Update the affected crate `README.md` files.
-3. Update the matching example `README.md` files when the change affects either registration style.
-4. Update the relevant `docs/ARCHITECTURE.md` files when the internal flow or crate boundaries changed.
-5. Keep these surfaces aligned in the same change unless there is a documented reason not to.
+1. Update the affected crate `README.md` files.
+1. Update the matching example `README.md` files when the change affects either registration style.
+1. Update the relevant `docs/ARCHITECTURE.md` files when the internal flow or crate boundaries changed.
+1. Keep these surfaces aligned in the same change unless there is a documented reason not to.
 
 Additional rules:
 
@@ -140,7 +140,6 @@ Additional rules:
 - Use `cargo fmt` for Rust formatting and `taplo fmt` for TOML formatting.
 - Keep shared dependency versions in the workspace root `Cargo.toml`.
 - Prefer `workspace = true` for workspace dependencies where applicable.
-- Ignore all folders matching `**/__crate_paths__/**`.
 
 ### When editing story registration or discovery
 
