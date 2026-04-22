@@ -1,5 +1,5 @@
 use gpui::{
-    Context, Corner, FocusHandle, InteractiveElement as _, IntoElement, ParentElement as _, Render,
+    Anchor, Context, FocusHandle, InteractiveElement as _, IntoElement, ParentElement as _, Render,
     Window, div, px,
 };
 use gpui_component::{
@@ -111,7 +111,7 @@ impl Render for FontSizeSelector {
                                 Box::new(SelectScrollbarShow(ScrollbarShow::Always)),
                             )
                     })
-                    .anchor(Corner::TopRight),
+                    .anchor(Anchor::TopRight),
             )
     }
 }
