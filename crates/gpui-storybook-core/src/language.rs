@@ -1,4 +1,4 @@
-use es_fluent::FluentDisplay;
+use es_fluent::FluentMessage;
 use gpui::Global;
 use strum::IntoEnumIterator;
 use unic_langid::LanguageIdentifier;
@@ -12,7 +12,7 @@ pub trait Language:
     + IntoEnumIterator
     + TryInto<LanguageIdentifier>
     + TryFrom<LanguageIdentifier>
-    + FluentDisplay
+    + FluentMessage
     + Default
     + std::fmt::Debug
 {
@@ -27,7 +27,7 @@ impl<T> Language for T where
         + IntoEnumIterator
         + TryInto<LanguageIdentifier>
         + TryFrom<LanguageIdentifier>
-        + FluentDisplay
+        + FluentMessage
         + Default
         + std::fmt::Debug
 {

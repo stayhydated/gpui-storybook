@@ -1,6 +1,5 @@
 use crate::language::Language;
 use anyhow::{Result, anyhow};
-use es_fluent::ToFluentString as _;
 use gpui::{App, Global};
 use std::marker::PhantomData;
 use unic_langid::LanguageIdentifier;
@@ -31,7 +30,9 @@ impl<L: Language> LocaleStore for LocaleManager<L> {
                 let locale = language.try_into().map_err(|_| {
                     anyhow!("failed to convert language {:?} into a locale", language)
                 })?;
-                Ok((language.to_fluent_string(), locale))
+                let label =
+                    crate::i18n::localize_message(&language).unwrap_or_else(|| locale.to_string());
+                Ok((label, locale))
             })
             .collect()
     }

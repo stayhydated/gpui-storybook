@@ -5,7 +5,7 @@ fmt:
     cargo sort-derives
     cargo fmt
     taplo fmt
-    uvx mdformat .
+    rumdl fmt .
 
 clippy:
     cargo clippy --workspace --all-features \

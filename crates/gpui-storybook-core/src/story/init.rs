@@ -7,7 +7,9 @@ use gpui::{App, KeyBinding, Menu, MenuItem, OsAction};
 use gpui_component::input::{Copy, Cut, Paste, Redo, Undo};
 
 pub fn init(cx: &mut App) {
-    i18n::init();
+    if let Err(err) = i18n::init() {
+        tracing::error!("Failed to initialize i18n module: {err:#}");
+    }
     gpui_component::init(cx);
     AppState::init(cx);
     themes::init(cx);

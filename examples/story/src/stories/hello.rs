@@ -1,4 +1,4 @@
-use es_fluent::{EsFluent, ToFluentString as _};
+use es_fluent::EsFluent;
 use gpui::*;
 use gpui_component::StyledExt as _;
 
@@ -21,7 +21,7 @@ impl Focusable for HelloWorld {
 
 impl gpui_storybook::Story for HelloWorld {
     fn title() -> String {
-        StoryItems::Title.to_fluent_string()
+        gpui_storybook::localize_message(&StoryItems::Title).unwrap_or_else(|| "Title".into())
     }
     fn new_view(window: &mut Window, cx: &mut App) -> Entity<impl Render + Focusable> {
         Self::view(window, cx)
@@ -48,6 +48,6 @@ impl Render for HelloWorld {
             .items_center()
             .justify_center()
             .text_center()
-            .child(StoryItems::Hi.to_fluent_string())
+            .child(gpui_storybook::localize_message(&StoryItems::Hi).unwrap_or_else(|| "Hi".into()))
     }
 }

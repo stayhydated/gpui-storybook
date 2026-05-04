@@ -23,9 +23,9 @@ version = "0.5.0"
 [workspace.dependencies]
 anyhow = "1.0"
 darling = "0.23"
-es-fluent = "0.15"
-es-fluent-lang = "0.15"
-es-fluent-manager-embedded = "0.15"
+es-fluent = { branch = "no-singleton", git = "https://github.com/stayhydated/es-fluent" }
+es-fluent-lang = { branch = "no-singleton", git = "https://github.com/stayhydated/es-fluent" }
+es-fluent-manager-embedded = { branch = "no-singleton", git = "https://github.com/stayhydated/es-fluent" }
 gpui = { git = "https://github.com/zed-industries/zed", rev = "f7d46cf7d02c88d3d71ec495a31d7f19bd5eb96b" }
 gpui-component = { git = "https://github.com/longbridge/gpui-component" }
 gpui-component-assets = { git = "https://github.com/longbridge/gpui-component" }
