@@ -1496,7 +1496,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1717,13 +1717,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
 name = "es-fluent"
 version = "0.16.0"
-source = "git+https://github.com/stayhydated/es-fluent?branch=no-singleton#38f3890872463260f2fc8a7c8f51a42ac7522e60"
+source = "git+https://github.com/stayhydated/es-fluent?branch=no-singleton#deebf3acb1c6fca4957a65cbf2761b7506ad6367"
 dependencies = [
  "es-fluent-derive",
  "es-fluent-manager-core",
@@ -1739,7 +1739,7 @@ dependencies = [
 [[package]]
 name = "es-fluent-derive"
 version = "0.16.0"
-source = "git+https://github.com/stayhydated/es-fluent?branch=no-singleton#38f3890872463260f2fc8a7c8f51a42ac7522e60"
+source = "git+https://github.com/stayhydated/es-fluent?branch=no-singleton#deebf3acb1c6fca4957a65cbf2761b7506ad6367"
 dependencies = [
  "darling",
  "es-fluent-derive-core",
@@ -1755,7 +1755,7 @@ dependencies = [
 [[package]]
 name = "es-fluent-derive-core"
 version = "0.16.0"
-source = "git+https://github.com/stayhydated/es-fluent?branch=no-singleton#38f3890872463260f2fc8a7c8f51a42ac7522e60"
+source = "git+https://github.com/stayhydated/es-fluent?branch=no-singleton#deebf3acb1c6fca4957a65cbf2761b7506ad6367"
 dependencies = [
  "bon",
  "darling",
@@ -1774,7 +1774,7 @@ dependencies = [
 [[package]]
 name = "es-fluent-lang"
 version = "0.16.0"
-source = "git+https://github.com/stayhydated/es-fluent?branch=no-singleton#38f3890872463260f2fc8a7c8f51a42ac7522e60"
+source = "git+https://github.com/stayhydated/es-fluent?branch=no-singleton#deebf3acb1c6fca4957a65cbf2761b7506ad6367"
 dependencies = [
  "es-fluent-lang-macro",
  "es-fluent-manager-core",
@@ -1790,7 +1790,7 @@ dependencies = [
 [[package]]
 name = "es-fluent-lang-macro"
 version = "0.16.0"
-source = "git+https://github.com/stayhydated/es-fluent?branch=no-singleton#38f3890872463260f2fc8a7c8f51a42ac7522e60"
+source = "git+https://github.com/stayhydated/es-fluent?branch=no-singleton#deebf3acb1c6fca4957a65cbf2761b7506ad6367"
 dependencies = [
  "es-fluent-toml",
  "heck 0.5.0",
@@ -1804,7 +1804,7 @@ dependencies = [
 [[package]]
 name = "es-fluent-manager-core"
 version = "0.16.0"
-source = "git+https://github.com/stayhydated/es-fluent?branch=no-singleton#38f3890872463260f2fc8a7c8f51a42ac7522e60"
+source = "git+https://github.com/stayhydated/es-fluent?branch=no-singleton#deebf3acb1c6fca4957a65cbf2761b7506ad6367"
 dependencies = [
  "es-fluent-shared",
  "fluent-bundle",
@@ -1823,7 +1823,7 @@ dependencies = [
 [[package]]
 name = "es-fluent-manager-embedded"
 version = "0.16.0"
-source = "git+https://github.com/stayhydated/es-fluent?branch=no-singleton#38f3890872463260f2fc8a7c8f51a42ac7522e60"
+source = "git+https://github.com/stayhydated/es-fluent?branch=no-singleton#deebf3acb1c6fca4957a65cbf2761b7506ad6367"
 dependencies = [
  "es-fluent",
  "es-fluent-manager-core",
@@ -1835,7 +1835,7 @@ dependencies = [
 [[package]]
 name = "es-fluent-manager-macros"
 version = "0.16.0"
-source = "git+https://github.com/stayhydated/es-fluent?branch=no-singleton#38f3890872463260f2fc8a7c8f51a42ac7522e60"
+source = "git+https://github.com/stayhydated/es-fluent?branch=no-singleton#deebf3acb1c6fca4957a65cbf2761b7506ad6367"
 dependencies = [
  "es-fluent-shared",
  "es-fluent-toml",
@@ -1849,7 +1849,7 @@ dependencies = [
 [[package]]
 name = "es-fluent-shared"
 version = "0.16.0"
-source = "git+https://github.com/stayhydated/es-fluent?branch=no-singleton#38f3890872463260f2fc8a7c8f51a42ac7522e60"
+source = "git+https://github.com/stayhydated/es-fluent?branch=no-singleton#deebf3acb1c6fca4957a65cbf2761b7506ad6367"
 dependencies = [
  "anyhow",
  "camino",
@@ -1871,7 +1871,7 @@ dependencies = [
 [[package]]
 name = "es-fluent-toml"
 version = "0.16.0"
-source = "git+https://github.com/stayhydated/es-fluent?branch=no-singleton#38f3890872463260f2fc8a7c8f51a42ac7522e60"
+source = "git+https://github.com/stayhydated/es-fluent?branch=no-singleton#deebf3acb1c6fca4957a65cbf2761b7506ad6367"
 dependencies = [
  "es-fluent-shared",
  "fs-err",
@@ -2835,13 +2835,13 @@ dependencies = [
 [[package]]
 name = "gpui"
 version = "0.2.2"
-source = "git+https://github.com/zed-industries/zed#ff8fa053ff0d0c02aec95def5b796dbe5cd541e1"
+source = "git+https://github.com/zed-industries/zed#3e046b4d292d019a2884415cb842fab0931e667c"
 replace = "gpui 0.2.2 (git+https://github.com/zed-industries/zed?rev=f7d46cf7d02c88d3d71ec495a31d7f19bd5eb96b)"
 
 [[package]]
 name = "gpui-component"
 version = "0.5.1"
-source = "git+https://github.com/longbridge/gpui-component#01a116a15e9660963a2aa07d0192e38785d8b9ad"
+source = "git+https://github.com/longbridge/gpui-component#094090261e178ce2ac869aa02e9bcfe640100fb5"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -2884,7 +2884,7 @@ dependencies = [
 [[package]]
 name = "gpui-component-assets"
 version = "0.5.1"
-source = "git+https://github.com/longbridge/gpui-component#01a116a15e9660963a2aa07d0192e38785d8b9ad"
+source = "git+https://github.com/longbridge/gpui-component#094090261e178ce2ac869aa02e9bcfe640100fb5"
 dependencies = [
  "anyhow",
  "gpui 0.2.2 (git+https://github.com/zed-industries/zed)",
@@ -2898,7 +2898,7 @@ dependencies = [
 [[package]]
 name = "gpui-component-macros"
 version = "0.5.1"
-source = "git+https://github.com/longbridge/gpui-component#01a116a15e9660963a2aa07d0192e38785d8b9ad"
+source = "git+https://github.com/longbridge/gpui-component#094090261e178ce2ac869aa02e9bcfe640100fb5"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3107,7 +3107,7 @@ dependencies = [
 [[package]]
 name = "gpui_macros"
 version = "0.1.0"
-source = "git+https://github.com/zed-industries/zed#ff8fa053ff0d0c02aec95def5b796dbe5cd541e1"
+source = "git+https://github.com/zed-industries/zed#3e046b4d292d019a2884415cb842fab0931e667c"
 dependencies = [
  "heck 0.5.0",
  "proc-macro2",
@@ -3285,9 +3285,9 @@ dependencies = [
 
 [[package]]
 name = "h2"
-version = "0.4.13"
+version = "0.4.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f44da3a8150a6703ed5d34e164b875fd14c2cdab9af1252a9a1020bde2bdc54"
+checksum = "171fefbc92fe4a4de27e0698d6a5b392d6a0e333506bc49133760b3bcf948733"
 dependencies = [
  "atomic-waker",
  "bytes",
@@ -4373,11 +4373,11 @@ dependencies = [
 
 [[package]]
 name = "kqueue-sys"
-version = "1.0.4"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed9625ffda8729b85e45cf04090035ac368927b8cebc34898e7c120f52e4838b"
+checksum = "a7b65860415f949f23fa882e669f2dbd4a0f0eeb1acdd56790b30494afd7da2f"
 dependencies = [
- "bitflags 1.3.2",
+ "bitflags 2.11.1",
  "libc",
 ]
 
@@ -4481,7 +4481,7 @@ dependencies = [
  "bitflags 2.11.1",
  "libc",
  "plain",
- "redox_syscall 0.7.4",
+ "redox_syscall 0.7.5",
 ]
 
 [[package]]
@@ -4994,7 +4994,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -5757,18 +5757,18 @@ dependencies = [
 
 [[package]]
 name = "profiling"
-version = "1.0.17"
+version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3eb8486b569e12e2c32ad3e204dbaba5e4b5b216e9367044f25f1dba42341773"
+checksum = "3d595e54a326bc53c1c197b32d295e14b169e3cfeaa8dc82b529f947fba6bcf5"
 dependencies = [
  "profiling-procmacros",
 ]
 
 [[package]]
 name = "profiling-procmacros"
-version = "1.0.17"
+version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "52717f9a02b6965224f95ca2a81e2e0c5c43baacd28ca057577988930b6c3d5b"
+checksum = "4488a4a36b9a4ba6b9334a32a39971f77c1436ec82c38707bce707699cc3bbcb"
 dependencies = [
  "quote",
  "syn 2.0.117",
@@ -5816,9 +5816,9 @@ dependencies = [
 
 [[package]]
 name = "quick-xml"
-version = "0.39.2"
+version = "0.39.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "958f21e8e7ceb5a1aa7fa87fab28e7c75976e0bfe7e23ff069e0a260f894067d"
+checksum = "721da970c312655cde9b4ffe0547f20a8494866a4af5ff51f18b7c633d0c870b"
 dependencies = [
  "memchr",
 ]
@@ -6099,9 +6099,9 @@ dependencies = [
 
 [[package]]
 name = "redox_syscall"
-version = "0.7.4"
+version = "0.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f450ad9c3b1da563fb6948a8e0fb0fb9269711c9c73d9ea1de5058c79c8d643a"
+checksum = "4666a1a60d8412eab19d94f6d13dcc9cea0a5ef4fdf6a5db306537413c661b1b"
 dependencies = [
  "bitflags 2.11.1",
 ]
@@ -6390,7 +6390,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -6947,7 +6947,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a766e1110788c36f4fa1c2b71b387a7815aa65f88ce0229841826633d93723e"
 dependencies = [
  "libc",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -6993,7 +6993,7 @@ dependencies = [
  "cfg-if",
  "libc",
  "psm",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -7384,7 +7384,7 @@ dependencies = [
  "getrandom 0.4.2",
  "once_cell",
  "rustix 1.1.4",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -7533,9 +7533,9 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "tokio"
-version = "1.52.1"
+version = "1.52.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b67dee974fe86fd92cc45b7a95fdd2f99a36a6d7b0d431a231178d3d670bbcc6"
+checksum = "110a78583f19d5cdb2c5ccf321d1290344e71313c6c37d43520d386027d18386"
 dependencies = [
  "bytes",
  "libc",
@@ -7868,7 +7868,7 @@ checksum = "f2f6fb2847f6742cd76af783a2a2c49e9375d0a111c7bef6f71cd9e738c72d6e"
 dependencies = [
  "memoffset",
  "tempfile",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -8454,7 +8454,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9c324a910fd86ebdc364a3e61ec1f11737d3b1d6c273c0239ee8ff4bc0d24b4a"
 dependencies = [
  "proc-macro2",
- "quick-xml 0.39.2",
+ "quick-xml 0.39.3",
  "quote",
 ]
 
@@ -8707,7 +8707,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
