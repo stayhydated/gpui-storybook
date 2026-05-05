@@ -18,7 +18,7 @@ cargo run -p gpui-storybook-example-component --features dock
 
 ## What to inspect
 
-- `src/main.rs`: app startup, locale initialization, and window creation
+- `src/main.rs`: app startup, embedded i18n module setup, locale initialization, and window creation
 - `src/lib.rs`: shared `StorySection` enum for stable ordering
 - `src/components/*.rs`: components annotated with `#[derive(ComponentStory)]`
 - `storybook.toml`: crate-level runtime group for discovery
@@ -46,6 +46,21 @@ impl RenderOnce for WelcomeCard {
 ```
 
 This flow keeps the storybook wrapper out of the component implementation. The component stays focused on its example data and markup.
+
+## Locale setup
+
+The binary defines its embedded i18n module, derives the app language enum with `EsFluent`, initializes storybook with the default language, and selects the active locale:
+
+```rs
+es_fluent_manager_embedded::define_i18n_module!();
+
+#[es_fluent_language]
+#[derive(Clone, Copy, Debug, EnumIter, EsFluent, PartialEq)]
+pub enum Languages {}
+
+gpui_storybook::init(Languages::default(), cx);
+gpui_storybook::change_locale(Languages::default()).unwrap();
+```
 
 ## Example config
 
