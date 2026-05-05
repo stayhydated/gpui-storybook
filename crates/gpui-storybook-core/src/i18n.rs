@@ -3,7 +3,8 @@ use es_fluent_manager_embedded as i18n_manager;
 use std::sync::OnceLock;
 use unic_langid::LanguageIdentifier;
 
-es_fluent_manager_embedded::define_i18n_module!();
+// reenable later when we i18n this crate
+// es_fluent_manager_embedded::define_i18n_module!();
 
 static I18N: OnceLock<i18n_manager::EmbeddedI18n> = OnceLock::new();
 
