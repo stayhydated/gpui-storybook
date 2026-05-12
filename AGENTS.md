@@ -20,7 +20,7 @@ Its priorities are:
 
 For most application code, start with `crates/gpui-storybook`.
 
-Reach for the example apps when you need to validate or demonstrate the two supported registration styles:
+Reach for the example apps when you need to understand or demonstrate the two supported registration styles:
 
 - `examples/story` for explicit `#[story]` plus `Story` implementations.
 - `examples/component` for `#[derive(ComponentStory)]` on the component itself.
@@ -156,14 +156,5 @@ Additional rules:
 
 ### When writing tests
 
-- Use `cargo test --workspace --all-features` for the full suite.
 - Prefer `insta` for proc-macro expansion snapshots when it fits better than assertion-heavy tests.
 - Prefer readable multiline Rust snippets in macro tests over escaped single-line literals.
-
-### When validating changes locally
-
-- Check the workspace with:
-  `cargo check --workspace --all-features --exclude gpui-storybook-example-story --exclude gpui-storybook-example-component`
-- Run the example apps when the change affects registration, discovery, theming, locale behavior, or dock UI:
-  `cargo run -p gpui-storybook-example-story`
-  `cargo run -p gpui-storybook-example-component`
