@@ -58,8 +58,8 @@ es_fluent_manager_embedded::define_i18n_module!();
 #[derive(Clone, Copy, Debug, EnumIter, EsFluent, PartialEq)]
 pub enum Languages {}
 
-gpui_storybook::init(Languages::default(), cx);
-gpui_storybook::change_locale(Languages::default()).unwrap();
+gpui_storybook::init(cx, Languages::default());
+gpui_storybook::change_locale(cx, Languages::default()).unwrap();
 ```
 
 ## Example config

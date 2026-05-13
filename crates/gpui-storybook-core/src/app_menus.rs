@@ -126,7 +126,7 @@ fn theme_menu(cx: &App) -> MenuItem {
 
 fn language_menu(cx: &App) -> MenuItem {
     let locale_store = cx.global::<Box<dyn LocaleStore>>();
-    let available_locales = match locale_store.available_locales() {
+    let available_locales = match locale_store.available_locales(cx) {
         Ok(available_locales) => available_locales,
         Err(err) => {
             tracing::error!("Failed to load available locales: {err:#}");

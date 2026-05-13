@@ -145,7 +145,7 @@ fn resolve_story_entry(
     })
 }
 
-pub fn init<L>(language: L, cx: &mut ::gpui::App)
+pub fn init<L>(cx: &mut ::gpui::App, language: L)
 where
     L: Language,
 {

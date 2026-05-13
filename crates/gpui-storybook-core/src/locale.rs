@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 use unic_langid::LanguageIdentifier;
 
 pub trait LocaleStore: Send + Sync {
-    fn available_locales(&self) -> Result<Vec<(String, LanguageIdentifier)>>;
+    fn available_locales(&self, cx: &App) -> Result<Vec<(String, LanguageIdentifier)>>;
     fn current_locale(&self, cx: &App) -> Result<LanguageIdentifier>;
     fn set_current_locale(&self, locale: LanguageIdentifier, cx: &mut App) -> Result<()>;
 }
@@ -24,14 +24,14 @@ impl<L: Language> LocaleManager<L> {
 }
 
 impl<L: Language> LocaleStore for LocaleManager<L> {
-    fn available_locales(&self) -> Result<Vec<(String, LanguageIdentifier)>> {
+    fn available_locales(&self, cx: &App) -> Result<Vec<(String, LanguageIdentifier)>> {
         L::iter()
             .map(|language| {
                 let locale = language.try_into().map_err(|_| {
                     anyhow!("failed to convert language {:?} into a locale", language)
                 })?;
-                let label =
-                    crate::i18n::localize_message(&language).unwrap_or_else(|| locale.to_string());
+                let label = crate::i18n::localize_message(cx, &language)
+                    .unwrap_or_else(|| locale.to_string());
                 Ok((label, locale))
             })
             .collect()
@@ -53,7 +53,7 @@ impl<L: Language> LocaleStore for LocaleManager<L> {
         })?;
         let locale_name = locale.to_string();
 
-        crate::i18n::change_locale(locale)
+        crate::i18n::change_locale(cx, locale)
             .map_err(|err| anyhow!("failed to change locale to '{locale_name}': {err}"))?;
         cx.set_global(crate::language::CurrentLanguage(new_lang));
         gpui_component::set_locale(&locale_name);

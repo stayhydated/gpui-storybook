@@ -36,8 +36,8 @@ fn main() {
     let app = gpui_platform::application().with_assets(Assets);
 
     app.run(|cx| {
-        gpui_storybook::init(Languages::default(), cx);
-        gpui_storybook::change_locale(Languages::default()).unwrap();
+        gpui_storybook::init(cx, Languages::default());
+        gpui_storybook::change_locale(cx, Languages::default()).unwrap();
 
         gpui_storybook::create_new_window("My App - Stories", |window, cx| {
             let stories = gpui_storybook::generate_stories(window, cx);

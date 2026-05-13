@@ -1,39 +1,59 @@
 use es_fluent::FluentMessage;
 use es_fluent_manager_embedded as i18n_manager;
-use std::sync::OnceLock;
+use gpui::App;
+use std::borrow::Borrow;
 use unic_langid::LanguageIdentifier;
 
 // reenable later when we i18n this crate
 // es_fluent_manager_embedded::define_i18n_module!();
 
-static I18N: OnceLock<i18n_manager::EmbeddedI18n> = OnceLock::new();
+pub struct I18n {
+    manager: i18n_manager::EmbeddedI18n,
+}
 
-pub fn init() -> Result<(), anyhow::Error> {
-    if I18N.get().is_some() {
-        return Ok(());
+impl I18n {
+    fn new() -> Result<Self, i18n_manager::EmbeddedInitError> {
+        Ok(Self {
+            manager: i18n_manager::EmbeddedI18n::try_new()?,
+        })
     }
 
-    let i18n = i18n_manager::EmbeddedI18n::try_new()?;
-    let _ = I18N.set(i18n);
+    fn select_language<L>(&self, locale: L) -> Result<(), i18n_manager::LocalizationError>
+    where
+        L: Into<LanguageIdentifier>,
+    {
+        self.manager.select_language(locale)
+    }
+
+    fn localize_message<T>(&self, message: &T) -> String
+    where
+        T: FluentMessage + ?Sized,
+    {
+        self.manager.localize_message(message)
+    }
+}
+
+impl gpui::Global for I18n {}
+
+pub fn init(cx: &mut App) -> Result<(), anyhow::Error> {
+    if cx.try_global::<I18n>().is_none() {
+        cx.set_global(I18n::new()?);
+    }
     Ok(())
 }
 
-pub fn change_locale<L>(locale: L) -> anyhow::Result<()>
+pub fn change_locale<L>(cx: &mut App, locale: L) -> anyhow::Result<()>
 where
     L: Into<LanguageIdentifier>,
 {
-    let locale = locale.into();
-    let i18n = I18N
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("embedded i18n has not been initialized"))?;
-
-    i18n.select_language(locale).map_err(Into::into)
+    cx.global::<I18n>()
+        .select_language(locale)
+        .map_err(Into::into)
 }
 
-pub fn localize_message<T>(message: &T) -> Option<String>
+pub fn localize_message<T>(cx: &impl Borrow<App>, message: &T) -> Option<String>
 where
     T: FluentMessage + ?Sized,
 {
-    let i18n = I18N.get()?;
-    Some(i18n.localize_message(message))
+    Some(cx.borrow().try_global::<I18n>()?.localize_message(message))
 }
