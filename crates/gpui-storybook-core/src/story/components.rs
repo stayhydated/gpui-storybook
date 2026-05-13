@@ -5,7 +5,7 @@ use gpui::{
 };
 
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use std::{borrow::Borrow, sync::Arc};
 
 use gpui_component::{
     ActiveTheme as _, IconName, Sizable as _,
@@ -128,8 +128,8 @@ pub struct StoryContainer {
     is_active: bool,
     zoomable: Option<PanelControl>,
     on_active: Option<fn(AnyView, bool, &mut Window, &mut App)>,
-    pub title_fn: Option<Box<dyn Fn() -> String>>,
-    pub description_fn: Option<Box<dyn Fn() -> String>>,
+    pub title_fn: Option<Box<dyn Fn(&App) -> String>>,
+    pub description_fn: Option<Box<dyn Fn(&App) -> String>>,
 }
 
 #[derive(Debug)]
@@ -143,8 +143,9 @@ pub trait Story: Focusable + Render + Sized {
         type_name.rsplit("::").next().unwrap_or(type_name)
     }
 
-    fn title() -> String;
-    fn description() -> String {
+    fn title(cx: &App) -> String;
+    fn description(cx: &App) -> String {
+        let _ = cx;
         "".to_owned()
     }
     fn closable() -> bool {
@@ -224,8 +225,8 @@ impl StoryContainer {
     }
 
     pub fn panel<S: Story>(window: &mut Window, cx: &mut App) -> Entity<Self> {
-        let name = S::title();
-        let description = S::description();
+        let name = S::title(cx);
+        let description = S::description(cx);
         let story = S::new_view(window, cx);
         let story_klass = S::klass();
         let focus_handle = story.focus_handle(cx);
@@ -266,6 +267,22 @@ impl StoryContainer {
         self.on_active = Some(on_active);
         self
     }
+
+    pub fn display_title(&self, cx: &impl Borrow<App>) -> String {
+        if let Some(title_fn) = &self.title_fn {
+            title_fn(cx.borrow())
+        } else {
+            self.name.to_string()
+        }
+    }
+
+    pub fn display_description(&self, cx: &impl Borrow<App>) -> String {
+        if let Some(description_fn) = &self.description_fn {
+            description_fn(cx.borrow())
+        } else {
+            self.description.to_string()
+        }
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -289,11 +306,7 @@ impl Panel for StoryContainer {
     fn title(&mut self, _window: &mut Window, _cx: &mut gpui::Context<Self>) -> impl IntoElement {
         let tab_panel = self.tab_panel.clone();
         let story_panel = _cx.entity().downgrade();
-        let title = if let Some(title_fn) = &self.title_fn {
-            title_fn().into_any_element()
-        } else {
-            self.name.clone().into_any_element()
-        };
+        let title = self.display_title(_cx).into_any_element();
 
         h_flex()
             .items_center()

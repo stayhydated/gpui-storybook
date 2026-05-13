@@ -49,11 +49,7 @@ impl Gallery {
                         .iter()
                         .filter(|story| {
                             let story_data = story.read(cx_window);
-                            let title = if let Some(title_fn) = &story_data.title_fn {
-                                title_fn()
-                            } else {
-                                story_data.name.to_string()
-                            };
+                            let title = story_data.display_title(cx_window);
                             let section = story_data
                                 .section
                                 .as_ref()
@@ -108,11 +104,7 @@ impl Gallery {
         let lowercase_name = name.to_lowercase().replace("story", "");
         let story_index = self.stories.iter().position(|story_entity| {
             let story_data = story_entity.read(app_cx);
-            let title = if let Some(title_fn) = &story_data.title_fn {
-                title_fn()
-            } else {
-                story_data.name.to_string()
-            };
+            let title = story_data.display_title(app_cx);
             title.to_lowercase().replace("story", "") == lowercase_name
         });
 
@@ -142,11 +134,7 @@ impl Render for Gallery {
             .iter()
             .filter(|story| {
                 let story_data = story.read(cx);
-                let title = if let Some(title_fn) = &story_data.title_fn {
-                    title_fn()
-                } else {
-                    story_data.name.to_string()
-                };
+                let title = story_data.display_title(cx);
                 let section = story_data
                     .section
                     .as_ref()
@@ -180,16 +168,8 @@ impl Render for Gallery {
         let (story_name, description) =
             if let Some(story_to_render_cloned) = active_story_to_render.as_ref() {
                 let story_data = story_to_render_cloned.read(cx);
-                let title = if let Some(title_fn) = &story_data.title_fn {
-                    title_fn()
-                } else {
-                    story_data.name.to_string()
-                };
-                let desc = if let Some(desc_fn) = &story_data.description_fn {
-                    desc_fn()
-                } else {
-                    story_data.description.to_string()
-                };
+                let title = story_data.display_title(cx);
+                let desc = story_data.display_description(cx);
                 (title, desc)
             } else {
                 ("".to_owned(), "".to_owned())
@@ -264,13 +244,9 @@ impl Render for Gallery {
                                                         )| {
                                                             let story_data =
                                                                 story_entity_in_filtered.read(cx);
-                                                            let name = if let Some(title_fn) =
-                                                                &story_data.title_fn
-                                                            {
-                                                                title_fn().into()
-                                                            } else {
-                                                                story_data.name.clone()
-                                                            };
+                                                            let name: SharedString = story_data
+                                                                .display_title(cx)
+                                                                .into();
                                                             let is_active =
                                                                 ui_active_index_in_filtered_list
                                                                     == Some(idx_in_filtered);

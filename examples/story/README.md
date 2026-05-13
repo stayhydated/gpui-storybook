@@ -30,7 +30,7 @@ cargo run -p gpui-storybook-example-story --features dock
 pub struct ButtonStory;
 
 impl gpui_storybook::Story for ButtonStory {
-    fn title() -> String {
+    fn title(_: &App) -> String {
         "Button".into()
     }
 
@@ -41,6 +41,7 @@ impl gpui_storybook::Story for ButtonStory {
 ```
 
 This flow is the right fit when a story is more than "render the component with example data".
+`title` and `description` receive `&App`, so explicit stories can localize metadata with `gpui_storybook::localize_message(cx, ...)`.
 
 ## Locale setup
 

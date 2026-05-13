@@ -385,11 +385,7 @@ impl Render for StorySidebar {
             .iter()
             .filter(|story| {
                 let story_data = story.read(cx);
-                let title = if let Some(title_fn) = &story_data.title_fn {
-                    title_fn()
-                } else {
-                    story_data.name.to_string()
-                };
+                let title = story_data.display_title(cx);
                 let section = story_data
                     .section
                     .as_ref()
@@ -467,11 +463,7 @@ impl Render for StorySidebar {
 
                                 items.extend(stories_in_section.into_iter().map(|story_entity| {
                                     let story_data = story_entity.read(cx);
-                                    let name = if let Some(title_fn) = &story_data.title_fn {
-                                        title_fn().into()
-                                    } else {
-                                        story_data.name.clone()
-                                    };
+                                    let name: SharedString = story_data.display_title(cx).into();
                                     let story_klass_for_drag =
                                         story_data.story_klass.clone().unwrap_or_default();
 

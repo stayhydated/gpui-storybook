@@ -34,6 +34,7 @@ The derive generates a hidden wrapper type named `__{Component}ComponentStoryVie
 - implements `Focusable`
 - implements `Render` by rendering either `example = ...` or `<Component as Default>::default()`
 - implements `Story` so the wrapper can be materialized through `StoryContainer::panel`
+- evaluates `title` and `description` expressions inside generated methods with `cx: &gpui::App` in scope
 
 Defaults:
 

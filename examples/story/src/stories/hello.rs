@@ -5,6 +5,7 @@ use gpui_component::StyledExt as _;
 #[derive(EsFluent)]
 enum StoryItems {
     Hi,
+    Title,
 }
 
 #[gpui_storybook::story("aaaaaaaaaaa")]
@@ -19,9 +20,10 @@ impl Focusable for HelloWorld {
 }
 
 impl gpui_storybook::Story for HelloWorld {
-    fn title() -> String {
-        "Title".into()
+    fn title(cx: &App) -> String {
+        gpui_storybook::localize_message(cx, &StoryItems::Title).unwrap_or_else(|| "Title".into())
     }
+
     fn new_view(window: &mut Window, cx: &mut App) -> Entity<impl Render + Focusable> {
         Self::view(window, cx)
     }

@@ -93,7 +93,7 @@ use gpui::{App, Focusable, Render, Window};
 pub struct ButtonStory;
 
 impl gpui_storybook::Story for ButtonStory {
-    fn title() -> String {
+    fn title(_: &App) -> String {
         "Button".into()
     }
 
@@ -102,6 +102,8 @@ impl gpui_storybook::Story for ButtonStory {
     }
 }
 ```
+
+`Story::title`, `Story::description`, and `ComponentStory` `title`/`description` expressions receive the GPUI `App` context, so story metadata can call `gpui_storybook::localize_message(cx, ...)`.
 
 See [`examples/story`](examples/story/README.md) for the full explicit workflow.
 

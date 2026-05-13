@@ -68,7 +68,7 @@ impl ButtonStory {
 }
 
 impl gpui_storybook::Story for ButtonStory {
-    fn title() -> String {
+    fn title(_: &gpui::App) -> String {
         "Button".into()
     }
 
@@ -97,6 +97,7 @@ pub struct WelcomeCard {
 ```
 
 `ComponentStory` expects a non-generic struct. Without `example = ...`, the generated wrapper renders `<Component as Default>::default()`.
+`title` and `description` expressions are emitted inside methods that receive `cx: &gpui::App`, so they can call `gpui_storybook::localize_message(cx, ...)`.
 
 Use `#[gpui_storybook::story_init]` for one-time setup that must run after `gpui_storybook::init(...)` and before stories are shown:
 

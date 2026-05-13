@@ -51,10 +51,10 @@ The facade supplies the language-specific `LocaleStore` before calling this func
 
 1. calling `S::new_view(window, cx)`
 1. storing `S::klass()` as `story_klass`
-1. capturing `S::title` and `S::description` as deferred metadata functions
+1. capturing `S::title` and `S::description` as deferred, context-aware metadata functions
 1. wrapping the rendered view in panel chrome used by both gallery and dock modes
 
-The resulting `StoryContainer` carries both runtime metadata (`group`, `section`, `story_klass`) and panel behavior (`Panel`, `PanelView`, focus handling, visibility).
+The resulting `StoryContainer` carries both runtime metadata (`group`, `section`, `story_klass`) and panel behavior (`Panel`, `PanelView`, focus handling, visibility). Story titles and descriptions are resolved with `&App` so sidebar, header, and dock labels can read app-scoped locale state.
 
 ## Gallery runtime
 

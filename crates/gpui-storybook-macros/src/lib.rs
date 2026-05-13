@@ -261,11 +261,13 @@ fn component_story_impl(input: TokenStream2) -> TokenStream2 {
                 #struct_name_str
             }
 
-            fn title() -> ::std::string::String {
+            fn title(cx: &::gpui::App) -> ::std::string::String {
+                let _ = cx;
                 (#title).into()
             }
 
-            fn description() -> ::std::string::String {
+            fn description(cx: &::gpui::App) -> ::std::string::String {
+                let _ = cx;
                 (#description).into()
             }
 
@@ -325,6 +327,7 @@ fn story_init_impl(_args: TokenStream2, input: TokenStream2) -> TokenStream2 {
 /// By default the wrapper renders `<Self as Default>::default()`. Use `example = ...`
 /// when the component needs a custom constructor or builder configuration. `title` and
 /// `description` accept expressions that evaluate into `String`, not only string literals.
+/// Those expressions are emitted inside methods with `cx: &gpui::App` in scope.
 ///
 /// ```ignore
 /// #[derive(gpui_storybook::ComponentStory, gpui::IntoElement)]
