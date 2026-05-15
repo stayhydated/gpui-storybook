@@ -5,18 +5,50 @@ description: "Use when Codex needs to help application developers adopt GPUI Sto
 
 # Use GPUI Storybook
 
-## Start
+## Scope Boundary
 
-Treat this as a user-facing application workflow. Center examples and edits on the public facade crate, `gpui-storybook`.
+Treat this skill as a hosted public-usage guide for GPUI Storybook consumers.
+Use it only for user-facing application workflows: setting up a storybook
+binary, adding stories, configuring `storybook.toml`, choosing gallery or dock
+mode, wiring locale initialization, and troubleshooting missing stories.
 
-Before editing an app, inspect:
+Do not use this skill as a contributor guide for `gpui-storybook` repository
+internals. For build, test, format, lint, maintenance, release, or architecture
+work, read the repository source, `AGENTS.md`, and the relevant crate
+documentation directly.
 
-- `Cargo.toml` for existing `gpui`, `gpui-component`, `gpui-storybook`, and feature setup.
-- Any existing storybook binary or example app.
-- Existing `storybook.toml` files.
-- Existing story section enums or naming conventions.
+## Core Workflow
 
-## Runtime Setup
+Start from the user-facing facade. Most application code uses
+`gpui-storybook` plus one story registration style:
+
+1. Inspect `Cargo.toml` for existing `gpui`, `gpui-component`,
+   `gpui-storybook`, and feature setup.
+2. Inspect any existing storybook binary, example app, `storybook.toml` files,
+   section enums, and naming conventions.
+3. Initialize the storybook runtime before creating the story window:
+   `gpui_storybook::init(cx, Languages::default())`.
+4. Choose gallery mode for a focused story browser, or enable the `dock` feature
+   and use the dock workspace when stories need docked panels.
+5. Use explicit `#[story]` when the story needs its own GPUI view state, focus
+   handle, actions, lifecycle, or wrapper UI.
+6. Use `#[derive(ComponentStory)]` when the component can render from example
+   data and storybook should generate the wrapper view.
+7. Put `storybook.toml` next to the crate whose stories need a runtime group or
+   filter.
+
+## Reference Selection
+
+This skill has no extra reference files. Prefer the current public READMEs,
+example applications, and source snippets over memory when details matter:
+
+- `README.md`: top-level setup and usage guidance.
+- `crates/gpui-storybook/README.md`: facade API guidance.
+- `examples/story/README.md`: explicit `#[story]` workflow.
+- `examples/component/README.md`: `#[derive(ComponentStory)]` workflow.
+- `crates/gpui-storybook-toml/README.md`: `storybook.toml` semantics.
+
+## Implementation Rules
 
 Use this shape for a storybook binary:
 
@@ -47,11 +79,11 @@ fn main() {
 }
 ```
 
-For the dock workspace, enable the `dock` feature and use `create_dock_window` plus `StoryWorkspace::view(...)` instead of `create_new_window` plus `Gallery::view(...)`.
+For the dock workspace, enable the `dock` feature and use
+`create_dock_window` plus `StoryWorkspace::view(...)` instead of
+`create_new_window` plus `Gallery::view(...)`.
 
-## Choose Registration
-
-Use explicit `#[story]` when the story needs its own GPUI view state, focus handle, actions, lifecycle, or wrapper UI:
+Use explicit `#[story]` when the story owns state:
 
 ```rust
 #[gpui_storybook::story(crate::StorySection::Buttons)]
@@ -81,7 +113,7 @@ impl gpui_storybook::Story for ButtonStory {
 }
 ```
 
-Use `#[derive(ComponentStory)]` when the component can render from example data and storybook should generate the wrapper view:
+Use `#[derive(ComponentStory)]` when storybook can generate the wrapper view:
 
 ```rust
 #[derive(gpui::IntoElement, gpui_storybook::ComponentStory)]
@@ -96,10 +128,14 @@ pub struct WelcomeCard {
 }
 ```
 
-`ComponentStory` expects a non-generic struct. Without `example = ...`, the generated wrapper renders `<Component as Default>::default()`.
-`title` and `description` expressions are emitted inside methods that receive `cx: &gpui::App`, so they can call `gpui_storybook::localize_message(cx, ...)`.
+`ComponentStory` expects a non-generic struct. Without `example = ...`, the
+generated wrapper renders `<Component as Default>::default()`.
 
-Use `#[gpui_storybook::story_init]` for one-time setup that must run after `gpui_storybook::init(...)` and before stories are shown:
+`title` and `description` expressions are emitted inside methods that receive
+`cx: &gpui::App`, so they can call `gpui_storybook::localize_message(cx, ...)`.
+
+Use `#[gpui_storybook::story_init]` for one-time setup that must run after
+`gpui_storybook::init(...)` and before stories are shown:
 
 ```rust
 #[gpui_storybook::story_init]
@@ -108,9 +144,8 @@ fn register_icons(cx: &mut gpui::App) {
 }
 ```
 
-## Sections And Filtering
-
-Prefer enum sections when stable ordering matters. String sections are fine for simple grouping.
+Prefer enum sections when stable ordering matters. String sections are fine for
+simple grouping:
 
 ```rust
 #[derive(Clone, Copy)]
@@ -121,15 +156,13 @@ enum StorySection {
 }
 ```
 
-Place `storybook.toml` next to the crate whose stories need a runtime group or filter:
+Apply these `storybook.toml` rules:
 
 ```toml
 group = "UI Kit"
 allow = ["UI Kit", "Shared"]
 disable_story = ["LegacyCardStory"]
 ```
-
-Apply these rules:
 
 - `group` is required when `storybook.toml` exists.
 - Omitting `allow` includes only the crate's own `group`.
@@ -138,4 +171,6 @@ Apply these rules:
 - `disable_story` matches the registered story type name exactly.
 - For `ComponentStory`, `disable_story` uses the component type name, not the generated wrapper type.
 
-If stories are unexpectedly missing, inspect runtime logs for discovered story count, selected runtime config, group filtering, and `disable_story` matches. Also confirm the crate containing story registrations is linked by the binary.
+If stories are unexpectedly missing, inspect runtime logs for discovered story
+count, selected runtime config, group filtering, and `disable_story` matches.
+Also confirm the crate containing story registrations is linked by the binary.
