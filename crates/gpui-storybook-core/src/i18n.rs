@@ -1,9 +1,23 @@
-use es_fluent_manager_embedded as i18n_manager;
+use gpui::App;
+use std::borrow::Borrow;
+use unic_langid::LanguageIdentifier;
 
-es_fluent_manager_embedded::define_i18n_module!();
+pub use gpui_es_fluent::I18n;
 
-pub fn init() {
-    i18n_manager::init();
+pub fn init(cx: &mut App) -> Result<(), gpui_es_fluent::EmbeddedInitError> {
+    gpui_es_fluent::init(cx)
 }
 
-pub use i18n_manager::select_language as change_locale;
+pub fn change_locale<L>(cx: &mut App, locale: L) -> Result<(), gpui_es_fluent::LocalizationError>
+where
+    L: Into<LanguageIdentifier>,
+{
+    gpui_es_fluent::change_locale(cx, locale)
+}
+
+pub fn localize_message<T>(cx: &impl Borrow<App>, message: &T) -> Option<String>
+where
+    T: es_fluent::FluentMessage + ?Sized,
+{
+    gpui_es_fluent::try_localize_message(cx, message)
+}

@@ -55,7 +55,7 @@ impl ButtonStory {
 }
 
 impl gpui_storybook::Story for ButtonStory {
-    fn title() -> String {
+    fn title(_: &App) -> String {
         "Button".into()
     }
 

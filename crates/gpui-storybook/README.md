@@ -17,7 +17,7 @@ It is built around three goals:
 | `gpui-storybook` | `gpui-component` | `gpui` |
 | :---------------- | :--------------- | :------ |
 | **git** | | |
-| `branch = "master"` | `branch = "main"` | `rev = "f7d46cf7d02c88d3d71ec495a31d7f19bd5eb96b"` |
+| `branch = "master"` | `branch = "main"` | `rev = "832c17e8192e2e1d472f0751e7cef2af84ded622"` |
 
 ## Examples
 
@@ -50,6 +50,8 @@ use es_fluent_lang::es_fluent_language;
 use gpui_storybook::{Assets, Gallery};
 use strum::EnumIter;
 
+es_fluent_manager_embedded::define_i18n_module!();
+
 #[es_fluent_language]
 #[derive(Clone, Copy, Debug, EnumIter, EsFluent, PartialEq)]
 pub enum Languages {}
@@ -58,8 +60,8 @@ fn main() {
     let app = gpui_platform::application().with_assets(Assets);
 
     app.run(|cx| {
-        gpui_storybook::init(Languages::default(), cx);
-        gpui_storybook::change_locale(Languages::default()).unwrap();
+        gpui_storybook::init(cx, Languages::default());
+        gpui_storybook::change_locale(cx, Languages::default()).unwrap();
 
         gpui_storybook::create_new_window("My App - Stories", |window, cx| {
             let stories = gpui_storybook::generate_stories(window, cx);
@@ -68,6 +70,8 @@ fn main() {
     });
 }
 ```
+
+The locale setup has three parts: define the embedded i18n module in the binary, derive the app language enum with `EsFluent`, then call `init` and `change_locale` with the selected language.
 
 Turn on the `dock` feature when you want a panel-based workspace instead of the gallery layout:
 
@@ -89,7 +93,7 @@ use gpui::{App, Focusable, Render, Window};
 pub struct ButtonStory;
 
 impl gpui_storybook::Story for ButtonStory {
-    fn title() -> String {
+    fn title(_: &App) -> String {
         "Button".into()
     }
 
@@ -98,6 +102,8 @@ impl gpui_storybook::Story for ButtonStory {
     }
 }
 ```
+
+`Story::title`, `Story::description`, and `ComponentStory` `title`/`description` expressions receive the GPUI `App` context, so story metadata can call `gpui_storybook::localize_message(cx, ...)`.
 
 See [`examples/story`](../../examples/story/README.md) for the full explicit workflow.
 

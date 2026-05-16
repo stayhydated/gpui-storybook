@@ -1,0 +1,4 @@
+interface:
+  display_name: "Use GPUI Storybook"
+  short_description: "Set up GPUI Storybook in an app"
+  default_prompt: "Use $use-gpui-storybook to set up GPUI Storybook for this GPUI app."

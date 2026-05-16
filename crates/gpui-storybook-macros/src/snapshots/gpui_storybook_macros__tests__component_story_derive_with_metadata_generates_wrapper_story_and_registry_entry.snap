@@ -36,10 +36,12 @@ impl ::gpui_storybook::Story for __ButtonChipComponentStoryView {
     fn klass() -> &'static str {
         "ButtonChip"
     }
-    fn title() -> ::std::string::String {
+    fn title(cx: &::gpui::App) -> ::std::string::String {
+        let _ = cx;
         ("Button").into()
     }
-    fn description() -> ::std::string::String {
+    fn description(cx: &::gpui::App) -> ::std::string::String {
+        let _ = cx;
         ("Interactive buttons").into()
     }
     fn new_view(

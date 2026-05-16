@@ -22,6 +22,7 @@ es-fluent-manager-embedded = { workspace = true }
 gpui = { workspace = true }
 gpui-component = { features = [ "inspector" ], workspace = true }
 gpui-component-assets = { workspace = true }
+gpui-es-fluent = { workspace = true }
 gpui-storybook-components = { workspace = true }
 inventory = { workspace = true }
 rust-embed = { features = [ "interpolate-folder-path" ], workspace = true }
@@ -35,7 +36,7 @@ unic-langid = { features = [ "serde" ], workspace = true }
 gtk = { version = "0.18" }
 
 [build-dependencies]
-es-fluent = { features = [ "build" ], workspace = true }
+es-fluent-build = { workspace = true }
 
 [lints]
 workspace = true

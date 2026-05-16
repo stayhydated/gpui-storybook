@@ -36,7 +36,7 @@ It owns:
 
 `gpui_storybook_core::story::init` is the runtime bootstrap sequence used by the facade:
 
-1. initialize embedded i18n through `es_fluent_manager_embedded`
+1. initialize embedded i18n via `gpui_storybook_core::i18n`, creating a crate-local `EmbeddedI18n` handle from `es_fluent_manager_embedded` locale data
 1. initialize `gpui-component`
 1. install `AppState`
 1. restore persisted theme state and register theme actions
@@ -51,10 +51,10 @@ The facade supplies the language-specific `LocaleStore` before calling this func
 
 1. calling `S::new_view(window, cx)`
 1. storing `S::klass()` as `story_klass`
-1. capturing `S::title` and `S::description` as deferred metadata functions
+1. capturing `S::title` and `S::description` as deferred, context-aware metadata functions
 1. wrapping the rendered view in panel chrome used by both gallery and dock modes
 
-The resulting `StoryContainer` carries both runtime metadata (`group`, `section`, `story_klass`) and panel behavior (`Panel`, `PanelView`, focus handling, visibility).
+The resulting `StoryContainer` carries both runtime metadata (`group`, `section`, `story_klass`) and panel behavior (`Panel`, `PanelView`, focus handling, visibility). Story titles and descriptions are resolved with `&App` so sidebar, header, and dock labels can read app-scoped locale state.
 
 ## Gallery runtime
 
@@ -110,12 +110,12 @@ Locale behavior is split across modules:
 
 - `language.rs` defines the trait bound expected from app language enums
 - `locale.rs` adapts that enum into a `LocaleStore`
-- `i18n.rs` delegates locale changes into `es_fluent_manager_embedded`
+- `i18n.rs` owns the crate-local `EmbeddedI18n` handle and updates it with `select_language`
 - `LocaleManager::set_current_locale` also updates `gpui_component::set_locale`
 
 ## Dependency edges
 
 - `gpui-component` supplies the bulk of shell UI, sidebar, dock, theming, and controls
-- `es-fluent` and `es-fluent-manager-embedded` supply localization lookup and embedded locale data
+- `es-fluent` provides localization message translation; `es-fluent-manager-embedded` provides embedded locale modules and data loading; `gpui-storybook-core` owns the active `EmbeddedI18n` handle
 - `gpui-storybook-components` supplies dock-sidebar-specific primitives
 - `inventory` is only used for shared registry types; discovery itself happens in the facade crate

@@ -5,7 +5,8 @@ use gpui_component::ActiveTheme as _;
 
 #[derive(gpui_storybook::ComponentStory, IntoElement)]
 #[storybook(
-    title = "Welcome Card",
+    title = gpui_storybook::localize_message(cx, &crate::StoryItems::Title)
+        .unwrap_or_else(|| "Title".into()),
     description = String::from("A quiet editorial card registered without a custom story view"),
     section = crate::StorySection::Intro,
     example = WelcomeCard::example(),

@@ -1,11 +1,11 @@
-use es_fluent::{EsFluent, ToFluentString as _};
+use es_fluent::EsFluent;
 use gpui::*;
 use gpui_component::StyledExt as _;
 
 #[derive(EsFluent)]
 enum StoryItems {
-    Title,
     Hi,
+    Title,
 }
 
 #[gpui_storybook::story("aaaaaaaaaaa")]
@@ -20,9 +20,10 @@ impl Focusable for HelloWorld {
 }
 
 impl gpui_storybook::Story for HelloWorld {
-    fn title() -> String {
-        StoryItems::Title.to_fluent_string()
+    fn title(cx: &App) -> String {
+        gpui_storybook::localize_message(cx, &StoryItems::Title).unwrap_or_else(|| "Title".into())
     }
+
     fn new_view(window: &mut Window, cx: &mut App) -> Entity<impl Render + Focusable> {
         Self::view(window, cx)
     }
@@ -40,7 +41,7 @@ impl HelloWorld {
 }
 
 impl Render for HelloWorld {
-    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         div()
             .v_flex()
             .gap_2()
@@ -48,6 +49,9 @@ impl Render for HelloWorld {
             .items_center()
             .justify_center()
             .text_center()
-            .child(StoryItems::Hi.to_fluent_string())
+            .child(
+                gpui_storybook::localize_message(cx, &StoryItems::Hi)
+                    .unwrap_or_else(|| "Hi".into()),
+            )
     }
 }

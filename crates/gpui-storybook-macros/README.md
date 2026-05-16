@@ -42,6 +42,8 @@ Supported `#[storybook(...)]` arguments:
 - `section = ...`
 - `example = ...`
 
+`title` and `description` are emitted inside generated `Story` methods that receive `cx: &gpui::App`, so those expressions can call app-scoped localization helpers.
+
 ### `#[story_init]`
 
 Registers one-time application setup that runs during `gpui_storybook::init(...)`.

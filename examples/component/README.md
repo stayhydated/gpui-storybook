@@ -18,19 +18,26 @@ cargo run -p gpui-storybook-example-component --features dock
 
 ## What to inspect
 
-- `src/main.rs`: app startup, locale initialization, and window creation
-- `src/lib.rs`: shared `StorySection` enum for stable ordering
+- `src/main.rs`: app startup, embedded i18n module setup, locale initialization, and window creation
+- `src/lib.rs`: shared `StorySection` enum for stable ordering and `StoryItems` i18n messages
 - `src/components/*.rs`: components annotated with `#[derive(ComponentStory)]`
 - `storybook.toml`: crate-level runtime group for discovery
 
 ## Core pattern
 
 ```rs
+use es_fluent::EsFluent;
 use gpui::{IntoElement, RenderOnce};
+
+#[derive(EsFluent)]
+pub enum StoryItems {
+    Title,
+}
 
 #[derive(IntoElement, gpui_storybook::ComponentStory)]
 #[storybook(
-    title = "Welcome Card",
+    title = gpui_storybook::localize_message(cx, &crate::StoryItems::Title)
+        .unwrap_or_else(|| "Title".into()),
     section = crate::StorySection::Intro,
     example = WelcomeCard::example(),
 )]
@@ -46,6 +53,22 @@ impl RenderOnce for WelcomeCard {
 ```
 
 This flow keeps the storybook wrapper out of the component implementation. The component stays focused on its example data and markup.
+`title` and `description` expressions are emitted inside methods that receive `cx: &App`, so component stories can localize metadata without adding a custom wrapper.
+
+## Locale setup
+
+The binary defines its embedded i18n module, derives the app language enum with `EsFluent`, initializes storybook with the default language, and selects the active locale:
+
+```rs
+es_fluent_manager_embedded::define_i18n_module!();
+
+#[es_fluent_language]
+#[derive(Clone, Copy, Debug, EnumIter, EsFluent, PartialEq)]
+pub enum Languages {}
+
+gpui_storybook::init(cx, Languages::default());
+gpui_storybook::change_locale(cx, Languages::default()).unwrap();
+```
 
 ## Example config
 

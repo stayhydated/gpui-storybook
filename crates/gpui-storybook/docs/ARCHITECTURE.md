@@ -20,6 +20,7 @@ This crate is the boundary where compile-time registration metadata becomes runt
 1. `#[story_init]` expansions submit `InitEntry` records into the same inventory system.
 1. `init` stores `CurrentLanguage<L>`, installs `LocaleManager<L>` as the `LocaleStore`, delegates runtime startup to `gpui_storybook_core::story::init`, optionally registers dock panels, then executes discovered init hooks.
 1. `generate_stories` iterates all `StoryEntry` records, resolves crate-local config, applies runtime filtering, sorts the surviving entries, and materializes `StoryContainer` entities by calling each entry's `create_fn`.
+1. Story titles and descriptions stay on the runtime `StoryContainer` as `&App`-aware callbacks so gallery and dock labels can reflect the active locale.
 
 ## Runtime config resolution
 

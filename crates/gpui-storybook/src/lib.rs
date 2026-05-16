@@ -17,6 +17,7 @@ pub use gpui_storybook_core::{
     assets::Assets,
     gallery::Gallery,
     i18n::change_locale,
+    i18n::localize_message,
     language::{CurrentLanguage, Language},
     story::{Story, StoryContainer, create_new_window, create_new_window_with_ui},
     storybook_window_ui::{StorybookWindow, StorybookWindowUi},
@@ -144,7 +145,7 @@ fn resolve_story_entry(
     })
 }
 
-pub fn init<L>(language: L, cx: &mut ::gpui::App)
+pub fn init<L>(cx: &mut ::gpui::App, language: L)
 where
     L: Language,
 {

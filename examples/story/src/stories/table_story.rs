@@ -40,7 +40,7 @@ impl TableStory {
 }
 
 impl gpui_storybook::Story for TableStory {
-    fn title() -> String {
+    fn title(_: &App) -> String {
         "Table".into()
     }
 

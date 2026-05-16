@@ -18,7 +18,7 @@ cargo run -p gpui-storybook-example-story --features dock
 
 ## What to inspect
 
-- `src/main.rs`: app startup, locale initialization, and window creation
+- `src/main.rs`: app startup, embedded i18n module setup, locale initialization, and window creation
 - `src/lib.rs`: shared `StorySection` enum for stable ordering
 - `src/stories/*.rs`: explicit story structs and `impl gpui_storybook::Story`
 - `storybook.toml`: crate-level runtime group for discovery
@@ -30,7 +30,7 @@ cargo run -p gpui-storybook-example-story --features dock
 pub struct ButtonStory;
 
 impl gpui_storybook::Story for ButtonStory {
-    fn title() -> String {
+    fn title(_: &App) -> String {
         "Button".into()
     }
 
@@ -41,6 +41,22 @@ impl gpui_storybook::Story for ButtonStory {
 ```
 
 This flow is the right fit when a story is more than "render the component with example data".
+`title` and `description` receive `&App`, so explicit stories can localize metadata with `gpui_storybook::localize_message(cx, ...)`.
+
+## Locale setup
+
+The binary defines its embedded i18n module, derives the app language enum with `EsFluent`, initializes storybook with the default language, and selects the active locale:
+
+```rs
+es_fluent_manager_embedded::define_i18n_module!();
+
+#[es_fluent_language]
+#[derive(Clone, Copy, Debug, EnumIter, EsFluent, PartialEq)]
+pub enum Languages {}
+
+gpui_storybook::init(cx, Languages::default());
+gpui_storybook::change_locale(cx, Languages::default()).unwrap();
+```
 
 ## Example config
 
