@@ -7,4 +7,5 @@ pub mod stories;
 pub enum StorySection {
     Tables = 7,
     Buttons = 6,
+    Grouped = 5,
 }

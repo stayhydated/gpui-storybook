@@ -1,6 +1,6 @@
 use crate::{
     registry::StoryEntry,
-    story::{StoryContainer, StoryState, reveal_story_panel},
+    story::{StoryContainer, StoryState, parse_story_list_klass, reveal_story_panel},
     storybook_window_ui::StorybookWindowUi,
     title_bar::AppTitleBar,
     window_options::default_storybook_window_options,
@@ -67,6 +67,7 @@ static STORY_SEEDS: LazyLock<Mutex<StorySeedRegistries>> =
 
 #[derive(Clone, Debug)]
 struct StorySeed {
+    name: String,
     story_klass: String,
     group: Option<String>,
     section: Option<String>,
@@ -257,6 +258,7 @@ impl StorySidebar {
                 let story_klass = story_data.story_klass.as_ref()?.to_string();
 
                 Some(StorySeed {
+                    name: story_data.display_title(cx),
                     story_klass,
                     group: story_data.group.as_ref().map(ToString::to_string),
                     section: story_data.section.as_ref().map(ToString::to_string),
@@ -288,12 +290,63 @@ impl StorySidebar {
             return Some(story);
         }
 
-        let story_seed = Self::story_seed(dock_area, story_klass)?;
+        let story_seed = Self::story_seed(dock_area, story_klass);
+        if let Some(member_klasses) = parse_story_list_klass(story_klass) {
+            let story_seed = story_seed?;
+            let member_stories = member_klasses
+                .iter()
+                .filter_map(|member_klass| {
+                    Self::create_story_panel_by_klass(
+                        member_klass,
+                        story_seed.group.as_deref(),
+                        story_seed.section.as_deref(),
+                        dock_area,
+                        window,
+                        cx,
+                    )
+                })
+                .collect::<Vec<_>>();
+
+            if member_stories.is_empty() {
+                return None;
+            }
+
+            let panel = StoryContainer::list_panel(story_seed.name, member_stories, window, cx);
+            panel.update(cx, |c, _| {
+                c.group = story_seed.group.clone().map(Into::into);
+                c.section = story_seed.section.clone().map(Into::into);
+            });
+            Self::register_story(dock_area, &panel, cx);
+            return Some(panel);
+        }
+
+        Self::create_story_panel_by_klass(
+            story_klass,
+            story_seed.as_ref().and_then(|seed| seed.group.as_deref()),
+            story_seed.as_ref().and_then(|seed| seed.section.as_deref()),
+            dock_area,
+            window,
+            cx,
+        )
+    }
+
+    fn create_story_panel_by_klass(
+        story_klass: &str,
+        group: Option<&str>,
+        section: Option<&str>,
+        dock_area: &gpui::WeakEntity<DockArea>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Option<Entity<StoryContainer>> {
+        if let Some(story) = Self::find_story_by_klass(dock_area, story_klass) {
+            return Some(story);
+        }
+
         let entry = inventory::iter::<StoryEntry>().find(|entry| entry.name == story_klass)?;
         let panel = (entry.create_fn)(window, cx);
         panel.update(cx, |c, _| {
-            c.group = story_seed.group.clone().map(Into::into);
-            c.section = story_seed.section.clone().map(Into::into);
+            c.group = group.map(Into::into);
+            c.section = section.map(Into::into);
         });
         Self::register_story(dock_area, &panel, cx);
         Some(panel)

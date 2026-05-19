@@ -21,6 +21,7 @@ cargo run -p gpui-storybook-example-story --features dock
 - `src/main.rs`: app startup, embedded i18n module setup, locale initialization, and window creation
 - `src/lib.rs`: shared `StorySection` enum for stable ordering
 - `src/stories/*.rs`: explicit story structs and `impl gpui_storybook::Story`
+- `src/stories/grouped_story.rs`: two story structs with the same title, grouped into one sidebar item
 - `storybook.toml`: crate-level runtime group for discovery
 
 ## Core pattern
@@ -42,6 +43,13 @@ impl gpui_storybook::Story for ButtonStory {
 
 This flow is the right fit when a story is more than "render the component with example data".
 `title` and `description` receive `&App`, so explicit stories can localize metadata with `gpui_storybook::localize_message(cx, ...)`.
+
+## Grouped title pattern
+
+Stories in the same group and section that return the same `title` are shown on
+one storybook page. `grouped_story.rs` registers `GroupedSummaryStory` and
+`GroupedDetailsStory`; both return `"Grouped Story"` from `title`, while their
+`description` values identify the individual variants in the combined page.
 
 ## Locale setup
 

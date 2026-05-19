@@ -15,9 +15,12 @@ use gpui_component::{
     h_flex,
     menu::PopupMenu,
     scroll::ScrollableElement as _,
+    v_flex,
 };
 
 use super::state::AppState;
+
+pub const STORY_LIST_KLASS_PREFIX: &str = "__gpui_storybook_list__:";
 
 #[derive(Action, Clone, Debug, Default, Eq, PartialEq)]
 #[action(namespace = story)]
@@ -132,6 +135,123 @@ pub struct StoryContainer {
     pub description_fn: Option<Box<dyn Fn(&App) -> String>>,
 }
 
+pub fn story_list_klass(stories: &[Entity<StoryContainer>], cx: &App) -> SharedString {
+    let mut klasses = stories
+        .iter()
+        .filter_map(|story| story.read(cx).story_klass.clone())
+        .map(|klass| klass.to_string())
+        .collect::<Vec<_>>();
+    klasses.sort();
+
+    format!("{}{}", STORY_LIST_KLASS_PREFIX, klasses.join("|")).into()
+}
+
+#[cfg(feature = "dock")]
+pub fn parse_story_list_klass(story_klass: &str) -> Option<Vec<String>> {
+    let members = story_klass.strip_prefix(STORY_LIST_KLASS_PREFIX)?;
+    Some(
+        members
+            .split('|')
+            .filter(|member| !member.is_empty())
+            .map(str::to_string)
+            .collect(),
+    )
+}
+
+pub struct StoryList {
+    focus_handle: gpui::FocusHandle,
+    stories: Vec<Entity<StoryContainer>>,
+}
+
+impl StoryList {
+    pub fn new(stories: Vec<Entity<StoryContainer>>, cx: &mut gpui::Context<Self>) -> Self {
+        Self {
+            focus_handle: cx.focus_handle(),
+            stories,
+        }
+    }
+
+    fn on_active_any(view: AnyView, active: bool, window: &mut Window, cx: &mut App) {
+        if let Ok(list) = view.downcast::<Self>() {
+            cx.update_entity(&list, |list, cx| {
+                for story_entity in &list.stories {
+                    story_entity.update(cx, |story, cx| {
+                        story.is_active = active;
+                        if let Some(on_active) = story.on_active
+                            && let Some(story_view) = story.story.clone()
+                        {
+                            on_active(story_view, active, window, cx);
+                        }
+                    });
+                }
+            });
+        }
+    }
+}
+
+impl Focusable for StoryList {
+    fn focus_handle(&self, _: &App) -> gpui::FocusHandle {
+        self.focus_handle.clone()
+    }
+}
+
+impl Render for StoryList {
+    fn render(&mut self, _: &mut Window, cx: &mut gpui::Context<Self>) -> impl IntoElement {
+        v_flex()
+            .id("storybook-story-list")
+            .w_full()
+            .gap_4()
+            .children(
+                self.stories
+                    .iter()
+                    .enumerate()
+                    .map(|(index, story_entity)| {
+                        let story = story_entity.read(cx);
+                        let title = story.display_title(cx);
+                        let description = story.display_description(cx);
+                        let story_klass = story.story_klass.clone().unwrap_or_default();
+                        let story_view = story.story.clone();
+
+                        v_flex()
+                            .id(format!("storybook-story-list-item-{index}"))
+                            .w_full()
+                            .border_1()
+                            .border_color(cx.theme().border)
+                            .rounded(cx.theme().radius)
+                            .overflow_hidden()
+                            .child(
+                                v_flex()
+                                    .w_full()
+                                    .gap_1()
+                                    .p_3()
+                                    .border_b_1()
+                                    .border_color(cx.theme().border)
+                                    .bg(cx.theme().muted.opacity(0.35))
+                                    .child(
+                                        h_flex().justify_between().gap_3().child(title).child(
+                                            div()
+                                                .text_xs()
+                                                .text_color(cx.theme().muted_foreground)
+                                                .child(story_klass),
+                                        ),
+                                    )
+                                    .when(!description.is_empty(), |this| {
+                                        this.child(
+                                            div()
+                                                .text_sm()
+                                                .text_color(cx.theme().muted_foreground)
+                                                .child(description),
+                                        )
+                                    }),
+                            )
+                            .when_some(story_view, |this, story| {
+                                this.child(div().w_full().p_4().child(story))
+                            })
+                    }),
+            )
+    }
+}
+
 #[derive(Debug)]
 pub enum ContainerEvent {
     Close,
@@ -243,6 +363,29 @@ impl StoryContainer {
             story.title_bg = S::title_bg();
             story.title_fn = Some(Box::new(S::title));
             story.description_fn = Some(Box::new(S::description));
+            story
+        })
+    }
+
+    pub fn list_panel(
+        name: impl Into<SharedString>,
+        stories: Vec<Entity<StoryContainer>>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Entity<Self> {
+        let name = name.into();
+        let story_klass = story_list_klass(&stories, cx);
+        let description = format!("{} story variants", stories.len());
+        let list = cx.new(|cx| StoryList::new(stories, cx));
+        let focus_handle = list.focus_handle(cx);
+
+        cx.new(|cx| {
+            let mut story = Self::new(window, cx)
+                .story(list.into(), story_klass)
+                .on_active(StoryList::on_active_any);
+            story.focus_handle = focus_handle;
+            story.name = name;
+            story.description = description.into();
             story
         })
     }
