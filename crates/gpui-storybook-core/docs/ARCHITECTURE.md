@@ -36,7 +36,7 @@ It owns:
 
 `gpui_storybook_core::story::init` is the runtime bootstrap sequence used by the facade:
 
-1. initialize embedded i18n via `gpui_storybook_core::i18n`, creating a crate-local `EmbeddedI18n` handle from `es_fluent_manager_embedded` locale data
+1. initialize embedded i18n via `gpui_storybook_core::i18n`, which delegates to `gpui_es_fluent`
 1. initialize `gpui-component`
 1. install `AppState`
 1. restore persisted theme state and register theme actions
@@ -110,12 +110,12 @@ Locale behavior is split across modules:
 
 - `language.rs` defines the trait bound expected from app language enums
 - `locale.rs` adapts that enum into a `LocaleStore`
-- `i18n.rs` owns the crate-local `EmbeddedI18n` handle and updates it with `select_language`
+- `i18n.rs` bridges runtime startup, locale changes, and message lookup into `gpui_es_fluent`
 - `LocaleManager::set_current_locale` also updates `gpui_component::set_locale`
 
 ## Dependency edges
 
 - `gpui-component` supplies the bulk of shell UI, sidebar, dock, theming, and controls
-- `es-fluent` provides localization message translation; `es-fluent-manager-embedded` provides embedded locale modules and data loading; `gpui-storybook-core` owns the active `EmbeddedI18n` handle
+- `es-fluent` provides localization message traits; `gpui-es-fluent` owns embedded i18n initialization, locale changes, and message lookup
 - `gpui-storybook-components` supplies dock-sidebar-specific primitives
 - `inventory` is only used for shared registry types; discovery itself happens in the facade crate
