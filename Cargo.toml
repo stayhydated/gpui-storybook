@@ -1,5 +1,5 @@
 [workspace]
-default-members = [ "examples/story" ]
+default-members = ["examples/story"]
 members = [
   "crates/gpui-storybook",
   "crates/gpui-storybook-components",
@@ -28,9 +28,9 @@ es-fluent-build = "0.16"
 es-fluent-lang = "0.16"
 es-fluent-manager-embedded = "0.16"
 gpui = { git = "https://github.com/zed-industries/zed", rev = "4bee412118dafea3bbd491cd044d354f16b3d665" }
-gpui-component = { git = "https://github.com/longbridge/gpui-component", rev = "277f220a6196572116a8fd84fba6c36187094cab" }
-gpui-component-assets = { git = "https://github.com/longbridge/gpui-component", rev = "277f220a6196572116a8fd84fba6c36187094cab" }
-gpui-es-fluent = { path = "../gpui-es-fluent/crates/gpui-es-fluent" }
+gpui-component = { git = "https://github.com/longbridge/gpui-component" }
+gpui-component-assets = { git = "https://github.com/longbridge/gpui-component" }
+gpui-es-fluent = { git = "https://github.com/stayhydated/gpui-es-fluent" }
 gpui-storybook = { path = "crates/gpui-storybook", version = "0.5.0" }
 gpui-storybook-components = { path = "crates/gpui-storybook-components", version = "0.5.0" }
 gpui-storybook-core = { path = "crates/gpui-storybook-core", version = "0.5.0" }
