@@ -12,13 +12,6 @@ It is built around three goals:
 1. Stable organization through sections and crate-level groups.
 1. Good developer experience with built-in theming, locale switching, and optional dock layouts.
 
-## Compatibility
-
-| `gpui-storybook` | `gpui-component` | `gpui` |
-| :---------------- | :--------------- | :------ |
-| **git** | | |
-| `branch = "master"` | `branch = "main"` | `rev = "832c17e8192e2e1d472f0751e7cef2af84ded622"` |
-
 ## Examples
 
 Explicit `#[story]` workflow:
@@ -178,7 +171,7 @@ Put a `storybook.toml` next to the crate whose stories you want to group or filt
 ```toml
 group = "UI Kit"
 allow = ["UI Kit", "Shared"]
-disable_story = ["LegacyCardStory"]
+disable_story = ["ExperimentalCardStory"]
 ```
 
 - `group` is required when `storybook.toml` exists.
@@ -188,4 +181,4 @@ disable_story = ["LegacyCardStory"]
 - `disable_story` matches the registered story type name.
 - For `ComponentStory`, the registered story name is the component type name.
 
-At runtime, `generate_stories` prefers the `storybook.toml` that belongs to the current binary crate and falls back to searching upward from the working directory.
+At runtime, `generate_stories` uses the `storybook.toml` from the registered story crate whose package name matches the running binary.

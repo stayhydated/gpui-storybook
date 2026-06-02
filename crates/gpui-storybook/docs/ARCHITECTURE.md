@@ -29,13 +29,13 @@ This crate is the boundary where compile-time registration metadata becomes runt
 - crate-local config: loaded from `entry.crate_dir/storybook.toml` for every discovered story crate and cached in a `HashMap<&'static str, Option<StorybookToml>>`
 - runtime config: the single `storybook.toml` used as the active filter for the current process
 
-Runtime config selection is intentionally heuristic:
+Runtime config selection uses the running binary name:
 
 1. derive the current binary name from `argv[0]`
-1. if a discovered `StoryEntry` has `crate_name == current_binary_name`, reuse that crate's cached config
-1. otherwise walk upward from the current working directory until a `storybook.toml` is found
+1. find the discovered `StoryEntry` whose `crate_name` matches it
+1. reuse that crate's cached config as the runtime config
 
-That behavior lets example apps and workspace-local binaries resolve their own config without requiring explicit configuration wiring.
+That behavior lets storybook binaries resolve their own config without requiring explicit configuration wiring. When the running binary does not match a discovered story crate, there is no runtime config and `generate_stories` does not apply runtime `allow` or `disable_story` filters.
 
 ## Filtering semantics
 

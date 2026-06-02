@@ -2,10 +2,7 @@
 pub use gpui_storybook_macros::*;
 
 use gpui_storybook_core::locale::LocaleStore;
-use std::{
-    collections::HashMap,
-    path::{Path, PathBuf},
-};
+use std::{collections::HashMap, path::PathBuf};
 
 #[cfg(feature = "dock")]
 pub use gpui_storybook_core::dock_gallery::{
@@ -104,35 +101,6 @@ fn load_storybook_config(
     }
 }
 
-fn load_storybook_config_from_working_directory() -> Option<gpui_storybook_toml::StorybookToml> {
-    let mut current = std::env::current_dir().ok()?;
-    loop {
-        match gpui_storybook_toml::load_from_dir(&current) {
-            Ok(Some(config)) => return Some(config),
-            Ok(None) => {},
-            Err(err) => {
-                tracing::warn!(
-                    "Failed to load storybook.toml from working directory '{}' path '{}': {}",
-                    std::env::current_dir()
-                        .ok()
-                        .as_deref()
-                        .unwrap_or_else(|| Path::new("<unknown>"))
-                        .display(),
-                    current.display(),
-                    err
-                );
-                return None;
-            },
-        }
-
-        if !current.pop() {
-            break;
-        }
-    }
-
-    None
-}
-
 fn current_binary_name() -> Option<String> {
     let argv0 = std::env::args_os().next()?;
     PathBuf::from(argv0)
@@ -144,19 +112,16 @@ fn load_runtime_storybook_config(
     all_entries: &[&'static __registry::StoryEntry],
     crate_configs: &mut HashMap<&'static str, Option<gpui_storybook_toml::StorybookToml>>,
 ) -> Option<gpui_storybook_toml::StorybookToml> {
-    if let Some(bin_name) = current_binary_name()
-        && let Some(entry) = all_entries
-            .iter()
-            .copied()
-            .find(|entry| entry.crate_name == bin_name)
-    {
-        return crate_configs
-            .entry(entry.crate_dir)
-            .or_insert_with(|| load_storybook_config(entry))
-            .clone();
-    }
+    let bin_name = current_binary_name()?;
+    let entry = all_entries
+        .iter()
+        .copied()
+        .find(|entry| entry.crate_name == bin_name)?;
 
-    load_storybook_config_from_working_directory()
+    crate_configs
+        .entry(entry.crate_dir)
+        .or_insert_with(|| load_storybook_config(entry))
+        .clone()
 }
 
 fn resolve_story_entry(

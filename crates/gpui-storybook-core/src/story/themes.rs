@@ -46,7 +46,7 @@ pub fn init(cx: &mut App) {
         }
     }
 
-    // Restore the previously selected theme on startup.
+    // Restore the persisted theme on startup.
     if let Some(theme) = ThemeRegistry::global(cx)
         .themes()
         .get(&saved_theme)

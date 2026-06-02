@@ -72,4 +72,5 @@ gpui_storybook::change_locale(cx, Languages::default()).unwrap();
 group = "gpui-storybook-example-story"
 ```
 
+`generate_stories` uses this file because the package name matches the running binary name.
 `allow` is intentionally omitted, so the example includes only its own `group`.

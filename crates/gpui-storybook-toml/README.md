@@ -7,12 +7,14 @@ Public integration crate for loading `storybook.toml`.
 
 Most applications do not need to depend on this crate directly. They should create a `storybook.toml` file and let [`gpui-storybook`](../gpui-storybook/README.md) consume it automatically. Depend on this crate directly when you are writing tooling or a custom runtime flow around the same config format.
 
+Through `gpui-storybook`, `generate_stories` uses the `storybook.toml` from the registered story crate whose package name matches the running binary.
+
 ## `storybook.toml` format
 
 ```toml
 group = "UI Kit"
 allow = ["UI Kit", "Shared"]
-disable_story = ["LegacyCardStory"]
+disable_story = ["ExperimentalCardStory"]
 ```
 
 - `group`: required when the file exists

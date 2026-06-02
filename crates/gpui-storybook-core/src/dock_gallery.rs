@@ -43,7 +43,7 @@ pub struct ToggleSidebar;
 
 const MAIN_DOCK_AREA: DockAreaTab = DockAreaTab {
     id: "storybook-main-dock",
-    version: 5, // Bumped version to remove sidebar tab title row
+    version: 5,
 };
 
 #[cfg(debug_assertions)]
@@ -572,10 +572,10 @@ impl StoryWorkspace {
         StorySidebar::register_story_seeds(&weak_dock_area, &stories, cx);
         StorySidebar::register_stories(&weak_dock_area, &stories, cx);
 
-        // Try to load saved layout, fall back to default
+        // Load saved layout when available; otherwise build the default layout.
         match Self::load_layout(dock_area.clone(), window, cx) {
             Ok(_) => {
-                // Layout loaded successfully
+                // The saved layout is mounted.
             },
             Err(_) => {
                 Self::reset_default_layout(weak_dock_area, &stories, window, cx);
@@ -649,7 +649,7 @@ impl StoryWorkspace {
     ) -> Result<()> {
         let state = DockLayoutStore::load_from_path(STATE_FILE)?;
 
-        // Check if the saved layout version matches
+        // Saved layouts must match the active dock schema.
         if state.version != Some(MAIN_DOCK_AREA.version) {
             anyhow::bail!("Layout version mismatch");
         }
@@ -811,32 +811,23 @@ pub fn register_story_panels(cx: &mut App) {
     register_panel(
         cx,
         "StoryContainer",
-        |dock_area, state, info, window, cx| {
-            // Try to recreate the story from saved state
-            // Extract the panel info value from the Panel variant
-            let panel_value = match info {
-                PanelInfo::Panel(value) => Some(value.clone()),
-                _ => None,
+        |dock_area, _state, info, window, cx| {
+            let PanelInfo::Panel(panel_value) = info else {
+                panic!("StoryContainer panel state must be PanelInfo::Panel");
             };
 
-            if let Some(story_state) =
-                panel_value.and_then(|v| serde_json::from_value::<StoryState>(v).ok())
-                && let Some(container) = StorySidebar::create_story_by_klass(
+            let story_state = serde_json::from_value::<StoryState>(panel_value.clone())
+                .expect("StoryContainer panel state must contain StoryState");
+
+            Box::new(
+                StorySidebar::create_story_by_klass(
                     story_state.story_klass.as_ref(),
                     &dock_area,
                     window,
                     cx,
                 )
-            {
-                return Box::new(container);
-            }
-
-            // Fallback: create an empty container with the panel name
-            Box::new(cx.new(|cx| {
-                let mut container = StoryContainer::new(window, cx);
-                container.name = state.panel_name.clone().into();
-                container
-            }))
+                .expect("StoryContainer panel state must reference a registered story"),
+            )
         },
     );
 

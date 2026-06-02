@@ -63,7 +63,7 @@ The resulting `StoryContainer` carries both runtime metadata (`group`, `section`
 - it owns the full story list
 - it keeps search state in a `gpui_component::input::InputState`
 - filtering matches story title, top-level group, and section
-- the sidebar groups stories by `group`, falling back to `section` when no group exists
+- the sidebar groups stories by `group`, or by `section` when no group exists
 - the active story is rendered from the filtered list while preserving indices into the original story vector
 
 This mode is stateless beyond the currently selected story and the search field.
@@ -75,7 +75,7 @@ This mode is stateless beyond the currently selected story and the search field.
 Key internal pieces:
 
 - `STORY_PANELS`: per-dock-area map of mounted `StoryContainer` weak refs keyed by `story_klass`
-- `STORY_SEEDS`: per-dock-area registry of seed metadata used to recreate stories from layout state
+- `STORY_SEEDS`: per-dock-area registry of seed metadata for recreating stories from layout state
 - `DockLayoutStore`: JSON sanitize/load/save layer for `DockAreaState`
 
 Important behavior:

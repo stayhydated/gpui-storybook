@@ -4,7 +4,7 @@
 
 `gpui-storybook-toml` is the schema and evaluation boundary for `storybook.toml`.
 
-This crate intentionally does not know about inventory, story containers, or working-directory fallback. It only:
+This crate intentionally does not know about inventory, story containers, or runtime config selection. It only:
 
 - loads `storybook.toml` from a directory
 - deserializes and validates the schema

@@ -161,7 +161,7 @@ Apply these `storybook.toml` rules:
 ```toml
 group = "UI Kit"
 allow = ["UI Kit", "Shared"]
-disable_story = ["LegacyCardStory"]
+disable_story = ["ExperimentalCardStory"]
 ```
 
 - `group` is required when `storybook.toml` exists.
@@ -170,6 +170,7 @@ disable_story = ["LegacyCardStory"]
 - `allow = []` includes none.
 - `disable_story` matches the registered story type name exactly.
 - For `ComponentStory`, `disable_story` uses the component type name, not the generated wrapper type.
+- `generate_stories` uses the `storybook.toml` from the registered story crate whose package name matches the running binary.
 
 If stories are unexpectedly missing, inspect runtime logs for discovered story
 count, selected runtime config, group filtering, and `disable_story` matches.

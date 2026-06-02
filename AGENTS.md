@@ -121,8 +121,8 @@ Keep `examples/component/README.md` aligned with `#[derive(ComponentStory)]`
 workflow changes.
 
 Keep `crates/gpui-storybook-toml/README.md`, both example `storybook.toml`
-files, and the facade docs aligned when `group`, `allow`, or `disable_story`
-behavior changes.
+files, and the facade docs aligned when `group`, `allow`, `disable_story`, or
+runtime config resolution behavior changes.
 
 ## Workspace Map
 
@@ -198,7 +198,7 @@ behavior changes.
 - Keep `#[story]` and `#[derive(ComponentStory)]` flows consistent in docs unless the change is intentionally specific to one flow.
 - Update both example apps when a shared registration concept changes.
 - Keep `disable_story` semantics aligned with the registered story type names described in the macro and TOML docs.
-- Update both the facade and TOML docs when group filtering or discovery fallback behavior changes.
+- Update both the facade and TOML docs when group filtering or runtime config resolution behavior changes.
 
 ### When Editing Runtime UI or Dock Behavior
 
