@@ -53,9 +53,9 @@ example applications, and source snippets over memory when details matter:
 Use this shape for a storybook binary:
 
 ```rust
+// src/i18n.rs
 use es_fluent::EsFluent;
 use es_fluent_lang::es_fluent_language;
-use gpui_storybook::{Assets, Gallery};
 use strum::EnumIter;
 
 es_fluent_manager_embedded::define_i18n_module!();
@@ -63,6 +63,13 @@ es_fluent_manager_embedded::define_i18n_module!();
 #[es_fluent_language]
 #[derive(Clone, Copy, Debug, EnumIter, EsFluent, PartialEq)]
 pub enum Languages {}
+
+// src/lib.rs
+pub mod i18n;
+
+// src/main.rs
+use my_app::i18n::Languages;
+use gpui_storybook::{Assets, Gallery};
 
 fn main() {
     let app = gpui_platform::application().with_assets(Assets);

@@ -1,20 +1,12 @@
-use es_fluent::EsFluent;
-use es_fluent_lang::es_fluent_language;
 use gpui_storybook::Assets;
 #[cfg(not(feature = "dock"))]
 use gpui_storybook::Gallery;
 #[cfg(feature = "dock")]
 use gpui_storybook::StoryWorkspace;
-use strum::EnumIter;
-
-es_fluent_manager_embedded::define_i18n_module!();
+use gpui_storybook_example_component::i18n::Languages;
 
 #[allow(unused_imports)]
 use gpui_storybook_example_component::*;
-
-#[es_fluent_language]
-#[derive(Clone, Copy, Debug, EnumIter, EsFluent, PartialEq)]
-pub enum Languages {}
 
 fn main() {
     tracing_subscriber::fmt()

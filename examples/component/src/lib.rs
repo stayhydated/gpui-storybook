@@ -1,4 +1,5 @@
 pub mod components;
+pub mod i18n;
 
 use es_fluent::EsFluent;
 

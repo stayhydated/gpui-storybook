@@ -57,14 +57,18 @@ This flow keeps the storybook wrapper out of the component implementation. The c
 
 ## Locale setup
 
-The binary defines its embedded i18n module, derives the app language enum with `EsFluent`, initializes storybook with the default language, and selects the active locale:
+The example library defines its embedded i18n module in `src/i18n.rs`, derives the app language enum with `EsFluent`, and the binary initializes Storybook with the default language before selecting the active locale:
 
 ```rs
+// src/i18n.rs
 es_fluent_manager_embedded::define_i18n_module!();
 
 #[es_fluent_language]
 #[derive(Clone, Copy, Debug, EnumIter, EsFluent, PartialEq)]
 pub enum Languages {}
+
+// src/main.rs
+use gpui_storybook_example_component::i18n::Languages;
 
 gpui_storybook::init(cx, Languages::default());
 gpui_storybook::change_locale(cx, Languages::default()).unwrap();

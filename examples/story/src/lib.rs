@@ -1,3 +1,4 @@
+pub mod i18n;
 pub mod section;
 pub mod stories;
 
