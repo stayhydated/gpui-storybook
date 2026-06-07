@@ -40,8 +40,9 @@ Before editing, classify the change:
    `docs/ARCHITECTURE.md`.
 3. **Sync public workflow changes.** If story registration, `storybook.toml`
    semantics, dock behavior, generated output, locale wiring, or recommended
-   usage changes, update the relevant README, example, architecture note, and
-   `.agents/skills/*` guidance in the same change when applicable.
+   usage changes, update the relevant README, example, architecture note,
+   public `skills/*` guidance, and repo-local `.agents/skills/*-dev` guidance
+   in the same change when applicable.
 4. **Validate narrowly.** Run the smallest command that proves the edited
    behavior or documentation surface is still sound.
 
@@ -89,14 +90,37 @@ Keep these topics in architecture documents, not in READMEs:
 
 ### Skill Guidance
 
-`.agents/skills/use-gpui-storybook` is hosted in this repository as public
-GPUI Storybook usage guidance for application developers. It is not internal
-architecture, maintenance, CI, release, or contributor-only workflow
-documentation.
+Skill guidance is split by audience and intended distribution:
 
-Update relevant in-repository `.agents/skills/*` guidance when a code change
-alters user-facing workflows, story registration behavior, `storybook.toml`
-semantics, dock behavior, locale setup, generated output, or recommended usage.
+- `.agents/skills/*-dev` contains auto-discovered repo-local development skills
+  for Codex/local agent use inside this repository. These skills may include
+  internal wording, repo-specific assumptions, implementation details,
+  maintainer workflows, and development-only instructions.
+- `skills/*` contains public, user-facing skills intended to be reusable outside
+  this repository or distributed as part of a skills catalog/plugin. These
+  skills must not include internal wording, maintainer-only language,
+  repo-private assumptions, or implementation details that belong only in the
+  corresponding `*-dev` skill.
+
+Each `.agents/skills/*-dev` directory and its `SKILL.md` `name` field must use
+the same `-dev` suffix.
+
+Prefer this root `AGENTS.md` for repo-wide contributor and agent policy. Create
+or keep a `.agents/skills/*-dev` skill only when there is a task-specific
+development workflow that should trigger selectively, or when the workflow needs
+bundled references, scripts, or assets. Do not create a dev skill merely to
+duplicate repository-wide instructions from `AGENTS.md`.
+
+Do not assume root-level `skills/*` are auto-loaded as repo-local Codex skills.
+Use `.agents/skills` for auto-discovered repo-local skills; use `skills/*` as
+the source location for public/reusable skills.
+
+Update relevant public `skills/*` guidance when a code change alters
+user-facing workflows, story registration behavior, `storybook.toml` semantics,
+dock behavior, locale setup, generated output, or recommended usage. Update
+relevant `.agents/skills/*-dev` guidance when a change alters repo-local agent
+workflows, internal synchronization rules, validation assumptions, or
+development-only instructions.
 
 ## Synchronization Rules
 
@@ -107,7 +131,7 @@ user-visible runtime behavior:
 1. Update the root `README.md`.
 2. Update the affected crate `README.md` files.
 3. Update the matching example `README.md` files when the change affects either registration style.
-4. Update relevant in-repository `.agents/skills/*` guidance.
+4. Update relevant public `skills/*` guidance and repo-local `.agents/skills/*-dev` guidance.
 5. Update the relevant `docs/ARCHITECTURE.md` files when the internal flow or crate boundaries changed.
 6. Keep these surfaces aligned in the same change unless there is a documented reason not to.
 
@@ -184,7 +208,7 @@ runtime config resolution behavior changes.
 - Keep READMEs user-facing and task-oriented.
 - Move discovery internals, runtime boundaries, and macro expansion details into `docs/ARCHITECTURE.md`.
 - Prefer example snippets over prose-only explanations.
-- Sync the root `README.md`, affected crate `README.md` files, example `README.md` files, and `.agents/skills/*` guidance in the same change when the workflow changed.
+- Sync the root `README.md`, affected crate `README.md` files, example `README.md` files, public `skills/*` guidance, and repo-local `.agents/skills/*-dev` guidance in the same change when the workflow changed.
 
 ### When Editing Rust Crates
 

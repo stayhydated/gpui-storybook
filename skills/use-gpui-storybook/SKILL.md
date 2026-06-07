@@ -1,21 +1,19 @@
 ---
 name: use-gpui-storybook
-description: "Use when Codex needs to help application developers adopt GPUI Storybook in an app: setting up a storybook binary, adding stories with #[story] or #[derive(ComponentStory)], configuring storybook.toml group/allow/disable_story behavior, choosing gallery versus dock mode, wiring locale initialization, or troubleshooting missing stories."
+description: "Use when helping application developers adopt GPUI Storybook in an app: setting up a storybook binary, adding stories with #[story] or #[derive(ComponentStory)], configuring storybook.toml group/allow/disable_story behavior, choosing gallery versus dock mode, wiring locale initialization, or troubleshooting missing stories."
 ---
 
 # Use GPUI Storybook
 
 ## Scope Boundary
 
-Treat this skill as a hosted public-usage guide for GPUI Storybook consumers.
-Use it only for user-facing application workflows: setting up a storybook
-binary, adding stories, configuring `storybook.toml`, choosing gallery or dock
-mode, wiring locale initialization, and troubleshooting missing stories.
+Use this public skill for application-level GPUI Storybook integration:
+setting up a storybook binary, adding stories, configuring `storybook.toml`,
+choosing gallery or dock mode, wiring locale initialization, and
+troubleshooting missing stories.
 
-Do not use this skill as a contributor guide for `gpui-storybook` repository
-internals. For build, test, format, lint, maintenance, release, or architecture
-work, read the repository source, `AGENTS.md`, and the relevant crate
-documentation directly.
+Do not use this skill for maintaining the GPUI Storybook implementation itself,
+release workflows, repository architecture, or crate internals.
 
 ## Core Workflow
 
@@ -39,14 +37,9 @@ Start from the user-facing facade. Most application code uses
 
 ## Reference Selection
 
-This skill has no extra reference files. Prefer the current public READMEs,
-example applications, and source snippets over memory when details matter:
-
-- `README.md`: top-level setup and usage guidance.
-- `crates/gpui-storybook/README.md`: facade API guidance.
-- `examples/story/README.md`: explicit `#[story]` workflow.
-- `examples/component/README.md`: `#[derive(ComponentStory)]` workflow.
-- `crates/gpui-storybook-toml/README.md`: `storybook.toml` semantics.
+This skill has no extra reference files. When exact details matter, prefer the
+project's public README, crate documentation, examples, and source snippets over
+memory.
 
 ## Implementation Rules
 
