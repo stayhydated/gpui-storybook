@@ -40,8 +40,8 @@ Before editing, classify the change:
    `docs/ARCHITECTURE.md`.
 3. **Sync public workflow changes.** If story registration, `storybook.toml`
    semantics, dock behavior, generated output, locale wiring, or recommended
-   usage changes, update the relevant README, example, architecture note,
-   and public `skills/*` guidance in the same change when applicable.
+   usage changes, update the relevant README, example, architecture note, and
+   `skills/use-gpui-storybook` guidance in the same change when applicable.
 4. **Validate narrowly.** Run the smallest command that proves the edited
    behavior or documentation surface is still sound.
 
@@ -89,17 +89,13 @@ Keep these topics in architecture documents, not in READMEs:
 
 ### Skill Guidance
 
-`skills/use-gpui-storybook` is the public reusable `gpui-storybook` usage skill
-for application developers. It must not include maintainer-only wording,
-repo-private assumptions, or implementation details that belong in this
-`AGENTS.md` or the relevant `docs/ARCHITECTURE.md`.
+`skills/use-gpui-storybook` is public application-developer guidance, not
+repo-local maintenance guidance. Keep maintainer-only details in this guide or
+the relevant `docs/ARCHITECTURE.md`.
 
-Do not assume root-level `skills/*` entries are auto-loaded as repo-local Codex
-skills. Treat `skills/*` as public distribution sources.
-
-Update relevant public `skills/*` guidance when a code change alters
-user-facing workflows, story registration behavior, `storybook.toml` semantics,
-dock behavior, locale setup, generated output, or recommended usage.
+Update it when user-facing workflows, story registration behavior,
+`storybook.toml` semantics, dock behavior, locale setup, generated output, or
+recommended usage change.
 
 ## Synchronization Rules
 
@@ -110,7 +106,7 @@ user-visible runtime behavior:
 1. Update the root `README.md`.
 2. Update the affected crate `README.md` files.
 3. Update the matching example `README.md` files when the change affects either registration style.
-4. Update relevant public `skills/*` guidance.
+4. Update `skills/use-gpui-storybook` when public usage guidance changes.
 5. Update the relevant `docs/ARCHITECTURE.md` files when the internal flow or crate boundaries changed.
 6. Keep these surfaces aligned in the same change unless there is a documented reason not to.
 
@@ -187,7 +183,8 @@ runtime config resolution behavior changes.
 - Keep READMEs user-facing and task-oriented.
 - Move discovery internals, runtime boundaries, and macro expansion details into `docs/ARCHITECTURE.md`.
 - Prefer example snippets over prose-only explanations.
-- Sync the root `README.md`, affected crate `README.md` files, example `README.md` files, and public `skills/*` guidance in the same change when the workflow changed.
+- Sync the root `README.md`, affected crate `README.md` files, example
+  `README.md` files, and `skills/use-gpui-storybook` when the workflow changed.
 
 ### When Editing Rust Crates
 
