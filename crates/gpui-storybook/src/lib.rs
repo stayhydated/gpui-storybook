@@ -1,3 +1,27 @@
+//! Public facade for building GPUI storybook binaries.
+//!
+//! Most applications should depend on this crate rather than the lower-level
+//! runtime, macro, or TOML crates. It re-exports the standard runtime shell,
+//! story traits, locale helpers, window helpers, and, with the default
+//! `macros` feature, the story registration macros.
+//!
+//! Story registration flows through `inventory`: `#[story]` and
+//! `#[derive(ComponentStory)]` submit story entries, while `#[story_init]`
+//! submits one-time setup hooks. The hidden `__registry` and `__inventory`
+//! re-exports are the stable expansion path used by those macros.
+//!
+//! `generate_stories` loads crate-local `storybook.toml` files for discovered
+//! story crates, selects a runtime config by matching the running binary name
+//! against registered story crate names, applies `allow` and `disable_story`
+//! filtering, then materializes sorted [`StoryContainer`] values. A story crate
+//! config's `group` becomes the sidebar's outer group; a story's declared
+//! section remains the nested label.
+//!
+//! Feature boundaries:
+//!
+//! - `macros`: re-exports proc macros from `gpui-storybook-macros`
+//! - `dock`: re-exports the dock workspace helpers from `gpui-storybook-core`
+
 #[cfg(feature = "macros")]
 pub use gpui_storybook_macros::*;
 
@@ -161,6 +185,13 @@ fn resolve_story_entry(
     })
 }
 
+/// Initializes Storybook runtime state and locale wiring.
+///
+/// Call this once before creating the story window or calling
+/// [`generate_stories`]. The function stores the current language, installs the
+/// locale manager, initializes the core runtime shell, registers dock panel
+/// types when the `dock` feature is enabled, and then runs all discovered
+/// `#[story_init]` hooks.
 pub fn init<L>(cx: &mut ::gpui::App, language: L)
 where
     L: Language,
@@ -183,6 +214,17 @@ where
     }
 }
 
+/// Discovers registered stories, applies `storybook.toml` filtering, and
+/// returns runtime story containers.
+///
+/// The active runtime config is selected from the registered story crate whose
+/// package name matches the running binary. If no registered story crate
+/// matches the binary name, crate-local groups are still attached to stories
+/// but runtime `allow` and `disable_story` filters are not applied.
+///
+/// Stories are sorted by enum-section order when available, then by section and
+/// registered story name. Stories with the same title in the same group and
+/// section are grouped into one list panel.
 pub fn generate_stories(
     window: &mut ::gpui::Window,
     cx: &mut ::gpui::App,

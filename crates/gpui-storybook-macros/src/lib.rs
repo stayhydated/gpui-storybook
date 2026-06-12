@@ -1,3 +1,24 @@
+//! Proc macros for GPUI Storybook registration.
+//!
+//! The macros emit `inventory` submissions that target the public facade crate
+//! under the `gpui_storybook` crate name. Direct users of this crate still need
+//! the facade crate available at that path because generated code references
+//! `gpui_storybook::__inventory`, `gpui_storybook::__registry`,
+//! `gpui_storybook::StoryContainer`, and `gpui_storybook::Story`.
+//!
+//! `#[story]` registers an explicit story struct, preserving the input item and
+//! appending a `StoryEntry` submission. The optional section can be a string
+//! literal or enum variant; enum variants provide both a section label and a
+//! `usize` ordering key.
+//!
+//! `#[derive(ComponentStory)]` supports non-generic structs and helper
+//! attributes `title`, `description`, `section`, and `example`. It generates a
+//! hidden wrapper view and registers the original component type name so
+//! `disable_story = ["ComponentName"]` matches the public type the user wrote.
+//!
+//! `#[story_init]` registers a one-time setup function that the facade executes
+//! during `gpui_storybook::init(...)`.
+
 use heck::ToTitleCase as _;
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
