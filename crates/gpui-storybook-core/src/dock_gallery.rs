@@ -342,7 +342,8 @@ impl StorySidebar {
             return Some(story);
         }
 
-        let entry = inventory::iter::<StoryEntry>().find(|entry| entry.name == story_klass)?;
+        let entry =
+            inventory::iter::<StoryEntry>().find(|entry| entry.name.as_str() == story_klass)?;
         let panel = (entry.create_fn)(window, cx);
         panel.update(cx, |c, _| {
             c.group = group.map(Into::into);

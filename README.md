@@ -171,6 +171,11 @@ pub struct CardStory;
 
 `#[storybook(section = StorySection::Patterns)]` follows the same rules.
 
+The macros store registered story and section labels as typed
+`StoryName`/`StorySectionName` values in the inventory registry. This mostly
+matters for manual registry integrations; normal story declarations can keep
+using string literals or enum variants.
+
 ## Filter stories with `storybook.toml`
 
 Put a `storybook.toml` next to the crate whose stories you want to group or filter:

@@ -113,18 +113,18 @@ fn registration_tokens(
 
     quote! {
         gpui_storybook::__inventory::submit! {
-            ::gpui_storybook::__registry::StoryEntry {
-                name: #entry_name,
-                section: #section_value,
-                section_order: #section_order,
-                create_fn: |window, cx| {
+            ::gpui_storybook::__registry::StoryEntry::new(
+                #entry_name,
+                #section_value,
+                #section_order,
+                |window, cx| {
                     ::gpui_storybook::StoryContainer::panel::<#story_type>(window, cx)
                 },
-                crate_name: ::std::env!("CARGO_PKG_NAME"),
-                crate_dir: ::std::env!("CARGO_MANIFEST_DIR"),
-                file: ::std::file!(),
-                line: ::std::line!(),
-            }
+                ::std::env!("CARGO_PKG_NAME"),
+                ::std::env!("CARGO_MANIFEST_DIR"),
+                ::std::file!(),
+                ::std::line!(),
+            )
         }
     }
 }

@@ -32,6 +32,7 @@ use std::{collections::HashMap, path::PathBuf};
 pub use gpui_storybook_core::dock_gallery::{
     StoryWorkspace, create_dock_window, register_story_panels,
 };
+pub use gpui_storybook_core::registry::{StoryName, StorySectionName};
 #[cfg(feature = "dock")]
 pub use gpui_storybook_core::window_view::DockWindowView;
 pub use gpui_storybook_core::{
@@ -153,7 +154,8 @@ fn resolve_story_entry(
     crate_group: Option<&str>,
     runtime_config: Option<&gpui_storybook_toml::StorybookToml>,
 ) -> Option<ResolvedStoryEntry> {
-    let filter_group = crate_group.or(entry.section);
+    let entry_section = entry.section.map(StorySectionName::as_str);
+    let filter_group = crate_group.or(entry_section);
 
     if let Some(runtime_config) = runtime_config
         && !runtime_config.allows_group(filter_group)
@@ -168,7 +170,7 @@ fn resolve_story_entry(
     }
 
     if let Some(runtime_config) = runtime_config
-        && runtime_config.is_story_disabled(entry.name)
+        && runtime_config.is_story_disabled(entry.name.as_str())
     {
         tracing::debug!(
             "Skipping story '{}' from crate '{}' because it is listed in runtime disable_story",
@@ -181,7 +183,7 @@ fn resolve_story_entry(
     Some(ResolvedStoryEntry {
         entry,
         group: crate_group.map(str::to_string),
-        section: entry.section.map(str::to_string),
+        section: entry.section.map(|section| section.as_str().to_string()),
     })
 }
 
@@ -286,7 +288,7 @@ pub fn generate_stories(
                 // Both have order, compare by order then by name
                 order_a
                     .cmp(&order_b)
-                    .then_with(|| a.entry.name.cmp(b.entry.name))
+                    .then_with(|| a.entry.name.cmp(&b.entry.name))
             },
             (Some(_), None) => std::cmp::Ordering::Less, // With order comes before without
             (None, Some(_)) => std::cmp::Ordering::Greater, // Without order comes after with
@@ -295,10 +297,10 @@ pub fn generate_stories(
                 match (&a.section, &b.section) {
                     (Some(sec_a), Some(sec_b)) => sec_a
                         .cmp(sec_b)
-                        .then_with(|| a.entry.name.cmp(b.entry.name)),
+                        .then_with(|| a.entry.name.cmp(&b.entry.name)),
                     (Some(_), None) => std::cmp::Ordering::Less,
                     (None, Some(_)) => std::cmp::Ordering::Greater,
-                    (None, None) => a.entry.name.cmp(b.entry.name),
+                    (None, None) => a.entry.name.cmp(&b.entry.name),
                 }
             },
         }
@@ -351,27 +353,27 @@ mod tests {
         unreachable!("story creation is not used in these tests");
     }
 
-    static SECTIONED_ENTRY: __registry::StoryEntry = __registry::StoryEntry {
-        name: "SectionedStory",
-        section: Some("Notes"),
-        section_order: None,
-        create_fn: unused_create_fn,
-        crate_name: "component-example",
-        crate_dir: "/tmp/component-example",
-        file: "examples/component/src/components/field_notes.rs",
-        line: 10,
-    };
+    static SECTIONED_ENTRY: __registry::StoryEntry = __registry::StoryEntry::new(
+        "SectionedStory",
+        Some("Notes"),
+        None,
+        unused_create_fn,
+        "component-example",
+        "/tmp/component-example",
+        "examples/component/src/components/field_notes.rs",
+        10,
+    );
 
-    static UNSECTIONED_ENTRY: __registry::StoryEntry = __registry::StoryEntry {
-        name: "UnsectionedStory",
-        section: None,
-        section_order: None,
-        create_fn: unused_create_fn,
-        crate_name: "component-example",
-        crate_dir: "/tmp/component-example",
-        file: "examples/component/src/components/field_notes.rs",
-        line: 42,
-    };
+    static UNSECTIONED_ENTRY: __registry::StoryEntry = __registry::StoryEntry::new(
+        "UnsectionedStory",
+        None,
+        None,
+        unused_create_fn,
+        "component-example",
+        "/tmp/component-example",
+        "examples/component/src/components/field_notes.rs",
+        42,
+    );
 
     fn runtime_config(allow: &[&str]) -> gpui_storybook_toml::StorybookToml {
         gpui_storybook_toml::StorybookToml {

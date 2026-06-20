@@ -23,6 +23,7 @@ version = "0.5.0"
 [workspace.dependencies]
 anyhow = "1.0"
 darling = "0.23"
+derive_more = "2.1"
 es-fluent = { path = "../es-fluent/crates/es-fluent", version = "0.16" }
 es-fluent-build = { path = "../es-fluent/crates/es-fluent-build", version = "0.16" }
 es-fluent-lang = { path = "../es-fluent/crates/es-fluent-lang", version = "0.16" }

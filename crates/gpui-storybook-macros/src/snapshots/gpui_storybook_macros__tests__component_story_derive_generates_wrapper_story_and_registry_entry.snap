@@ -52,9 +52,8 @@ impl ::gpui_storybook::Story for __ButtonChipComponentStoryView {
     }
 }
 gpui_storybook::__inventory::submit! {
-    ::gpui_storybook::__registry::StoryEntry { name : "ButtonChip", section :
-    Some("Components"), section_order : None, create_fn : | window, cx | {
-    ::gpui_storybook::StoryContainer::panel:: < __ButtonChipComponentStoryView > (window,
-    cx) }, crate_name : ::std::env!("CARGO_PKG_NAME"), crate_dir :
-    ::std::env!("CARGO_MANIFEST_DIR"), file : ::std::file!(), line : ::std::line!(), }
+    ::gpui_storybook::__registry::StoryEntry::new("ButtonChip", Some("Components"), None,
+    | window, cx | { ::gpui_storybook::StoryContainer::panel:: <
+    __ButtonChipComponentStoryView > (window, cx) }, ::std::env!("CARGO_PKG_NAME"),
+    ::std::env!("CARGO_MANIFEST_DIR"), ::std::file!(), ::std::line!(),)
 }

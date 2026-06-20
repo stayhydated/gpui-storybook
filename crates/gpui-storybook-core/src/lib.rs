@@ -20,8 +20,8 @@
 //! - `language`, `locale`, and `i18n`: locale abstraction and bridge into
 //!   `es-fluent`, `gpui-es-fluent`, and `gpui-component`
 //! - `assets`: embedded Storybook assets plus delegated component assets
-//! - `registry`: `inventory` entry definitions shared with the facade and
-//!   macro crates
+//! - `registry`: typed `inventory` entry definitions shared with the facade
+//!   and macro crates
 
 pub mod actions;
 pub mod app_menus;

@@ -17,6 +17,7 @@ dock = [  ]
 
 [dependencies]
 anyhow = { workspace = true }
+derive_more = { features = [ "as_ref", "display", "from" ], workspace = true }
 es-fluent = { workspace = true }
 gpui = { workspace = true }
 gpui-component = { features = [ "inspector" ], workspace = true }
