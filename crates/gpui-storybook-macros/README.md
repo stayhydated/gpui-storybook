@@ -20,6 +20,11 @@ pub struct ButtonStory;
 
 Use this flow when the story needs custom state, focus handling, or a wrapper view around the component being previewed.
 
+The registered story name is the story struct name. Macro-generated registry
+entries also include a stable automation key in the form
+`{crate-package-name}-{story-struct-name}` and a duplicate-key marker so two
+stories with the same generated key fail to build.
+
 ### `#[derive(ComponentStory)]`
 
 Generates a story wrapper around a component type.
@@ -43,6 +48,10 @@ Supported `#[storybook(...)]` arguments:
 - `example = ...`
 
 `title` and `description` are emitted inside generated `Story` methods that receive `cx: &gpui::App`, so those expressions can call app-scoped localization helpers.
+
+The registered story name is the component type name, not the hidden wrapper
+type. The stable automation key uses
+`{crate-package-name}-{component-type-name}`.
 
 ### `#[story_init]`
 

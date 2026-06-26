@@ -80,6 +80,36 @@ Turn on the `dock` feature when you want a panel-based workspace instead of the 
 gpui-storybook = { version = "*", features = ["dock"] }
 ```
 
+Turn on the `mcp` feature when another process needs to list stories, open a
+story by key, or capture the active story:
+
+```toml
+[dependencies]
+gpui-storybook = { version = "*", features = ["mcp"] }
+```
+
+No constructor changes are required. `gpui_storybook::init(...)` installs the
+MCP automation controller when the feature is enabled, and `Gallery::view(...)`
+or `StoryWorkspace::view(...)` attach it automatically.
+
+Run an MCP-enabled example over stdio:
+
+```bash
+GPUI_STORYBOOK_MCP_STDIO=1 cargo run -p gpui-storybook-example-story --features mcp
+```
+
+Capture a story without starting an MCP client:
+
+```bash
+WGPU_CAPTURE_ROUTE=gpui-storybook-example-story-ButtonStory \
+WGPU_CAPTURE_PATH=target/storybook-captures/button.png \
+cargo run -p gpui-storybook-example-story --features mcp
+```
+
+`WGPU_CAPTURE_WIDTH` and `WGPU_CAPTURE_HEIGHT` request a live window resize
+before capture. MCP capture results report the actual rendered pixel size,
+which can differ on scaled or compositor-managed displays.
+
 ## Choose a registration style
 
 ### Explicit stories with `#[story]`
@@ -176,6 +206,14 @@ The macros store registered story and section labels as typed
 matters for manual registry integrations; normal story declarations can keep
 using string literals or enum variants.
 
+Each registered story also receives a stable `StoryKey` for automation and
+capture. Macro-generated keys use `{crate-package-name}-{registered-story-name}`;
+for example, `gpui-storybook-example-story-ButtonStory` or
+`gpui-storybook-example-component-WelcomeCard`. Explicit `#[story]` entries use
+the story struct name. `ComponentStory` entries use the component type name.
+Duplicate macro-generated keys fail to build, and `generate_stories` rejects
+duplicate keys from manual registry entries.
+
 ## Filter stories with `storybook.toml`
 
 Put a `storybook.toml` next to the crate whose stories you want to group or filter:
@@ -192,5 +230,6 @@ disable_story = ["ExperimentalCardStory"]
 - `allow = []` includes none.
 - `disable_story` matches the registered story type name.
 - For `ComponentStory`, the registered story name is the component type name.
+- `disable_story` does not use the full automation `StoryKey`.
 
 At runtime, `generate_stories` uses the `storybook.toml` from the registered story crate whose package name matches the running binary.

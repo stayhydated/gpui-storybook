@@ -1,4 +1,12 @@
-use crate::story::StoryContainer;
+use crate::{
+    automation::{
+        SharedStorybookAutomation, StoryCurrentSnapshot, StoryScreenshotRequest, StorySnapshot,
+        StorybookAutomationCommand, StorybookAutomationError, apply_capture_target_size,
+        capture_exit_code, default_storybook_automation, render_story_capture,
+        story_snapshots_from_containers, validate_capture_target_size,
+    },
+    story::StoryContainer,
+};
 use gpui::prelude::{
     Context, FluentBuilder as _, InteractiveElement as _, IntoElement, ParentElement as _, Render,
     StatefulInteractiveElement as _, Styled as _,
@@ -13,13 +21,14 @@ use gpui_component::{
     sidebar::{Sidebar, SidebarGroup, SidebarMenu, SidebarMenuItem},
     v_flex,
 };
-use std::collections::BTreeMap;
+use std::{borrow::Borrow, collections::BTreeMap};
 
 pub struct Gallery {
     stories: Vec<Entity<StoryContainer>>,
     active_index: Option<usize>,
     collapsed: bool,
     search_input: Entity<InputState>,
+    automation: Option<SharedStorybookAutomation>,
 
     _subscriptions: Vec<Subscription>,
 }
@@ -28,6 +37,7 @@ impl Gallery {
     pub fn new(
         initial_stories: Vec<Entity<StoryContainer>>,
         init_story_name: Option<&str>,
+        automation: Option<SharedStorybookAutomation>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
@@ -75,6 +85,7 @@ impl Gallery {
                     } else {
                         this.active_index = None;
                     }
+                    this.confirm_active_story(cx_window);
                     cx_window.notify();
                 },
                 _ => {},
@@ -90,11 +101,18 @@ impl Gallery {
                 Some(0)
             },
             collapsed: false,
+            automation,
             _subscriptions: subscriptions,
         };
 
         if let Some(name) = init_story_name {
             this.set_active_story(name, cx);
+        }
+
+        this.sync_automation_stories(cx);
+        this.confirm_active_story(cx);
+        if let Some(automation) = this.automation.clone() {
+            this.attach_automation_host(automation, window, cx);
         }
 
         this
@@ -113,13 +131,190 @@ impl Gallery {
         }
     }
 
+    fn active_story_snapshot(&self, cx: &impl Borrow<App>) -> Option<StorySnapshot> {
+        let active_index = self.active_index?;
+        let story = self.stories.get(active_index)?;
+        StorySnapshot::from_container(story.read(cx.borrow()), cx)
+    }
+
+    fn sync_automation_stories(&self, cx: &impl Borrow<App>) {
+        if let Some(automation) = &self.automation {
+            automation.set_stories(story_snapshots_from_containers(&self.stories, cx));
+        }
+    }
+
+    fn confirm_active_story(&self, cx: &impl Borrow<App>) {
+        let Some(automation) = &self.automation else {
+            return;
+        };
+        let Some(snapshot) = self.active_story_snapshot(cx) else {
+            return;
+        };
+
+        let _ = automation.confirm_current_story(&snapshot.key);
+    }
+
+    fn story_contains_key(
+        story: &Entity<StoryContainer>,
+        key: &str,
+        cx: &impl Borrow<App>,
+    ) -> bool {
+        let (matches, members) = {
+            let story = story.read(cx.borrow());
+            (
+                story
+                    .story_key
+                    .as_ref()
+                    .is_some_and(|story_key| story_key == key),
+                story.list_members.clone(),
+            )
+        };
+
+        matches
+            || members
+                .iter()
+                .any(|member| Self::story_contains_key(member, key, cx))
+    }
+
+    fn set_active_story_by_key(
+        &mut self,
+        key: &str,
+        cx: &impl Borrow<App>,
+    ) -> Result<StoryCurrentSnapshot, StorybookAutomationError> {
+        let Some(index) = self
+            .stories
+            .iter()
+            .position(|story| Self::story_contains_key(story, key, cx))
+        else {
+            return Err(StorybookAutomationError::StoryNotFound {
+                key: key.to_string(),
+            });
+        };
+
+        self.active_index = Some(index);
+        self.automation
+            .as_ref()
+            .expect("automation command requires automation")
+            .confirm_current_story(key)
+    }
+
+    fn attach_automation_host(
+        &self,
+        automation: SharedStorybookAutomation,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(mut receiver) = automation.take_command_receiver() else {
+            return;
+        };
+
+        cx.spawn_in(window, async move |this, cx| {
+            while let Some(command) = receiver.recv().await {
+                let _ = this.update_in(cx, |gallery, window, cx| {
+                    gallery.handle_automation_command(command, window, cx);
+                });
+            }
+        })
+        .detach();
+    }
+
+    fn handle_automation_command(
+        &mut self,
+        command: StorybookAutomationCommand,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        match command {
+            StorybookAutomationCommand::OpenStory { key, response } => {
+                let result = self.set_active_story_by_key(&key, cx);
+                cx.notify();
+                let _ = response.send(result);
+            },
+            StorybookAutomationCommand::CaptureCurrentStory {
+                request_id,
+                request,
+                response,
+            } => {
+                let quit_after_capture = request.quit_after_capture;
+                match self.prepare_capture_current_story(&request, window, cx) {
+                    Ok(story) => {
+                        window.on_next_frame(move |window, _cx| {
+                            let result = render_story_capture(request_id, request, story, window);
+                            let exit_code = capture_exit_code(&result);
+                            let _ = response.send(result);
+                            if quit_after_capture {
+                                std::process::exit(exit_code);
+                            }
+                        });
+                    },
+                    Err(error) => {
+                        eprintln!("gpui-storybook capture session failed: {error}");
+                        let _ = response.send(Err(error));
+                        if quit_after_capture {
+                            std::process::exit(1);
+                        }
+                    },
+                }
+            },
+        }
+    }
+
+    fn prepare_capture_current_story(
+        &mut self,
+        request: &StoryScreenshotRequest,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Result<StorySnapshot, StorybookAutomationError> {
+        let story = self
+            .automation
+            .as_ref()
+            .and_then(|automation| automation.current_story().story)
+            .or_else(|| self.active_story_snapshot(cx))
+            .ok_or_else(|| StorybookAutomationError::CaptureUnavailable {
+                message: "no current story is selected for capture".to_string(),
+            })?;
+
+        apply_capture_target_size(window, validate_capture_target_size(request)?);
+        cx.notify();
+        window.refresh();
+
+        Ok(story)
+    }
+
     pub fn view(
         initial_stories: Vec<Entity<StoryContainer>>,
         init_story_name: Option<&str>,
         window: &mut Window,
         cx: &mut App,
     ) -> Entity<Self> {
-        cx.new(|cx_self| Self::new(initial_stories, init_story_name, window, cx_self))
+        let automation = default_storybook_automation(cx);
+        cx.new(|cx_self| {
+            Self::new(
+                initial_stories,
+                init_story_name,
+                automation,
+                window,
+                cx_self,
+            )
+        })
+    }
+
+    pub fn view_with_automation(
+        initial_stories: Vec<Entity<StoryContainer>>,
+        init_story_name: Option<&str>,
+        automation: SharedStorybookAutomation,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Entity<Self> {
+        cx.new(|cx_self| {
+            Self::new(
+                initial_stories,
+                init_story_name,
+                Some(automation),
+                window,
+                cx_self,
+            )
+        })
     }
 }
 

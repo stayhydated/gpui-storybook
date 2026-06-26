@@ -122,11 +122,17 @@ pub struct StoryContainer {
     pub section: Option<SharedString>,
     pub title_bg: Option<Hsla>,
     pub description: SharedString,
+    pub(crate) list_members: Vec<Entity<StoryContainer>>,
     width: Option<gpui::Pixels>,
     height: Option<gpui::Pixels>,
     tab_panel: Option<gpui::WeakEntity<gpui_component::dock::TabPanel>>,
     story: Option<AnyView>,
     pub story_klass: Option<SharedString>,
+    pub story_key: Option<SharedString>,
+    pub story_name: Option<SharedString>,
+    pub crate_name: Option<SharedString>,
+    pub source_file: Option<SharedString>,
+    pub source_line: Option<u32>,
     closable: bool,
     is_active: bool,
     zoomable: Option<PanelControl>,
@@ -309,11 +315,17 @@ impl StoryContainer {
             section: None,
             title_bg: None,
             description: "".into(),
+            list_members: Vec::new(),
             width: None,
             height: None,
             tab_panel: None,
             story: None,
             story_klass: None,
+            story_key: None,
+            story_name: None,
+            crate_name: None,
+            source_file: None,
+            source_line: None,
             closable: true,
             is_active: false,
             zoomable: Some(PanelControl::default()),
@@ -376,6 +388,7 @@ impl StoryContainer {
         let name = name.into();
         let story_klass = story_list_klass(&stories, cx);
         let description = format!("{} story variants", stories.len());
+        let list_members = stories.clone();
         let list = cx.new(|cx| StoryList::new(stories, cx));
         let focus_handle = list.focus_handle(cx);
 
@@ -386,6 +399,7 @@ impl StoryContainer {
             story.focus_handle = focus_handle;
             story.name = name;
             story.description = description.into();
+            story.list_members = list_members;
             story
         })
     }

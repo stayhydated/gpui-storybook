@@ -33,7 +33,10 @@ fn main() {
             move |window, cx| {
                 // Stories are filtered by examples/story/storybook.toml.
                 let all_stories = gpui_storybook::generate_stories(window, cx);
-                Gallery::view(all_stories, None, window, cx)
+
+                let view = Gallery::view(all_stories, None, window, cx);
+
+                view
             },
             app_cx,
         );
@@ -45,7 +48,9 @@ fn main() {
                 // Stories are filtered by examples/story/storybook.toml.
                 let all_stories = gpui_storybook::generate_stories(window, cx);
 
-                StoryWorkspace::view(all_stories, window, cx)
+                let view = StoryWorkspace::view(all_stories, window, cx);
+
+                view
             },
             app_cx,
         );

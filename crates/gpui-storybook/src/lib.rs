@@ -17,22 +17,32 @@
 //! config's `group` becomes the sidebar's outer group; a story's declared
 //! section remains the nested label.
 //!
+//! Macro-generated stories carry stable [`StoryKey`] values in the form
+//! `{crate-package-name}-{registered-story-name}`. These keys are copied into
+//! generated [`StoryContainer`] values for automation and capture routes.
+//!
 //! Feature boundaries:
 //!
 //! - `macros`: re-exports proc macros from `gpui-storybook-macros`
 //! - `dock`: re-exports the dock workspace helpers from `gpui-storybook-core`
+//! - `mcp`: installs a default automation controller during [`init`] and
+//!   re-exports MCP automation and capture helpers
 
 #[cfg(feature = "macros")]
 pub use gpui_storybook_macros::*;
 
 use gpui_storybook_core::locale::LocaleStore;
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::{BTreeMap, HashMap},
+    fmt,
+    path::PathBuf,
+};
 
 #[cfg(feature = "dock")]
 pub use gpui_storybook_core::dock_gallery::{
     StoryWorkspace, create_dock_window, register_story_panels,
 };
-pub use gpui_storybook_core::registry::{StoryName, StorySectionName};
+pub use gpui_storybook_core::registry::{StoryKey, StoryName, StorySectionName};
 #[cfg(feature = "dock")]
 pub use gpui_storybook_core::window_view::DockWindowView;
 pub use gpui_storybook_core::{
@@ -52,10 +62,64 @@ pub use gpui_storybook_core::registry as __registry;
 #[doc(hidden)]
 pub use inventory as __inventory;
 
+#[cfg(feature = "mcp")]
+pub mod mcp {
+    pub use gpui_storybook_mcp::*;
+}
+
+#[cfg(feature = "mcp")]
+pub mod capture {
+    pub use gpui_storybook_mcp::capture::*;
+}
+
 struct ResolvedStoryEntry {
     entry: &'static __registry::StoryEntry,
     group: Option<String>,
     section: Option<String>,
+}
+
+#[derive(Debug)]
+struct DuplicateStoryKeyError {
+    key: StoryKey,
+    first: StoryRegistrationLocation,
+    second: StoryRegistrationLocation,
+}
+
+#[derive(Clone, Debug)]
+struct StoryRegistrationLocation {
+    crate_name: &'static str,
+    story_name: StoryName,
+    file: &'static str,
+    line: u32,
+}
+
+impl From<&'static __registry::StoryEntry> for StoryRegistrationLocation {
+    fn from(entry: &'static __registry::StoryEntry) -> Self {
+        Self {
+            crate_name: entry.crate_name,
+            story_name: entry.name,
+            file: entry.file,
+            line: entry.line,
+        }
+    }
+}
+
+impl fmt::Display for DuplicateStoryKeyError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "duplicate story key `{}` registered by {}::{} at {}:{} and {}::{} at {}:{}",
+            self.key,
+            self.first.crate_name,
+            self.first.story_name,
+            self.first.file,
+            self.first.line,
+            self.second.crate_name,
+            self.second.story_name,
+            self.second.file,
+            self.second.line,
+        )
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -205,6 +269,8 @@ where
     gpui_storybook_core::story::init(cx);
     #[cfg(feature = "dock")]
     register_story_panels(cx);
+    #[cfg(feature = "mcp")]
+    init_mcp_automation(cx);
 
     let global_init_count = inventory::iter::<__registry::InitEntry>().count();
     if global_init_count > 0 {
@@ -213,6 +279,27 @@ where
             tracing::info!("Init fn: {} ({}:{})", entry.fn_name, entry.file, entry.line);
             (entry.init_fn)(cx);
         }
+    }
+}
+
+#[cfg(feature = "mcp")]
+fn init_mcp_automation(cx: &mut ::gpui::App) {
+    let automation = gpui_storybook_core::automation::default_storybook_automation(cx)
+        .unwrap_or_else(|| {
+            gpui_storybook_core::automation::set_default_storybook_automation(
+                cx,
+                gpui_storybook_mcp::StorybookAutomation::new(),
+            )
+        });
+
+    if gpui_storybook_mcp::stdio_requested()
+        && let Err(error) = gpui_storybook_mcp::start_stdio(automation.clone())
+    {
+        eprintln!("failed to start gpui-storybook MCP stdio server: {error}");
+    }
+
+    if let Err(error) = gpui_storybook_mcp::start_capture_session_from_env(automation) {
+        eprintln!("failed to start storybook capture session: {error}");
     }
 }
 
@@ -245,6 +332,8 @@ pub fn generate_stories(
     );
 
     let all_entries: Vec<_> = inventory::iter::<__registry::StoryEntry>().collect();
+    validate_unique_story_keys(&all_entries)
+        .unwrap_or_else(|error| panic!("invalid storybook registry: {error}"));
     let mut crate_configs: HashMap<&'static str, Option<gpui_storybook_toml::StorybookToml>> =
         HashMap::new();
     let runtime_config = load_runtime_storybook_config(&all_entries, &mut crate_configs);
@@ -321,8 +410,9 @@ pub fn generate_stories(
                 .unwrap_or_default();
 
             tracing::info!(
-                "Story: {}{}{} ({}:{}) [{}]",
+                "Story: {} (key: {}){}{} ({}:{}) [{}]",
                 resolved.entry.name,
+                resolved.entry.key(),
                 section_info,
                 group_info,
                 resolved.entry.file,
@@ -334,12 +424,35 @@ pub fn generate_stories(
             container.update(cx, |c, _| {
                 c.group = resolved.group.clone().map(Into::into);
                 c.section = resolved.section.clone().map(Into::into);
+                c.story_key = Some(resolved.entry.key().as_str().into());
+                c.story_name = Some(resolved.entry.name.as_str().into());
+                c.crate_name = Some(resolved.entry.crate_name.into());
+                c.source_file = Some(resolved.entry.file.into());
+                c.source_line = Some(resolved.entry.line);
             });
             container
         })
         .collect();
 
     group_duplicate_story_titles(stories, window, cx)
+}
+
+fn validate_unique_story_keys(
+    entries: &[&'static __registry::StoryEntry],
+) -> Result<(), DuplicateStoryKeyError> {
+    let mut seen = BTreeMap::new();
+
+    for entry in entries {
+        if let Some(first) = seen.insert(entry.key(), *entry) {
+            return Err(DuplicateStoryKeyError {
+                key: entry.key(),
+                first: StoryRegistrationLocation::from(first),
+                second: StoryRegistrationLocation::from(*entry),
+            });
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -354,6 +467,7 @@ mod tests {
     }
 
     static SECTIONED_ENTRY: __registry::StoryEntry = __registry::StoryEntry::new(
+        "component-example-SectionedStory",
         "SectionedStory",
         Some("Notes"),
         None,
@@ -365,6 +479,7 @@ mod tests {
     );
 
     static UNSECTIONED_ENTRY: __registry::StoryEntry = __registry::StoryEntry::new(
+        "component-example-UnsectionedStory",
         "UnsectionedStory",
         None,
         None,
@@ -413,5 +528,40 @@ mod tests {
             Some("gpui-storybook-example-component")
         );
         assert_eq!(resolved.section.as_deref(), None);
+    }
+
+    #[test]
+    fn duplicate_story_key_validator_reports_both_registrations() {
+        static FIRST_ENTRY: __registry::StoryEntry = __registry::StoryEntry::new(
+            "component-example-ButtonStory",
+            "ButtonStory",
+            None,
+            None,
+            unused_create_fn,
+            "component-example",
+            "/tmp/component-example",
+            "src/first.rs",
+            10,
+        );
+        static SECOND_ENTRY: __registry::StoryEntry = __registry::StoryEntry::new(
+            "component-example-ButtonStory",
+            "ButtonStory",
+            None,
+            None,
+            unused_create_fn,
+            "component-example",
+            "/tmp/component-example",
+            "src/second.rs",
+            20,
+        );
+
+        let error = validate_unique_story_keys(&[&FIRST_ENTRY, &SECOND_ENTRY])
+            .expect_err("duplicate keys should be rejected");
+
+        assert_eq!(error.key.as_str(), "component-example-ButtonStory");
+        assert_eq!(
+            error.to_string(),
+            "duplicate story key `component-example-ButtonStory` registered by component-example::ButtonStory at src/first.rs:10 and component-example::ButtonStory at src/second.rs:20"
+        );
     }
 }

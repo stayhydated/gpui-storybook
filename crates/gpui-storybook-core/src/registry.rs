@@ -1,7 +1,51 @@
 use crate::story::StoryContainer;
 use std::borrow::Borrow;
 
-/// Stable identity for a registered story.
+/// Stable runtime key for a registered story.
+///
+/// Keys are globally scoped to the registering crate and story type using the
+/// format `{crate-name}-{story-name}`. Unlike story titles, keys are not
+/// localized and are suitable for automation and capture routes.
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Eq,
+    Hash,
+    Ord,
+    PartialEq,
+    PartialOrd,
+    derive_more::AsRef,
+    derive_more::Display,
+    derive_more::From,
+)]
+#[as_ref(forward)]
+#[display("{_0}")]
+pub struct StoryKey(&'static str);
+
+impl StoryKey {
+    /// Creates a story key from a static registration label.
+    pub const fn new(value: &'static str) -> Self {
+        Self(value)
+    }
+
+    /// Returns the stable story key.
+    pub const fn as_str(self) -> &'static str {
+        self.0
+    }
+}
+
+impl Borrow<str> for StoryKey {
+    fn borrow(&self) -> &str {
+        self.0
+    }
+}
+
+/// Story-local identity for a registered story.
+///
+/// This remains the struct name used for sorting and `disable_story`
+/// compatibility. Use [`StoryKey`] when an automation or capture workflow needs
+/// a stable global identity.
 #[derive(
     Clone,
     Copy,
@@ -75,6 +119,7 @@ impl Borrow<str> for StorySectionName {
 
 /// Entry type for story registration
 pub struct StoryEntry {
+    pub key: StoryKey,
     pub name: StoryName,
     pub section: Option<StorySectionName>,
     pub section_order: Option<usize>,
@@ -88,6 +133,7 @@ pub struct StoryEntry {
 impl StoryEntry {
     /// Creates a registry entry while keeping macro call sites string-oriented.
     pub const fn new(
+        key: &'static str,
         name: &'static str,
         section: Option<&'static str>,
         section_order: Option<usize>,
@@ -103,6 +149,7 @@ impl StoryEntry {
         };
 
         Self {
+            key: StoryKey::new(key),
             name: StoryName::new(name),
             section,
             section_order,
@@ -112,6 +159,11 @@ impl StoryEntry {
             file,
             line,
         }
+    }
+
+    /// Returns this story's stable machine key.
+    pub const fn key(&self) -> StoryKey {
+        self.key
     }
 }
 
@@ -129,13 +181,23 @@ inventory::collect!(InitEntry);
 
 #[cfg(test)]
 mod tests {
-    use super::{StoryContainer, StoryEntry, StoryName, StorySectionName};
+    use super::{StoryContainer, StoryEntry, StoryKey, StoryName, StorySectionName};
 
     fn unused_create_fn(
         _: &mut ::gpui::Window,
         _: &mut ::gpui::App,
     ) -> ::gpui::Entity<StoryContainer> {
         unreachable!("story creation is not used in this test");
+    }
+
+    #[test]
+    fn story_key_exposes_registered_label() {
+        let key = StoryKey::new("gpui-storybook-example-story-ButtonStory");
+        let key_ref: &str = key.as_ref();
+
+        assert_eq!(key.as_str(), "gpui-storybook-example-story-ButtonStory");
+        assert_eq!(key.to_string(), "gpui-storybook-example-story-ButtonStory");
+        assert_eq!(key_ref, "gpui-storybook-example-story-ButtonStory");
     }
 
     #[test]
@@ -161,6 +223,7 @@ mod tests {
     #[test]
     fn story_entry_new_wraps_names_at_registry_boundary() {
         let entry = StoryEntry::new(
+            "storybook-ButtonStory",
             "ButtonStory",
             Some("Components"),
             Some(1),
@@ -171,6 +234,7 @@ mod tests {
             42,
         );
 
+        assert_eq!(entry.key().as_str(), "storybook-ButtonStory");
         assert_eq!(entry.name.as_str(), "ButtonStory");
         assert_eq!(
             entry.section.map(StorySectionName::as_str),

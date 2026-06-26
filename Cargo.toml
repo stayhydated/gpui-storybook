@@ -5,6 +5,7 @@ members = [
   "crates/gpui-storybook-components",
   "crates/gpui-storybook-core",
   "crates/gpui-storybook-macros",
+  "crates/gpui-storybook-mcp",
   "crates/gpui-storybook-toml",
   "examples/story",
   "examples/component",
@@ -22,13 +23,14 @@ version = "0.5.0"
 
 [workspace.dependencies]
 anyhow = "1.0"
+component-shape-mcp = { path = "../component-shape/crates/component-shape-mcp" }
 darling = "0.23"
 derive_more = "2.1"
 es-fluent = { path = "../es-fluent/crates/es-fluent", version = "0.16" }
 es-fluent-build = { path = "../es-fluent/crates/es-fluent-build", version = "0.16" }
 es-fluent-lang = { path = "../es-fluent/crates/es-fluent-lang", version = "0.16" }
 es-fluent-manager-embedded = { path = "../es-fluent/crates/es-fluent-manager-embedded", version = "0.16" }
-gpui = { git = "https://github.com/zed-industries/zed", rev = "b077f41a9f26ae5ed7fadfea55a501d34afb25de" }
+gpui = { path = "../zed/crates/gpui" }
 gpui-component = { git = "https://github.com/longbridge/gpui-component" }
 gpui-component-assets = { git = "https://github.com/longbridge/gpui-component" }
 gpui-es-fluent = { path = "../gpui-es-fluent/crates/gpui-es-fluent", version = "0.1" }
@@ -36,13 +38,14 @@ gpui-storybook = { path = "crates/gpui-storybook", version = "0.5.0" }
 gpui-storybook-components = { path = "crates/gpui-storybook-components", version = "0.5.0" }
 gpui-storybook-core = { path = "crates/gpui-storybook-core", version = "0.5.0" }
 gpui-storybook-macros = { path = "crates/gpui-storybook-macros", version = "0.5.0" }
+gpui-storybook-mcp = { path = "crates/gpui-storybook-mcp", version = "0.5.0" }
 gpui-storybook-toml = { path = "crates/gpui-storybook-toml", version = "0.5.0" }
 gpui_platform = { features = [
   "font-kit",
   "x11",
   "wayland",
   "runtime_shaders",
-], git = "https://github.com/zed-industries/zed", rev = "b077f41a9f26ae5ed7fadfea55a501d34afb25de" }
+], path = "../zed/crates/gpui_platform" }
 heck = "0.5"
 insta = "1.46"
 inventory = "0.3"
@@ -50,7 +53,7 @@ itertools = "0.14"
 prettyplease = "0.2"
 proc-macro2 = "1.0"
 quote = "1.0"
-reqwest_client = { git = "https://github.com/zed-industries/zed", rev = "b077f41a9f26ae5ed7fadfea55a501d34afb25de" }
+reqwest_client = { path = "../zed/crates/reqwest_client" }
 rust-embed = "8.11"
 serde = "1.0"
 serde_json = "1.0"
@@ -63,9 +66,13 @@ tracing = "0.1"
 tracing-subscriber = "0.3"
 unic-langid = "0.9"
 unicode-segmentation = "1.12"
+wgpu-capture = { path = "../wgpu-capture/crates/wgpu-capture" }
+wgpu-capture-routes = { path = "../wgpu-capture/crates/wgpu-capture-routes" }
 
-[replace]
-"https://github.com/zed-industries/zed#gpui@0.2.2" = { git = "https://github.com/zed-industries/zed", rev = "b077f41a9f26ae5ed7fadfea55a501d34afb25de" }
+[patch."https://github.com/zed-industries/zed"]
+gpui = { path = "../zed/crates/gpui" }
+gpui_platform = { path = "../zed/crates/gpui_platform" }
+reqwest_client = { path = "../zed/crates/reqwest_client" }
 
 [workspace.lints.rust]
 unexpected_cfgs = { level = "deny" }

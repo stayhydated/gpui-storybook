@@ -16,9 +16,16 @@ With the dock workspace:
 cargo run -p gpui-storybook-example-story --features dock
 ```
 
+With MCP automation and capture helpers:
+
+```bash
+cargo run -p gpui-storybook-example-story --features mcp
+GPUI_STORYBOOK_MCP_STDIO=1 cargo run -p gpui-storybook-example-story --features mcp
+```
+
 ## What to inspect
 
-- `src/main.rs`: app startup, embedded i18n module setup, locale initialization, and window creation
+- `src/main.rs`: app startup, embedded i18n module setup, locale initialization, feature-gated MCP automation, and window creation
 - `src/lib.rs`: shared `StorySection` enum for stable ordering
 - `src/stories/*.rs`: explicit story structs and `impl gpui_storybook::Story`
 - `src/stories/grouped_story.rs`: two story structs with the same title, grouped into one sidebar item
@@ -43,6 +50,10 @@ impl gpui_storybook::Story for ButtonStory {
 
 This flow is the right fit when a story is more than "render the component with example data".
 `title` and `description` receive `&App`, so explicit stories can localize metadata with `gpui_storybook::localize_message(cx, ...)`.
+
+The stable automation key for this story is
+`gpui-storybook-example-story-ButtonStory`: the package name plus the registered
+story struct name.
 
 ## Grouped title pattern
 
@@ -78,3 +89,18 @@ group = "gpui-storybook-example-story"
 
 `generate_stories` uses this file because the package name matches the running binary name.
 `allow` is intentionally omitted, so the example includes only its own `group`.
+
+## Capture a story
+
+The `mcp` feature enables live story automation and PNG capture. This example
+wires `StorybookAutomation` into both gallery and dock modes.
+
+```bash
+WGPU_CAPTURE_ROUTE=gpui-storybook-example-story-ButtonStory \
+WGPU_CAPTURE_PATH=target/storybook-captures/button.png \
+cargo run -p gpui-storybook-example-story --features mcp
+```
+
+Add `WGPU_CAPTURE_WIDTH` and `WGPU_CAPTURE_HEIGHT` to request a live window
+resize before capture. The returned capture metadata reports the actual rendered
+pixel size.

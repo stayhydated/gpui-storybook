@@ -15,6 +15,9 @@
 //! attributes `title`, `description`, `section`, and `example`. It generates a
 //! hidden wrapper view and registers the original component type name so
 //! `disable_story = ["ComponentName"]` matches the public type the user wrote.
+//! Macro-generated story entries also include a stable automation key in the
+//! form `{crate-package-name}-{registered-story-name}` and an exported marker
+//! that makes duplicate generated keys in the same package fail to build.
 //!
 //! `#[story_init]` registers a one-time setup function that the facade executes
 //! during `gpui_storybook::init(...)`.
@@ -110,10 +113,22 @@ fn registration_tokens(
     section: Option<&SectionArg>,
 ) -> TokenStream2 {
     let (section_value, section_order) = section_tokens(section);
+    let marker_ident = format_ident!("__gpui_storybook_story_key_marker_{entry_name}");
 
     quote! {
+        #[doc(hidden)]
+        #[used]
+        #[unsafe(export_name = concat!(
+            "__gpui_storybook_story_key__",
+            env!("CARGO_PKG_NAME"),
+            "__",
+            #entry_name,
+        ))]
+        static #marker_ident: u8 = 0;
+
         gpui_storybook::__inventory::submit! {
             ::gpui_storybook::__registry::StoryEntry::new(
+                concat!(::std::env!("CARGO_PKG_NAME"), "-", #entry_name),
                 #entry_name,
                 #section_value,
                 #section_order,

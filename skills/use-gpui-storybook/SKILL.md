@@ -1,6 +1,6 @@
 ---
 name: use-gpui-storybook
-description: "Use when helping application developers adopt GPUI Storybook in an app: setting up a storybook binary, adding stories with #[story] or #[derive(ComponentStory)], configuring storybook.toml group/allow/disable_story behavior, choosing gallery versus dock mode, wiring locale initialization, or troubleshooting missing stories."
+description: "Use when helping application developers adopt GPUI Storybook in an app: setting up a storybook binary, adding stories with #[story] or #[derive(ComponentStory)], configuring storybook.toml group/allow/disable_story behavior, choosing gallery versus dock mode, wiring locale initialization, enabling MCP automation/capture, or troubleshooting missing stories."
 ---
 
 # Use GPUI Storybook
@@ -9,8 +9,8 @@ description: "Use when helping application developers adopt GPUI Storybook in an
 
 Use this public skill for application-level GPUI Storybook integration:
 setting up a storybook binary, adding stories, configuring `storybook.toml`,
-choosing gallery or dock mode, wiring locale initialization, and
-troubleshooting missing stories.
+choosing gallery or dock mode, wiring locale initialization, enabling MCP
+automation/capture, and troubleshooting missing stories.
 
 Do not use this skill for maintaining the GPUI Storybook implementation itself,
 release workflows, repository architecture, or crate internals.
@@ -34,6 +34,8 @@ Start from the user-facing facade. Most application code uses
    data and storybook should generate the wrapper view.
 7. Put `storybook.toml` next to the crate whose stories need a runtime group or
    filter.
+8. Enable the `mcp` feature only when callers need external automation, MCP
+   tools, or PNG capture.
 
 ## Reference Selection
 
@@ -82,6 +84,15 @@ fn main() {
 For the dock workspace, enable the `dock` feature and use
 `create_dock_window` plus `StoryWorkspace::view(...)` instead of
 `create_new_window` plus `Gallery::view(...)`.
+
+For MCP automation or capture, enable the `mcp` feature. No constructor changes
+are required: `gpui_storybook::init(...)` installs the automation controller,
+and `Gallery::view(...)` or `StoryWorkspace::view(...)` attach it
+automatically. Set `GPUI_STORYBOOK_MCP_STDIO=1` to serve MCP over stdio. Set
+`WGPU_CAPTURE_ROUTE` to a story key and `WGPU_CAPTURE_PATH` to capture one
+story during startup.
+`WGPU_CAPTURE_WIDTH` and `WGPU_CAPTURE_HEIGHT` request a live resize; use the
+capture result's pixel dimensions as the source of truth.
 
 Use explicit `#[story]` when the story owns state:
 
@@ -134,6 +145,14 @@ generated wrapper renders `<Component as Default>::default()`.
 `title` and `description` expressions are emitted inside methods that receive
 `cx: &gpui::App`, so they can call `gpui_storybook::localize_message(cx, ...)`.
 
+Story registration also emits a stable automation key:
+
+- Explicit `#[story]`: `{crate-package-name}-{story-struct-name}`.
+- `ComponentStory`: `{crate-package-name}-{component-type-name}`.
+
+For example, `gpui-storybook-example-story-ButtonStory` and
+`gpui-storybook-example-component-WelcomeCard` are valid capture routes.
+
 Use `#[gpui_storybook::story_init]` for one-time setup that must run after
 `gpui_storybook::init(...)` and before stories are shown:
 
@@ -170,6 +189,7 @@ disable_story = ["ExperimentalCardStory"]
 - `allow = []` includes none.
 - `disable_story` matches the registered story type name exactly.
 - For `ComponentStory`, `disable_story` uses the component type name, not the generated wrapper type.
+- `disable_story` does not use the full automation story key.
 - `generate_stories` uses the `storybook.toml` from the registered story crate whose package name matches the running binary.
 
 If stories are unexpectedly missing, inspect runtime logs for discovered story

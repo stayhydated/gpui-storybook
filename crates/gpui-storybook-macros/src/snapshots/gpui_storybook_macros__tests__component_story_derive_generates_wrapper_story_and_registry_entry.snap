@@ -51,9 +51,21 @@ impl ::gpui_storybook::Story for __ButtonChipComponentStoryView {
         Self::view(window, cx)
     }
 }
+#[doc(hidden)]
+#[used]
+#[unsafe(
+    export_name = concat!(
+        "__gpui_storybook_story_key__",
+        env!("CARGO_PKG_NAME"),
+        "__",
+        "ButtonChip",
+    )
+)]
+static __gpui_storybook_story_key_marker_ButtonChip: u8 = 0;
 gpui_storybook::__inventory::submit! {
-    ::gpui_storybook::__registry::StoryEntry::new("ButtonChip", Some("Components"), None,
-    | window, cx | { ::gpui_storybook::StoryContainer::panel:: <
-    __ButtonChipComponentStoryView > (window, cx) }, ::std::env!("CARGO_PKG_NAME"),
-    ::std::env!("CARGO_MANIFEST_DIR"), ::std::file!(), ::std::line!(),)
+    ::gpui_storybook::__registry::StoryEntry::new(concat!(::std::env!("CARGO_PKG_NAME"),
+    "-", "ButtonChip"), "ButtonChip", Some("Components"), None, | window, cx | {
+    ::gpui_storybook::StoryContainer::panel:: < __ButtonChipComponentStoryView > (window,
+    cx) }, ::std::env!("CARGO_PKG_NAME"), ::std::env!("CARGO_MANIFEST_DIR"),
+    ::std::file!(), ::std::line!(),)
 }
