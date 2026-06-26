@@ -13,7 +13,7 @@ readme = "README.md"
 include = [ "src/**/*", "assets/**/*", "i18n.toml" ]
 
 [features]
-capture = [ "dep:gpui_platform", "gpui/test-support", "gpui_platform/test-support" ]
+capture = [ "dep:gpui_platform", "dep:image", "gpui/test-support", "gpui_platform/test-support" ]
 dock = [  ]
 
 [dependencies]
@@ -26,6 +26,7 @@ gpui-component = { features = [ "inspector" ], workspace = true }
 gpui-component-assets = { workspace = true }
 gpui-es-fluent = { workspace = true }
 gpui-storybook-components = { workspace = true }
+image = { optional = true, workspace = true }
 inventory = { workspace = true }
 rust-embed = { features = [ "interpolate-folder-path" ], workspace = true }
 serde = { features = [ "derive" ], workspace = true }

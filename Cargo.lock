@@ -3066,6 +3066,7 @@ dependencies = [
  "gpui-storybook-components",
  "gpui_platform",
  "gtk",
+ "image",
  "inventory",
  "rust-embed",
  "serde",

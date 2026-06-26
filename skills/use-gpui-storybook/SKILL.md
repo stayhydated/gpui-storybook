@@ -90,7 +90,8 @@ are required: `gpui_storybook::init(...)` installs the automation controller,
 and `Gallery::view(...)` or `StoryWorkspace::view(...)` attach it
 automatically. Set `GPUI_STORYBOOK_MCP_STDIO=1` to serve MCP over stdio. Set
 `WGPU_CAPTURE_ROUTE` to a story key and `WGPU_CAPTURE_PATH` to capture one
-story during startup.
+story during startup. Captures are cropped to the story view, excluding the
+sidebar and storybook header or dock chrome.
 `WGPU_CAPTURE_WIDTH` and `WGPU_CAPTURE_HEIGHT` request a live resize; use the
 capture result's pixel dimensions as the source of truth.
 
@@ -152,6 +153,9 @@ Story registration also emits a stable automation key:
 
 For example, `gpui-storybook-example-story-ButtonStory` and
 `gpui-storybook-example-component-WelcomeCard` are valid capture routes.
+Sub-story routes use `story-key/section-slug` for sections registered with
+`gpui_storybook::capture_substory(...)`; for example,
+`gpui-storybook-example-story-ButtonStory/with-progress`.
 
 Use `#[gpui_storybook::story_init]` for one-time setup that must run after
 `gpui_storybook::init(...)` and before stories are shown:

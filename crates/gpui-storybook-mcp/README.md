@@ -62,6 +62,11 @@ Optional environment variables:
 - `WGPU_CAPTURE_HEIGHT`
 - `GPUI_STORYBOOK_MCP_STDIO=1`
 
-Width and height request a live window resize before capture. The capture
-result reports the actual rendered pixel size, which can differ on scaled or
-compositor-managed displays.
+Width and height request a live window resize before capture. Captures are
+cropped to the story view, excluding the sidebar and storybook header or dock
+chrome. The capture result reports the actual rendered pixel size, which can
+differ on scaled or compositor-managed displays.
+
+Sub-story routes use `story-key/section-slug` for sections registered with
+`gpui_storybook::capture_substory(...)`; for example,
+`gpui-storybook-example-story-ButtonStory/with-progress`.

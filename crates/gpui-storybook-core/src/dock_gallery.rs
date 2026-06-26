@@ -2,9 +2,10 @@ use crate::{
     automation::{
         SharedStorybookAutomation, StoryCurrentSnapshot, StoryScreenshotRequest, StorySnapshot,
         StorybookAutomationCommand, StorybookAutomationError, apply_capture_target_size,
-        capture_exit_code, default_storybook_automation, render_story_capture,
-        story_snapshots_from_containers, validate_capture_target_size,
+        default_storybook_automation, schedule_story_capture, story_snapshots_from_containers,
+        validate_capture_target_size,
     },
+    capture_region::capture_route_story_key,
     registry::StoryEntry,
     story::{StoryContainer, StoryState, parse_story_list_klass, reveal_story_panel},
     storybook_window_ui::StorybookWindowUi,
@@ -940,14 +941,14 @@ impl StoryWorkspace {
                 let quit_after_capture = request.quit_after_capture;
                 match self.prepare_capture_current_story(&request, window, cx) {
                     Ok(story) => {
-                        window.on_next_frame(move |window, _cx| {
-                            let result = render_story_capture(request_id, request, story, window);
-                            let exit_code = capture_exit_code(&result);
-                            let _ = response.send(result);
-                            if quit_after_capture {
-                                std::process::exit(exit_code);
-                            }
-                        });
+                        schedule_story_capture(
+                            request_id,
+                            request,
+                            story,
+                            response,
+                            quit_after_capture,
+                            window,
+                        );
                     },
                     Err(error) => {
                         eprintln!("gpui-storybook capture session failed: {error}");
@@ -967,9 +968,10 @@ impl StoryWorkspace {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Result<StoryCurrentSnapshot, StorybookAutomationError> {
+        let story_key = capture_route_story_key(key);
         StorySidebar::open_story_by_key(
             self.dock_area.downgrade(),
-            key,
+            story_key,
             self.automation.clone(),
             window,
             cx,

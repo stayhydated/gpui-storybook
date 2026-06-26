@@ -366,7 +366,7 @@ pub fn capture_catalog(stories: &[StorySnapshot]) -> Value {
     json!({
         "routes": stories.iter().map(|story| {
             json!({
-                "id": story.key,
+                "id": story.capture_route_id,
                 "title": story.title,
                 "default_size": story.default_size,
             })

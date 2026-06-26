@@ -18,6 +18,8 @@
 //! - `automation`: shared controller and command types for live story
 //!   listing, story opening, screenshot capture, and the optional default
 //!   automation global consumed by the base gallery and dock constructors
+//! - `capture_region`: story-view and sub-story capture bounds used by MCP
+//!   screenshot capture
 //! - `storybook_window_ui`: customization hooks for application menu and
 //!   title-bar additions
 //! - `language`, `locale`, and `i18n`: locale abstraction and bridge into
@@ -30,6 +32,7 @@ pub mod actions;
 pub mod app_menus;
 pub mod assets;
 pub mod automation;
+pub mod capture_region;
 #[cfg(feature = "dock")]
 pub mod dock_gallery;
 pub mod gallery;

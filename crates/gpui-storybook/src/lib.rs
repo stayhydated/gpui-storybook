@@ -47,6 +47,7 @@ pub use gpui_storybook_core::registry::{StoryKey, StoryName, StorySectionName};
 pub use gpui_storybook_core::window_view::DockWindowView;
 pub use gpui_storybook_core::{
     assets::Assets,
+    capture_region::{capture_route_slug, capture_substory, capture_substory_route_id},
     gallery::Gallery,
     i18n::change_locale,
     i18n::localize_message,

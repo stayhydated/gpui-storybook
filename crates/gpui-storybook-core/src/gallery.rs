@@ -2,9 +2,10 @@ use crate::{
     automation::{
         SharedStorybookAutomation, StoryCurrentSnapshot, StoryScreenshotRequest, StorySnapshot,
         StorybookAutomationCommand, StorybookAutomationError, apply_capture_target_size,
-        capture_exit_code, default_storybook_automation, render_story_capture,
-        story_snapshots_from_containers, validate_capture_target_size,
+        default_storybook_automation, schedule_story_capture, story_snapshots_from_containers,
+        validate_capture_target_size,
     },
+    capture_region::capture_route_story_key,
     story::StoryContainer,
 };
 use gpui::prelude::{
@@ -181,10 +182,11 @@ impl Gallery {
         key: &str,
         cx: &impl Borrow<App>,
     ) -> Result<StoryCurrentSnapshot, StorybookAutomationError> {
+        let story_key = capture_route_story_key(key);
         let Some(index) = self
             .stories
             .iter()
-            .position(|story| Self::story_contains_key(story, key, cx))
+            .position(|story| Self::story_contains_key(story, story_key, cx))
         else {
             return Err(StorybookAutomationError::StoryNotFound {
                 key: key.to_string(),
@@ -238,14 +240,14 @@ impl Gallery {
                 let quit_after_capture = request.quit_after_capture;
                 match self.prepare_capture_current_story(&request, window, cx) {
                     Ok(story) => {
-                        window.on_next_frame(move |window, _cx| {
-                            let result = render_story_capture(request_id, request, story, window);
-                            let exit_code = capture_exit_code(&result);
-                            let _ = response.send(result);
-                            if quit_after_capture {
-                                std::process::exit(exit_code);
-                            }
-                        });
+                        schedule_story_capture(
+                            request_id,
+                            request,
+                            story,
+                            response,
+                            quit_after_capture,
+                            window,
+                        );
                     },
                     Err(error) => {
                         eprintln!("gpui-storybook capture session failed: {error}");

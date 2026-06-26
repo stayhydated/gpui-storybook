@@ -62,7 +62,8 @@ impl Styled for StorySection {
 
 impl RenderOnce for StorySection {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
-        GroupBox::new()
+        let title = self.title.clone();
+        let group = GroupBox::new()
             .id(self.title.clone())
             .outline()
             .title(
@@ -80,7 +81,9 @@ impl RenderOnce for StorySection {
                     .items_center()
                     .justify_center(),
             )
-            .child(self.base.children(self.children))
+            .child(self.base.children(self.children));
+
+        gpui_storybook::capture_substory(title, group)
     }
 }
 

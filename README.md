@@ -107,8 +107,17 @@ cargo run -p gpui-storybook-example-story --features mcp
 ```
 
 `WGPU_CAPTURE_WIDTH` and `WGPU_CAPTURE_HEIGHT` request a live window resize
-before capture. MCP capture results report the actual rendered pixel size,
-which can differ on scaled or compositor-managed displays.
+before capture. Captures are cropped to the story view, excluding the sidebar
+and storybook header or dock chrome. MCP capture results report the actual
+rendered pixel size, which can differ on scaled or compositor-managed displays.
+
+Sub-story routes use `story-key/section-slug` for story sections registered
+with `gpui_storybook::capture_substory(...)`. The built-in story section helper
+and this repository's explicit-story example do this automatically, so the
+Button story can also be captured with routes such as
+`gpui-storybook-example-story-ButtonStory/normal-button`,
+`gpui-storybook-example-story-ButtonStory/button-with-icon`, and
+`gpui-storybook-example-story-ButtonStory/with-progress`.
 
 ## Choose a registration style
 

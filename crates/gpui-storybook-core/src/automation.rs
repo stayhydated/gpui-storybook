@@ -1,5 +1,10 @@
-use crate::story::StoryContainer;
-use gpui::{App, Global, Window, px};
+use crate::{
+    capture_region::{
+        capture_region_bounds, capture_route_story_key, scroll_capture_region_into_view,
+    },
+    story::StoryContainer,
+};
+use gpui::{App, Bounds, Global, Pixels, Window, point, px};
 use serde::{Deserialize, Serialize};
 use std::{
     borrow::Borrow,
@@ -161,7 +166,7 @@ impl fmt::Display for StorybookAutomationError {
                     "live GPUI storybook host disconnected: {message}"
                 )
             },
-            Self::StoryNotFound { key } => write!(formatter, "story key `{key}` was not found"),
+            Self::StoryNotFound { key } => write!(formatter, "story route `{key}` was not found"),
             Self::CaptureAlreadyPending => {
                 write!(formatter, "a story screenshot request is already pending")
             },
@@ -234,7 +239,7 @@ impl StorybookAutomation {
         let current_exists = state
             .current_story_key
             .as_ref()
-            .is_some_and(|key| stories.iter().any(|story| &story.key == key));
+            .is_some_and(|key| resolve_story_route(&stories, key).is_some());
 
         if !current_exists {
             state.current_story_key = stories.first().map(|story| story.key.clone());
@@ -253,27 +258,21 @@ impl StorybookAutomation {
     }
 
     pub fn get_story(&self, key: &str) -> Result<StorySnapshot, StorybookAutomationError> {
-        self.state
-            .lock()
-            .expect("automation state poisoned")
-            .stories
-            .iter()
-            .find(|story| story.key == key)
-            .cloned()
-            .ok_or_else(|| StorybookAutomationError::StoryNotFound {
+        let state = self.state.lock().expect("automation state poisoned");
+
+        resolve_story_route(&state.stories, key).ok_or_else(|| {
+            StorybookAutomationError::StoryNotFound {
                 key: key.to_string(),
-            })
+            }
+        })
     }
 
     pub fn current_story(&self) -> StoryCurrentSnapshot {
         let state = self.state.lock().expect("automation state poisoned");
-        let story = state.current_story_key.as_ref().and_then(|key| {
-            state
-                .stories
-                .iter()
-                .find(|story| &story.key == key)
-                .cloned()
-        });
+        let story = state
+            .current_story_key
+            .as_ref()
+            .and_then(|key| resolve_story_route(&state.stories, key));
 
         StoryCurrentSnapshot {
             story,
@@ -363,24 +362,97 @@ impl StorybookAutomation {
         key: &str,
     ) -> Result<StoryCurrentSnapshot, StorybookAutomationError> {
         let mut state = self.state.lock().expect("automation state poisoned");
-        if !state.stories.iter().any(|story| story.key == key) {
-            return Err(StorybookAutomationError::StoryNotFound {
+        let story = resolve_story_route(&state.stories, key).ok_or_else(|| {
+            StorybookAutomationError::StoryNotFound {
                 key: key.to_string(),
-            });
-        }
+            }
+        })?;
 
         if state.current_story_key.as_deref() != Some(key) {
             state.current_story_key = Some(key.to_string());
             state.revision = state.revision.saturating_add(1);
         }
 
-        let story = state.stories.iter().find(|story| story.key == key).cloned();
-
         Ok(StoryCurrentSnapshot {
-            story,
+            story: Some(story),
             revision: state.revision,
         })
     }
+}
+
+fn resolve_story_route(stories: &[StorySnapshot], route_id: &str) -> Option<StorySnapshot> {
+    let story_key = capture_route_story_key(route_id);
+    let story = stories
+        .iter()
+        .find(|story| story.key == story_key || story.capture_route_id == story_key)?;
+
+    Some(story_snapshot_for_route(story.clone(), route_id))
+}
+
+fn story_snapshot_for_route(mut story: StorySnapshot, route_id: &str) -> StorySnapshot {
+    if route_id != story.capture_route_id {
+        story.capture_route_id = route_id.to_string();
+        if let Some((_, slug)) = route_id.split_once('/') {
+            story.title = format!("{} / {}", story.title, humanize_capture_slug(slug));
+        }
+    }
+
+    story
+}
+
+fn humanize_capture_slug(slug: &str) -> String {
+    let mut result = String::new();
+    let mut capitalize_next = true;
+
+    for ch in slug.chars() {
+        if ch == '-' || ch == '_' {
+            result.push(' ');
+            capitalize_next = true;
+        } else if capitalize_next {
+            result.push(ch.to_ascii_uppercase());
+            capitalize_next = false;
+        } else {
+            result.push(ch);
+        }
+    }
+
+    result
+}
+
+pub(crate) fn schedule_story_capture(
+    request_id: u64,
+    request: StoryScreenshotRequest,
+    story: StorySnapshot,
+    response: oneshot::Sender<Result<StoryCaptureSnapshot, StorybookAutomationError>>,
+    quit_after_capture: bool,
+    window: &mut Window,
+) {
+    window.on_next_frame(move |window, _cx| {
+        if !scroll_capture_region_into_view(&story.capture_route_id) {
+            let result = Err(StorybookAutomationError::CaptureUnavailable {
+                message: format!(
+                    "capture route `{}` was not rendered by the current story view",
+                    story.capture_route_id
+                ),
+            });
+            let exit_code = capture_exit_code(&result);
+            let _ = response.send(result);
+            if quit_after_capture {
+                std::process::exit(exit_code);
+            }
+            return;
+        }
+
+        window.refresh();
+        window.on_next_frame(move |window, _cx| {
+            let result = render_story_capture(request_id, request, story, window);
+            let exit_code = capture_exit_code(&result);
+            let _ = response.send(result);
+            if quit_after_capture {
+                std::process::exit(exit_code);
+            }
+        });
+    });
 }
 
 pub fn story_snapshots_from_containers(
@@ -419,7 +491,7 @@ pub fn story_snapshots_from_containers(
 pub fn default_capture_output_path(story: &StorySnapshot) -> PathBuf {
     PathBuf::from("target")
         .join("storybook-captures")
-        .join(format!("{}.png", story.key))
+        .join(format!("{}.png", story.capture_route_id))
 }
 
 pub(crate) fn validate_capture_target_size(
@@ -460,6 +532,7 @@ pub(crate) fn render_story_capture(
                 message: format!("failed to render current story to image: {error}"),
             }
         })?;
+        let image = crop_story_capture_image(image, &story, window)?;
         let path = request
             .output_path
             .unwrap_or_else(|| default_capture_output_path(&story));
@@ -499,6 +572,75 @@ pub(crate) fn render_story_capture(
     }
 }
 
+#[cfg(feature = "capture")]
+fn crop_story_capture_image(
+    image: image::RgbaImage,
+    story: &StorySnapshot,
+    window: &Window,
+) -> Result<image::RgbaImage, StorybookAutomationError> {
+    let region = capture_region_bounds(&story.capture_route_id).ok_or_else(|| {
+        StorybookAutomationError::CaptureUnavailable {
+            message: format!(
+                "capture route `{}` was not rendered by the current story view",
+                story.capture_route_id
+            ),
+        }
+    })?;
+    let window_size = window.bounds().size;
+    let window_bounds = Bounds {
+        origin: point(px(0.), px(0.)),
+        size: window_size,
+    };
+    let bounds = region.bounds.intersect(&window_bounds);
+
+    let Some((x, y, width, height)) = image_crop_rect(bounds, window_size, &image) else {
+        return Err(StorybookAutomationError::CaptureUnavailable {
+            message: format!(
+                "capture route `{}` is outside the rendered story view",
+                story.capture_route_id
+            ),
+        });
+    };
+
+    Ok(image::imageops::crop_imm(&image, x, y, width, height).to_image())
+}
+
+#[cfg(feature = "capture")]
+fn image_crop_rect(
+    bounds: Bounds<Pixels>,
+    window_size: gpui::Size<Pixels>,
+    image: &image::RgbaImage,
+) -> Option<(u32, u32, u32, u32)> {
+    let window_width = f32::from(window_size.width);
+    let window_height = f32::from(window_size.height);
+    if window_width <= 0. || window_height <= 0. || image.width() == 0 || image.height() == 0 {
+        return None;
+    }
+
+    let x_scale = image.width() as f32 / window_width;
+    let y_scale = image.height() as f32 / window_height;
+    let left = (f32::from(bounds.origin.x) * x_scale)
+        .floor()
+        .clamp(0., image.width() as f32) as u32;
+    let top = (f32::from(bounds.origin.y) * y_scale)
+        .floor()
+        .clamp(0., image.height() as f32) as u32;
+    let right = ((f32::from(bounds.origin.x) + f32::from(bounds.size.width)) * x_scale)
+        .ceil()
+        .clamp(0., image.width() as f32) as u32;
+    let bottom = ((f32::from(bounds.origin.y) + f32::from(bounds.size.height)) * y_scale)
+        .ceil()
+        .clamp(0., image.height() as f32) as u32;
+
+    let width = right.checked_sub(left)?;
+    let height = bottom.checked_sub(top)?;
+    if width == 0 || height == 0 {
+        return None;
+    }
+
+    Some((left, top, width, height))
+}
+
 pub(crate) fn capture_exit_code(
     result: &Result<StoryCaptureSnapshot, StorybookAutomationError>,
 ) -> i32 {
@@ -507,5 +649,35 @@ pub(crate) fn capture_exit_code(
         1
     } else {
         0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn story_routes_resolve_substory_capture_ids() {
+        let automation = StorybookAutomation::with_stories(vec![StorySnapshot {
+            key: "crate-ButtonStory".to_string(),
+            crate_name: "crate".to_string(),
+            story_name: "ButtonStory".to_string(),
+            title: "Button".to_string(),
+            description: String::new(),
+            group: None,
+            section: None,
+            source_file: "src/button.rs".to_string(),
+            source_line: 7,
+            capture_route_id: "crate-ButtonStory".to_string(),
+            default_size: StoryDefaultSize::default(),
+        }]);
+
+        let story = automation
+            .get_story("crate-ButtonStory/with-progress")
+            .expect("substory route should resolve through its base story");
+
+        assert_eq!(story.key, "crate-ButtonStory");
+        assert_eq!(story.capture_route_id, "crate-ButtonStory/with-progress");
+        assert_eq!(story.title, "Button / With Progress");
     }
 }

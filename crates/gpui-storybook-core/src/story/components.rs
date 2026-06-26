@@ -1,7 +1,8 @@
 use gpui::{
     Action, AnyElement, AnyView, App, AppContext as _, ClickEvent, Div, Entity, EventEmitter,
     Focusable, Hsla, InteractiveElement as _, IntoElement, ParentElement, Render, RenderOnce,
-    SharedString, StyleRefinement, Styled, Window, div, prelude::FluentBuilder as _, rems,
+    ScrollHandle, SharedString, StatefulInteractiveElement as _, StyleRefinement, Styled, Window,
+    div, prelude::FluentBuilder as _, rems,
 };
 
 use serde::{Deserialize, Serialize};
@@ -19,6 +20,10 @@ use gpui_component::{
 };
 
 use super::state::AppState;
+use crate::capture_region::{
+    capture_scroll_scope, capture_story_view, capture_story_view_with_scroll, capture_substory,
+    current_capture_scroll_handle,
+};
 
 pub const STORY_LIST_KLASS_PREFIX: &str = "__gpui_storybook_list__:";
 
@@ -79,7 +84,8 @@ impl Styled for StorySection {
 
 impl RenderOnce for StorySection {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
-        GroupBox::new()
+        let title = self.title.clone();
+        let group = GroupBox::new()
             .id(self.title.clone())
             .outline()
             .title(
@@ -97,7 +103,9 @@ impl RenderOnce for StorySection {
                     .items_center()
                     .justify_center(),
             )
-            .child(self.base.children(self.children))
+            .child(self.base.children(self.children));
+
+        capture_substory(title, group)
     }
 }
 
@@ -123,6 +131,7 @@ pub struct StoryContainer {
     pub title_bg: Option<Hsla>,
     pub description: SharedString,
     pub(crate) list_members: Vec<Entity<StoryContainer>>,
+    scroll_handle: ScrollHandle,
     width: Option<gpui::Pixels>,
     height: Option<gpui::Pixels>,
     tab_panel: Option<gpui::WeakEntity<gpui_component::dock::TabPanel>>,
@@ -217,8 +226,9 @@ impl Render for StoryList {
                         let description = story.display_description(cx);
                         let story_klass = story.story_klass.clone().unwrap_or_default();
                         let story_view = story.story.clone();
+                        let story_key = story.story_key.clone();
 
-                        v_flex()
+                        let item = v_flex()
                             .id(format!("storybook-story-list-item-{index}"))
                             .w_full()
                             .border_1()
@@ -252,7 +262,18 @@ impl Render for StoryList {
                             )
                             .when_some(story_view, |this, story| {
                                 this.child(div().w_full().p_4().child(story))
-                            })
+                            });
+
+                        if let Some(story_key) = story_key {
+                            capture_story_view_with_scroll(
+                                story_key.to_string(),
+                                current_capture_scroll_handle(),
+                                item,
+                            )
+                            .into_any_element()
+                        } else {
+                            item.into_any_element()
+                        }
                     }),
             )
     }
@@ -316,6 +337,7 @@ impl StoryContainer {
             title_bg: None,
             description: "".into(),
             list_members: Vec::new(),
+            scroll_handle: ScrollHandle::new(),
             width: None,
             height: None,
             tab_panel: None,
@@ -602,13 +624,22 @@ impl Focusable for StoryContainer {
 }
 impl Render for StoryContainer {
     fn render(&mut self, _: &mut Window, _cx: &mut gpui::Context<Self>) -> impl IntoElement {
-        div()
+        let scroll_handle = self.scroll_handle.clone();
+        let story_key = self.story_key.clone();
+        let content = div()
             .id("story-container")
             .size_full()
+            .track_scroll(&scroll_handle)
             .overflow_y_scrollbar()
             .track_focus(&self.focus_handle)
             .when_some(self.story.clone(), |this, story| {
                 this.child(div().size_full().p_4().child(story))
-            })
+            });
+
+        if let Some(story_key) = story_key {
+            capture_story_view(story_key.to_string(), scroll_handle, content).into_any_element()
+        } else {
+            capture_scroll_scope(scroll_handle, content).into_any_element()
+        }
     }
 }

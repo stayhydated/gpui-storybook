@@ -47,6 +47,7 @@ gpui_platform = { features = [
   "runtime_shaders",
 ], path = "../zed/crates/gpui_platform" }
 heck = "0.5"
+image = { default-features = false, features = [ "png" ], version = "0.25" }
 insta = "1.46"
 inventory = "0.3"
 itertools = "0.14"
