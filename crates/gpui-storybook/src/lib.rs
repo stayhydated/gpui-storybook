@@ -21,7 +21,8 @@
 //!
 //! Macro-generated stories carry stable [`StoryKey`] values in the form
 //! `{crate-package-name}-{registered-story-name}`. These keys are copied into
-//! generated [`StoryContainer`] values for automation and capture routes.
+//! generated [`StoryContainer`] values as typed [`RegisteredStoryMetadata`] for
+//! automation and capture routes.
 //!
 //! Feature boundaries:
 //!
@@ -44,7 +45,9 @@ use std::{
 pub use gpui_storybook_core::dock_gallery::{
     StoryWorkspace, create_dock_window, register_story_panels,
 };
-pub use gpui_storybook_core::registry::{StoryKey, StoryName, StorySectionName};
+pub use gpui_storybook_core::registry::{
+    RegisteredStoryMetadata, StoryKey, StoryName, StorySectionName,
+};
 #[cfg(feature = "dock")]
 pub use gpui_storybook_core::window_view::DockWindowView;
 pub use gpui_storybook_core::{
@@ -433,11 +436,7 @@ pub fn generate_stories(
             container.update(cx, |c, _| {
                 c.group = resolved.group.clone().map(Into::into);
                 c.section = resolved.section.clone().map(Into::into);
-                c.story_key = Some(resolved.entry.key().as_str().into());
-                c.story_name = Some(resolved.entry.name.as_str().into());
-                c.crate_name = Some(resolved.entry.crate_name.into());
-                c.source_file = Some(resolved.entry.file.into());
-                c.source_line = Some(resolved.entry.line);
+                c.set_registration_metadata(resolved.entry.metadata());
             });
             container
         })

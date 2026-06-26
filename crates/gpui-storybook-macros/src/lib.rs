@@ -156,8 +156,14 @@ fn registration_tokens(
 }
 
 fn story_impl(args: TokenStream2, input: TokenStream2) -> TokenStream2 {
-    let args: StoryArgs = syn::parse2(args).expect("failed to parse story macro arguments");
-    let input_struct: ItemStruct = syn::parse2(input).expect("story macro expects a struct");
+    let args: StoryArgs = match syn::parse2(args) {
+        Ok(args) => args,
+        Err(err) => return err.to_compile_error(),
+    };
+    let input_struct: ItemStruct = match syn::parse2(input) {
+        Ok(input_struct) => input_struct,
+        Err(err) => return err.to_compile_error(),
+    };
     let struct_name = &input_struct.ident;
     let struct_name_str = struct_name.to_string();
     let registration = registration_tokens(
@@ -279,7 +285,10 @@ fn parse_substory_variant_args(attrs: &[syn::Attribute]) -> syn::Result<Substory
 }
 
 fn substory_impl(input: TokenStream2) -> TokenStream2 {
-    let input: DeriveInput = syn::parse2(input).expect("Substory derive expects a type");
+    let input: DeriveInput = match syn::parse2(input) {
+        Ok(input) => input,
+        Err(err) => return err.to_compile_error(),
+    };
 
     let data = match &input.data {
         Data::Enum(data) => data,
@@ -344,7 +353,10 @@ fn substory_impl(input: TokenStream2) -> TokenStream2 {
 }
 
 fn component_story_impl(input: TokenStream2) -> TokenStream2 {
-    let input: DeriveInput = syn::parse2(input).expect("ComponentStory derive expects a type");
+    let input: DeriveInput = match syn::parse2(input) {
+        Ok(input) => input,
+        Err(err) => return err.to_compile_error(),
+    };
 
     if !matches!(input.data, Data::Struct(_)) {
         return syn::Error::new_spanned(
@@ -463,7 +475,10 @@ pub fn story(args: TokenStream, input: TokenStream) -> TokenStream {
 }
 
 fn story_init_impl(_args: TokenStream2, input: TokenStream2) -> TokenStream2 {
-    let input_fn: ItemFn = syn::parse2(input).expect("story_init macro expects a function");
+    let input_fn: ItemFn = match syn::parse2(input) {
+        Ok(input_fn) => input_fn,
+        Err(err) => return err.to_compile_error(),
+    };
     let fn_name = &input_fn.sig.ident;
     let fn_name_str = fn_name.to_string();
 
@@ -655,6 +670,46 @@ mod tests {
         let expanded = story_init_impl(TokenStream2::new(), input);
         assert_snapshot!(
             "story_init_attribute_generates_registry_entry",
+            snapshot_tokens(expanded)
+        );
+    }
+
+    #[test]
+    fn story_attribute_on_non_struct_reports_compile_error() {
+        let input = quote! {
+            pub fn button_story() {}
+        };
+
+        let expanded = story_impl(TokenStream2::new(), input);
+        assert_snapshot!(
+            "story_attribute_on_non_struct_reports_compile_error",
+            snapshot_tokens(expanded)
+        );
+    }
+
+    #[test]
+    fn component_story_duplicate_metadata_reports_compile_error() {
+        let input = quote! {
+            #[storybook(title = "Button", title = "Button Again")]
+            pub struct ButtonChip;
+        };
+
+        let expanded = component_story_impl(input);
+        assert_snapshot!(
+            "component_story_duplicate_metadata_reports_compile_error",
+            snapshot_tokens(expanded)
+        );
+    }
+
+    #[test]
+    fn story_init_attribute_on_non_function_reports_compile_error() {
+        let input = quote! {
+            pub struct Setup;
+        };
+
+        let expanded = story_init_impl(TokenStream2::new(), input);
+        assert_snapshot!(
+            "story_init_attribute_on_non_function_reports_compile_error",
             snapshot_tokens(expanded)
         );
     }

@@ -20,9 +20,12 @@ use gpui_component::{
 };
 
 use super::state::AppState;
-use crate::capture_region::{
-    capture_scroll_scope, capture_story_view, capture_story_view_with_scroll, capture_substory,
-    capture_substory_with_key, current_capture_scroll_handle,
+use crate::{
+    capture_region::{
+        capture_scroll_scope, capture_story_view, capture_story_view_with_scroll, capture_substory,
+        capture_substory_with_key, current_capture_scroll_handle,
+    },
+    registry::{RegisteredStoryMetadata, StoryKey, StoryName},
 };
 
 pub const STORY_LIST_KLASS_PREFIX: &str = "__gpui_storybook_list__:";
@@ -216,6 +219,7 @@ pub struct StoryContainer {
     tab_panel: Option<gpui::WeakEntity<gpui_component::dock::TabPanel>>,
     story: Option<AnyView>,
     pub story_klass: Option<SharedString>,
+    registration_metadata: Option<RegisteredStoryMetadata>,
     pub story_key: Option<SharedString>,
     pub story_name: Option<SharedString>,
     pub crate_name: Option<SharedString>,
@@ -305,7 +309,7 @@ impl Render for StoryList {
                         let description = story.display_description(cx);
                         let story_klass = story.story_klass.clone().unwrap_or_default();
                         let story_view = story.story.clone();
-                        let story_key = story.story_key.clone();
+                        let story_key = story.story_key_label().map(str::to_owned);
 
                         let item = v_flex()
                             .id(format!("storybook-story-list-item-{index}"))
@@ -345,7 +349,7 @@ impl Render for StoryList {
 
                         if let Some(story_key) = story_key {
                             capture_story_view_with_scroll(
-                                story_key.to_string(),
+                                story_key,
                                 current_capture_scroll_handle(),
                                 item,
                             )
@@ -422,6 +426,7 @@ impl StoryContainer {
             tab_panel: None,
             story: None,
             story_klass: None,
+            registration_metadata: None,
             story_key: None,
             story_name: None,
             crate_name: None,
@@ -524,6 +529,83 @@ impl StoryContainer {
     pub fn on_active(mut self, on_active: fn(AnyView, bool, &mut Window, &mut App)) -> Self {
         self.on_active = Some(on_active);
         self
+    }
+
+    /// Store typed registry metadata on this runtime container.
+    ///
+    /// This also keeps the legacy string metadata fields populated for callers
+    /// that still read them directly.
+    pub fn set_registration_metadata(&mut self, metadata: RegisteredStoryMetadata) {
+        self.story_key = Some(metadata.key().as_str().into());
+        self.story_name = Some(metadata.name().as_str().into());
+        self.crate_name = Some(metadata.crate_name().into());
+        self.source_file = Some(metadata.source_file().into());
+        self.source_line = Some(metadata.source_line());
+        self.registration_metadata = Some(metadata);
+    }
+
+    /// Returns the typed metadata copied from the inventory registry.
+    pub fn registration_metadata(&self) -> Option<RegisteredStoryMetadata> {
+        self.registration_metadata
+    }
+
+    /// Returns this story's typed stable key when it came from the registry.
+    pub fn story_key(&self) -> Option<StoryKey> {
+        self.registration_metadata.map(RegisteredStoryMetadata::key)
+    }
+
+    /// Returns this story's typed registered name when it came from the
+    /// registry.
+    pub fn story_name(&self) -> Option<StoryName> {
+        self.registration_metadata
+            .map(RegisteredStoryMetadata::name)
+    }
+
+    /// Returns this story's stable key as a string label.
+    pub fn story_key_label(&self) -> Option<&str> {
+        self.registration_metadata
+            .map(|metadata| metadata.key().as_str())
+            .or_else(|| self.story_key.as_ref().map(|story_key| story_key.as_ref()))
+    }
+
+    /// Returns this story's registered name as a string label.
+    pub fn story_name_label(&self) -> Option<&str> {
+        self.registration_metadata
+            .map(|metadata| metadata.name().as_str())
+            .or_else(|| {
+                self.story_name
+                    .as_ref()
+                    .map(|story_name| story_name.as_ref())
+            })
+    }
+
+    /// Returns the crate package name that registered this story.
+    pub fn crate_name_label(&self) -> Option<&str> {
+        self.registration_metadata
+            .map(RegisteredStoryMetadata::crate_name)
+            .or_else(|| {
+                self.crate_name
+                    .as_ref()
+                    .map(|crate_name| crate_name.as_ref())
+            })
+    }
+
+    /// Returns the source file recorded for this story.
+    pub fn source_file_label(&self) -> Option<&str> {
+        self.registration_metadata
+            .map(RegisteredStoryMetadata::source_file)
+            .or_else(|| {
+                self.source_file
+                    .as_ref()
+                    .map(|source_file| source_file.as_ref())
+            })
+    }
+
+    /// Returns the source line recorded for this story.
+    pub fn source_line(&self) -> Option<u32> {
+        self.registration_metadata
+            .map(RegisteredStoryMetadata::source_line)
+            .or(self.source_line)
     }
 
     pub fn display_title(&self, cx: &impl Borrow<App>) -> String {
@@ -704,7 +786,7 @@ impl Focusable for StoryContainer {
 impl Render for StoryContainer {
     fn render(&mut self, _: &mut Window, _cx: &mut gpui::Context<Self>) -> impl IntoElement {
         let scroll_handle = self.scroll_handle.clone();
-        let story_key = self.story_key.clone();
+        let story_key = self.story_key_label().map(str::to_owned);
         let content = div()
             .id("story-container")
             .size_full()

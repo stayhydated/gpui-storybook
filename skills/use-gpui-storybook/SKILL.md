@@ -151,6 +151,10 @@ Story registration also emits a stable automation key:
 - Explicit `#[story]`: `{crate-package-name}-{story-struct-name}`.
 - `ComponentStory`: `{crate-package-name}-{component-type-name}`.
 
+When code needs the registered identity from generated `StoryContainer` values,
+prefer `registration_metadata()`, `story_key()`, or `story_name()` over manual
+string field coordination.
+
 For example, `gpui-storybook-example-story-ButtonStory` and
 `gpui-storybook-example-component-WelcomeCard` are valid capture routes.
 Sub-story routes use `story-key/substory-key`. Plain string sections use

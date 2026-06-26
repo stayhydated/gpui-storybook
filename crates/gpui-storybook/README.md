@@ -238,6 +238,10 @@ the story struct name. `ComponentStory` entries use the component type name.
 Duplicate macro-generated keys fail to build, and `generate_stories` rejects
 duplicate keys from manual registry entries.
 
+Generated containers keep that identity as typed `RegisteredStoryMetadata`.
+Use `StoryContainer::registration_metadata()` or the `story_key()` /
+`story_name()` accessors when integrations need the registered story identity.
+
 For capture-addressable sections inside a story, derive `Substory` on a
 fieldless enum and pass variants to `gpui_storybook::section(...)`. The default
 capture key is the variant name in kebab case; `#[substory(title = "...")]`

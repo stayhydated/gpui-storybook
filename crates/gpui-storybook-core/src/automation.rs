@@ -180,32 +180,28 @@ impl std::error::Error for StorybookAutomationError {}
 
 impl StorySnapshot {
     pub fn from_container(story: &StoryContainer, cx: &impl Borrow<App>) -> Option<Self> {
-        let key = story.story_key.as_ref()?.to_string();
+        let key = story.story_key_label()?.to_string();
         let story_name = story
-            .story_name
-            .as_ref()
-            .or(story.story_klass.as_ref())?
+            .story_name_label()
+            .or_else(|| {
+                story
+                    .story_klass
+                    .as_ref()
+                    .map(|story_klass| story_klass.as_ref())
+            })?
             .to_string();
 
         Some(Self {
             capture_route_id: key.clone(),
             key,
-            crate_name: story
-                .crate_name
-                .as_ref()
-                .map(ToString::to_string)
-                .unwrap_or_default(),
+            crate_name: story.crate_name_label().unwrap_or_default().to_string(),
             story_name,
             title: story.display_title(cx),
             description: story.display_description(cx),
             group: story.group.as_ref().map(ToString::to_string),
             section: story.section.as_ref().map(ToString::to_string),
-            source_file: story
-                .source_file
-                .as_ref()
-                .map(ToString::to_string)
-                .unwrap_or_default(),
-            source_line: story.source_line.unwrap_or_default(),
+            source_file: story.source_file_label().unwrap_or_default().to_string(),
+            source_line: story.source_line().unwrap_or_default(),
             default_size: StoryDefaultSize::default(),
         })
     }

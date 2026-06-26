@@ -12,6 +12,7 @@ This crate is for applications that need runtime-level control over the window s
 - `Gallery` for the searchable sidebar and active-story layout
 - `StorybookAutomation` for live story listing, story opening, and capture coordination
 - `StoryContainer`, `Story`, and section helpers with stable sub-story capture keys
+- typed registration metadata on `StoryContainer` for automation keys, registered names, and source locations
 - `create_new_window` and `create_new_window_with_ui` for the standard storybook shell
 - `StorybookWindowUi` for custom app-menu and title-bar additions
 - `StoryWorkspace` and `create_dock_window` behind the `dock` feature

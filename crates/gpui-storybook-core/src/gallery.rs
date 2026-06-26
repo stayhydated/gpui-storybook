@@ -164,8 +164,7 @@ impl Gallery {
             let story = story.read(cx.borrow());
             (
                 story
-                    .story_key
-                    .as_ref()
+                    .story_key_label()
                     .is_some_and(|story_key| story_key == key),
                 story.list_members.clone(),
             )

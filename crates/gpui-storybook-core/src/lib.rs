@@ -27,7 +27,8 @@
 //!   `es-fluent`, `gpui-es-fluent`, and `gpui-component`
 //! - `assets`: embedded Storybook assets plus delegated component assets
 //! - `registry`: typed `inventory` entry definitions shared with the facade
-//!   and macro crates
+//!   and macro crates, plus registration metadata copied into runtime story
+//!   containers
 
 pub mod actions;
 pub mod app_menus;

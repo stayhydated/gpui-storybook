@@ -117,6 +117,73 @@ impl Borrow<str> for StorySectionName {
     }
 }
 
+/// Typed registration metadata copied from the inventory registry into runtime
+/// story containers.
+///
+/// This keeps story identity, declared section, and source location together so
+/// automation, capture, and integrations do not need to coordinate separate
+/// string fields by hand.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct RegisteredStoryMetadata {
+    key: StoryKey,
+    name: StoryName,
+    section: Option<StorySectionName>,
+    crate_name: &'static str,
+    source_file: &'static str,
+    source_line: u32,
+}
+
+impl RegisteredStoryMetadata {
+    /// Creates registration metadata from typed registry values.
+    pub const fn new(
+        key: StoryKey,
+        name: StoryName,
+        section: Option<StorySectionName>,
+        crate_name: &'static str,
+        source_file: &'static str,
+        source_line: u32,
+    ) -> Self {
+        Self {
+            key,
+            name,
+            section,
+            crate_name,
+            source_file,
+            source_line,
+        }
+    }
+
+    /// Returns this story's stable machine key.
+    pub const fn key(self) -> StoryKey {
+        self.key
+    }
+
+    /// Returns the registered story type name.
+    pub const fn name(self) -> StoryName {
+        self.name
+    }
+
+    /// Returns the declared registration section, if any.
+    pub const fn section(self) -> Option<StorySectionName> {
+        self.section
+    }
+
+    /// Returns the crate package name that registered the story.
+    pub const fn crate_name(self) -> &'static str {
+        self.crate_name
+    }
+
+    /// Returns the source file recorded by the registration macro.
+    pub const fn source_file(self) -> &'static str {
+        self.source_file
+    }
+
+    /// Returns the source line recorded by the registration macro.
+    pub const fn source_line(self) -> u32 {
+        self.source_line
+    }
+}
+
 /// Entry type for story registration
 pub struct StoryEntry {
     pub key: StoryKey,
@@ -165,6 +232,25 @@ impl StoryEntry {
     pub const fn key(&self) -> StoryKey {
         self.key
     }
+
+    /// Returns the typed metadata that should be copied into runtime
+    /// [`StoryContainer`] values.
+    pub const fn metadata(&self) -> RegisteredStoryMetadata {
+        RegisteredStoryMetadata::new(
+            self.key,
+            self.name,
+            self.section,
+            self.crate_name,
+            self.file,
+            self.line,
+        )
+    }
+}
+
+impl From<&StoryEntry> for RegisteredStoryMetadata {
+    fn from(entry: &StoryEntry) -> Self {
+        entry.metadata()
+    }
 }
 
 inventory::collect!(StoryEntry);
@@ -181,7 +267,9 @@ inventory::collect!(InitEntry);
 
 #[cfg(test)]
 mod tests {
-    use super::{StoryContainer, StoryEntry, StoryKey, StoryName, StorySectionName};
+    use super::{
+        RegisteredStoryMetadata, StoryContainer, StoryEntry, StoryKey, StoryName, StorySectionName,
+    };
 
     fn unused_create_fn(
         _: &mut ::gpui::Window,
@@ -241,5 +329,32 @@ mod tests {
             Some("Components")
         );
         assert_eq!(entry.section_order, Some(1));
+    }
+
+    #[test]
+    fn story_entry_metadata_keeps_registration_fields_together() {
+        let entry = StoryEntry::new(
+            "storybook-ButtonStory",
+            "ButtonStory",
+            Some("Components"),
+            Some(1),
+            unused_create_fn,
+            "storybook",
+            "/tmp/storybook",
+            "src/lib.rs",
+            42,
+        );
+
+        let metadata = RegisteredStoryMetadata::from(&entry);
+
+        assert_eq!(metadata.key(), StoryKey::new("storybook-ButtonStory"));
+        assert_eq!(metadata.name(), StoryName::new("ButtonStory"));
+        assert_eq!(
+            metadata.section(),
+            Some(StorySectionName::new("Components"))
+        );
+        assert_eq!(metadata.crate_name(), "storybook");
+        assert_eq!(metadata.source_file(), "src/lib.rs");
+        assert_eq!(metadata.source_line(), 42);
     }
 }

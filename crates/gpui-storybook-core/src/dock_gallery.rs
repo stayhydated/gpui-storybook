@@ -210,7 +210,7 @@ impl StorySidebar {
         let Some(dock_area) = dock_area.upgrade() else {
             return;
         };
-        let story_key = story.read(cx).story_key.clone();
+        let story_key = story.read(cx).story_key_label().map(str::to_owned);
 
         if reveal_story_panel(&story, window, cx) {
             if let Some(automation) = automation
@@ -257,7 +257,7 @@ impl StorySidebar {
         if let Ok(mut registries) = STORY_PANELS.lock() {
             let registry = registries.entry(dock_area.entity_id()).or_default();
             registry.insert(story_klass.to_string(), story.downgrade());
-            if let Some(story_key) = story.read(cx).story_key.clone() {
+            if let Some(story_key) = story.read(cx).story_key_label() {
                 registry.insert(story_key.to_string(), story.downgrade());
             }
         }
@@ -286,7 +286,7 @@ impl StorySidebar {
 
                 Some(StorySeed {
                     name: story_data.display_title(cx),
-                    story_key: story_data.story_key.as_ref().map(ToString::to_string),
+                    story_key: story_data.story_key_label().map(str::to_owned),
                     story_klass,
                     group: story_data.group.as_ref().map(ToString::to_string),
                     section: story_data.section.as_ref().map(ToString::to_string),
@@ -388,11 +388,7 @@ impl StorySidebar {
         panel.update(cx, |c, _| {
             c.group = group.map(Into::into);
             c.section = section.map(Into::into);
-            c.story_key = Some(entry.key().as_str().into());
-            c.story_name = Some(entry.name.as_str().into());
-            c.crate_name = Some(entry.crate_name.into());
-            c.source_file = Some(entry.file.into());
-            c.source_line = Some(entry.line);
+            c.set_registration_metadata(entry.metadata());
         });
         Self::register_story(dock_area, &panel, cx);
         Some(panel)
@@ -437,11 +433,7 @@ impl StorySidebar {
         panel.update(cx, |c, _| {
             c.group = group.map(Into::into);
             c.section = section.map(Into::into);
-            c.story_key = Some(entry.key().as_str().into());
-            c.story_name = Some(entry.name.as_str().into());
-            c.crate_name = Some(entry.crate_name.into());
-            c.source_file = Some(entry.file.into());
-            c.source_line = Some(entry.line);
+            c.set_registration_metadata(entry.metadata());
         });
         Self::register_story(dock_area, &panel, cx);
         Some(panel)
