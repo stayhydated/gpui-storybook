@@ -11,7 +11,8 @@
 //! Important module boundaries:
 //!
 //! - `story`: the [`story::Story`] contract, [`story::StoryContainer`],
-//!   section helpers, runtime startup, and standard window helpers
+//!   section helpers with stable sub-story capture metadata, runtime startup,
+//!   and standard window helpers
 //! - `gallery`: searchable sidebar plus active-story display
 //! - `dock_gallery`: feature-gated dock workspace, sidebar panel, story panel
 //!   registry, and layout persistence

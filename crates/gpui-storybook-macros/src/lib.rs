@@ -19,15 +19,20 @@
 //! form `{crate-package-name}-{registered-story-name}` and an exported marker
 //! that makes duplicate generated keys in the same package fail to build.
 //!
+//! `#[derive(Substory)]` supports fieldless enums used with
+//! `gpui_storybook::section(...)`. It generates stable capture keys from enum
+//! variant names while keeping visible titles configurable with
+//! `#[substory(title = "...")]`.
+//!
 //! `#[story_init]` registers a one-time setup function that the facade executes
 //! during `gpui_storybook::init(...)`.
 
-use heck::ToTitleCase as _;
+use heck::{ToKebabCase as _, ToTitleCase as _};
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{format_ident, quote};
 use syn::{
-    Data, DeriveInput, Expr, ExprLit, ExprPath, ItemFn, ItemStruct, Lit, LitStr, Token,
+    Data, DeriveInput, Expr, ExprLit, ExprPath, Fields, ItemFn, ItemStruct, Lit, LitStr, Token,
     meta::ParseNestedMeta, parse::Parse, parse::ParseStream,
 };
 
@@ -46,6 +51,12 @@ struct ComponentStoryArgs {
     description: Option<Expr>,
     section: Option<SectionArg>,
     example: Option<Expr>,
+}
+
+#[derive(Default)]
+struct SubstoryVariantArgs {
+    title: Option<LitStr>,
+    key: Option<LitStr>,
 }
 
 impl Parse for StoryArgs {
@@ -217,6 +228,121 @@ fn default_component_title(struct_name: &str) -> String {
     struct_name.trim_end_matches("Story").to_title_case()
 }
 
+fn validate_substory_key(key: &LitStr) -> syn::Result<()> {
+    let value = key.value();
+    let is_valid = !value.is_empty()
+        && value
+            .chars()
+            .all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '-');
+
+    if is_valid {
+        Ok(())
+    } else {
+        Err(syn::Error::new_spanned(
+            key,
+            "substory key must use lowercase ASCII letters, numbers, or `-`",
+        ))
+    }
+}
+
+fn parse_substory_variant_args(attrs: &[syn::Attribute]) -> syn::Result<SubstoryVariantArgs> {
+    let mut args = SubstoryVariantArgs::default();
+
+    for attr in attrs {
+        if !attr.path().is_ident("substory") {
+            continue;
+        }
+
+        attr.parse_nested_meta(|meta| {
+            if meta.path.is_ident("title") {
+                let title: LitStr = meta.value()?.parse()?;
+                if args.title.replace(title).is_some() {
+                    return Err(duplicate_attr_error(&meta, "title"));
+                }
+                return Ok(());
+            }
+
+            if meta.path.is_ident("key") {
+                let key: LitStr = meta.value()?.parse()?;
+                validate_substory_key(&key)?;
+                if args.key.replace(key).is_some() {
+                    return Err(duplicate_attr_error(&meta, "key"));
+                }
+                return Ok(());
+            }
+
+            Err(meta.error("unsupported #[substory(...)] argument; expected `title` or `key`"))
+        })?;
+    }
+
+    Ok(args)
+}
+
+fn substory_impl(input: TokenStream2) -> TokenStream2 {
+    let input: DeriveInput = syn::parse2(input).expect("Substory derive expects a type");
+
+    let data = match &input.data {
+        Data::Enum(data) => data,
+        _ => {
+            return syn::Error::new_spanned(input.ident, "Substory can only be derived for enums")
+                .to_compile_error();
+        },
+    };
+
+    if !input.generics.params.is_empty() {
+        return syn::Error::new_spanned(
+            input.generics,
+            "Substory does not support generic enums yet",
+        )
+        .to_compile_error();
+    }
+
+    let enum_name = &input.ident;
+    let mut key_arms = Vec::new();
+    let mut title_arms = Vec::new();
+
+    for variant in &data.variants {
+        if !matches!(variant.fields, Fields::Unit) {
+            return syn::Error::new_spanned(&variant.fields, "Substory variants must be fieldless")
+                .to_compile_error();
+        }
+
+        let args = match parse_substory_variant_args(&variant.attrs) {
+            Ok(args) => args,
+            Err(err) => return err.to_compile_error(),
+        };
+
+        let variant_ident = &variant.ident;
+        let default_key = variant_ident.to_string().to_kebab_case();
+        let key = args.key.map_or(default_key, |key| key.value());
+        let default_title = variant_ident.to_string().to_title_case();
+        let title = args.title.map_or(default_title, |title| title.value());
+
+        key_arms.push(quote! {
+            Self::#variant_ident => #key,
+        });
+        title_arms.push(quote! {
+            Self::#variant_ident => #title.into(),
+        });
+    }
+
+    quote! {
+        impl ::gpui_storybook::Substory for #enum_name {
+            fn capture_key(&self) -> &'static str {
+                match self {
+                    #(#key_arms)*
+                }
+            }
+
+            fn title(&self) -> ::gpui::SharedString {
+                match self {
+                    #(#title_arms)*
+                }
+            }
+        }
+    }
+}
+
 fn component_story_impl(input: TokenStream2) -> TokenStream2 {
     let input: DeriveInput = syn::parse2(input).expect("ComponentStory derive expects a type");
 
@@ -379,6 +505,30 @@ pub fn component_story(input: TokenStream) -> TokenStream {
     component_story_impl(input.into()).into()
 }
 
+/// Derive stable capture metadata for sub-story sections.
+///
+/// Variants become capture-addressable section descriptors that can be passed
+/// to `gpui_storybook::section(...)`. By default, the route key is the variant
+/// name in kebab case and the visible title is title case. Use
+/// `#[substory(title = "...")]` to change the visible title without changing
+/// the route key. Use `#[substory(key = "...")]` before renaming a variant when
+/// an existing route must remain stable.
+///
+/// ```ignore
+/// #[derive(gpui_storybook::Substory)]
+/// enum ButtonSubstory {
+///     NormalButton,
+///     #[substory(title = "Button with Icon")]
+///     ButtonWithIcon,
+///     #[substory(key = "progress", title = "With Progress")]
+///     WithProgress,
+/// }
+/// ```
+#[proc_macro_derive(Substory, attributes(substory))]
+pub fn substory(input: TokenStream) -> TokenStream {
+    substory_impl(input.into()).into()
+}
+
 /// Attribute macro to register an init function
 #[proc_macro_attribute]
 pub fn story_init(_args: TokenStream, input: TokenStream) -> TokenStream {
@@ -473,6 +623,25 @@ mod tests {
         let expanded = component_story_impl(input);
         assert_snapshot!(
             "component_story_derive_with_string_expressions_generates_wrapper_story_and_registry_entry",
+            snapshot_tokens(expanded)
+        );
+    }
+
+    #[test]
+    fn substory_derive_generates_stable_keys_and_titles() {
+        let input = quote! {
+            pub enum ButtonSubstory {
+                NormalButton,
+                #[substory(title = "Button with Icon")]
+                ButtonWithIcon,
+                #[substory(key = "progress", title = "With Progress")]
+                WithProgress,
+            }
+        };
+
+        let expanded = substory_impl(input);
+        assert_snapshot!(
+            "substory_derive_generates_stable_keys_and_titles",
             snapshot_tokens(expanded)
         );
     }

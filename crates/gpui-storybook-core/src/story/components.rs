@@ -22,7 +22,7 @@ use gpui_component::{
 use super::state::AppState;
 use crate::capture_region::{
     capture_scroll_scope, capture_story_view, capture_story_view_with_scroll, capture_substory,
-    current_capture_scroll_handle,
+    capture_substory_with_key, current_capture_scroll_handle,
 };
 
 pub const STORY_LIST_KLASS_PREFIX: &str = "__gpui_storybook_list__:";
@@ -31,10 +31,81 @@ pub const STORY_LIST_KLASS_PREFIX: &str = "__gpui_storybook_list__:";
 #[action(namespace = story)]
 pub struct ShowPanelInfo;
 
+/// Stable descriptor for a capture-addressable section inside a story.
+///
+/// Derive this with `#[derive(gpui_storybook::Substory)]` on a fieldless enum,
+/// then pass variants to [`section`] so capture routes use stable enum-derived
+/// keys instead of display-title slugs.
+pub trait Substory: 'static {
+    /// Stable route segment used in `story-key/substory-key` capture routes.
+    fn capture_key(&self) -> &'static str;
+
+    /// Visible section title shown in the story UI.
+    fn title(&self) -> SharedString;
+}
+
+/// Input accepted by [`section`] for visible titles and stable capture keys.
+#[derive(Clone, Debug)]
+pub struct StorySectionTitle {
+    title: SharedString,
+    capture_key: Option<SharedString>,
+}
+
+impl StorySectionTitle {
+    /// Create a section whose capture key is derived from the visible title.
+    pub fn new(title: impl Into<SharedString>) -> Self {
+        Self {
+            title: title.into(),
+            capture_key: None,
+        }
+    }
+
+    /// Create a section with an explicit stable capture key.
+    pub fn with_capture_key(
+        capture_key: impl Into<SharedString>,
+        title: impl Into<SharedString>,
+    ) -> Self {
+        Self {
+            title: title.into(),
+            capture_key: Some(capture_key.into()),
+        }
+    }
+
+    /// Split the descriptor into its visible title and optional capture key.
+    pub fn into_parts(self) -> (SharedString, Option<SharedString>) {
+        (self.title, self.capture_key)
+    }
+}
+
+impl From<&str> for StorySectionTitle {
+    fn from(title: &str) -> Self {
+        Self::new(title)
+    }
+}
+
+impl From<String> for StorySectionTitle {
+    fn from(title: String) -> Self {
+        Self::new(title)
+    }
+}
+
+impl From<SharedString> for StorySectionTitle {
+    fn from(title: SharedString) -> Self {
+        Self::new(title)
+    }
+}
+
+impl<T: Substory> From<T> for StorySectionTitle {
+    fn from(substory: T) -> Self {
+        Self::with_capture_key(substory.capture_key(), substory.title())
+    }
+}
+
 #[derive(IntoElement)]
 pub struct StorySection {
     base: Div,
     title: SharedString,
+    capture_key: Option<SharedString>,
     sub_title: Vec<AnyElement>,
     children: Vec<AnyElement>,
 }
@@ -85,6 +156,7 @@ impl Styled for StorySection {
 impl RenderOnce for StorySection {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
         let title = self.title.clone();
+        let capture_key = self.capture_key.clone();
         let group = GroupBox::new()
             .id(self.title.clone())
             .outline()
@@ -105,13 +177,20 @@ impl RenderOnce for StorySection {
             )
             .child(self.base.children(self.children));
 
-        capture_substory(title, group)
+        if let Some(capture_key) = capture_key {
+            capture_substory_with_key(capture_key, group).into_any_element()
+        } else {
+            capture_substory(title, group).into_any_element()
+        }
     }
 }
 
-pub fn section(title: impl Into<SharedString>) -> StorySection {
+pub fn section(title: impl Into<StorySectionTitle>) -> StorySection {
+    let (title, capture_key) = title.into().into_parts();
+
     StorySection {
-        title: title.into(),
+        title,
+        capture_key,
         sub_title: vec![],
         base: h_flex()
             .flex_wrap()

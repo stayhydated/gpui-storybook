@@ -67,6 +67,8 @@ cropped to the story view, excluding the sidebar and storybook header or dock
 chrome. The capture result reports the actual rendered pixel size, which can
 differ on scaled or compositor-managed displays.
 
-Sub-story routes use `story-key/section-slug` for sections registered with
-`gpui_storybook::capture_substory(...)`; for example,
+Sub-story routes use `story-key/substory-key`. Plain string sections use
+title-derived slugs through `gpui_storybook::capture_substory(...)`; sections
+passed a `#[derive(gpui_storybook::Substory)]` enum variant use the variant's
+stable key. For example:
 `gpui-storybook-example-story-ButtonStory/with-progress`.

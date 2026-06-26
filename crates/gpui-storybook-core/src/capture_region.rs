@@ -69,18 +69,42 @@ pub fn capture_substory(
     title: impl Into<SharedString>,
     child: impl IntoElement,
 ) -> impl IntoElement {
+    let title = title.into();
+
     CaptureSubstoryElement {
-        title: title.into().to_string(),
+        route_key: capture_route_slug(title),
+        child: child.into_any_element(),
+    }
+}
+
+/// Wrap a section inside a story with an explicit stable capture key.
+///
+/// This is useful when the visible section title can change independently from
+/// automation and capture routes.
+pub fn capture_substory_with_key(
+    key: impl AsRef<str>,
+    child: impl IntoElement,
+) -> impl IntoElement {
+    CaptureSubstoryElement {
+        route_key: capture_route_slug(key),
         child: child.into_any_element(),
     }
 }
 
 /// Build the capture route id for a story section title.
 pub fn capture_substory_route_id(story_key: impl AsRef<str>, title: impl AsRef<str>) -> String {
+    capture_substory_route_id_with_key(story_key, capture_route_slug(title))
+}
+
+/// Build the capture route id for an explicit sub-story key.
+pub fn capture_substory_route_id_with_key(
+    story_key: impl AsRef<str>,
+    key: impl AsRef<str>,
+) -> String {
     format!(
         "{}/{}",
         story_key.as_ref(),
-        capture_route_slug(title.as_ref())
+        capture_route_slug(key.as_ref())
     )
 }
 
@@ -259,7 +283,7 @@ impl Element for CaptureScopeElement {
 }
 
 struct CaptureSubstoryElement {
-    title: String,
+    route_key: String,
     child: AnyElement,
 }
 
@@ -307,7 +331,7 @@ impl Element for CaptureSubstoryElement {
             && let Some(story_key) = scope.story_key.clone()
         {
             record_region(
-                capture_substory_route_id(story_key, &self.title),
+                capture_substory_route_id_with_key(story_key, &self.route_key),
                 bounds,
                 &scope,
             );
@@ -327,5 +351,26 @@ impl Element for CaptureSubstoryElement {
         cx: &mut App,
     ) {
         self.child.paint(window, cx);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{capture_substory_route_id, capture_substory_route_id_with_key};
+
+    #[test]
+    fn substory_route_id_slugs_titles_for_backwards_compatibility() {
+        assert_eq!(
+            capture_substory_route_id("story-key", "Button with Icon"),
+            "story-key/button-with-icon"
+        );
+    }
+
+    #[test]
+    fn substory_route_id_accepts_explicit_stable_keys() {
+        assert_eq!(
+            capture_substory_route_id_with_key("story-key", "button-with-icon"),
+            "story-key/button-with-icon"
+        );
     }
 }

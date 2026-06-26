@@ -153,9 +153,20 @@ Story registration also emits a stable automation key:
 
 For example, `gpui-storybook-example-story-ButtonStory` and
 `gpui-storybook-example-component-WelcomeCard` are valid capture routes.
-Sub-story routes use `story-key/section-slug` for sections registered with
-`gpui_storybook::capture_substory(...)`; for example,
+Sub-story routes use `story-key/substory-key`. Plain string sections use
+title-derived slugs through `gpui_storybook::capture_substory(...)`; sections
+passed a `#[derive(gpui_storybook::Substory)]` enum variant use the variant's
+stable kebab-case key. For example:
 `gpui-storybook-example-story-ButtonStory/with-progress`.
+
+```rust
+#[derive(gpui_storybook::Substory)]
+enum ButtonSubstory {
+    NormalButton,
+    #[substory(title = "Button with Icon")]
+    ButtonWithIcon,
+}
+```
 
 Use `#[gpui_storybook::story_init]` for one-time setup that must run after
 `gpui_storybook::init(...)` and before stories are shown:

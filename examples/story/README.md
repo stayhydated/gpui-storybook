@@ -107,10 +107,23 @@ sidebar and storybook header. The returned capture metadata reports the actual
 rendered pixel size.
 
 The local `section(...)` helper registers capture sub-routes for each section.
-For the Button story, use routes such as:
+It accepts plain strings and `#[derive(gpui_storybook::Substory)]` enum
+variants; enum variants keep capture keys stable even if visible section titles
+change. For the Button story, use routes such as:
 
 ```bash
 WGPU_CAPTURE_ROUTE=gpui-storybook-example-story-ButtonStory/normal-button
 WGPU_CAPTURE_ROUTE=gpui-storybook-example-story-ButtonStory/button-with-icon
 WGPU_CAPTURE_ROUTE=gpui-storybook-example-story-ButtonStory/with-progress
+```
+
+```rust
+#[derive(gpui_storybook::Substory)]
+enum ButtonSubstory {
+    NormalButton,
+    #[substory(title = "Button with Icon")]
+    ButtonWithIcon,
+    #[substory(title = "With Progress")]
+    WithProgress,
+}
 ```

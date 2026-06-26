@@ -53,6 +53,29 @@ The registered story name is the component type name, not the hidden wrapper
 type. The stable automation key uses
 `{crate-package-name}-{component-type-name}`.
 
+### `#[derive(Substory)]`
+
+Generates stable capture metadata for fieldless enum variants that are passed
+to `gpui_storybook::section(...)`.
+
+```rs
+#[derive(gpui_storybook::Substory)]
+enum ButtonSubstory {
+    NormalButton,
+    #[substory(title = "Button with Icon")]
+    ButtonWithIcon,
+    #[substory(key = "progress", title = "With Progress")]
+    WithProgress,
+}
+
+gpui_storybook::section(ButtonSubstory::ButtonWithIcon);
+```
+
+By default, the capture key is the variant name in kebab case and the visible
+title is title case. Use `title` to change display text without changing the
+capture route. Use `key` before renaming a variant when an existing route must
+remain stable.
+
 ### `#[story_init]`
 
 Registers one-time application setup that runs during `gpui_storybook::init(...)`.

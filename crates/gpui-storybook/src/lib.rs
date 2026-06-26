@@ -6,9 +6,11 @@
 //! `macros` feature, the story registration macros.
 //!
 //! Story registration flows through `inventory`: `#[story]` and
-//! `#[derive(ComponentStory)]` submit story entries, while `#[story_init]`
-//! submits one-time setup hooks. The hidden `__registry` and `__inventory`
-//! re-exports are the stable expansion path used by those macros.
+//! `#[derive(ComponentStory)]` submit story entries, `#[derive(Substory)]`
+//! derives stable capture keys for sections inside a story, and
+//! `#[story_init]` submits one-time setup hooks. The hidden `__registry` and
+//! `__inventory` re-exports are the stable expansion path used by those
+//! macros.
 //!
 //! `generate_stories` loads crate-local `storybook.toml` files for discovered
 //! story crates, selects a runtime config by matching the running binary name
@@ -47,12 +49,18 @@ pub use gpui_storybook_core::registry::{StoryKey, StoryName, StorySectionName};
 pub use gpui_storybook_core::window_view::DockWindowView;
 pub use gpui_storybook_core::{
     assets::Assets,
-    capture_region::{capture_route_slug, capture_substory, capture_substory_route_id},
+    capture_region::{
+        capture_route_slug, capture_substory, capture_substory_route_id,
+        capture_substory_route_id_with_key, capture_substory_with_key,
+    },
     gallery::Gallery,
     i18n::change_locale,
     i18n::localize_message,
     language::{CurrentLanguage, Language},
-    story::{Story, StoryContainer, create_new_window, create_new_window_with_ui},
+    story::{
+        Story, StoryContainer, StorySection, StorySectionTitle, Substory, create_new_window,
+        create_new_window_with_ui, section,
+    },
     storybook_window_ui::{StorybookWindow, StorybookWindowUi},
     window_view::SimpleWindowView,
 };

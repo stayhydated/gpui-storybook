@@ -111,13 +111,28 @@ before capture. Captures are cropped to the story view, excluding the sidebar
 and storybook header or dock chrome. MCP capture results report the actual
 rendered pixel size, which can differ on scaled or compositor-managed displays.
 
-Sub-story routes use `story-key/section-slug` for story sections registered
-with `gpui_storybook::capture_substory(...)`. The built-in story section helper
-and this repository's explicit-story example do this automatically, so the
-Button story can also be captured with routes such as
+Sub-story routes use `story-key/substory-key`. Plain string sections keep the
+old title-derived slug behavior through `gpui_storybook::capture_substory(...)`;
+sections passed a `#[derive(gpui_storybook::Substory)]` enum variant use the
+variant's stable key instead. The built-in story section helper and this
+repository's explicit-story example do this automatically, so the Button story
+can also be captured with routes such as
 `gpui-storybook-example-story-ButtonStory/normal-button`,
 `gpui-storybook-example-story-ButtonStory/button-with-icon`, and
 `gpui-storybook-example-story-ButtonStory/with-progress`.
+
+```rs
+#[derive(gpui_storybook::Substory)]
+enum ButtonSubstory {
+    NormalButton,
+    #[substory(title = "Button with Icon")]
+    ButtonWithIcon,
+    #[substory(title = "With Progress")]
+    WithProgress,
+}
+
+gpui_storybook::section(ButtonSubstory::WithProgress)
+```
 
 ## Choose a registration style
 
@@ -222,6 +237,12 @@ for example, `gpui-storybook-example-story-ButtonStory` or
 the story struct name. `ComponentStory` entries use the component type name.
 Duplicate macro-generated keys fail to build, and `generate_stories` rejects
 duplicate keys from manual registry entries.
+
+For capture-addressable sections inside a story, derive `Substory` on a
+fieldless enum and pass variants to `gpui_storybook::section(...)`. The default
+capture key is the variant name in kebab case; `#[substory(title = "...")]`
+changes only the visible title, and `#[substory(key = "...")]` preserves an
+existing route before a variant rename.
 
 ## Filter stories with `storybook.toml`
 

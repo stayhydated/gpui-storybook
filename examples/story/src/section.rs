@@ -13,6 +13,7 @@ use gpui_component::{
 pub struct StorySection {
     base: Div,
     title: SharedString,
+    capture_key: Option<SharedString>,
     sub_title: Vec<AnyElement>,
     children: Vec<AnyElement>,
 }
@@ -63,6 +64,7 @@ impl Styled for StorySection {
 impl RenderOnce for StorySection {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
         let title = self.title.clone();
+        let capture_key = self.capture_key.clone();
         let group = GroupBox::new()
             .id(self.title.clone())
             .outline()
@@ -83,13 +85,21 @@ impl RenderOnce for StorySection {
             )
             .child(self.base.children(self.children));
 
-        gpui_storybook::capture_substory(title, group)
+        if let Some(capture_key) = capture_key {
+            gpui_storybook::capture_substory_with_key(capture_key, group).into_any_element()
+        } else {
+            gpui_storybook::capture_substory(title, group).into_any_element()
+        }
     }
 }
 
-pub fn section(title: impl Into<SharedString>) -> StorySection {
+pub fn section(title: impl Into<gpui_storybook::StorySectionTitle>) -> StorySection {
+    let title = title.into();
+    let (title, capture_key) = title.into_parts();
+
     StorySection {
-        title: title.into(),
+        title,
+        capture_key,
         sub_title: vec![],
         base: h_flex()
             .flex_wrap()

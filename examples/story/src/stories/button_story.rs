@@ -23,6 +23,15 @@ enum ButtonAction {
     Compact,
 }
 
+#[derive(gpui_storybook::Substory)]
+enum ButtonSubstory {
+    NormalButton,
+    #[substory(title = "Button with Icon")]
+    ButtonWithIcon,
+    #[substory(title = "With Progress")]
+    WithProgress,
+}
+
 #[gpui_storybook::story(crate::StorySection::Buttons)]
 pub struct ButtonStory {
     focus_handle: gpui::FocusHandle,
@@ -146,7 +155,7 @@ impl Render for ButtonStory {
                     ),
             )
             .child(
-                section("Normal Button")
+                section(ButtonSubstory::NormalButton)
                     .max_w_lg()
                     .child(
                         Button::new("button-0")
@@ -259,7 +268,7 @@ impl Render for ButtonStory {
                     ),
             )
             .child(
-                section("Button with Icon")
+                section(ButtonSubstory::ButtonWithIcon)
                     .child(
                         Button::new("button-icon-1")
                             .outline()
@@ -344,7 +353,7 @@ impl Render for ButtonStory {
                     ),
             )
             .child(
-                section("With Progress").child(
+                section(ButtonSubstory::WithProgress).child(
                     h_flex()
                         .gap_4()
                         .child(
