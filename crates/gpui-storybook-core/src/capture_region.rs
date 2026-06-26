@@ -64,7 +64,9 @@ pub(crate) fn capture_scroll_scope(
 
 /// Wrap a section inside a story so it can be captured as `story-key/section-slug`.
 ///
-/// The standard [`section`](crate::story::section) helper uses this automatically.
+/// The standard styled [`section`](crate::story::section) helper and
+/// [`StorySectionBase::capture`](crate::story::StorySectionBase::capture) use
+/// this automatically.
 pub fn capture_substory(
     title: impl Into<SharedString>,
     child: impl IntoElement,

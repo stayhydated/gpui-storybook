@@ -114,9 +114,9 @@ rendered pixel size, which can differ on scaled or compositor-managed displays.
 Sub-story routes use `story-key/substory-key`. Plain string sections keep the
 old title-derived slug behavior through `gpui_storybook::capture_substory(...)`;
 sections passed a `#[derive(gpui_storybook::Substory)]` enum variant use the
-variant's stable key instead. The built-in story section helper and this
-repository's explicit-story example do this automatically, so the Button story
-can also be captured with routes such as
+variant's stable key instead. The built-in styled `section(...)` helper and
+custom components built on `StorySectionBase` both do this automatically, so
+the Button story can also be captured with routes such as
 `gpui-storybook-example-story-ButtonStory/normal-button`,
 `gpui-storybook-example-story-ButtonStory/button-with-icon`, and
 `gpui-storybook-example-story-ButtonStory/with-progress`.
@@ -133,6 +133,11 @@ enum ButtonSubstory {
 
 gpui_storybook::section(ButtonSubstory::WithProgress)
 ```
+
+Define a custom section component when you want application-specific layout or
+chrome. Store `gpui_storybook::StorySectionBase::new(...)` on the component and
+call `base.capture(...)` from its `RenderOnce` implementation after building
+the component's own element tree.
 
 ## Choose a registration style
 
@@ -243,10 +248,11 @@ Use `StoryContainer::registration_metadata()` or the `story_key()` /
 `story_name()` accessors when integrations need the registered story identity.
 
 For capture-addressable sections inside a story, derive `Substory` on a
-fieldless enum and pass variants to `gpui_storybook::section(...)`. The default
-capture key is the variant name in kebab case; `#[substory(title = "...")]`
-changes only the visible title, and `#[substory(key = "...")]` preserves an
-existing route before a variant rename.
+fieldless enum and pass variants to `gpui_storybook::section(...)` for the
+standard styled section, or store `gpui_storybook::StorySectionBase` in a
+custom section component. The default capture key is the variant name in kebab
+case; `#[substory(title = "...")]` changes only the visible title, and
+`#[substory(key = "...")]` preserves an existing route before a variant rename.
 
 ## Filter stories with `storybook.toml`
 

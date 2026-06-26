@@ -56,7 +56,8 @@ type. The stable automation key uses
 ### `#[derive(Substory)]`
 
 Generates stable capture metadata for fieldless enum variants that are passed
-to `gpui_storybook::section(...)`.
+to `gpui_storybook::section(...)` or `gpui_storybook::StorySectionBase::new(...)`
+for custom section components.
 
 ```rs
 #[derive(gpui_storybook::Substory)]
@@ -69,6 +70,7 @@ enum ButtonSubstory {
 }
 
 gpui_storybook::section(ButtonSubstory::ButtonWithIcon);
+let base = gpui_storybook::StorySectionBase::new(ButtonSubstory::WithProgress);
 ```
 
 By default, the capture key is the variant name in kebab case and the visible

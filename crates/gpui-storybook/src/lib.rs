@@ -7,7 +7,8 @@
 //!
 //! Story registration flows through `inventory`: `#[story]` and
 //! `#[derive(ComponentStory)]` submit story entries, `#[derive(Substory)]`
-//! derives stable capture keys for sections inside a story, and
+//! derives stable capture keys for styled `section` or custom
+//! `StorySectionBase` regions inside a story, and
 //! `#[story_init]` submits one-time setup hooks. The hidden `__registry` and
 //! `__inventory` re-exports are the stable expansion path used by those
 //! macros.
@@ -61,8 +62,8 @@ pub use gpui_storybook_core::{
     i18n::localize_message,
     language::{CurrentLanguage, Language},
     story::{
-        Story, StoryContainer, StorySection, StorySectionTitle, Substory, create_new_window,
-        create_new_window_with_ui, section,
+        Story, StoryContainer, StorySection, StorySectionBase, StorySectionTitle, Substory,
+        create_new_window, create_new_window_with_ui, section,
     },
     storybook_window_ui::{StorybookWindow, StorybookWindowUi},
     window_view::SimpleWindowView,

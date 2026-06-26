@@ -13,7 +13,7 @@ use gpui_component::{
     v_flex,
 };
 
-use crate::section::section;
+use gpui_storybook::section;
 
 #[gpui_storybook::story(crate::StorySection::Tables)]
 pub struct TableStory {

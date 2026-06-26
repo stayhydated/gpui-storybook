@@ -29,6 +29,7 @@ GPUI_STORYBOOK_MCP_STDIO=1 cargo run -p gpui-storybook-example-story --features 
 - `src/lib.rs`: shared `StorySection` enum for stable ordering
 - `src/stories/*.rs`: explicit story structs and `impl gpui_storybook::Story`
 - `src/stories/grouped_story.rs`: two story structs with the same title, grouped into one sidebar item
+- `src/stories/custom_section_story.rs`: custom section component built on `StorySectionBase`
 - `storybook.toml`: crate-level runtime group for discovery
 
 ## Core pattern
@@ -106,10 +107,13 @@ resize before capture. Captures are cropped to the story page, excluding the
 sidebar and storybook header. The returned capture metadata reports the actual
 rendered pixel size.
 
-The local `section(...)` helper registers capture sub-routes for each section.
-It accepts plain strings and `#[derive(gpui_storybook::Substory)]` enum
-variants; enum variants keep capture keys stable even if visible section titles
-change. For the Button story, use routes such as:
+The facade `gpui_storybook::section(...)` helper renders the standard styled
+section and registers capture sub-routes for each section. It accepts plain
+strings and `#[derive(gpui_storybook::Substory)]` enum variants; enum variants
+keep capture keys stable even if visible section titles change. Custom section
+components can store `gpui_storybook::StorySectionBase` and call
+`base.capture(...)` from `RenderOnce` to reuse the same capture metadata without
+the standard section styling. For the Button story, use routes such as:
 
 ```bash
 WGPU_CAPTURE_ROUTE=gpui-storybook-example-story-ButtonStory/normal-button
@@ -126,4 +130,14 @@ enum ButtonSubstory {
     #[substory(title = "With Progress")]
     WithProgress,
 }
+```
+
+`custom_section_story.rs` shows the custom component form. Its
+`metric_section(...)` constructor stores `StorySectionBase`; the component
+renders its own section layout, then calls `base.capture(...)` from
+`RenderOnce`. Its capture routes include:
+
+```bash
+WGPU_CAPTURE_ROUTE=gpui-storybook-example-story-CustomSectionStory/product-metrics
+WGPU_CAPTURE_ROUTE=gpui-storybook-example-story-CustomSectionStory/health-signals
 ```

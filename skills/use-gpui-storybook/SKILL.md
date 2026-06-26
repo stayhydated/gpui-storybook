@@ -162,6 +162,10 @@ title-derived slugs through `gpui_storybook::capture_substory(...)`; sections
 passed a `#[derive(gpui_storybook::Substory)]` enum variant use the variant's
 stable kebab-case key. For example:
 `gpui-storybook-example-story-ButtonStory/with-progress`.
+Use `gpui_storybook::section(...)` for the standard styled section. For custom
+section components, store `gpui_storybook::StorySectionBase::new(...)` and call
+`base.capture(...)` from `RenderOnce` after building the component's own layout
+and chrome.
 
 ```rust
 #[derive(gpui_storybook::Substory)]

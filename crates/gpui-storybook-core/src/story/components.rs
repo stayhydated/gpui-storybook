@@ -37,8 +37,8 @@ pub struct ShowPanelInfo;
 /// Stable descriptor for a capture-addressable section inside a story.
 ///
 /// Derive this with `#[derive(gpui_storybook::Substory)]` on a fieldless enum,
-/// then pass variants to [`section`] so capture routes use stable enum-derived
-/// keys instead of display-title slugs.
+/// then pass variants to [`section`] or [`StorySectionBase::new`] so capture
+/// routes use stable enum-derived keys instead of display-title slugs.
 pub trait Substory: 'static {
     /// Stable route segment used in `story-key/substory-key` capture routes.
     fn capture_key(&self) -> &'static str;
@@ -47,7 +47,8 @@ pub trait Substory: 'static {
     fn title(&self) -> SharedString;
 }
 
-/// Input accepted by [`section`] for visible titles and stable capture keys.
+/// Input accepted by [`section`] and [`StorySectionBase::new`] for visible
+/// titles and stable capture keys.
 #[derive(Clone, Debug)]
 pub struct StorySectionTitle {
     title: SharedString,
@@ -104,11 +105,52 @@ impl<T: Substory> From<T> for StorySectionTitle {
     }
 }
 
-#[derive(IntoElement)]
-pub struct StorySection {
-    base: Div,
+/// Base capture metadata for a user-defined story section component.
+///
+/// Store this inside a custom section component, render the component with the
+/// app's own layout and chrome, then call [`capture`](Self::capture) with the
+/// rendered element from `RenderOnce`. The styled [`section`] helper uses this
+/// same base type internally.
+#[derive(Clone, Debug)]
+pub struct StorySectionBase {
     title: SharedString,
     capture_key: Option<SharedString>,
+}
+
+impl StorySectionBase {
+    /// Create capture metadata from a visible title, explicit section title, or
+    /// `#[derive(Substory)]` enum variant.
+    pub fn new(title: impl Into<StorySectionTitle>) -> Self {
+        let (title, capture_key) = title.into().into_parts();
+
+        Self { title, capture_key }
+    }
+
+    /// Visible title supplied for this section.
+    pub fn title(&self) -> &SharedString {
+        &self.title
+    }
+
+    /// Explicit stable capture key, when one was supplied by a `Substory`
+    /// variant or [`StorySectionTitle::with_capture_key`].
+    pub fn capture_key(&self) -> Option<&SharedString> {
+        self.capture_key.as_ref()
+    }
+
+    /// Wrap a rendered custom section in the capture marker.
+    pub fn capture(self, child: impl IntoElement) -> AnyElement {
+        if let Some(capture_key) = self.capture_key {
+            capture_substory_with_key(capture_key, child).into_any_element()
+        } else {
+            capture_substory(self.title, child).into_any_element()
+        }
+    }
+}
+
+#[derive(IntoElement)]
+pub struct StorySection {
+    capture: StorySectionBase,
+    base: Div,
     sub_title: Vec<AnyElement>,
     children: Vec<AnyElement>,
 }
@@ -158,17 +200,17 @@ impl Styled for StorySection {
 
 impl RenderOnce for StorySection {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
-        let title = self.title.clone();
-        let capture_key = self.capture_key.clone();
+        let capture = self.capture;
+        let title = capture.title().clone();
         let group = GroupBox::new()
-            .id(self.title.clone())
+            .id(title.clone())
             .outline()
             .title(
                 h_flex()
                     .justify_between()
                     .w_full()
                     .gap_4()
-                    .child(self.title)
+                    .child(title)
                     .children(self.sub_title),
             )
             .content_style(
@@ -180,20 +222,13 @@ impl RenderOnce for StorySection {
             )
             .child(self.base.children(self.children));
 
-        if let Some(capture_key) = capture_key {
-            capture_substory_with_key(capture_key, group).into_any_element()
-        } else {
-            capture_substory(title, group).into_any_element()
-        }
+        capture.capture(group)
     }
 }
 
 pub fn section(title: impl Into<StorySectionTitle>) -> StorySection {
-    let (title, capture_key) = title.into().into_parts();
-
     StorySection {
-        title,
-        capture_key,
+        capture: StorySectionBase::new(title),
         sub_title: vec![],
         base: h_flex()
             .flex_wrap()

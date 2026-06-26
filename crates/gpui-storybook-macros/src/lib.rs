@@ -20,8 +20,9 @@
 //! that makes duplicate generated keys in the same package fail to build.
 //!
 //! `#[derive(Substory)]` supports fieldless enums used with
-//! `gpui_storybook::section(...)`. It generates stable capture keys from enum
-//! variant names while keeping visible titles configurable with
+//! `gpui_storybook::section(...)` or `gpui_storybook::StorySectionBase::new(...)`.
+//! It generates stable capture keys from enum variant names while keeping
+//! visible titles configurable with
 //! `#[substory(title = "...")]`.
 //!
 //! `#[story_init]` registers a one-time setup function that the facade executes
@@ -523,8 +524,9 @@ pub fn component_story(input: TokenStream) -> TokenStream {
 /// Derive stable capture metadata for sub-story sections.
 ///
 /// Variants become capture-addressable section descriptors that can be passed
-/// to `gpui_storybook::section(...)`. By default, the route key is the variant
-/// name in kebab case and the visible title is title case. Use
+/// to `gpui_storybook::section(...)` or `gpui_storybook::StorySectionBase::new(...)`.
+/// By default, the route key is the variant name in kebab case and the visible
+/// title is title case. Use
 /// `#[substory(title = "...")]` to change the visible title without changing
 /// the route key. Use `#[substory(key = "...")]` before renaming a variant when
 /// an existing route must remain stable.
