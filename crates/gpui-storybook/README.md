@@ -106,10 +106,11 @@ WGPU_CAPTURE_PATH=target/storybook-captures/button.png \
 cargo run -p gpui-storybook-example-story --features mcp
 ```
 
-`WGPU_CAPTURE_WIDTH` and `WGPU_CAPTURE_HEIGHT` request a live window resize
-before capture. Captures are cropped to the story view, excluding the sidebar
-and storybook header or dock chrome. MCP capture results report the actual
-rendered pixel size, which can differ on scaled or compositor-managed displays.
+`WGPU_CAPTURE_WIDTH` and `WGPU_CAPTURE_HEIGHT` must be set together and greater
+than zero; they request a live window resize before capture. Captures are
+cropped to the story view, excluding the sidebar and storybook header or dock
+chrome. MCP capture results report the actual rendered pixel size, which can
+differ on scaled or compositor-managed displays.
 
 Sub-story routes use `story-key/substory-key`. Plain string sections keep the
 old title-derived slug behavior through `gpui_storybook::capture_substory(...)`;

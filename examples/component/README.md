@@ -105,6 +105,6 @@ WGPU_CAPTURE_PATH=target/storybook-captures/welcome-card.png \
 cargo run -p gpui-storybook-example-component --features mcp
 ```
 
-Add `WGPU_CAPTURE_WIDTH` and `WGPU_CAPTURE_HEIGHT` to request a live window
-resize before capture. The returned capture metadata reports the actual rendered
-pixel size.
+Add `WGPU_CAPTURE_WIDTH` and `WGPU_CAPTURE_HEIGHT` together to request a live
+window resize before capture; both values must be greater than zero. The
+returned capture metadata reports the actual rendered pixel size.

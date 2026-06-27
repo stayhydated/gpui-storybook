@@ -14,7 +14,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{collections::BTreeMap, path::PathBuf, thread, time::Duration};
 use thiserror::Error;
-use wgpu_capture::{CaptureConfig, CaptureEnv, CaptureEnvError, CaptureRouteId, PixelSize};
+use wgpu_capture::{
+    CaptureConfig, CaptureEnv, CaptureEnvError, CaptureLaunchEnv as WgpuCaptureLaunchEnv,
+    CaptureLaunchEnvError, CaptureRouteId, PixelSize,
+};
 
 pub use gpui_storybook_core::automation;
 
@@ -83,6 +86,8 @@ pub enum StorybookMcpError {
     Tool(#[from] McpToolError),
     #[error("{0}")]
     CaptureEnv(#[from] CaptureEnvError),
+    #[error("{0}")]
+    CaptureLaunchEnv(#[from] CaptureLaunchEnvError),
     #[error("{0}")]
     Automation(#[from] StorybookAutomationError),
     #[error("{0}")]
@@ -399,30 +404,12 @@ fn tool_error(message: impl Into<String>) -> ToolCallResult {
 fn build_capture_launch_env(
     input: CaptureLaunchEnvInput,
 ) -> Result<CaptureLaunchEnv, StorybookMcpError> {
-    CaptureRouteId::new(input.key.clone()).map_err(|error| {
-        StorybookMcpError::InvalidDefaultStoryKey {
-            key: input.key.clone(),
-            message: error.to_string(),
-        }
-    })?;
-
-    let mut env = BTreeMap::new();
-    env.insert("WGPU_CAPTURE_ROUTE".to_string(), input.key);
-    if let Some(path) = input.output_path {
-        env.insert(
-            "WGPU_CAPTURE_PATH".to_string(),
-            path.to_string_lossy().to_string(),
-        );
-    }
-    if let Some(frame) = input.frame {
-        env.insert("WGPU_CAPTURE_FRAME".to_string(), frame.to_string());
-    }
-    if let Some(width) = input.width {
-        env.insert("WGPU_CAPTURE_WIDTH".to_string(), width.to_string());
-    }
-    if let Some(height) = input.height {
-        env.insert("WGPU_CAPTURE_HEIGHT".to_string(), height.to_string());
-    }
+    let mut env = WgpuCaptureLaunchEnv::try_builder(input.key)?
+        .optional_output_path(input.output_path)?
+        .optional_frame(input.frame)?
+        .optional_size(input.width, input.height)?
+        .build()
+        .env_map_lossy();
     if input.stdio.unwrap_or(true) {
         env.insert(STDIO_ENV_VAR.to_string(), "1".to_string());
     }
@@ -516,6 +503,12 @@ mod tests {
             structured["env"]["WGPU_CAPTURE_ROUTE"],
             "gpui-storybook-example-story-ButtonStory"
         );
+        assert_eq!(
+            structured["env"]["WGPU_CAPTURE_PATH"],
+            "target/storybook-captures/button.png"
+        );
+        assert_eq!(structured["env"]["WGPU_CAPTURE_WIDTH"], "900");
+        assert_eq!(structured["env"]["WGPU_CAPTURE_HEIGHT"], "700");
         assert_eq!(structured["env"][STDIO_ENV_VAR], "1");
         assert_eq!(
             structured["command"],
@@ -529,6 +522,45 @@ mod tests {
                 "--bin",
                 "story"
             ])
+        );
+    }
+
+    #[test]
+    fn capture_launch_env_rejects_invalid_wgpu_capture_values() {
+        let error = build_capture_launch_env(CaptureLaunchEnvInput {
+            key: "gpui-storybook-example-story-ButtonStory".to_string(),
+            output_path: Some(PathBuf::from("target/storybook-captures/button.png")),
+            frame: Some(0),
+            width: None,
+            height: None,
+            package: None,
+            bin: None,
+            features: None,
+            stdio: None,
+        })
+        .unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("capture frame must be greater than zero")
+        );
+
+        let error = build_capture_launch_env(CaptureLaunchEnvInput {
+            key: "gpui-storybook-example-story-ButtonStory".to_string(),
+            output_path: None,
+            frame: None,
+            width: Some(900),
+            height: None,
+            package: None,
+            bin: None,
+            features: None,
+            stdio: None,
+        })
+        .unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("set both capture width and height")
         );
     }
 }

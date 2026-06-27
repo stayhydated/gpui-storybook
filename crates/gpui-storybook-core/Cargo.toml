@@ -21,11 +21,11 @@ anyhow = { workspace = true }
 derive_more = { features = [ "as_ref", "display", "from" ], workspace = true }
 es-fluent = { workspace = true }
 gpui = { workspace = true }
-gpui_platform = { optional = true, workspace = true }
 gpui-component = { features = [ "inspector" ], workspace = true }
 gpui-component-assets = { workspace = true }
 gpui-es-fluent = { workspace = true }
 gpui-storybook-components = { workspace = true }
+gpui_platform = { optional = true, workspace = true }
 image = { optional = true, workspace = true }
 inventory = { workspace = true }
 rust-embed = { features = [ "interpolate-folder-path" ], workspace = true }

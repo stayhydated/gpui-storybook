@@ -102,10 +102,10 @@ WGPU_CAPTURE_PATH=target/storybook-captures/button.png \
 cargo run -p gpui-storybook-example-story --features mcp
 ```
 
-Add `WGPU_CAPTURE_WIDTH` and `WGPU_CAPTURE_HEIGHT` to request a live window
-resize before capture. Captures are cropped to the story page, excluding the
-sidebar and storybook header. The returned capture metadata reports the actual
-rendered pixel size.
+Add `WGPU_CAPTURE_WIDTH` and `WGPU_CAPTURE_HEIGHT` together to request a live
+window resize before capture; both values must be greater than zero. Captures
+are cropped to the story page, excluding the sidebar and storybook header. The
+returned capture metadata reports the actual rendered pixel size.
 
 The facade `gpui_storybook::section(...)` helper renders the standard styled
 section and registers capture sub-routes for each section. It accepts plain

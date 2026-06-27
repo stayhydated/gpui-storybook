@@ -92,8 +92,9 @@ automatically. Set `GPUI_STORYBOOK_MCP_STDIO=1` to serve MCP over stdio. Set
 `WGPU_CAPTURE_ROUTE` to a story key and `WGPU_CAPTURE_PATH` to capture one
 story during startup. Captures are cropped to the story view, excluding the
 sidebar and storybook header or dock chrome.
-`WGPU_CAPTURE_WIDTH` and `WGPU_CAPTURE_HEIGHT` request a live resize; use the
-capture result's pixel dimensions as the source of truth.
+`WGPU_CAPTURE_WIDTH` and `WGPU_CAPTURE_HEIGHT` must be set together and greater
+than zero; they request a live resize. Use the capture result's pixel
+dimensions as the source of truth.
 
 Use explicit `#[story]` when the story owns state:
 
