@@ -404,10 +404,12 @@ fn tool_error(message: impl Into<String>) -> ToolCallResult {
 fn build_capture_launch_env(
     input: CaptureLaunchEnvInput,
 ) -> Result<CaptureLaunchEnv, StorybookMcpError> {
-    let mut env = WgpuCaptureLaunchEnv::try_builder(input.key)?
-        .optional_output_path(input.output_path)?
-        .optional_frame(input.frame)?
-        .optional_size(input.width, input.height)?
+    let size = WgpuCaptureLaunchEnv::optional_size(input.width, input.height)?;
+    let mut env = WgpuCaptureLaunchEnv::builder()
+        .route_id(input.key)?
+        .maybe_output_path(input.output_path)?
+        .maybe_frame(input.frame)?
+        .maybe_size(size)?
         .build()
         .env_map_lossy();
     if input.stdio.unwrap_or(true) {

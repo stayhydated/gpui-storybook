@@ -1900,7 +1900,6 @@ dependencies = [
  "es-fluent-shared",
  "fluent-bundle",
  "inventory",
- "rust-embed",
  "tracing",
  "unic-langid",
 ]
@@ -1997,6 +1996,7 @@ dependencies = [
  "es-fluent",
  "es-fluent-manager-core",
  "es-fluent-manager-macros",
+ "rust-embed",
  "tracing",
  "unic-langid",
 ]
@@ -8700,6 +8700,7 @@ dependencies = [
 name = "wgpu-capture"
 version = "0.1.0"
 dependencies = [
+ "bon",
  "derive_more",
  "koruma",
  "serde",
