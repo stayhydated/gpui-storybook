@@ -528,8 +528,8 @@ pub fn component_story(input: TokenStream) -> TokenStream {
 /// By default, the route key is the variant name in kebab case and the visible
 /// title is title case. Use
 /// `#[substory(title = "...")]` to change the visible title without changing
-/// the route key. Use `#[substory(key = "...")]` before renaming a variant when
-/// an existing route must remain stable.
+/// the route key. Use `#[substory(key = "...")]` to set an explicit route key
+/// independent of the variant name.
 ///
 /// ```ignore
 /// #[derive(gpui_storybook::Substory)]

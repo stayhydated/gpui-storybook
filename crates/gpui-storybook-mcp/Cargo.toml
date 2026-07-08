@@ -18,8 +18,8 @@ serde = { features = [ "derive" ], workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 tokio = { features = [ "rt-multi-thread", "sync", "time" ], workspace = true }
-wgpu-capture = { workspace = true }
-wgpu-capture-routes = { workspace = true }
+frame-capture = { workspace = true }
+frame-capture-routes = { workspace = true }
 
 [lints]
 workspace = true

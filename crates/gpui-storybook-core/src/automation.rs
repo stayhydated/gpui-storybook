@@ -327,14 +327,13 @@ impl StorybookAutomation {
             return Err(error);
         }
 
-        let result =
-            receiver
-                .await
-                .map_err(|error| StorybookAutomationError::HostDisconnected {
-                    message: error.to_string(),
-                })?;
+        let result = receiver
+            .await
+            .map_err(|error| StorybookAutomationError::HostDisconnected {
+                message: error.to_string(),
+            });
         self.capture_pending.store(false, Ordering::SeqCst);
-        result
+        result?
     }
 
     pub(crate) fn take_command_receiver(

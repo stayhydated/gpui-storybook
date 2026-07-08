@@ -14,8 +14,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{collections::BTreeMap, path::PathBuf, thread, time::Duration};
 use thiserror::Error;
-use wgpu_capture::{
-    CaptureConfig, CaptureEnv, CaptureEnvError, CaptureLaunchEnv as WgpuCaptureLaunchEnv,
+use frame_capture::{
+    CaptureConfig, CaptureEnv, CaptureEnvError, CaptureLaunchEnv as FrameCaptureLaunchEnv,
     CaptureLaunchEnvError, CaptureRouteId, PixelSize,
 };
 
@@ -91,7 +91,7 @@ pub enum StorybookMcpError {
     #[error("{0}")]
     Automation(#[from] StorybookAutomationError),
     #[error("{0}")]
-    Io(String),
+    Io(#[from] std::io::Error),
     #[error("invalid default story key `{key}`: {message}")]
     InvalidDefaultStoryKey { key: String, message: String },
     #[error("capture session was requested before any stories were registered")]
@@ -145,8 +145,7 @@ pub fn start_capture_session(
             let should_exit = exit_after_capture && session.capture.is_some();
             let runtime = tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
-                .build()
-                .map_err(|error| StorybookMcpError::Io(error.to_string()))?;
+                .build()?;
 
             let result =
                 runtime.block_on(run_capture_session(automation, session, exit_after_capture));
@@ -157,7 +156,7 @@ pub fn start_capture_session(
 
             result
         })
-        .map_err(|error| StorybookMcpError::Io(error.to_string()))
+        .map_err(StorybookMcpError::Io)
 }
 
 fn start_capture_session_from_env_when_ready(
@@ -168,8 +167,7 @@ fn start_capture_session_from_env_when_ready(
         .spawn(move || {
             let runtime = tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
-                .build()
-                .map_err(|error| StorybookMcpError::Io(error.to_string()))?;
+                .build()?;
 
             runtime.block_on(async move {
                 let default_story_key = wait_for_default_story_key(automation.clone()).await?;
@@ -182,7 +180,7 @@ fn start_capture_session_from_env_when_ready(
                 result
             })
         })
-        .map_err(|error| StorybookMcpError::Io(error.to_string()))
+        .map_err(StorybookMcpError::Io)
 }
 
 async fn wait_for_default_story_key(
@@ -404,8 +402,8 @@ fn tool_error(message: impl Into<String>) -> ToolCallResult {
 fn build_capture_launch_env(
     input: CaptureLaunchEnvInput,
 ) -> Result<CaptureLaunchEnv, StorybookMcpError> {
-    let size = WgpuCaptureLaunchEnv::optional_size(input.width, input.height)?;
-    let mut env = WgpuCaptureLaunchEnv::builder()
+    let size = FrameCaptureLaunchEnv::optional_size(input.width, input.height)?;
+    let mut env = FrameCaptureLaunchEnv::builder()
         .route_id(input.key)?
         .maybe_output_path(input.output_path)?
         .maybe_frame(input.frame)?
@@ -461,7 +459,7 @@ pub mod capture {
         CaptureLaunchEnv, StorybookCaptureSession, capture_catalog, read_capture_session,
         start_capture_session, start_capture_session_from_env,
     };
-    pub use wgpu_capture::{CaptureConfig, CaptureEnv, CaptureFrame, PixelSize};
+    pub use frame_capture::{CaptureConfig, CaptureEnv, CaptureFrame, PixelSize};
 }
 
 pub mod prelude {
@@ -528,7 +526,7 @@ mod tests {
     }
 
     #[test]
-    fn capture_launch_env_rejects_invalid_wgpu_capture_values() {
+    fn capture_launch_env_rejects_invalid_frame_capture_values() {
         let error = build_capture_launch_env(CaptureLaunchEnvInput {
             key: "gpui-storybook-example-story-ButtonStory".to_string(),
             output_path: Some(PathBuf::from("target/storybook-captures/button.png")),

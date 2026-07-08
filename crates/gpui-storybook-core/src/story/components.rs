@@ -568,8 +568,8 @@ impl StoryContainer {
 
     /// Store typed registry metadata on this runtime container.
     ///
-    /// This also keeps the legacy string metadata fields populated for callers
-    /// that still read them directly.
+    /// This also populates the string metadata fields exposed by this
+    /// container.
     pub fn set_registration_metadata(&mut self, metadata: RegisteredStoryMetadata) {
         self.story_key = Some(metadata.key().as_str().into());
         self.story_name = Some(metadata.name().as_str().into());

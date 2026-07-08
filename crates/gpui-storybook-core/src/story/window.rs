@@ -32,34 +32,30 @@ where
     let title = SharedString::from(title.to_string());
 
     cx.spawn(async move |cx| {
-        let window = cx
-            .open_window(options, |window, cx| {
-                let storybook_window = create_view_fn(window, cx);
-                let root = cx.new(|cx| {
-                    StoryRoot::new(
-                        title.clone(),
-                        storybook_window.view,
-                        storybook_window.ui,
-                        window,
-                        cx,
-                    )
-                });
+        let window = cx.open_window(options, |window, cx| {
+            let storybook_window = create_view_fn(window, cx);
+            let root = cx.new(|cx| {
+                StoryRoot::new(
+                    title.clone(),
+                    storybook_window.view,
+                    storybook_window.ui,
+                    window,
+                    cx,
+                )
+            });
 
-                let focus_handle = root.focus_handle(cx);
-                window.defer(cx, move |window, cx| {
-                    focus_handle.focus(window, cx);
-                });
+            let focus_handle = root.focus_handle(cx);
+            window.defer(cx, move |window, cx| {
+                focus_handle.focus(window, cx);
+            });
 
-                cx.new(|cx| Root::new(root, window, cx))
-            })
-            .expect("failed to open window");
+            cx.new(|cx| Root::new(root, window, cx))
+        })?;
 
-        window
-            .update(cx, |_, window, _| {
-                window.activate_window();
-                window.set_window_title(&title);
-            })
-            .expect("failed to update window");
+        window.update(cx, |_, window, _| {
+            window.activate_window();
+            window.set_window_title(&title);
+        })?;
 
         Ok::<_, anyhow::Error>(())
     })

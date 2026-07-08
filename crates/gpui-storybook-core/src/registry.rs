@@ -43,9 +43,9 @@ impl Borrow<str> for StoryKey {
 
 /// Story-local identity for a registered story.
 ///
-/// This remains the struct name used for sorting and `disable_story`
-/// compatibility. Use [`StoryKey`] when an automation or capture workflow needs
-/// a stable global identity.
+/// This is the struct name used for sorting and `disable_story` matching. Use
+/// [`StoryKey`] when an automation or capture workflow needs a stable global
+/// identity.
 #[derive(
     Clone,
     Copy,

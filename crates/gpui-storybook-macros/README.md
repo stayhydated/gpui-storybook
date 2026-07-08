@@ -75,8 +75,8 @@ let base = gpui_storybook::StorySectionBase::new(ButtonSubstory::WithProgress);
 
 By default, the capture key is the variant name in kebab case and the visible
 title is title case. Use `title` to change display text without changing the
-capture route. Use `key` before renaming a variant when an existing route must
-remain stable.
+capture route. Use `key` to set an explicit route key independent of the
+variant name.
 
 ### `#[story_init]`
 

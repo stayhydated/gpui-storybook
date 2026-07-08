@@ -7,10 +7,9 @@ edition = "2024"
 publish = false
 
 [dependencies]
-gpui = { path = "../../../../../../zed/crates/gpui" }
+gpui = { git = "https://github.com/zed-industries/zed", rev = "c545fb67d0ce13e335bff76f7c08986000333f2c" }
 gpui-storybook = { path = "../../.." }
 
-[patch."https://github.com/zed-industries/zed"]
-gpui = { path = "../../../../../../zed/crates/gpui" }
-gpui_platform = { path = "../../../../../../zed/crates/gpui_platform" }
-reqwest_client = { path = "../../../../../../zed/crates/reqwest_client" }
+[replace]
+"https://github.com/zed-industries/zed#gpui@0.2.2" = { git = "https://github.com/zed-industries/zed", rev = "c545fb67d0ce13e335bff76f7c08986000333f2c" }
+"https://github.com/zed-industries/zed#gpui_macros@0.1.0" = { git = "https://github.com/zed-industries/zed", rev = "c545fb67d0ce13e335bff76f7c08986000333f2c" }

@@ -20,7 +20,8 @@ fn main() {
 
     app.run(move |app_cx| {
         gpui_storybook::init(app_cx, Languages::default());
-        gpui_storybook::change_locale(app_cx, Languages::default()).unwrap();
+        gpui_storybook::change_locale(app_cx, Languages::default())
+            .expect("default story example language should be registered");
 
         let http_client = std::sync::Arc::new(reqwest_client::ReqwestClient::new());
         app_cx.set_http_client(http_client);

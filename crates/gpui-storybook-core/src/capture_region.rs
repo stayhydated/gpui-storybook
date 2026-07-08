@@ -361,7 +361,7 @@ mod tests {
     use super::{capture_substory_route_id, capture_substory_route_id_with_key};
 
     #[test]
-    fn substory_route_id_slugs_titles_for_backwards_compatibility() {
+    fn substory_route_id_slugs_titles() {
         assert_eq!(
             capture_substory_route_id("story-key", "Button with Icon"),
             "story-key/button-with-icon"

@@ -112,8 +112,8 @@ cropped to the story view, excluding the sidebar and storybook header or dock
 chrome. MCP capture results report the actual rendered pixel size, which can
 differ on scaled or compositor-managed displays.
 
-Sub-story routes use `story-key/substory-key`. Plain string sections keep the
-old title-derived slug behavior through `gpui_storybook::capture_substory(...)`;
+Sub-story routes use `story-key/substory-key`. Plain string sections derive
+their slug from the visible title through `gpui_storybook::capture_substory(...)`;
 sections passed a `#[derive(gpui_storybook::Substory)]` enum variant use the
 variant's stable key instead. The built-in styled `section(...)` helper and
 custom components built on `StorySectionBase` both do this automatically, so
@@ -253,7 +253,8 @@ fieldless enum and pass variants to `gpui_storybook::section(...)` for the
 standard styled section, or store `gpui_storybook::StorySectionBase` in a
 custom section component. The default capture key is the variant name in kebab
 case; `#[substory(title = "...")]` changes only the visible title, and
-`#[substory(key = "...")]` preserves an existing route before a variant rename.
+`#[substory(key = "...")]` sets an explicit route key independent of the
+variant name.
 
 ## Filter stories with `storybook.toml`
 

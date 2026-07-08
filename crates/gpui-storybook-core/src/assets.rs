@@ -38,8 +38,8 @@ impl AssetSource for Assets {
 
         results.extend(
             LocalAssets::iter()
-                .filter_map(|p| p.starts_with(path).then(|| p.into()))
-                .collect::<Vec<_>>(),
+                .filter(|asset_path| asset_path.starts_with(path))
+                .map(Into::into),
         );
 
         Ok(results)

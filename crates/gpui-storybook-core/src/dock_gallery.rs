@@ -1119,19 +1119,15 @@ where
     ]);
 
     cx.spawn(async move |cx| {
-        let window = cx
-            .open_window(options, |window, cx| {
-                let view = create_view_fn(window, cx);
-                cx.new(|cx| Root::new(view, window, cx))
-            })
-            .expect("failed to open window");
+        let window = cx.open_window(options, |window, cx| {
+            let view = create_view_fn(window, cx);
+            cx.new(|cx| Root::new(view, window, cx))
+        })?;
 
-        window
-            .update(cx, |_, window, _| {
-                window.activate_window();
-                window.set_window_title(&title);
-            })
-            .expect("failed to update window");
+        window.update(cx, |_, window, _| {
+            window.activate_window();
+            window.set_window_title(&title);
+        })?;
 
         Ok::<_, anyhow::Error>(())
     })
