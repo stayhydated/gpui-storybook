@@ -4,6 +4,10 @@ use component_shape_mcp::{
     McpSchema, McpServer, McpToolCall, McpToolError, ServeStdioResult, ToolCallResult,
     tool_definition, tool_error_result, tool_structured_result,
 };
+use frame_capture::{
+    CaptureConfig, CaptureEnv, CaptureEnvError, CaptureLaunchEnv as FrameCaptureLaunchEnv,
+    CaptureLaunchEnvError, CaptureRouteId, PixelSize,
+};
 pub use gpui_storybook_core::automation::{
     DEFAULT_STORY_CAPTURE_HEIGHT, DEFAULT_STORY_CAPTURE_WIDTH, SharedStoryCaptureController,
     SharedStoryController, SharedStorybookAutomation, StoryCaptureSnapshot, StoryCurrentSnapshot,
@@ -14,10 +18,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{collections::BTreeMap, path::PathBuf, thread, time::Duration};
 use thiserror::Error;
-use frame_capture::{
-    CaptureConfig, CaptureEnv, CaptureEnvError, CaptureLaunchEnv as FrameCaptureLaunchEnv,
-    CaptureLaunchEnvError, CaptureRouteId, PixelSize,
-};
 
 pub use gpui_storybook_core::automation;
 
@@ -31,6 +31,7 @@ pub const TOOL_CAPTURE_CURRENT_STORY: &str = "storybook_capture_current_story";
 pub const TOOL_CAPTURE_LAUNCH_ENV: &str = "storybook_capture_launch_env";
 
 const CAPTURE_SESSION_TIMEOUT_SECS: u64 = 30;
+const CAPTURE_ENV_PREFIX: &str = "WGPU";
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct StorybookCaptureConfig {
@@ -118,9 +119,8 @@ pub fn start_stdio(
 pub fn start_capture_session_from_env(
     automation: SharedStorybookAutomation,
 ) -> Result<Option<thread::JoinHandle<Result<(), StorybookMcpError>>>, StorybookMcpError> {
-    if std::env::var_os("WGPU_CAPTURE_ROUTE").is_none()
-        && std::env::var_os("WGPU_CAPTURE_PATH").is_none()
-    {
+    let env = storybook_capture_env();
+    if std::env::var_os(env.route_var()).is_none() && std::env::var_os(env.path_var()).is_none() {
         return Ok(None);
     }
 
@@ -355,7 +355,7 @@ pub fn read_capture_session(
             message: error.to_string(),
         }
     })?;
-    let env = CaptureEnv::wgpu();
+    let env = storybook_capture_env();
     let (story_key, _) = env.read_route_id_or(&default_route)?;
     let capture = env.read_capture(default_capture_size())?;
 
@@ -405,6 +405,7 @@ fn build_capture_launch_env(
     let size = FrameCaptureLaunchEnv::optional_size(input.width, input.height)?;
     let mut env = FrameCaptureLaunchEnv::builder()
         .route_id(input.key)?
+        .env(storybook_capture_env())
         .maybe_output_path(input.output_path)?
         .maybe_frame(input.frame)?
         .maybe_size(size)?
@@ -439,6 +440,10 @@ fn build_capture_launch_env(
 
 fn default_capture_size() -> PixelSize {
     PixelSize::new(DEFAULT_STORY_CAPTURE_WIDTH, DEFAULT_STORY_CAPTURE_HEIGHT)
+}
+
+fn storybook_capture_env() -> CaptureEnv {
+    CaptureEnv::with_prefix(CAPTURE_ENV_PREFIX)
 }
 
 impl From<CaptureConfig> for StorybookCaptureConfig {
@@ -477,6 +482,42 @@ pub mod prelude {
 mod tests {
     use super::*;
     use component_shape_mcp::tool_call_structured_content;
+    use std::{env, ffi::OsString, sync::Mutex};
+
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+    struct EnvGuard(Vec<(String, Option<OsString>)>);
+
+    impl EnvGuard {
+        fn set(vars: &[(&str, &str)]) -> Self {
+            let previous = vars
+                .iter()
+                .map(|(name, _)| ((*name).to_string(), env::var_os(name)))
+                .collect();
+
+            unsafe {
+                for (name, value) in vars {
+                    env::set_var(name, value);
+                }
+            }
+
+            Self(previous)
+        }
+    }
+
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            unsafe {
+                for (name, value) in self.0.drain(..) {
+                    if let Some(value) = value {
+                        env::set_var(name, value);
+                    } else {
+                        env::remove_var(name);
+                    }
+                }
+            }
+        }
+    }
 
     #[test]
     fn capture_launch_env_returns_wgpu_env_and_command() {
@@ -523,6 +564,34 @@ mod tests {
                 "story"
             ])
         );
+    }
+
+    #[test]
+    fn read_capture_session_reads_wgpu_env() {
+        let _lock = ENV_LOCK.lock().expect("env lock should not be poisoned");
+        let _env = EnvGuard::set(&[
+            (
+                "WGPU_CAPTURE_ROUTE",
+                "gpui-storybook-example-story-ButtonStory",
+            ),
+            ("WGPU_CAPTURE_PATH", "target/storybook-captures/button.png"),
+            ("WGPU_CAPTURE_WIDTH", "900"),
+            ("WGPU_CAPTURE_HEIGHT", "700"),
+        ]);
+
+        let session = read_capture_session("fallback-story").unwrap();
+        let capture = session.capture.expect("capture config should be read");
+
+        assert_eq!(
+            session.story_key,
+            "gpui-storybook-example-story-ButtonStory"
+        );
+        assert_eq!(
+            capture.path,
+            PathBuf::from("target/storybook-captures/button.png")
+        );
+        assert_eq!(capture.size.width, 900);
+        assert_eq!(capture.size.height, 700);
     }
 
     #[test]

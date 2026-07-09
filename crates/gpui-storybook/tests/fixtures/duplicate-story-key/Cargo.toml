@@ -7,9 +7,9 @@ edition = "2024"
 publish = false
 
 [dependencies]
-gpui = { git = "https://github.com/zed-industries/zed", rev = "c545fb67d0ce13e335bff76f7c08986000333f2c" }
+gpui = { branch = "linux-headless-renderer", git = "https://github.com/stayhydated/zed", version = "0.2.2" }
 gpui-storybook = { path = "../../.." }
 
-[replace]
-"https://github.com/zed-industries/zed#gpui@0.2.2" = { git = "https://github.com/zed-industries/zed", rev = "c545fb67d0ce13e335bff76f7c08986000333f2c" }
-"https://github.com/zed-industries/zed#gpui_macros@0.1.0" = { git = "https://github.com/zed-industries/zed", rev = "c545fb67d0ce13e335bff76f7c08986000333f2c" }
+[patch."https://github.com/zed-industries/zed"]
+gpui = { branch = "linux-headless-renderer", git = "https://github.com/stayhydated/zed", version = "=0.2.2" }
+gpui_macros = { branch = "linux-headless-renderer", git = "https://github.com/stayhydated/zed", version = "0.1.0" }
