@@ -44,6 +44,10 @@ or custom controllers.
 Tool inputs use the stable story key emitted by registration macros:
 `{crate-package-name}-{registered-story-name}`. Explicit `#[story]` entries use
 the story struct name. `ComponentStory` entries use the component type name.
+Every tool advertises a closed input schema, a structured output schema, and
+MCP behavior annotations. Missing required fields, unknown arguments, invalid
+story keys, and invalid capture options return machine-readable structured
+errors.
 
 ## Environment capture
 

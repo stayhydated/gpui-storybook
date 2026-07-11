@@ -91,6 +91,9 @@ gpui-storybook = { version = "*", features = ["mcp"] }
 No constructor changes are required. `gpui_storybook::init(...)` installs the
 MCP automation controller when the feature is enabled, and `Gallery::view(...)`
 or `StoryWorkspace::view(...)` attach it automatically.
+The six storybook tools publish closed, typed input and output schemas plus MCP
+read-only, idempotence, destructive, and open-world annotations. Invalid,
+missing, and unknown arguments return machine-readable structured errors.
 
 Run an MCP-enabled example over stdio:
 

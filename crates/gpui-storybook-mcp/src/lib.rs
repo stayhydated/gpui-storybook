@@ -1,8 +1,9 @@
 //! MCP tools for driving a live `gpui-storybook` window.
 
 use component_shape_mcp::{
-    McpSchema, McpServer, McpToolCall, McpToolError, ServeStdioResult, ToolCallResult,
-    tool_definition, tool_error_result, tool_structured_result,
+    McpSchema, McpSchemaProperties, McpServer, McpToolError, McpToolInput, McpToolMetadata,
+    McpTypedTool, ServeStdioResult, ToolCallResult, nullable_schema,
+    tool_definition_for_input_with_metadata, tool_error_result_for, tool_structured_result,
 };
 use frame_capture::{
     CaptureConfig, CaptureEnv, CaptureEnvError, CaptureLaunchEnv as FrameCaptureLaunchEnv,
@@ -53,31 +54,59 @@ pub struct CaptureLaunchEnv {
     pub command: Vec<String>,
 }
 
-#[derive(Clone, Debug, Default, Deserialize)]
+/// No arguments.
+#[derive(Clone, Debug, Default)]
 struct EmptyInput {}
 
-#[derive(Clone, Debug, Deserialize)]
+impl McpToolInput for EmptyInput {
+    fn input_schema() -> McpSchema {
+        McpSchema::object().with_additional_properties(false)
+    }
+
+    fn from_tool_call(call: component_shape_mcp::McpToolCall) -> Result<Self, McpToolError> {
+        call.into_arguments().finish()?;
+        Ok(Self {})
+    }
+}
+
+/// Select one registered story or sub-story route.
+#[derive(Clone, Debug, component_shape_mcp::McpToolInput)]
 struct StoryKeyInput {
+    /// Stable story key or `story-key/substory-key` capture route.
     key: String,
 }
 
-#[derive(Clone, Debug, Default, Deserialize)]
+/// Capture the story currently displayed by the live storybook window.
+#[derive(Clone, Debug, Default, component_shape_mcp::McpToolInput)]
 struct CaptureCurrentStoryInput {
+    /// PNG output path. The capture runtime chooses its default when omitted.
     output_path: Option<PathBuf>,
+    /// Requested capture width in pixels. Set together with `height`.
     width: Option<u32>,
+    /// Requested capture height in pixels. Set together with `width`.
     height: Option<u32>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+/// Build the environment and Cargo command for launching a capture-enabled storybook.
+#[derive(Clone, Debug, component_shape_mcp::McpToolInput)]
 struct CaptureLaunchEnvInput {
+    /// Stable story key or `story-key/substory-key` capture route.
     key: String,
+    /// PNG output path. Omit it to open the route without taking a capture.
     output_path: Option<PathBuf>,
+    /// One-based frame number to capture.
     frame: Option<u32>,
+    /// Requested capture width in pixels. Set together with `height`.
     width: Option<u32>,
+    /// Requested capture height in pixels. Set together with `width`.
     height: Option<u32>,
+    /// Optional Cargo package passed with `-p`.
     package: Option<String>,
+    /// Optional Cargo binary passed with `--bin`.
     bin: Option<String>,
+    /// Cargo features passed with `--features`.
     features: Option<Vec<String>>,
+    /// Whether to include `GPUI_STORYBOOK_MCP_STDIO=1`; defaults to `true`.
     stdio: Option<bool>,
 }
 
@@ -251,94 +280,115 @@ pub fn register_tools(
     server: &mut McpServer,
     automation: SharedStorybookAutomation,
 ) -> Result<(), McpToolError> {
-    server.add_tool(tool(TOOL_LIST_STORIES, "List Stories")?, {
-        let automation = automation.clone();
-        move |call| {
-            decode::<EmptyInput>(call)
-                .map(|_| json!({ "stories": automation.stories() }))
-                .map_or_else(tool_error, tool_structured_result)
-        }
-    })?;
-
-    server.add_tool(tool(TOOL_GET_STORY, "Get Story")?, {
-        let automation = automation.clone();
-        move |call| {
-            decode::<StoryKeyInput>(call)
-                .and_then(|input| {
-                    automation
-                        .get_story(&input.key)
-                        .map(|story| json!({ "story": story }))
-                        .map_err(|error| error.to_string())
-                })
-                .map_or_else(tool_error, tool_structured_result)
-        }
-    })?;
-
-    server.add_tool(tool(TOOL_CURRENT_STORY, "Current Story")?, {
-        let automation = automation.clone();
-        move |call| {
-            decode::<EmptyInput>(call)
-                .map(|_| json!(automation.current_story()))
-                .map_or_else(tool_error, tool_structured_result)
-        }
-    })?;
-
-    server.add_tool_async(tool(TOOL_OPEN_STORY, "Open Story")?, {
-        let automation = automation.clone();
-        move |call| {
-            let automation = automation.clone();
-            async move {
-                let input = match decode::<StoryKeyInput>(call) {
-                    Ok(input) => input,
-                    Err(error) => return tool_error(error),
-                };
-
-                match automation.open_story(input.key).await {
-                    Ok(snapshot) => tool_structured_result(json!(snapshot)),
-                    Err(error) => tool_error(error.to_string()),
-                }
-            }
-        }
-    })?;
-
-    server.add_tool_async(
-        tool(TOOL_CAPTURE_CURRENT_STORY, "Capture Current Story")?,
+    server.add_typed_tool(
+        tool::<EmptyInput>(
+            TOOL_LIST_STORIES,
+            "List Stories",
+            "List the registered stories and their stable capture route metadata.",
+            list_stories_output_schema(),
+            ToolHints::read_only(),
+        )?,
         {
             let automation = automation.clone();
-            move |call| {
+            move |_input| tool_structured_result(json!({ "stories": automation.stories() }))
+        },
+    )?;
+
+    server.add_typed_tool(
+        tool::<StoryKeyInput>(
+            TOOL_GET_STORY,
+            "Get Story",
+            "Inspect one registered story or sub-story route by its stable key.",
+            get_story_output_schema(),
+            ToolHints::read_only(),
+        )?,
+        {
+            let automation = automation.clone();
+            move |input| match automation.get_story(&input.key) {
+                Ok(story) => tool_structured_result(json!({ "story": story })),
+                Err(error) => automation_tool_error(error),
+            }
+        },
+    )?;
+
+    server.add_typed_tool(
+        tool::<EmptyInput>(
+            TOOL_CURRENT_STORY,
+            "Current Story",
+            "Inspect the story currently displayed by the live storybook window.",
+            current_story_output_schema(),
+            ToolHints::read_only(),
+        )?,
+        {
+            let automation = automation.clone();
+            move |_input| tool_structured_result(json!(automation.current_story()))
+        },
+    )?;
+
+    server.add_typed_tool_async(
+        tool::<StoryKeyInput>(
+            TOOL_OPEN_STORY,
+            "Open Story",
+            "Open one registered story or sub-story route in the live storybook window.",
+            current_story_output_schema(),
+            ToolHints::mutation(true, false),
+        )?,
+        {
+            let automation = automation.clone();
+            move |input| {
                 let automation = automation.clone();
                 async move {
-                    let input = match decode::<CaptureCurrentStoryInput>(call) {
-                        Ok(input) => input,
-                        Err(error) => return tool_error(error),
-                    };
-
-                    let request = StoryScreenshotRequest {
-                        output_path: input.output_path,
-                        width: input.width,
-                        height: input.height,
-                        quit_after_capture: false,
-                    };
-
-                    match automation.capture_current_story(request).await {
+                    match automation.open_story(input.key).await {
                         Ok(snapshot) => tool_structured_result(json!(snapshot)),
-                        Err(error) => tool_error(error.to_string()),
+                        Err(error) => automation_tool_error(error),
                     }
                 }
             }
         },
     )?;
 
-    server.add_tool(
-        tool(TOOL_CAPTURE_LAUNCH_ENV, "Capture Launch Env")?,
-        move |call| {
-            decode::<CaptureLaunchEnvInput>(call)
-                .and_then(|input| {
-                    build_capture_launch_env(input)
-                        .map(|env| json!(env))
-                        .map_err(|error| error.to_string())
-                })
-                .map_or_else(tool_error, tool_structured_result)
+    server.add_typed_tool_async(
+        capture_tool::<CaptureCurrentStoryInput>(
+            TOOL_CAPTURE_CURRENT_STORY,
+            "Capture Current Story",
+            "Capture the current story view to a PNG, excluding storybook chrome.",
+            capture_story_output_schema(),
+            ToolHints::mutation(false, true),
+            false,
+        )?,
+        move |input| {
+            let automation = automation.clone();
+            async move {
+                let request = StoryScreenshotRequest {
+                    output_path: input.output_path,
+                    width: input.width,
+                    height: input.height,
+                    quit_after_capture: false,
+                };
+
+                match automation.capture_current_story(request).await {
+                    Ok(snapshot) => tool_structured_result(json!(snapshot)),
+                    Err(error) => automation_tool_error(error),
+                }
+            }
+        },
+    )?;
+
+    server.add_typed_tool(
+        capture_tool::<CaptureLaunchEnvInput>(
+            TOOL_CAPTURE_LAUNCH_ENV,
+            "Capture Launch Env",
+            "Build frame-capture environment variables and a Cargo launch command for a story route.",
+            capture_launch_env_output_schema(),
+            ToolHints::read_only(),
+            true,
+        )?,
+        move |input| match build_capture_launch_env(input) {
+            Ok(env) => tool_structured_result(json!(env)),
+            Err(error) => tool_error_result_for(McpToolError::invalid_field_value(
+                "capture",
+                error.to_string(),
+            )),
         },
     )?;
 
@@ -377,26 +427,212 @@ pub fn capture_catalog(stories: &[StorySnapshot]) -> Value {
     })
 }
 
-fn tool(name: &str, title: &str) -> Result<component_shape_mcp::ToolDefinition, McpToolError> {
-    tool_definition(
+#[derive(Clone, Copy)]
+struct ToolHints {
+    read_only: bool,
+    destructive: bool,
+    idempotent: bool,
+}
+
+impl ToolHints {
+    const fn read_only() -> Self {
+        Self {
+            read_only: true,
+            destructive: false,
+            idempotent: true,
+        }
+    }
+
+    const fn mutation(idempotent: bool, destructive: bool) -> Self {
+        Self {
+            read_only: false,
+            destructive,
+            idempotent,
+        }
+    }
+}
+
+fn tool<Input>(
+    name: &'static str,
+    title: &'static str,
+    description: &'static str,
+    output_schema: McpSchema,
+    hints: ToolHints,
+) -> Result<McpTypedTool<Input>, McpToolError>
+where
+    Input: McpToolInput,
+{
+    tool_definition_for_input_with_metadata(
         name,
-        Some(title.to_string()),
-        None,
-        McpSchema::object().with_additional_properties(true),
-        None,
+        McpToolMetadata::new()
+            .with_title(title)
+            .with_description(description)
+            .with_read_only_hint(hints.read_only)
+            .with_destructive_hint(hints.destructive)
+            .with_idempotent_hint(hints.idempotent)
+            .with_open_world_hint(false),
+        Some(output_schema),
     )
 }
 
-fn decode<T>(call: McpToolCall) -> Result<T, String>
+fn capture_tool<Input>(
+    name: &'static str,
+    title: &'static str,
+    description: &'static str,
+    output_schema: McpSchema,
+    hints: ToolHints,
+    has_frame: bool,
+) -> Result<McpTypedTool<Input>, McpToolError>
 where
-    T: for<'de> Deserialize<'de>,
+    Input: McpToolInput,
 {
-    serde_json::from_value(Value::Object(call.into_arguments().into_inner()))
-        .map_err(|error| error.to_string())
+    let mut tool = tool(name, title, description, output_schema, hints)?;
+    let input_schema = std::sync::Arc::make_mut(&mut tool.definition_mut().input_schema);
+    input_schema.insert(
+        "dependentRequired".to_string(),
+        json!({
+            "width": ["height"],
+            "height": ["width"],
+        }),
+    );
+    if let Some(properties) = input_schema
+        .get_mut("properties")
+        .and_then(Value::as_object_mut)
+    {
+        set_optional_positive_integer(properties, "width");
+        set_optional_positive_integer(properties, "height");
+        if has_frame {
+            set_optional_positive_integer(properties, "frame");
+        }
+    }
+    Ok(tool)
 }
 
-fn tool_error(message: impl Into<String>) -> ToolCallResult {
-    tool_error_result(message.into())
+fn set_optional_positive_integer(properties: &mut serde_json::Map<String, Value>, field: &str) {
+    let Some(branches) = properties
+        .get_mut(field)
+        .and_then(Value::as_object_mut)
+        .and_then(|schema| schema.get_mut("anyOf"))
+        .and_then(Value::as_array_mut)
+    else {
+        return;
+    };
+    if let Some(integer) = branches.iter_mut().find_map(|branch| {
+        let object = branch.as_object_mut()?;
+        (object.get("type").and_then(Value::as_str) == Some("integer")).then_some(object)
+    }) {
+        integer.insert("minimum".to_string(), json!(1));
+    }
+}
+
+fn automation_tool_error(error: StorybookAutomationError) -> ToolCallResult {
+    let error = match error {
+        StorybookAutomationError::StoryNotFound { key } => {
+            McpToolError::invalid_field_value("key", key)
+        },
+        error => McpToolError::handler(error.to_string()),
+    };
+    tool_error_result_for(error)
+}
+
+fn object_schema<const N: usize>(
+    properties: [(String, McpSchema); N],
+    required: impl IntoIterator<Item = &'static str>,
+) -> McpSchema {
+    McpSchema::object()
+        .with_properties(McpSchemaProperties::from(properties))
+        .with_required(required)
+        .with_additional_properties(false)
+}
+
+fn story_size_schema() -> McpSchema {
+    object_schema(
+        [
+            ("width".to_string(), McpSchema::integer()),
+            ("height".to_string(), McpSchema::integer()),
+        ],
+        ["width", "height"],
+    )
+}
+
+fn story_schema() -> McpSchema {
+    object_schema(
+        [
+            ("key".to_string(), McpSchema::string()),
+            ("crate_name".to_string(), McpSchema::string()),
+            ("story_name".to_string(), McpSchema::string()),
+            ("title".to_string(), McpSchema::string()),
+            ("description".to_string(), McpSchema::string()),
+            ("group".to_string(), nullable_schema(McpSchema::string())),
+            ("section".to_string(), nullable_schema(McpSchema::string())),
+            ("source_file".to_string(), McpSchema::string()),
+            ("source_line".to_string(), McpSchema::integer()),
+            ("capture_route_id".to_string(), McpSchema::string()),
+            ("default_size".to_string(), story_size_schema()),
+        ],
+        [
+            "key",
+            "crate_name",
+            "story_name",
+            "title",
+            "description",
+            "group",
+            "section",
+            "source_file",
+            "source_line",
+            "capture_route_id",
+            "default_size",
+        ],
+    )
+}
+
+fn list_stories_output_schema() -> McpSchema {
+    object_schema(
+        [("stories".to_string(), McpSchema::array(story_schema()))],
+        ["stories"],
+    )
+}
+
+fn get_story_output_schema() -> McpSchema {
+    object_schema([("story".to_string(), story_schema())], ["story"])
+}
+
+fn current_story_output_schema() -> McpSchema {
+    object_schema(
+        [
+            ("story".to_string(), nullable_schema(story_schema())),
+            ("revision".to_string(), McpSchema::integer()),
+        ],
+        ["story", "revision"],
+    )
+}
+
+fn capture_story_output_schema() -> McpSchema {
+    object_schema(
+        [
+            ("request_id".to_string(), McpSchema::integer()),
+            ("path".to_string(), McpSchema::string()),
+            ("pixel_width".to_string(), McpSchema::integer()),
+            ("pixel_height".to_string(), McpSchema::integer()),
+            ("story".to_string(), story_schema()),
+        ],
+        ["request_id", "path", "pixel_width", "pixel_height", "story"],
+    )
+}
+
+fn capture_launch_env_output_schema() -> McpSchema {
+    let string_array = || McpSchema::array(McpSchema::string());
+    object_schema(
+        [
+            (
+                "env".to_string(),
+                McpSchema::object().with_additional_properties(McpSchema::string()),
+            ),
+            ("cargo_args".to_string(), string_array()),
+            ("command".to_string(), string_array()),
+        ],
+        ["env", "cargo_args", "command"],
+    )
 }
 
 fn build_capture_launch_env(
@@ -517,6 +753,160 @@ mod tests {
                 }
             }
         }
+    }
+
+    fn sample_story() -> StorySnapshot {
+        StorySnapshot {
+            key: "example-ButtonStory".to_string(),
+            crate_name: "example".to_string(),
+            story_name: "ButtonStory".to_string(),
+            title: "Button".to_string(),
+            description: "Button states".to_string(),
+            group: Some("Inputs".to_string()),
+            section: None,
+            source_file: "src/stories/button.rs".to_string(),
+            source_line: 12,
+            capture_route_id: "example-ButtonStory".to_string(),
+            default_size: StoryDefaultSize::default(),
+        }
+    }
+
+    #[test]
+    fn tools_advertise_typed_inputs_outputs_and_annotations() {
+        let server = server(StorybookAutomation::with_stories(vec![sample_story()]))
+            .expect("server should build");
+        let tools = serde_json::to_value(server.list_tools()).expect("tools should serialize");
+        let tools = tools.as_array().expect("tools should be an array");
+        let find = |name: &str| {
+            tools
+                .iter()
+                .find(|tool| tool["name"] == name)
+                .unwrap_or_else(|| panic!("tool `{name}` should be registered"))
+        };
+
+        let list = find(TOOL_LIST_STORIES);
+        assert_eq!(list["inputSchema"]["additionalProperties"], false);
+        assert_eq!(
+            list["outputSchema"]["properties"]["stories"]["type"],
+            "array"
+        );
+        assert_eq!(list["annotations"]["readOnlyHint"], true);
+        assert_eq!(list["annotations"]["openWorldHint"], false);
+
+        let get = find(TOOL_GET_STORY);
+        assert_eq!(get["inputSchema"]["required"], json!(["key"]));
+        assert_eq!(get["inputSchema"]["properties"]["key"]["type"], "string");
+        assert_eq!(get["outputSchema"]["properties"]["story"]["type"], "object");
+
+        let capture = find(TOOL_CAPTURE_CURRENT_STORY);
+        assert_eq!(capture["inputSchema"]["required"], json!([]));
+        assert_eq!(
+            capture["inputSchema"]["properties"]["width"]["anyOf"][0]["type"],
+            "integer"
+        );
+        assert_eq!(
+            capture["inputSchema"]["properties"]["width"]["anyOf"][0]["minimum"],
+            1
+        );
+        assert_eq!(
+            capture["inputSchema"]["dependentRequired"]["width"],
+            json!(["height"])
+        );
+        assert_eq!(capture["annotations"]["destructiveHint"], true);
+
+        let launch = find(TOOL_CAPTURE_LAUNCH_ENV);
+        assert_eq!(launch["inputSchema"]["required"], json!(["key"]));
+        assert_eq!(
+            launch["inputSchema"]["properties"]["features"]["anyOf"][0]["type"],
+            "array"
+        );
+        assert_eq!(
+            launch["inputSchema"]["properties"]["frame"]["anyOf"][0]["minimum"],
+            1
+        );
+        assert_eq!(
+            launch["outputSchema"]["properties"]["env"]["type"],
+            "object"
+        );
+    }
+
+    #[test]
+    fn typed_tool_calls_reject_bad_arguments_and_return_structured_results() {
+        let story = sample_story();
+        let server = server(StorybookAutomation::with_stories(vec![story.clone()]))
+            .expect("server should build");
+
+        let listed = serde_json::to_value(server.call_tool(TOOL_LIST_STORIES, Some(json!({}))))
+            .expect("result should serialize");
+        assert_eq!(
+            tool_call_structured_content(&listed).expect("structured list result")["stories"][0]["key"],
+            story.key
+        );
+
+        let found = serde_json::to_value(
+            server.call_tool(TOOL_GET_STORY, Some(json!({ "key": story.key }))),
+        )
+        .expect("result should serialize");
+        assert_eq!(found["structuredContent"]["story"]["title"], story.title);
+
+        let current = serde_json::to_value(server.call_tool(TOOL_CURRENT_STORY, Some(json!({}))))
+            .expect("result should serialize");
+        assert_eq!(current["structuredContent"]["story"]["key"], story.key);
+        assert_eq!(current["structuredContent"]["revision"], 0);
+
+        let unexpected = serde_json::to_value(
+            server.call_tool(TOOL_LIST_STORIES, Some(json!({ "unexpected": true }))),
+        )
+        .expect("result should serialize");
+        assert_eq!(unexpected["isError"], true);
+        assert_eq!(
+            unexpected["structuredContent"]["error"]["kind"],
+            "unknown_field"
+        );
+
+        let missing = serde_json::to_value(server.call_tool(TOOL_GET_STORY, Some(json!({}))))
+            .expect("result should serialize");
+        assert_eq!(
+            missing["structuredContent"]["error"]["kind"],
+            "missing_field"
+        );
+
+        let unknown = serde_json::to_value(
+            server.call_tool(TOOL_GET_STORY, Some(json!({ "key": "missing-story" }))),
+        )
+        .expect("result should serialize");
+        assert_eq!(
+            unknown["structuredContent"]["error"]["kind"],
+            "invalid_field_value"
+        );
+    }
+
+    #[test]
+    fn capture_output_schema_accepts_runtime_snapshot_shape() {
+        let snapshot = StoryCaptureSnapshot {
+            request_id: 7,
+            path: PathBuf::from("target/storybook-captures/button.png"),
+            pixel_width: 900,
+            pixel_height: 700,
+            story: sample_story(),
+        };
+        let definition = component_shape_mcp::tool_definition(
+            "capture_schema_test",
+            None,
+            None,
+            McpSchema::object().with_additional_properties(false),
+            Some(capture_story_output_schema()),
+        )
+        .expect("capture schema should define a valid tool");
+        let mut server = McpServer::new("capture-schema-test", "0.0.0");
+        server
+            .add_tool(definition, move |_| tool_structured_result(json!(snapshot)))
+            .expect("schema test tool should register");
+
+        let result = serde_json::to_value(server.call_tool("capture_schema_test", Some(json!({}))))
+            .expect("result should serialize");
+        assert_eq!(result["isError"], false);
+        assert_eq!(result["structuredContent"]["pixel_width"], 900);
     }
 
     #[test]

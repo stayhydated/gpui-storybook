@@ -98,6 +98,9 @@ group = "gpui-storybook-example-component"
 
 The `mcp` feature enables live story automation and PNG capture. This example
 wires `StorybookAutomation` into both gallery and dock modes.
+The stdio tools expose typed input/output schemas and structured argument
+errors, so clients can discover story keys and capture options from MCP tool
+metadata.
 
 ```bash
 WGPU_CAPTURE_ROUTE=gpui-storybook-example-component-WelcomeCard \
