@@ -1248,7 +1248,7 @@ dependencies = [
 [[package]]
 name = "component-shape"
 version = "0.1.0"
-source = "git+https://github.com/stayhydated/component-shape#872319877369f9fe12cf62a03fc16b5a15e79b2c"
+source = "git+https://github.com/stayhydated/component-shape#74e5c8397f1a6c34a26ebf507fd40daca6249e13"
 dependencies = [
  "derive_more",
  "heck 0.5.0",
@@ -1260,11 +1260,11 @@ dependencies = [
 [[package]]
 name = "component-shape-mcp"
 version = "0.1.0"
-source = "git+https://github.com/stayhydated/component-shape#872319877369f9fe12cf62a03fc16b5a15e79b2c"
+source = "git+https://github.com/stayhydated/component-shape#74e5c8397f1a6c34a26ebf507fd40daca6249e13"
 dependencies = [
  "component-shape",
  "component-shape-mcp-macros",
- "rmcp 1.8.0",
+ "rmcp",
  "serde",
  "serde_json",
  "strum 0.28.0",
@@ -1275,7 +1275,7 @@ dependencies = [
 [[package]]
 name = "component-shape-mcp-macros"
 version = "0.1.0"
-source = "git+https://github.com/stayhydated/component-shape#872319877369f9fe12cf62a03fc16b5a15e79b2c"
+source = "git+https://github.com/stayhydated/component-shape#74e5c8397f1a6c34a26ebf507fd40daca6249e13"
 dependencies = [
  "proc-macro-crate 3.5.0",
  "proc-macro2",
@@ -3261,7 +3261,7 @@ dependencies = [
  "component-shape-mcp",
  "frame-capture",
  "gpui-storybook-core",
- "rmcp 2.2.0",
+ "rmcp",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
@@ -6676,26 +6676,6 @@ dependencies = [
  "libc",
  "untrusted",
  "windows-sys 0.52.0",
-]
-
-[[package]]
-name = "rmcp"
-version = "1.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d1f571c72940a19d9532fe52dbea8bc9912bf1d766c2970bb824056b86f3f59"
-dependencies = [
- "async-trait",
- "chrono",
- "futures",
- "pastey 0.2.3",
- "pin-project-lite",
- "schemars",
- "serde",
- "serde_json",
- "thiserror 2.0.18",
- "tokio",
- "tokio-util",
- "tracing",
 ]
 
 [[package]]
