@@ -528,3 +528,152 @@ impl Render for Gallery {
             )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::registry::{RegisteredStoryMetadata, StoryKey, StoryName};
+    use tokio::sync::oneshot;
+
+    fn story(
+        key: &'static str,
+        name: &'static str,
+        title: &'static str,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Entity<StoryContainer> {
+        cx.new(|cx| {
+            let mut story = StoryContainer::new(window, cx);
+            story.name = title.into();
+            story.set_registration_metadata(RegisteredStoryMetadata::new(
+                StoryKey::new(key),
+                StoryName::new(name),
+                None,
+                "crate",
+                "src/stories.rs",
+                1,
+            ));
+            story
+        })
+    }
+
+    #[gpui::test]
+    fn gallery_selects_by_title_key_and_automation_command(cx: &mut App) {
+        gpui_component::init(cx);
+        let automation = crate::automation::StorybookAutomation::new();
+        let automation_for_view = automation.clone();
+        let window: gpui::WindowHandle<Gallery> = cx
+            .open_window(Default::default(), move |window, cx| {
+                let button = story("crate-ButtonStory", "ButtonStory", "Button", window, cx);
+                let table = story("crate-TableStory", "TableStory", "Table", window, cx);
+                Gallery::view_with_automation(
+                    vec![button, table],
+                    Some("TableStory"),
+                    automation_for_view,
+                    window,
+                    cx,
+                )
+            })
+            .expect("gallery window should open");
+
+        window
+            .update(cx, |gallery, window, cx| {
+                assert_eq!(gallery.active_index, Some(1));
+                assert!(!gallery.collapsed);
+                assert_eq!(
+                    gallery
+                        .active_story_snapshot(cx)
+                        .expect("table should be active")
+                        .key,
+                    "crate-TableStory"
+                );
+
+                gallery.set_active_story("ButtonStory", cx);
+                assert_eq!(gallery.active_index, Some(0));
+                gallery.set_active_story("MissingStory", cx);
+                assert_eq!(gallery.active_index, Some(0));
+
+                let selected = gallery
+                    .set_active_story_by_key("crate-ButtonStory/with-icon", cx)
+                    .expect("substory key should select its parent story");
+                assert_eq!(
+                    selected
+                        .story
+                        .expect("selected story should be returned")
+                        .capture_route_id,
+                    "crate-ButtonStory/with-icon"
+                );
+                assert!(matches!(
+                    gallery.set_active_story_by_key("missing", cx),
+                    Err(StorybookAutomationError::StoryNotFound { key }) if key == "missing"
+                ));
+
+                let (response, mut result) = oneshot::channel();
+                gallery.handle_automation_command(
+                    StorybookAutomationCommand::OpenStory {
+                        key: "crate-TableStory".to_string(),
+                        response,
+                    },
+                    window,
+                    cx,
+                );
+                assert_eq!(
+                    result
+                        .try_recv()
+                        .expect("open response should be sent")
+                        .expect("table should open")
+                        .story
+                        .expect("table snapshot should exist")
+                        .key,
+                    "crate-TableStory"
+                );
+
+                gallery.stories.clear();
+                gallery.active_index = None;
+                automation.set_stories(Vec::new());
+                let error = gallery
+                    .prepare_capture_current_story(&StoryScreenshotRequest::default(), window, cx)
+                    .expect_err("capture requires a selected story");
+                assert!(matches!(
+                    error,
+                    StorybookAutomationError::CaptureUnavailable { message }
+                        if message.contains("no current story")
+                ));
+
+                let (response, mut result) = oneshot::channel();
+                gallery.handle_automation_command(
+                    StorybookAutomationCommand::CaptureCurrentStory {
+                        request_id: 7,
+                        request: StoryScreenshotRequest::default(),
+                        response,
+                    },
+                    window,
+                    cx,
+                );
+                assert!(matches!(
+                    result.try_recv().expect("capture error should be sent"),
+                    Err(StorybookAutomationError::CaptureUnavailable { .. })
+                ));
+            })
+            .expect("gallery should update");
+    }
+
+    #[gpui::test]
+    fn empty_gallery_has_no_active_story(cx: &mut App) {
+        gpui_component::init(cx);
+        let window: gpui::WindowHandle<Gallery> = cx
+            .open_window(Default::default(), |window, cx| {
+                Gallery::view(Vec::new(), Some("Missing"), window, cx)
+            })
+            .expect("empty gallery window should open");
+
+        window
+            .update(cx, |gallery, _, cx| {
+                assert_eq!(gallery.active_index, None);
+                assert_eq!(gallery.active_story_snapshot(cx), None);
+                gallery.sync_automation_stories(cx);
+                gallery.confirm_active_story(cx);
+            })
+            .expect("empty gallery should update");
+    }
+}

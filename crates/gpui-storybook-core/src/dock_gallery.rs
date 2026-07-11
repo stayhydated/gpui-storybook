@@ -6,6 +6,8 @@ use crate::{
         validate_capture_target_size,
     },
     capture_region::capture_route_story_key,
+    dock_layout_store::DockLayoutStore,
+    dock_sidebar_index::{SidebarStoryMetadata, group_matching_stories},
     registry::StoryEntry,
     story::{StoryContainer, StoryState, parse_story_list_klass, reveal_story_panel},
     storybook_window_ui::StorybookWindowUi,
@@ -32,7 +34,6 @@ use gpui_component::{
 use gpui_storybook_components::{StoryDrag, StorySidebarItem};
 use std::{
     collections::BTreeMap,
-    path::Path,
     sync::{Arc, LazyLock, Mutex},
 };
 
@@ -79,83 +80,6 @@ struct StorySeed {
     story_klass: String,
     group: Option<String>,
     section: Option<String>,
-}
-
-struct DockLayoutStore;
-
-impl DockLayoutStore {
-    fn sanitize_state_json(value: &mut serde_json::Value) {
-        match value {
-            serde_json::Value::Object(map) => {
-                for child in map.values_mut() {
-                    Self::sanitize_state_json(child);
-                }
-
-                let is_tab_panel = map
-                    .get("panel_name")
-                    .and_then(serde_json::Value::as_str)
-                    .is_some_and(|name| name == "TabPanel");
-                if !is_tab_panel {
-                    return;
-                }
-
-                if let Some(info) = map.get_mut("info")
-                    && info
-                        .as_object()
-                        .and_then(|info| info.get("panel"))
-                        .is_some_and(serde_json::Value::is_null)
-                {
-                    *info = serde_json::json!({
-                        "tabs": {
-                            "active_index": 0
-                        }
-                    });
-                }
-            },
-            serde_json::Value::Array(items) => {
-                for item in items {
-                    Self::sanitize_state_json(item);
-                }
-            },
-            _ => {},
-        }
-    }
-
-    fn to_json(state: &DockAreaState) -> Result<String> {
-        let mut state_json = serde_json::to_value(state)?;
-        Self::sanitize_state_json(&mut state_json);
-        Ok(serde_json::to_string_pretty(&state_json)?)
-    }
-
-    fn sanitize_state(state: DockAreaState) -> Result<DockAreaState> {
-        let mut state_json = serde_json::to_value(state)?;
-        Self::sanitize_state_json(&mut state_json);
-        Ok(serde_json::from_value(state_json)?)
-    }
-
-    fn from_json(json: &str) -> Result<DockAreaState> {
-        let mut state_json = serde_json::from_str::<serde_json::Value>(json)?;
-        Self::sanitize_state_json(&mut state_json);
-        Ok(serde_json::from_value::<DockAreaState>(state_json)?)
-    }
-
-    fn save_to_path(path: &str, state: &DockAreaState) -> Result<()> {
-        let json = Self::to_json(state)?;
-        let path_ref = Path::new(path);
-        if let Some(parent) = path_ref.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-
-        let tmp_path = format!("{path}.tmp");
-        std::fs::write(&tmp_path, json)?;
-        std::fs::rename(&tmp_path, path)?;
-        Ok(())
-    }
-
-    fn load_from_path(path: &str) -> Result<DockAreaState> {
-        let json = std::fs::read_to_string(path)?;
-        Self::from_json(&json)
-    }
 }
 
 /// Sidebar panel for navigating stories
@@ -530,50 +454,22 @@ impl Focusable for StorySidebar {
 
 impl Render for StorySidebar {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let query = self.search_input.read(cx).value().trim().to_lowercase();
-
-        let filtered_stories: Vec<Entity<StoryContainer>> = self
+        let query = self.search_input.read(cx).value();
+        let story_metadata = self
             .stories
             .iter()
-            .filter(|story| {
+            .map(|story| {
                 let story_data = story.read(cx);
-                let title = story_data.display_title(cx);
-                let section = story_data
-                    .section
-                    .as_ref()
-                    .map(|s| s.to_string())
-                    .unwrap_or_default();
-                let group = story_data
-                    .group
-                    .as_ref()
-                    .map(|s| s.to_string())
-                    .unwrap_or_default();
-                title.to_lowercase().contains(&query)
-                    || group.to_lowercase().contains(&query)
-                    || section.to_lowercase().contains(&query)
+                SidebarStoryMetadata {
+                    title: story_data.display_title(cx),
+                    group: story_data.sidebar_group().map(|group| group.to_string()),
+                    section: story_data
+                        .sidebar_section()
+                        .map(|section| section.to_string()),
+                }
             })
-            .cloned()
-            .collect();
-
-        // Group stories by crate group, then optional section.
-        let mut groups: BTreeMap<
-            Option<SharedString>,
-            BTreeMap<Option<SharedString>, Vec<Entity<StoryContainer>>>,
-        > = BTreeMap::new();
-
-        for story_entity in filtered_stories.iter() {
-            let (group, section) = {
-                let story_data = story_entity.read(cx);
-                (story_data.sidebar_group(), story_data.sidebar_section())
-            };
-
-            groups
-                .entry(group)
-                .or_default()
-                .entry(section)
-                .or_default()
-                .push(story_entity.clone());
-        }
+            .collect::<Vec<_>>();
+        let groups = group_matching_stories(&story_metadata, query.as_ref());
 
         Sidebar::new("story-sidebar")
             .side(gpui_component::Side::Left)
@@ -613,7 +509,8 @@ impl Render for StorySidebar {
                                     );
                                 }
 
-                                items.extend(stories_in_section.into_iter().map(|story_entity| {
+                                items.extend(stories_in_section.into_iter().map(|story_index| {
+                                    let story_entity = &self.stories[story_index];
                                     let story_data = story_entity.read(cx);
                                     let name: SharedString = story_data.display_title(cx).into();
                                     let story_klass_for_drag =
@@ -769,7 +666,7 @@ impl StoryWorkspace {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Result<()> {
-        let state = DockLayoutStore::load_from_path(STATE_FILE)?;
+        let state: DockAreaState = DockLayoutStore::load_from_path(STATE_FILE)?;
 
         // Saved layouts must match the active dock schema.
         if state.version != Some(MAIN_DOCK_AREA.version) {

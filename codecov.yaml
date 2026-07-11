@@ -1,0 +1,49 @@
+codecov:
+  require_ci_to_pass: true
+
+# https://docs.codecov.com/docs/components
+component_management:
+  individual_components:
+    - component_id: gpui-storybook
+      name: "gpui-storybook"
+      paths:
+        - crates/gpui-storybook/**
+
+    - component_id: gpui-storybook-components
+      name: "gpui-storybook-components"
+      paths:
+        - crates/gpui-storybook-components/**
+
+    - component_id: gpui-storybook-core
+      name: "gpui-storybook-core"
+      paths:
+        - crates/gpui-storybook-core/**
+
+    - component_id: gpui-storybook-macros
+      name: "gpui-storybook-macros"
+      paths:
+        - crates/gpui-storybook-macros/**
+
+    - component_id: gpui-storybook-mcp
+      name: "gpui-storybook-mcp"
+      paths:
+        - crates/gpui-storybook-mcp/**
+
+    - component_id: gpui-storybook-toml
+      name: "gpui-storybook-toml"
+      paths:
+        - crates/gpui-storybook-toml/**
+
+coverage:
+  precision: 2
+  round: down
+  range: "90...100"
+  status:
+    project:
+      default:
+        target: 90%
+        threshold: 5%
+    patch:
+      default:
+        target: 90%
+        threshold: 10%

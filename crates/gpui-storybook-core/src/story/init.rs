@@ -49,3 +49,17 @@ pub fn init(cx: &mut App) {
     ]);
     cx.activate(true);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[gpui::test]
+    fn runtime_init_installs_storybook_state(cx: &mut App) {
+        init(cx);
+
+        assert!(cx.try_global::<AppState>().is_some());
+        assert!(cx.try_global::<gpui_component::Theme>().is_some());
+        assert!(cx.try_global::<gpui_component::ThemeRegistry>().is_some());
+    }
+}

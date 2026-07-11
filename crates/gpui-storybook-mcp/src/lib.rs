@@ -739,6 +739,21 @@ mod tests {
 
             Self(previous)
         }
+
+        fn remove(names: &[&str]) -> Self {
+            let previous = names
+                .iter()
+                .map(|name| ((*name).to_string(), env::var_os(name)))
+                .collect();
+
+            unsafe {
+                for name in names {
+                    env::remove_var(name);
+                }
+            }
+
+            Self(previous)
+        }
     }
 
     impl Drop for EnvGuard {
@@ -1021,5 +1036,175 @@ mod tests {
                 .to_string()
                 .contains("set both capture width and height")
         );
+    }
+
+    #[test]
+    fn stdio_flag_requires_the_explicit_enabled_value() {
+        let _lock = ENV_LOCK.lock().expect("env lock should not be poisoned");
+        let _unset = EnvGuard::remove(&[STDIO_ENV_VAR]);
+        assert!(!stdio_requested());
+
+        {
+            let _disabled = EnvGuard::set(&[(STDIO_ENV_VAR, "0")]);
+            assert!(!stdio_requested());
+        }
+        {
+            let _enabled = EnvGuard::set(&[(STDIO_ENV_VAR, "1")]);
+            assert!(stdio_requested());
+        }
+    }
+
+    #[test]
+    fn capture_catalog_exposes_route_metadata_only() {
+        let story = sample_story();
+        assert_eq!(
+            capture_catalog(std::slice::from_ref(&story)),
+            json!({
+                "routes": [{
+                    "id": story.capture_route_id,
+                    "title": story.title,
+                    "default_size": story.default_size,
+                }]
+            })
+        );
+        assert_eq!(capture_catalog(&[]), json!({ "routes": [] }));
+    }
+
+    #[test]
+    fn capture_session_defaults_without_capture_environment() {
+        let _lock = ENV_LOCK.lock().expect("env lock should not be poisoned");
+        let _env = EnvGuard::remove(&[
+            "WGPU_CAPTURE_ROUTE",
+            "WGPU_CAPTURE_PATH",
+            "WGPU_CAPTURE_FRAME",
+            "WGPU_CAPTURE_WIDTH",
+            "WGPU_CAPTURE_HEIGHT",
+        ]);
+
+        let session = read_capture_session("fallback-story").expect("fallback should be valid");
+        assert_eq!(
+            session,
+            StorybookCaptureSession {
+                story_key: "fallback-story".to_string(),
+                capture: None,
+            }
+        );
+
+        let error = read_capture_session("").expect_err("blank fallback route should fail");
+        assert!(matches!(
+            error,
+            StorybookMcpError::InvalidDefaultStoryKey { key, .. } if key.is_empty()
+        ));
+    }
+
+    #[test]
+    fn capture_launch_env_supports_minimal_non_stdio_commands() {
+        let launch = build_capture_launch_env(CaptureLaunchEnvInput {
+            key: "example-ButtonStory".to_string(),
+            output_path: None,
+            frame: None,
+            width: None,
+            height: None,
+            package: None,
+            bin: None,
+            features: Some(Vec::new()),
+            stdio: Some(false),
+        })
+        .expect("minimal launch environment should build");
+
+        assert_eq!(launch.cargo_args, vec!["run"]);
+        assert_eq!(launch.command, vec!["cargo", "run"]);
+        assert!(!launch.env.contains_key(STDIO_ENV_VAR));
+        assert_eq!(launch.env["WGPU_CAPTURE_ROUTE"], "example-ButtonStory");
+    }
+
+    #[test]
+    fn schema_constraint_helper_tolerates_unexpected_shapes() {
+        let mut properties = serde_json::Map::new();
+        set_optional_positive_integer(&mut properties, "width");
+        assert!(properties.is_empty());
+
+        properties.insert("width".to_string(), json!({ "type": "integer" }));
+        set_optional_positive_integer(&mut properties, "width");
+        assert_eq!(properties["width"], json!({ "type": "integer" }));
+
+        properties.insert(
+            "width".to_string(),
+            json!({ "anyOf": [{ "type": "string" }] }),
+        );
+        set_optional_positive_integer(&mut properties, "width");
+        assert_eq!(properties["width"]["anyOf"][0]["minimum"], Value::Null);
+    }
+
+    #[test]
+    fn async_tools_return_structured_live_host_errors() {
+        let server = server(StorybookAutomation::with_stories(vec![sample_story()]))
+            .expect("server should build");
+
+        let open = serde_json::to_value(server.call_tool(
+            TOOL_OPEN_STORY,
+            Some(json!({ "key": "example-ButtonStory" })),
+        ))
+        .expect("open result should serialize");
+        assert_eq!(open["isError"], true);
+        assert_eq!(open["structuredContent"]["error"]["kind"], "handler");
+
+        let capture = serde_json::to_value(server.call_tool(
+            TOOL_CAPTURE_CURRENT_STORY,
+            Some(json!({ "output_path": "capture.png", "width": 800, "height": 600 })),
+        ))
+        .expect("capture result should serialize");
+        assert_eq!(capture["isError"], true);
+        assert_eq!(capture["structuredContent"]["error"]["kind"], "handler");
+    }
+
+    #[test]
+    fn capture_session_thread_reports_missing_live_host() {
+        let automation = StorybookAutomation::with_stories(vec![sample_story()]);
+        let handle = start_capture_session(
+            automation,
+            StorybookCaptureSession {
+                story_key: "example-ButtonStory".to_string(),
+                capture: None,
+            },
+            false,
+        )
+        .expect("capture session thread should start");
+
+        let error = handle
+            .join()
+            .expect("capture session thread should not panic")
+            .expect_err("a detached automation host should fail");
+        assert!(matches!(
+            error,
+            StorybookMcpError::Automation(StorybookAutomationError::NoLiveHost)
+        ));
+    }
+
+    #[test]
+    fn capture_session_from_env_handles_absent_and_late_story_registration() {
+        let _lock = ENV_LOCK.lock().expect("env lock should not be poisoned");
+        let _clean = EnvGuard::remove(&["WGPU_CAPTURE_ROUTE", "WGPU_CAPTURE_PATH"]);
+        assert!(
+            start_capture_session_from_env(StorybookAutomation::new())
+                .expect("absent capture env should not fail")
+                .is_none()
+        );
+
+        let _route = EnvGuard::set(&[("WGPU_CAPTURE_ROUTE", "example-ButtonStory")]);
+        let automation = StorybookAutomation::new();
+        let handle = start_capture_session_from_env(automation.clone())
+            .expect("capture waiter should start")
+            .expect("capture route should request a session");
+        automation.set_stories(vec![sample_story()]);
+
+        let error = handle
+            .join()
+            .expect("capture waiter should not panic")
+            .expect_err("a detached automation host should fail");
+        assert!(matches!(
+            error,
+            StorybookMcpError::Automation(StorybookAutomationError::NoLiveHost)
+        ));
     }
 }

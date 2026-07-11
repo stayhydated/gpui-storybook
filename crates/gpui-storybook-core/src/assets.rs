@@ -45,3 +45,47 @@ impl AssetSource for Assets {
         Ok(results)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn asset_source_loads_local_and_component_assets() {
+        let assets = Assets;
+
+        assert!(
+            assets
+                .load("")
+                .expect("blank path should be valid")
+                .is_none()
+        );
+        assert!(
+            assets
+                .load("themes/adventure.json")
+                .expect("embedded theme should load")
+                .is_some()
+        );
+        assert!(
+            assets
+                .load("icons/arrow-down.svg")
+                .expect("component icon should load")
+                .is_some()
+        );
+        assert!(assets.load("missing.asset").is_err());
+    }
+
+    #[test]
+    fn asset_lists_support_root_local_and_partial_icon_prefixes() {
+        let assets = Assets;
+        let root = assets.list("").expect("root assets should list");
+        let themes = assets.list("themes/").expect("themes should list");
+        let icons = assets
+            .list("icon")
+            .expect("partial icon prefix should list");
+
+        assert!(root.iter().any(|path| path == "themes/adventure.json"));
+        assert!(themes.iter().all(|path| path.starts_with("themes/")));
+        assert!(icons.iter().any(|path| path.starts_with("icons/")));
+    }
+}

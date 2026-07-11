@@ -96,3 +96,55 @@ pub(crate) struct SwitchTheme(pub(crate) SharedString);
 #[derive(Action, Clone, PartialEq)]
 #[action(namespace = story_themes, no_json)]
 pub(crate) struct SwitchThemeMode(pub(crate) ThemeMode);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn persisted_theme_state_defaults_and_round_trips() {
+        let state = State::default();
+        assert_eq!(state.theme.as_ref(), "Default Dark");
+        assert_eq!(state.scrollbar_show, None);
+
+        let json = serde_json::to_string(&state).expect("state should serialize");
+        let restored: State = serde_json::from_str(&json).expect("state should deserialize");
+        assert_eq!(restored.theme, state.theme);
+        assert_eq!(restored.scrollbar_show, state.scrollbar_show);
+    }
+
+    #[test]
+    fn theme_actions_preserve_selected_values() {
+        let theme = SwitchTheme("Adventure".into());
+        assert!(theme == theme.clone());
+
+        let mode = SwitchThemeMode(ThemeMode::Light);
+        assert!(mode == mode.clone());
+    }
+
+    #[gpui::test]
+    fn registered_theme_actions_apply_mode_and_named_theme(cx: &mut App) {
+        gpui_component::init(cx);
+        init(cx);
+
+        let target_mode = if cx.theme().mode.is_dark() {
+            ThemeMode::Light
+        } else {
+            ThemeMode::Dark
+        };
+        cx.dispatch_action(&SwitchThemeMode(target_mode));
+        assert_eq!(cx.theme().mode, target_mode);
+
+        let theme_name = ThemeRegistry::global(cx)
+            .sorted_themes()
+            .first()
+            .expect("component themes should be registered")
+            .name
+            .clone();
+        cx.dispatch_action(&SwitchTheme(theme_name.clone()));
+        assert_eq!(cx.theme().theme_name(), &theme_name);
+
+        cx.dispatch_action(&SwitchTheme("missing-theme".into()));
+        assert_eq!(cx.theme().theme_name(), &theme_name);
+    }
+}

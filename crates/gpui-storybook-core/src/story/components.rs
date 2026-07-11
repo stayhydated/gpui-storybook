@@ -833,9 +833,225 @@ impl Render for StoryContainer {
             });
 
         if let Some(story_key) = story_key {
-            capture_story_view(story_key.to_string(), scroll_handle, content).into_any_element()
+            capture_story_view(story_key, scroll_handle, content).into_any_element()
         } else {
             capture_scroll_scope(scroll_handle, content).into_any_element()
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::registry::{StoryKey, StoryName, StorySectionName};
+    use gpui::{div, px};
+
+    enum DemoSubstory {
+        WithIcon,
+    }
+
+    impl Substory for DemoSubstory {
+        fn capture_key(&self) -> &'static str {
+            "with-icon"
+        }
+
+        fn title(&self) -> SharedString {
+            "With Icon".into()
+        }
+    }
+
+    struct DefaultStoryContract;
+
+    impl Focusable for DefaultStoryContract {
+        fn focus_handle(&self, _: &App) -> gpui::FocusHandle {
+            unreachable!("the static Story defaults do not require a focus handle")
+        }
+    }
+
+    impl Render for DefaultStoryContract {
+        fn render(&mut self, _: &mut Window, _: &mut gpui::Context<Self>) -> impl IntoElement {
+            div()
+        }
+    }
+
+    impl Story for DefaultStoryContract {
+        fn title(_: &App) -> String {
+            "Default Story".to_string()
+        }
+
+        fn new_view(_: &mut Window, cx: &mut App) -> Entity<impl Render + Focusable> {
+            cx.new(|_| DefaultStoryContract)
+        }
+    }
+
+    #[test]
+    fn section_titles_support_visible_and_stable_capture_identity() {
+        let (title, key) = StorySectionTitle::new("Visible").into_parts();
+        assert_eq!(title.as_ref(), "Visible");
+        assert_eq!(key, None);
+
+        let (title, key) = StorySectionTitle::with_capture_key("stable", "Visible").into_parts();
+        assert_eq!(title.as_ref(), "Visible");
+        assert_eq!(key.as_deref(), Some("stable"));
+
+        for descriptor in [
+            StorySectionTitle::from("Borrowed"),
+            StorySectionTitle::from(String::from("Owned")),
+            StorySectionTitle::from(SharedString::from("Shared")),
+        ] {
+            assert_eq!(descriptor.capture_key, None);
+        }
+
+        let descriptor = StorySectionTitle::from(DemoSubstory::WithIcon);
+        let base = StorySectionBase::new(descriptor);
+        assert_eq!(base.title().as_ref(), "With Icon");
+        assert_eq!(base.capture_key().map(AsRef::as_ref), Some("with-icon"));
+        let _captured = base.capture(div());
+
+        let visible = StorySectionBase::new("Visible");
+        assert_eq!(visible.title().as_ref(), "Visible");
+        assert_eq!(visible.capture_key(), None);
+        let _captured = visible.capture(div());
+    }
+
+    #[test]
+    fn styled_section_builder_collects_subtitles_children_and_widths() {
+        let mut section = section("Examples")
+            .sub_title(div().child("Subtitle"))
+            .max_w_md()
+            .max_w_lg()
+            .max_w_xl()
+            .max_w_2xl();
+        section.extend([div().child("First").into_any_element()]);
+        let _style = section.style();
+
+        assert_eq!(section.capture.title().as_ref(), "Examples");
+        assert_eq!(section.sub_title.len(), 1);
+        assert_eq!(section.children.len(), 1);
+    }
+
+    #[cfg(feature = "dock")]
+    #[test]
+    fn story_list_class_round_trips_sorted_members() {
+        assert_eq!(parse_story_list_klass("ButtonStory"), None);
+        assert_eq!(
+            parse_story_list_klass(STORY_LIST_KLASS_PREFIX),
+            Some(Vec::new())
+        );
+        assert_eq!(
+            parse_story_list_klass("__gpui_storybook_list__:TableStory||ButtonStory"),
+            Some(vec!["TableStory".to_string(), "ButtonStory".to_string()])
+        );
+    }
+
+    #[gpui::test]
+    fn story_trait_defaults_are_stable(cx: &mut App) {
+        assert_eq!(DefaultStoryContract::klass(), "DefaultStoryContract");
+        assert_eq!(DefaultStoryContract::title(cx), "Default Story");
+        assert_eq!(DefaultStoryContract::description(cx), "");
+        assert!(DefaultStoryContract::closable());
+        assert!(DefaultStoryContract::zoomable().is_some());
+        assert_eq!(DefaultStoryContract::title_bg(), None);
+    }
+
+    #[gpui::test]
+    fn story_container_builders_and_metadata_expose_runtime_contract(cx: &mut App) {
+        gpui_component::init(cx);
+        let window: gpui::WindowHandle<StoryContainer> = cx
+            .open_window(Default::default(), |window, cx| {
+                cx.new(|cx| StoryContainer::new(window, cx))
+            })
+            .expect("test window should open");
+
+        window
+            .update(cx, |container, window, cx| {
+                assert_eq!(container.sidebar_group(), None);
+                assert_eq!(container.sidebar_section(), None);
+                assert_eq!(container.display_title(cx), "");
+                assert_eq!(container.display_description(cx), "");
+
+                *container = StoryContainer::new(window, cx)
+                    .group("Examples")
+                    .section("Components")
+                    .width(px(800.))
+                    .height(px(600.));
+                container.name = "Button".into();
+                container.description = "Button states".into();
+                assert_eq!(container.sidebar_group().as_deref(), Some("Examples"));
+                assert_eq!(container.sidebar_section().as_deref(), Some("Components"));
+                assert_eq!(container.display_title(cx), "Button");
+                assert_eq!(container.display_description(cx), "Button states");
+                assert_eq!(container.width, Some(px(800.)));
+                assert_eq!(container.height, Some(px(600.)));
+
+                let metadata = RegisteredStoryMetadata::new(
+                    StoryKey::new("crate-ButtonStory"),
+                    StoryName::new("ButtonStory"),
+                    Some(StorySectionName::new("Components")),
+                    "crate",
+                    "src/button.rs",
+                    42,
+                );
+                container.set_registration_metadata(metadata);
+                assert_eq!(container.registration_metadata(), Some(metadata));
+                assert_eq!(
+                    container.story_key(),
+                    Some(StoryKey::new("crate-ButtonStory"))
+                );
+                assert_eq!(container.story_name(), Some(StoryName::new("ButtonStory")));
+                assert_eq!(container.story_key_label(), Some("crate-ButtonStory"));
+                assert_eq!(container.story_name_label(), Some("ButtonStory"));
+                assert_eq!(container.crate_name_label(), Some("crate"));
+                assert_eq!(container.source_file_label(), Some("src/button.rs"));
+                assert_eq!(container.source_line(), Some(42));
+
+                container.title_fn = Some(Box::new(|_| "Localized Button".to_string()));
+                container.description_fn = Some(Box::new(|_| "Localized description".to_string()));
+                assert_eq!(container.display_title(cx), "Localized Button");
+                assert_eq!(container.display_description(cx), "Localized description");
+            })
+            .expect("container should update");
+    }
+
+    #[gpui::test]
+    fn story_list_class_sorts_entities_and_ignores_missing_classes(cx: &mut App) {
+        gpui_component::init(cx);
+        let window: gpui::WindowHandle<StoryContainer> = cx
+            .open_window(Default::default(), |window, cx| {
+                cx.new(|cx| StoryContainer::new(window, cx))
+            })
+            .expect("test window should open");
+
+        window
+            .update(cx, |_, window, cx| {
+                let table = cx.new(|cx| {
+                    let mut story = StoryContainer::new(window, cx);
+                    story.story_klass = Some("TableStory".into());
+                    story
+                });
+                let button = cx.new(|cx| {
+                    let mut story = StoryContainer::new(window, cx);
+                    story.story_klass = Some("ButtonStory".into());
+                    story
+                });
+                let missing = cx.new(|cx| StoryContainer::new(window, cx));
+
+                assert_eq!(
+                    story_list_klass(&[table, missing, button], cx).as_ref(),
+                    "__gpui_storybook_list__:ButtonStory|TableStory"
+                );
+            })
+            .expect("story classes should be computed");
+    }
+
+    #[test]
+    fn story_state_serializes_panel_identity() {
+        let state = StoryState {
+            story_klass: "ButtonStory".into(),
+        };
+        assert_eq!(
+            state.to_value(),
+            serde_json::json!({ "story_klass": "ButtonStory" })
+        );
     }
 }

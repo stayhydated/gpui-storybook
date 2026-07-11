@@ -63,3 +63,70 @@ impl Render for AppTitleBar {
             )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::locale::LocaleStore;
+    use anyhow::Result;
+    use unic_langid::LanguageIdentifier;
+
+    struct TestLocales;
+
+    impl LocaleStore for TestLocales {
+        fn available_locales(&self, _: &App) -> Result<Vec<(String, LanguageIdentifier)>> {
+            Ok(Vec::new())
+        }
+
+        fn current_locale(&self, _: &App) -> Result<LanguageIdentifier> {
+            Ok("en".parse().expect("valid locale"))
+        }
+
+        fn set_current_locale(&self, _: LanguageIdentifier, _: &mut App) -> Result<()> {
+            Ok(())
+        }
+    }
+
+    fn init_test_globals(cx: &mut App) {
+        gpui_component::init(cx);
+        cx.set_global(Box::new(TestLocales) as Box<dyn LocaleStore>);
+    }
+
+    #[gpui::test]
+    fn title_bar_builds_default_and_custom_content(cx: &mut App) {
+        init_test_globals(cx);
+        let custom: gpui::WindowHandle<AppTitleBar> = cx
+            .open_window(Default::default(), |window, cx| {
+                cx.new(|cx| {
+                    AppTitleBar::new(
+                        "Storybook",
+                        StorybookWindowUi::new()
+                            .with_title_bar_items(|_, _| div().child("Initial")),
+                        window,
+                        cx,
+                    )
+                    .child(|_, _| div().child("Override"))
+                })
+            })
+            .expect("custom title bar should open");
+        custom
+            .update(cx, |title_bar, _, _| {
+                assert_ne!(
+                    title_bar.app_menu_bar.entity_id(),
+                    title_bar.font_size_selector.entity_id()
+                );
+            })
+            .expect("custom title bar should update");
+
+        let default: gpui::WindowHandle<AppTitleBar> = cx
+            .open_window(Default::default(), |window, cx| {
+                cx.new(|cx| AppTitleBar::new("Storybook", StorybookWindowUi::default(), window, cx))
+            })
+            .expect("default title bar should open");
+        default
+            .update(cx, |title_bar, window, cx| {
+                let _ = (title_bar.child.clone())(window, cx);
+            })
+            .expect("default child should render");
+    }
+}

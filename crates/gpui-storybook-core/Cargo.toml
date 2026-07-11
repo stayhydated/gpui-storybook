@@ -41,5 +41,9 @@ gtk = { version = "0.18" }
 [build-dependencies]
 es-fluent-build = { workspace = true }
 
+[dev-dependencies]
+strum.workspace = true
+tokio = { features = [ "rt" ], workspace = true }
+
 [lints]
 workspace = true

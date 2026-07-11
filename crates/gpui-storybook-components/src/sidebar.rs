@@ -180,3 +180,52 @@ impl SidebarItem for StorySidebarItem {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn story_drag_preserves_machine_identity_and_visible_label() {
+        let drag = StoryDrag::new("ButtonStory", "Button");
+        let cloned = drag.clone();
+
+        assert_eq!(drag.story_klass(), "ButtonStory");
+        assert_eq!(drag.label.as_ref(), "Button");
+        assert_eq!(cloned.story_klass(), "ButtonStory");
+    }
+
+    #[test]
+    fn sidebar_item_builder_tracks_interaction_and_layout_state() {
+        let item = StorySidebarItem::new("Button", "ButtonStory")
+            .on_click(|_, _, _| {})
+            .active(true)
+            .disable(true)
+            .indented(true)
+            .section_heading(true)
+            .collapsed(true);
+
+        assert_eq!(item.label.as_ref(), "Button");
+        assert_eq!(item.story_klass.as_ref(), "ButtonStory");
+        assert!(item.active);
+        assert!(item.disabled);
+        assert!(item.indented);
+        assert!(item.section_heading);
+        assert!(item.is_collapsed());
+        assert_eq!(Rc::strong_count(&item.handler), 1);
+
+        let expanded = item.collapsed(false);
+        assert!(!expanded.is_collapsed());
+    }
+
+    #[test]
+    fn sidebar_item_defaults_are_enabled_and_expanded() {
+        let item = StorySidebarItem::new("Table", "TableStory");
+
+        assert!(!item.active);
+        assert!(!item.disabled);
+        assert!(!item.indented);
+        assert!(!item.section_heading);
+        assert!(!item.is_collapsed());
+    }
+}

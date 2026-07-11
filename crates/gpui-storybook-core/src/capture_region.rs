@@ -358,7 +358,12 @@ impl Element for CaptureSubstoryElement {
 
 #[cfg(test)]
 mod tests {
-    use super::{capture_substory_route_id, capture_substory_route_id_with_key};
+    use super::*;
+    use gpui::{ScrollHandle, div, point, px};
+
+    fn clear_registry() {
+        CAPTURE_REGIONS.with_borrow_mut(|registry| *registry = CaptureRegionRegistry::default());
+    }
 
     #[test]
     fn substory_route_id_slugs_titles() {
@@ -374,5 +379,103 @@ mod tests {
             capture_substory_route_id_with_key("story-key", "button-with-icon"),
             "story-key/button-with-icon"
         );
+    }
+
+    #[test]
+    fn route_slugs_normalize_separators_and_blank_titles() {
+        assert_eq!(
+            capture_route_slug("  Button___With ICON!  "),
+            "button-with-icon"
+        );
+        assert_eq!(capture_route_slug("123 Ready"), "123-ready");
+        assert_eq!(capture_route_slug("💧"), "section");
+        assert_eq!(capture_route_story_key("story-key/section"), "story-key");
+        assert_eq!(capture_route_story_key("story-key"), "story-key");
+    }
+
+    #[test]
+    fn scopes_restore_previous_state_and_record_region_bounds() {
+        clear_registry();
+        let outer = CaptureScope {
+            story_key: Some("story-key".to_string()),
+            viewport_bounds: None,
+            scroll_handle: None,
+        };
+        let bounds = Bounds {
+            origin: point(px(10.), px(20.)),
+            size: gpui::size(px(100.), px(50.)),
+        };
+
+        assert!(current_scope().is_none());
+        with_scope(outer, || {
+            assert_eq!(
+                current_scope().and_then(|scope| scope.story_key),
+                Some("story-key".to_string())
+            );
+            let scope = current_scope().expect("scope should be active");
+            record_region("story-key".to_string(), bounds, &scope);
+        });
+        assert!(current_scope().is_none());
+
+        let recorded = capture_region_bounds("story-key").expect("region should be recorded");
+        assert_eq!(recorded.bounds, bounds);
+        assert_eq!(recorded.viewport_bounds, bounds);
+        assert!(recorded.scroll_handle.is_none());
+        assert!(scroll_capture_region_into_view("story-key"));
+        assert!(!scroll_capture_region_into_view("missing"));
+    }
+
+    #[test]
+    fn scrolling_recorded_region_aligns_it_with_viewport() {
+        clear_registry();
+        let handle = ScrollHandle::new();
+        handle.set_offset(point(px(5.), px(10.)));
+        let scope = CaptureScope {
+            story_key: Some("story-key".to_string()),
+            viewport_bounds: Some(Bounds {
+                origin: point(px(20.), px(30.)),
+                size: gpui::size(px(100.), px(100.)),
+            }),
+            scroll_handle: Some(handle.clone()),
+        };
+        record_region(
+            "story-key/section".to_string(),
+            Bounds {
+                origin: point(px(50.), px(70.)),
+                size: gpui::size(px(40.), px(20.)),
+            },
+            &scope,
+        );
+
+        assert!(scroll_capture_region_into_view("story-key/section"));
+        assert_eq!(handle.offset(), point(px(-25.), px(-30.)));
+
+        with_scope(scope, || {
+            let active = current_capture_scroll_handle().expect("scroll handle should be exposed");
+            assert_eq!(active.offset(), point(px(-25.), px(-30.)));
+        });
+        assert!(current_capture_scroll_handle().is_none());
+    }
+
+    #[test]
+    fn capture_wrappers_are_anonymous_elements() {
+        let scroll = ScrollHandle::new();
+        let story = capture_story_view("story", scroll.clone(), div()).into_element();
+        assert!(story.id().is_none());
+        assert!(story.source_location().is_none());
+
+        let story_without_scroll =
+            capture_story_view_with_scroll("story", None, div()).into_element();
+        assert!(story_without_scroll.id().is_none());
+
+        let scroll_scope = capture_scroll_scope(scroll, div()).into_element();
+        assert!(scroll_scope.source_location().is_none());
+
+        let substory = capture_substory("With Icon", div()).into_element();
+        assert!(substory.id().is_none());
+        assert!(substory.source_location().is_none());
+
+        let keyed_substory = capture_substory_with_key("stable-key", div()).into_element();
+        assert!(keyed_substory.id().is_none());
     }
 }

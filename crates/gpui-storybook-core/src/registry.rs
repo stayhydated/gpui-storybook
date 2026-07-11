@@ -282,30 +282,36 @@ mod tests {
     fn story_key_exposes_registered_label() {
         let key = StoryKey::new("gpui-storybook-example-story-ButtonStory");
         let key_ref: &str = key.as_ref();
+        let borrowed: &str = std::borrow::Borrow::borrow(&key);
 
         assert_eq!(key.as_str(), "gpui-storybook-example-story-ButtonStory");
         assert_eq!(key.to_string(), "gpui-storybook-example-story-ButtonStory");
         assert_eq!(key_ref, "gpui-storybook-example-story-ButtonStory");
+        assert_eq!(borrowed, "gpui-storybook-example-story-ButtonStory");
     }
 
     #[test]
     fn story_name_exposes_registered_label() {
         let name = StoryName::new("ButtonStory");
         let name_ref: &str = name.as_ref();
+        let borrowed: &str = std::borrow::Borrow::borrow(&name);
 
         assert_eq!(name.as_str(), "ButtonStory");
         assert_eq!(name.to_string(), "ButtonStory");
         assert_eq!(name_ref, "ButtonStory");
+        assert_eq!(borrowed, "ButtonStory");
     }
 
     #[test]
     fn section_name_exposes_registered_label() {
         let section = StorySectionName::new("Components");
         let section_ref: &str = section.as_ref();
+        let borrowed: &str = std::borrow::Borrow::borrow(&section);
 
         assert_eq!(section.as_str(), "Components");
         assert_eq!(section.to_string(), "Components");
         assert_eq!(section_ref, "Components");
+        assert_eq!(borrowed, "Components");
     }
 
     #[test]
@@ -356,5 +362,24 @@ mod tests {
         assert_eq!(metadata.crate_name(), "storybook");
         assert_eq!(metadata.source_file(), "src/lib.rs");
         assert_eq!(metadata.source_line(), 42);
+    }
+
+    #[test]
+    fn story_entry_supports_unsectioned_registration() {
+        let entry = StoryEntry::new(
+            "storybook-ButtonStory",
+            "ButtonStory",
+            None,
+            None,
+            unused_create_fn,
+            "storybook",
+            "/tmp/storybook",
+            "src/lib.rs",
+            42,
+        );
+
+        assert_eq!(entry.section, None);
+        assert_eq!(entry.metadata().section(), None);
+        assert_eq!(entry.crate_dir, "/tmp/storybook");
     }
 }

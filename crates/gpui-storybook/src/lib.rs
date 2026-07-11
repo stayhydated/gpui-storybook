@@ -264,6 +264,27 @@ fn resolve_story_entry(
     })
 }
 
+fn compare_resolved_story_entries(
+    a: &ResolvedStoryEntry,
+    b: &ResolvedStoryEntry,
+) -> std::cmp::Ordering {
+    match (a.entry.section_order, b.entry.section_order) {
+        (Some(order_a), Some(order_b)) => order_a
+            .cmp(&order_b)
+            .then_with(|| a.entry.name.cmp(&b.entry.name)),
+        (Some(_), None) => std::cmp::Ordering::Less,
+        (None, Some(_)) => std::cmp::Ordering::Greater,
+        (None, None) => match (&a.section, &b.section) {
+            (Some(sec_a), Some(sec_b)) => sec_a
+                .cmp(sec_b)
+                .then_with(|| a.entry.name.cmp(&b.entry.name)),
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            (None, None) => a.entry.name.cmp(&b.entry.name),
+        },
+    }
+}
+
 /// Initializes Storybook runtime state and locale wiring.
 ///
 /// Call this once before creating the story window or calling
@@ -383,30 +404,7 @@ pub fn generate_stories(
         entries.len()
     );
 
-    entries.sort_by(|a, b| {
-        // First sort by section_order (if both have it)
-        match (a.entry.section_order, b.entry.section_order) {
-            (Some(order_a), Some(order_b)) => {
-                // Both have order, compare by order then by name
-                order_a
-                    .cmp(&order_b)
-                    .then_with(|| a.entry.name.cmp(&b.entry.name))
-            },
-            (Some(_), None) => std::cmp::Ordering::Less, // With order comes before without
-            (None, Some(_)) => std::cmp::Ordering::Greater, // Without order comes after with
-            (None, None) => {
-                // Neither has order, sort by section name (if present) then by story name
-                match (&a.section, &b.section) {
-                    (Some(sec_a), Some(sec_b)) => sec_a
-                        .cmp(sec_b)
-                        .then_with(|| a.entry.name.cmp(&b.entry.name)),
-                    (Some(_), None) => std::cmp::Ordering::Less,
-                    (None, Some(_)) => std::cmp::Ordering::Greater,
-                    (None, None) => a.entry.name.cmp(&b.entry.name),
-                }
-            },
-        }
-    });
+    entries.sort_by(compare_resolved_story_entries);
 
     let stories = entries
         .into_iter()
@@ -467,6 +465,10 @@ fn validate_unique_story_keys(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::{
+        path::Path,
+        time::{SystemTime, UNIX_EPOCH},
+    };
 
     fn unused_create_fn(
         _: &mut ::gpui::Window,
@@ -498,6 +500,53 @@ mod tests {
         "examples/component/src/components/field_notes.rs",
         42,
     );
+
+    static ORDERED_FIRST: __registry::StoryEntry = __registry::StoryEntry::new(
+        "component-example-ZStory",
+        "ZStory",
+        Some("Zed"),
+        Some(1),
+        unused_create_fn,
+        "component-example",
+        "/tmp/component-example",
+        "src/z.rs",
+        1,
+    );
+
+    static ORDERED_SECOND: __registry::StoryEntry = __registry::StoryEntry::new(
+        "component-example-AStory",
+        "AStory",
+        Some("Alpha"),
+        Some(2),
+        unused_create_fn,
+        "component-example",
+        "/tmp/component-example",
+        "src/a.rs",
+        2,
+    );
+
+    static ORDERED_FIRST_ALPHA: __registry::StoryEntry = __registry::StoryEntry::new(
+        "component-example-AStory",
+        "AStory",
+        Some("Alpha"),
+        Some(1),
+        unused_create_fn,
+        "component-example",
+        "/tmp/component-example",
+        "src/a.rs",
+        3,
+    );
+
+    fn with_temp_dir(test_fn: impl FnOnce(&Path)) {
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time should move forward")
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!("gpui_storybook_facade_{timestamp}"));
+        std::fs::create_dir_all(&path).expect("temp directory should be created");
+        test_fn(&path);
+        std::fs::remove_dir_all(path).expect("temp directory should be removed");
+    }
 
     fn runtime_config(allow: &[&str]) -> gpui_storybook_toml::StorybookToml {
         gpui_storybook_toml::StorybookToml {
@@ -572,5 +621,156 @@ mod tests {
             error.to_string(),
             "duplicate story key `component-example-ButtonStory` registered by component-example::ButtonStory at src/first.rs:10 and component-example::ButtonStory at src/second.rs:20"
         );
+    }
+
+    #[test]
+    fn unique_story_key_validator_accepts_empty_and_distinct_registrations() {
+        assert!(validate_unique_story_keys(&[]).is_ok());
+        assert!(validate_unique_story_keys(&[&SECTIONED_ENTRY, &UNSECTIONED_ENTRY]).is_ok());
+    }
+
+    #[test]
+    fn runtime_filters_reject_unlisted_groups_and_disabled_stories() {
+        assert!(
+            resolve_story_entry(
+                &SECTIONED_ENTRY,
+                Some("component-example"),
+                Some(&runtime_config(&["other"])),
+            )
+            .is_none()
+        );
+
+        let mut config = runtime_config(&["component-example"]);
+        config.disable_story.push("SectionedStory".to_string());
+        assert!(
+            resolve_story_entry(&SECTIONED_ENTRY, Some("component-example"), Some(&config))
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn declared_section_is_the_filter_group_without_crate_config() {
+        let resolved =
+            resolve_story_entry(&SECTIONED_ENTRY, None, Some(&runtime_config(&["Notes"])))
+                .expect("declared section should satisfy the allow list");
+
+        assert_eq!(resolved.group, None);
+        assert_eq!(resolved.section.as_deref(), Some("Notes"));
+        assert!(resolve_story_entry(&UNSECTIONED_ENTRY, None, None).is_some());
+    }
+
+    #[test]
+    fn resolved_entries_sort_by_order_section_then_name() {
+        let ordered_first = ResolvedStoryEntry {
+            entry: &ORDERED_FIRST,
+            group: None,
+            section: Some("Zed".to_string()),
+        };
+        let ordered_second = ResolvedStoryEntry {
+            entry: &ORDERED_SECOND,
+            group: None,
+            section: Some("Alpha".to_string()),
+        };
+        let ordered_first_alpha = ResolvedStoryEntry {
+            entry: &ORDERED_FIRST_ALPHA,
+            group: None,
+            section: Some("Alpha".to_string()),
+        };
+        let sectioned = ResolvedStoryEntry {
+            entry: &SECTIONED_ENTRY,
+            group: None,
+            section: Some("Notes".to_string()),
+        };
+        let sectioned_alpha = ResolvedStoryEntry {
+            entry: &ORDERED_SECOND,
+            group: None,
+            section: Some("Alpha".to_string()),
+        };
+        let unsectioned = ResolvedStoryEntry {
+            entry: &UNSECTIONED_ENTRY,
+            group: None,
+            section: None,
+        };
+
+        assert!(compare_resolved_story_entries(&ordered_first, &ordered_second).is_lt());
+        assert!(compare_resolved_story_entries(&ordered_second, &ordered_first).is_gt());
+        assert!(compare_resolved_story_entries(&ordered_first_alpha, &ordered_first).is_lt());
+        assert!(compare_resolved_story_entries(&ordered_first, &sectioned).is_lt());
+        assert!(compare_resolved_story_entries(&sectioned, &ordered_first).is_gt());
+        assert!(compare_resolved_story_entries(&sectioned_alpha, &sectioned).is_lt());
+        assert!(compare_resolved_story_entries(&sectioned, &unsectioned).is_lt());
+        assert!(compare_resolved_story_entries(&unsectioned, &sectioned).is_gt());
+
+        let unsectioned_alpha = ResolvedStoryEntry {
+            entry: &ORDERED_SECOND,
+            group: None,
+            section: None,
+        };
+        assert!(compare_resolved_story_entries(&unsectioned_alpha, &unsectioned).is_lt());
+    }
+
+    #[test]
+    fn config_loading_handles_valid_missing_and_invalid_files() {
+        with_temp_dir(|dir| {
+            let crate_dir: &'static str =
+                Box::leak(dir.to_string_lossy().into_owned().into_boxed_str());
+            let entry = __registry::StoryEntry::new(
+                "temp-Story",
+                "Story",
+                None,
+                None,
+                unused_create_fn,
+                "temp",
+                crate_dir,
+                "src/lib.rs",
+                1,
+            );
+
+            assert_eq!(load_storybook_config(&entry), None);
+
+            std::fs::write(dir.join("storybook.toml"), "group = \"Temp\"\n")
+                .expect("valid config should be written");
+            assert_eq!(
+                load_storybook_config(&entry).map(|config| config.group),
+                Some("Temp".to_string())
+            );
+
+            std::fs::write(dir.join("storybook.toml"), "invalid = true\n")
+                .expect("invalid config should be written");
+            assert_eq!(load_storybook_config(&entry), None);
+        });
+    }
+
+    #[test]
+    fn runtime_config_matches_the_current_test_binary_and_populates_cache() {
+        with_temp_dir(|dir| {
+            std::fs::write(dir.join("storybook.toml"), "group = \"Test Binary\"\n")
+                .expect("runtime config should be written");
+            let bin_name = current_binary_name().expect("test binary should have a file stem");
+            let crate_name: &'static str = Box::leak(bin_name.into_boxed_str());
+            let crate_dir: &'static str =
+                Box::leak(dir.to_string_lossy().into_owned().into_boxed_str());
+            let entry: &'static __registry::StoryEntry =
+                Box::leak(Box::new(__registry::StoryEntry::new(
+                    "test-Story",
+                    "Story",
+                    None,
+                    None,
+                    unused_create_fn,
+                    crate_name,
+                    crate_dir,
+                    "src/lib.rs",
+                    1,
+                )));
+            let mut cache = HashMap::new();
+
+            let config = load_runtime_storybook_config(&[entry], &mut cache)
+                .expect("matching binary config should load");
+            assert_eq!(config.group(), Some("Test Binary"));
+            assert!(cache.contains_key(crate_dir));
+
+            let unmatched = load_runtime_storybook_config(&[], &mut cache);
+            assert_eq!(unmatched, None);
+        });
     }
 }

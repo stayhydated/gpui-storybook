@@ -34,9 +34,15 @@ pub mod actions;
 pub mod app_menus;
 pub mod assets;
 pub mod automation;
+#[cfg(feature = "capture")]
+mod capture_output;
 pub mod capture_region;
 #[cfg(feature = "dock")]
 pub mod dock_gallery;
+#[cfg(feature = "dock")]
+mod dock_layout_store;
+#[cfg(feature = "dock")]
+mod dock_sidebar_index;
 pub mod gallery;
 pub mod i18n;
 pub mod language;

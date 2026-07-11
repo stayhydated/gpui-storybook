@@ -130,8 +130,8 @@ pub fn load_from_dir(dir: impl AsRef<Path>) -> Result<Option<StorybookToml>, Sto
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::Path;
     use std::time::{SystemTime, UNIX_EPOCH};
+    use std::{error::Error as _, path::Path};
 
     fn with_temp_dir(test_fn: impl FnOnce(&Path)) {
         let timestamp = SystemTime::now()
@@ -266,6 +266,64 @@ mod tests {
 
             let error = load_from_dir(dir).expect_err("missing group should fail parsing");
             assert!(error.to_string().contains("missing field `group`"));
+        });
+    }
+
+    #[test]
+    fn filters_normalize_blank_and_whitespace_groups() {
+        let config = StorybookToml {
+            group: "  Examples  ".to_string(),
+            allow: None,
+            disable_story: Vec::new(),
+        };
+
+        assert_eq!(config.group(), Some("Examples"));
+        assert!(config.allows_group(Some("  Examples ")));
+        assert!(!config.allows_group(None));
+        assert!(!config.allows_group(Some("   ")));
+
+        let blank = StorybookToml {
+            group: "   ".to_string(),
+            ..StorybookToml::default()
+        };
+        assert_eq!(blank.group(), None);
+        assert!(!blank.allows_group(None));
+
+        let allow = StorybookToml {
+            group: "Examples".to_string(),
+            allow: Some(vec![" Other ".to_string()]),
+            disable_story: Vec::new(),
+        };
+        assert!(allow.allows_group(Some(" Other ")));
+    }
+
+    #[test]
+    fn parse_errors_preserve_path_and_source() {
+        with_temp_dir(|dir| {
+            let path = dir.join(STORYBOOK_TOML_FILE_NAME);
+            std::fs::write(&path, "unknown = true\n").expect("should write invalid config");
+
+            let error = load_from_dir(dir).expect_err("invalid config should fail parsing");
+            assert!(error.to_string().contains(&path.display().to_string()));
+            assert!(error.source().is_some());
+            assert!(
+                matches!(error, StorybookTomlError::Parse { path: error_path, .. } if error_path == path)
+            );
+        });
+    }
+
+    #[test]
+    fn read_errors_preserve_path_and_source() {
+        with_temp_dir(|dir| {
+            let path = dir.join(STORYBOOK_TOML_FILE_NAME);
+            std::fs::create_dir(&path).expect("should create unreadable config path");
+
+            let error = load_from_dir(dir).expect_err("a directory should not parse as a file");
+            assert!(error.to_string().contains(&path.display().to_string()));
+            assert!(error.source().is_some());
+            assert!(
+                matches!(error, StorybookTomlError::Read { path: error_path, .. } if error_path == path)
+            );
         });
     }
 }

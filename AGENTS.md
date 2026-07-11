@@ -177,13 +177,15 @@ locale setup or message keys change.
 - Run the narrowest command that proves the edited behavior works for the
   affected crate, docs, example, or storybook surface.
 - Use `just fmt`, `just check`, `just clippy`, `just test`, `just test-docs`,
-  or a more specific command when the change spans multiple surfaces.
+  `just cov`, or a more specific command when the change spans multiple surfaces.
   `just check` and `just clippy` exclude both example packages; `just test`
-  matches CI's workspace test command.
+  matches CI's workspace test command. `just cov` measures every publishable
+  crate and excludes the two example applications.
 - CI also runs an es-fluent FTL check, `cargo fmt --check`,
   `cargo clippy --workspace --all-features`,
   `cargo doc --workspace --all-features --no-deps --locked`,
-  `cargo package --workspace --list`, and a cargo-machete action.
+  `cargo package --workspace --list`, workspace coverage uploaded to Codecov,
+  and a cargo-machete action.
 - If validation cannot be run, state why and what remains unvalidated.
 - Do not claim a change works unless it was validated or the remaining risk is
   explicitly documented.

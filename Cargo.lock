@@ -3130,6 +3130,7 @@ dependencies = [
  "rust-embed",
  "serde",
  "serde_json",
+ "strum 0.28.0",
  "tokio",
  "tracing",
  "unic-langid",
