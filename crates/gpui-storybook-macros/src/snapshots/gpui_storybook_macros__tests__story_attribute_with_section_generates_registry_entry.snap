@@ -18,6 +18,6 @@ gpui_storybook::__inventory::submit! {
     ::gpui_storybook::__registry::StoryEntry::new(concat!(::std::env!("CARGO_PKG_NAME"),
     "-", "ButtonStory"), "ButtonStory", Some("Components"), None, | window, cx | {
     ::gpui_storybook::StoryContainer::panel:: < ButtonStory > (window, cx) },
-    ::std::env!("CARGO_PKG_NAME"), ::std::env!("CARGO_MANIFEST_DIR"), ::std::file!(),
-    ::std::line!(),)
+    ::gpui_storybook::__registry::StoryRegistrationSource::new(::std::env!("CARGO_PKG_NAME"),
+    ::std::env!("CARGO_MANIFEST_DIR"), ::std::file!(), ::std::line!(),),)
 }

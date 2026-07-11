@@ -197,6 +197,35 @@ pub struct StoryEntry {
     pub line: u32,
 }
 
+/// Compile-time source provenance for a registered story.
+///
+/// Registration macros use this value to keep package and source-location
+/// fields together when constructing a [`StoryEntry`].
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct StoryRegistrationSource {
+    crate_name: &'static str,
+    crate_dir: &'static str,
+    file: &'static str,
+    line: u32,
+}
+
+impl StoryRegistrationSource {
+    /// Creates source provenance from compile-time Cargo and Rust macros.
+    pub const fn new(
+        crate_name: &'static str,
+        crate_dir: &'static str,
+        file: &'static str,
+        line: u32,
+    ) -> Self {
+        Self {
+            crate_name,
+            crate_dir,
+            file,
+            line,
+        }
+    }
+}
+
 impl StoryEntry {
     /// Creates a registry entry while keeping macro call sites string-oriented.
     pub const fn new(
@@ -205,10 +234,7 @@ impl StoryEntry {
         section: Option<&'static str>,
         section_order: Option<usize>,
         create_fn: fn(&mut ::gpui::Window, &mut ::gpui::App) -> ::gpui::Entity<StoryContainer>,
-        crate_name: &'static str,
-        crate_dir: &'static str,
-        file: &'static str,
-        line: u32,
+        source: StoryRegistrationSource,
     ) -> Self {
         let section = match section {
             Some(section) => Some(StorySectionName::new(section)),
@@ -221,10 +247,10 @@ impl StoryEntry {
             section,
             section_order,
             create_fn,
-            crate_name,
-            crate_dir,
-            file,
-            line,
+            crate_name: source.crate_name,
+            crate_dir: source.crate_dir,
+            file: source.file,
+            line: source.line,
         }
     }
 
@@ -268,7 +294,8 @@ inventory::collect!(InitEntry);
 #[cfg(test)]
 mod tests {
     use super::{
-        RegisteredStoryMetadata, StoryContainer, StoryEntry, StoryKey, StoryName, StorySectionName,
+        RegisteredStoryMetadata, StoryContainer, StoryEntry, StoryKey, StoryName,
+        StoryRegistrationSource, StorySectionName,
     };
 
     fn unused_create_fn(
@@ -322,10 +349,7 @@ mod tests {
             Some("Components"),
             Some(1),
             unused_create_fn,
-            "storybook",
-            "/tmp/storybook",
-            "src/lib.rs",
-            42,
+            StoryRegistrationSource::new("storybook", "/tmp/storybook", "src/lib.rs", 42),
         );
 
         assert_eq!(entry.key().as_str(), "storybook-ButtonStory");
@@ -345,10 +369,7 @@ mod tests {
             Some("Components"),
             Some(1),
             unused_create_fn,
-            "storybook",
-            "/tmp/storybook",
-            "src/lib.rs",
-            42,
+            StoryRegistrationSource::new("storybook", "/tmp/storybook", "src/lib.rs", 42),
         );
 
         let metadata = RegisteredStoryMetadata::from(&entry);
@@ -372,10 +393,7 @@ mod tests {
             None,
             None,
             unused_create_fn,
-            "storybook",
-            "/tmp/storybook",
-            "src/lib.rs",
-            42,
+            StoryRegistrationSource::new("storybook", "/tmp/storybook", "src/lib.rs", 42),
         );
 
         assert_eq!(entry.section, None);

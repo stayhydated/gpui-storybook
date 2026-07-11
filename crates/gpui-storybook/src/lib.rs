@@ -446,16 +446,16 @@ pub fn generate_stories(
 
 fn validate_unique_story_keys(
     entries: &[&'static __registry::StoryEntry],
-) -> Result<(), DuplicateStoryKeyError> {
+) -> Result<(), Box<DuplicateStoryKeyError>> {
     let mut seen = BTreeMap::new();
 
     for entry in entries {
         if let Some(first) = seen.insert(entry.key(), *entry) {
-            return Err(DuplicateStoryKeyError {
+            return Err(Box::new(DuplicateStoryKeyError {
                 key: entry.key(),
                 first: StoryRegistrationLocation::from(first),
                 second: StoryRegistrationLocation::from(*entry),
-            });
+            }));
         }
     }
 
@@ -483,10 +483,12 @@ mod tests {
         Some("Notes"),
         None,
         unused_create_fn,
-        "component-example",
-        "/tmp/component-example",
-        "examples/component/src/components/field_notes.rs",
-        10,
+        __registry::StoryRegistrationSource::new(
+            "component-example",
+            "/tmp/component-example",
+            "examples/component/src/components/field_notes.rs",
+            10,
+        ),
     );
 
     static UNSECTIONED_ENTRY: __registry::StoryEntry = __registry::StoryEntry::new(
@@ -495,10 +497,12 @@ mod tests {
         None,
         None,
         unused_create_fn,
-        "component-example",
-        "/tmp/component-example",
-        "examples/component/src/components/field_notes.rs",
-        42,
+        __registry::StoryRegistrationSource::new(
+            "component-example",
+            "/tmp/component-example",
+            "examples/component/src/components/field_notes.rs",
+            42,
+        ),
     );
 
     static ORDERED_FIRST: __registry::StoryEntry = __registry::StoryEntry::new(
@@ -507,10 +511,12 @@ mod tests {
         Some("Zed"),
         Some(1),
         unused_create_fn,
-        "component-example",
-        "/tmp/component-example",
-        "src/z.rs",
-        1,
+        __registry::StoryRegistrationSource::new(
+            "component-example",
+            "/tmp/component-example",
+            "src/z.rs",
+            1,
+        ),
     );
 
     static ORDERED_SECOND: __registry::StoryEntry = __registry::StoryEntry::new(
@@ -519,10 +525,12 @@ mod tests {
         Some("Alpha"),
         Some(2),
         unused_create_fn,
-        "component-example",
-        "/tmp/component-example",
-        "src/a.rs",
-        2,
+        __registry::StoryRegistrationSource::new(
+            "component-example",
+            "/tmp/component-example",
+            "src/a.rs",
+            2,
+        ),
     );
 
     static ORDERED_FIRST_ALPHA: __registry::StoryEntry = __registry::StoryEntry::new(
@@ -531,10 +539,12 @@ mod tests {
         Some("Alpha"),
         Some(1),
         unused_create_fn,
-        "component-example",
-        "/tmp/component-example",
-        "src/a.rs",
-        3,
+        __registry::StoryRegistrationSource::new(
+            "component-example",
+            "/tmp/component-example",
+            "src/a.rs",
+            3,
+        ),
     );
 
     fn with_temp_dir(test_fn: impl FnOnce(&Path)) {
@@ -596,10 +606,12 @@ mod tests {
             None,
             None,
             unused_create_fn,
-            "component-example",
-            "/tmp/component-example",
-            "src/first.rs",
-            10,
+            __registry::StoryRegistrationSource::new(
+                "component-example",
+                "/tmp/component-example",
+                "src/first.rs",
+                10,
+            ),
         );
         static SECOND_ENTRY: __registry::StoryEntry = __registry::StoryEntry::new(
             "component-example-ButtonStory",
@@ -607,10 +619,12 @@ mod tests {
             None,
             None,
             unused_create_fn,
-            "component-example",
-            "/tmp/component-example",
-            "src/second.rs",
-            20,
+            __registry::StoryRegistrationSource::new(
+                "component-example",
+                "/tmp/component-example",
+                "src/second.rs",
+                20,
+            ),
         );
 
         let error = validate_unique_story_keys(&[&FIRST_ENTRY, &SECOND_ENTRY])
@@ -720,10 +734,7 @@ mod tests {
                 None,
                 None,
                 unused_create_fn,
-                "temp",
-                crate_dir,
-                "src/lib.rs",
-                1,
+                __registry::StoryRegistrationSource::new("temp", crate_dir, "src/lib.rs", 1),
             );
 
             assert_eq!(load_storybook_config(&entry), None);
@@ -757,10 +768,12 @@ mod tests {
                     None,
                     None,
                     unused_create_fn,
-                    crate_name,
-                    crate_dir,
-                    "src/lib.rs",
-                    1,
+                    __registry::StoryRegistrationSource::new(
+                        crate_name,
+                        crate_dir,
+                        "src/lib.rs",
+                        1,
+                    ),
                 )));
             let mut cache = HashMap::new();
 

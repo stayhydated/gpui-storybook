@@ -23,15 +23,15 @@ version = "0.5.0"
 
 [workspace.dependencies]
 anyhow = "1.0"
-component-shape-mcp = { path = "../component-shape/crates/component-shape-mcp" }
+component-shape-mcp = { git = "https://github.com/stayhydated/component-shape" }
 darling = "0.23"
 derive_more = "2.1"
 es-fluent = "0.18"
 es-fluent-build = "0.18"
 es-fluent-lang = "0.18"
 es-fluent-manager-embedded = "0.18"
-frame-capture = { path = "../frame-capture/crates/frame-capture" }
-frame-capture-routes = { path = "../frame-capture/crates/frame-capture-routes" }
+frame-capture = { git = "https://github.com/stayhydated/frame-capture" }
+frame-capture-routes = { git = "https://github.com/stayhydated/frame-capture" }
 gpui = { branch = "linux-headless-renderer", git = "https://github.com/stayhydated/zed", version = "0.2.2" }
 gpui-component = { git = "https://github.com/longbridge/gpui-component" }
 gpui-component-assets = { git = "https://github.com/longbridge/gpui-component" }
@@ -50,25 +50,25 @@ gpui_platform = { branch = "linux-headless-renderer", features = [
 ], git = "https://github.com/stayhydated/zed" }
 heck = "0.5"
 image = { default-features = false, features = [ "png" ], version = "0.25" }
-insta = "1.46"
+insta = "1.48"
 inventory = "0.3"
 itertools = "0.14"
 prettyplease = "0.2"
 proc-macro2 = "1.0"
 quote = "1.0"
 reqwest_client = { branch = "linux-headless-renderer", git = "https://github.com/stayhydated/zed" }
-rust-embed = "8.11"
+rust-embed = "8.12"
 serde = "1.0"
 serde_json = "1.0"
 strum = "0.28"
 syn = "2.0"
 thiserror = "2.0"
-tokio = "1.49"
-toml = "1.0"
+tokio = "1.52"
+toml = "1.1"
 tracing = "0.1"
 tracing-subscriber = "0.3"
 unic-langid = "0.9"
-unicode-segmentation = "1.12"
+unicode-segmentation = "1.13"
 
 [patch."https://github.com/zed-industries/zed"]
 gpui = { branch = "linux-headless-renderer", git = "https://github.com/stayhydated/zed", version = "=0.2.2" }

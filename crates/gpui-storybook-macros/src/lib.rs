@@ -147,10 +147,12 @@ fn registration_tokens(
                 |window, cx| {
                     ::gpui_storybook::StoryContainer::panel::<#story_type>(window, cx)
                 },
-                ::std::env!("CARGO_PKG_NAME"),
-                ::std::env!("CARGO_MANIFEST_DIR"),
-                ::std::file!(),
-                ::std::line!(),
+                ::gpui_storybook::__registry::StoryRegistrationSource::new(
+                    ::std::env!("CARGO_PKG_NAME"),
+                    ::std::env!("CARGO_MANIFEST_DIR"),
+                    ::std::file!(),
+                    ::std::line!(),
+                ),
             )
         }
     }

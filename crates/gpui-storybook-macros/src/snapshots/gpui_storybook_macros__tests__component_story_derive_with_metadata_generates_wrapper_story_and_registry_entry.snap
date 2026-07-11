@@ -67,6 +67,7 @@ gpui_storybook::__inventory::submit! {
     "-", "ButtonChip"), "ButtonChip", Some("Components"), Some(crate
     ::StorySection::Components as usize), | window, cx | {
     ::gpui_storybook::StoryContainer::panel:: < __ButtonChipComponentStoryView > (window,
-    cx) }, ::std::env!("CARGO_PKG_NAME"), ::std::env!("CARGO_MANIFEST_DIR"),
-    ::std::file!(), ::std::line!(),)
+    cx) },
+    ::gpui_storybook::__registry::StoryRegistrationSource::new(::std::env!("CARGO_PKG_NAME"),
+    ::std::env!("CARGO_MANIFEST_DIR"), ::std::file!(), ::std::line!(),),)
 }
