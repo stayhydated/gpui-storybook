@@ -2453,7 +2453,7 @@ dependencies = [
 [[package]]
 name = "frame-capture"
 version = "0.1.0"
-source = "git+https://github.com/stayhydated/frame-capture#57cb4ec31bf0f697b0b407e4921199dd39c1ef95"
+source = "git+https://github.com/stayhydated/frame-capture#a83aa513204145e93c32319abe49f748d667185a"
 dependencies = [
  "bon",
  "derive_more",
@@ -2468,7 +2468,7 @@ dependencies = [
 [[package]]
 name = "frame-capture-macros"
 version = "0.1.0"
-source = "git+https://github.com/stayhydated/frame-capture#57cb4ec31bf0f697b0b407e4921199dd39c1ef95"
+source = "git+https://github.com/stayhydated/frame-capture#a83aa513204145e93c32319abe49f748d667185a"
 dependencies = [
  "darling",
  "frame-capture-toml",
@@ -2482,7 +2482,7 @@ dependencies = [
 [[package]]
 name = "frame-capture-toml"
 version = "0.1.0"
-source = "git+https://github.com/stayhydated/frame-capture#57cb4ec31bf0f697b0b407e4921199dd39c1ef95"
+source = "git+https://github.com/stayhydated/frame-capture#a83aa513204145e93c32319abe49f748d667185a"
 dependencies = [
  "serde",
  "thiserror 2.0.18",
