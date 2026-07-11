@@ -10,17 +10,24 @@ This crate is for applications that need runtime-level control over the window s
 ## What it provides
 
 - `Gallery` for the searchable sidebar and active-story layout
-- `StoryContainer` and the `Story` runtime contract
+- `StorybookAutomation` for live story listing, story opening, and capture coordination
+- `StoryContainer`, `Story`, the styled `section` helper, and `StorySectionBase` for custom section components with stable sub-story capture keys
+- typed registration metadata on `StoryContainer` for automation keys, registered names, and source locations
 - `create_new_window` and `create_new_window_with_ui` for the standard storybook shell
 - `StorybookWindowUi` for custom app-menu and title-bar additions
 - `StoryWorkspace` and `create_dock_window` behind the `dock` feature
 - built-in theme persistence, locale wiring, and embedded assets
+
+Enable the `capture` feature when automation needs to render the active story
+to a PNG through GPUI's platform test-support image path. Most applications
+should use the facade crate's `mcp` feature instead of enabling this directly.
 
 ## Typical direct use
 
 ```rs
 use gpui::App;
 use gpui_storybook_core::{
+    automation::{StorybookAutomation, set_default_storybook_automation},
     gallery::Gallery,
     story::StoryContainer,
     story::{create_new_window_with_ui},
@@ -29,9 +36,11 @@ use gpui_storybook_core::{
 
 fn open_story_window(stories: Vec<gpui::Entity<StoryContainer>>, cx: &mut App) {
     let ui = StorybookWindowUi::new().with_app_menu_items(|_| Vec::new());
+    set_default_storybook_automation(cx, StorybookAutomation::new());
 
     create_new_window_with_ui("Stories", move |window, cx| {
-        StorybookWindow::new(Gallery::view(stories.clone(), None, window, cx)).with_ui(ui)
+        StorybookWindow::new(Gallery::view(stories.clone(), None, window, cx))
+        .with_ui(ui)
     }, cx);
 }
 ```

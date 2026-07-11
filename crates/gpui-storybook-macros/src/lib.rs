@@ -1,9 +1,39 @@
-use heck::ToTitleCase as _;
+//! Proc macros for GPUI Storybook registration.
+//!
+//! The macros emit `inventory` submissions that target the public facade crate
+//! under the `gpui_storybook` crate name. Direct users of this crate still need
+//! the facade crate available at that path because generated code references
+//! `gpui_storybook::__inventory`, `gpui_storybook::__registry`,
+//! `gpui_storybook::StoryContainer`, and `gpui_storybook::Story`.
+//!
+//! `#[story]` registers an explicit story struct, preserving the input item and
+//! appending a `StoryEntry` submission. The optional section can be a string
+//! literal or enum variant; enum variants provide both a section label and a
+//! `usize` ordering key.
+//!
+//! `#[derive(ComponentStory)]` supports non-generic structs and helper
+//! attributes `title`, `description`, `section`, and `example`. It generates a
+//! hidden wrapper view and registers the original component type name so
+//! `disable_story = ["ComponentName"]` matches the public type the user wrote.
+//! Macro-generated story entries also include a stable automation key in the
+//! form `{crate-package-name}-{registered-story-name}` and an exported marker
+//! that makes duplicate generated keys in the same package fail to build.
+//!
+//! `#[derive(Substory)]` supports fieldless enums used with
+//! `gpui_storybook::section(...)` or `gpui_storybook::StorySectionBase::new(...)`.
+//! It generates stable capture keys from enum variant names while keeping
+//! visible titles configurable with
+//! `#[substory(title = "...")]`.
+//!
+//! `#[story_init]` registers a one-time setup function that the facade executes
+//! during `gpui_storybook::init(...)`.
+
+use heck::{ToKebabCase as _, ToTitleCase as _};
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{format_ident, quote};
 use syn::{
-    Data, DeriveInput, Expr, ExprLit, ExprPath, ItemFn, ItemStruct, Lit, LitStr, Token,
+    Data, DeriveInput, Expr, ExprLit, ExprPath, Fields, ItemFn, ItemStruct, Lit, LitStr, Token,
     meta::ParseNestedMeta, parse::Parse, parse::ParseStream,
 };
 
@@ -22,6 +52,12 @@ struct ComponentStoryArgs {
     description: Option<Expr>,
     section: Option<SectionArg>,
     example: Option<Expr>,
+}
+
+#[derive(Default)]
+struct SubstoryVariantArgs {
+    title: Option<LitStr>,
+    key: Option<LitStr>,
 }
 
 impl Parse for StoryArgs {
@@ -89,28 +125,48 @@ fn registration_tokens(
     section: Option<&SectionArg>,
 ) -> TokenStream2 {
     let (section_value, section_order) = section_tokens(section);
+    let marker_ident = format_ident!("__gpui_storybook_story_key_marker_{entry_name}");
 
     quote! {
+        #[doc(hidden)]
+        #[used]
+        #[unsafe(export_name = concat!(
+            "__gpui_storybook_story_key__",
+            env!("CARGO_PKG_NAME"),
+            "__",
+            #entry_name,
+        ))]
+        static #marker_ident: u8 = 0;
+
         gpui_storybook::__inventory::submit! {
-            ::gpui_storybook::__registry::StoryEntry {
-                name: #entry_name,
-                section: #section_value,
-                section_order: #section_order,
-                create_fn: |window, cx| {
+            ::gpui_storybook::__registry::StoryEntry::new(
+                concat!(::std::env!("CARGO_PKG_NAME"), "-", #entry_name),
+                #entry_name,
+                #section_value,
+                #section_order,
+                |window, cx| {
                     ::gpui_storybook::StoryContainer::panel::<#story_type>(window, cx)
                 },
-                crate_name: ::std::env!("CARGO_PKG_NAME"),
-                crate_dir: ::std::env!("CARGO_MANIFEST_DIR"),
-                file: ::std::file!(),
-                line: ::std::line!(),
-            }
+                ::gpui_storybook::__registry::StoryRegistrationSource::new(
+                    ::std::env!("CARGO_PKG_NAME"),
+                    ::std::env!("CARGO_MANIFEST_DIR"),
+                    ::std::file!(),
+                    ::std::line!(),
+                ),
+            )
         }
     }
 }
 
 fn story_impl(args: TokenStream2, input: TokenStream2) -> TokenStream2 {
-    let args: StoryArgs = syn::parse2(args).expect("failed to parse story macro arguments");
-    let input_struct: ItemStruct = syn::parse2(input).expect("story macro expects a struct");
+    let args: StoryArgs = match syn::parse2(args) {
+        Ok(args) => args,
+        Err(err) => return err.to_compile_error(),
+    };
+    let input_struct: ItemStruct = match syn::parse2(input) {
+        Ok(input_struct) => input_struct,
+        Err(err) => return err.to_compile_error(),
+    };
     let struct_name = &input_struct.ident;
     let struct_name_str = struct_name.to_string();
     let registration = registration_tokens(
@@ -181,8 +237,129 @@ fn default_component_title(struct_name: &str) -> String {
     struct_name.trim_end_matches("Story").to_title_case()
 }
 
+fn validate_substory_key(key: &LitStr) -> syn::Result<()> {
+    let value = key.value();
+    let is_valid = !value.is_empty()
+        && value
+            .chars()
+            .all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '-');
+
+    if is_valid {
+        Ok(())
+    } else {
+        Err(syn::Error::new_spanned(
+            key,
+            "substory key must use lowercase ASCII letters, numbers, or `-`",
+        ))
+    }
+}
+
+fn parse_substory_variant_args(attrs: &[syn::Attribute]) -> syn::Result<SubstoryVariantArgs> {
+    let mut args = SubstoryVariantArgs::default();
+
+    for attr in attrs {
+        if !attr.path().is_ident("substory") {
+            continue;
+        }
+
+        attr.parse_nested_meta(|meta| {
+            if meta.path.is_ident("title") {
+                let title: LitStr = meta.value()?.parse()?;
+                if args.title.replace(title).is_some() {
+                    return Err(duplicate_attr_error(&meta, "title"));
+                }
+                return Ok(());
+            }
+
+            if meta.path.is_ident("key") {
+                let key: LitStr = meta.value()?.parse()?;
+                validate_substory_key(&key)?;
+                if args.key.replace(key).is_some() {
+                    return Err(duplicate_attr_error(&meta, "key"));
+                }
+                return Ok(());
+            }
+
+            Err(meta.error("unsupported #[substory(...)] argument; expected `title` or `key`"))
+        })?;
+    }
+
+    Ok(args)
+}
+
+fn substory_impl(input: TokenStream2) -> TokenStream2 {
+    let input: DeriveInput = match syn::parse2(input) {
+        Ok(input) => input,
+        Err(err) => return err.to_compile_error(),
+    };
+
+    let data = match &input.data {
+        Data::Enum(data) => data,
+        _ => {
+            return syn::Error::new_spanned(input.ident, "Substory can only be derived for enums")
+                .to_compile_error();
+        },
+    };
+
+    if !input.generics.params.is_empty() {
+        return syn::Error::new_spanned(
+            input.generics,
+            "Substory does not support generic enums yet",
+        )
+        .to_compile_error();
+    }
+
+    let enum_name = &input.ident;
+    let mut key_arms = Vec::new();
+    let mut title_arms = Vec::new();
+
+    for variant in &data.variants {
+        if !matches!(variant.fields, Fields::Unit) {
+            return syn::Error::new_spanned(&variant.fields, "Substory variants must be fieldless")
+                .to_compile_error();
+        }
+
+        let args = match parse_substory_variant_args(&variant.attrs) {
+            Ok(args) => args,
+            Err(err) => return err.to_compile_error(),
+        };
+
+        let variant_ident = &variant.ident;
+        let default_key = variant_ident.to_string().to_kebab_case();
+        let key = args.key.map_or(default_key, |key| key.value());
+        let default_title = variant_ident.to_string().to_title_case();
+        let title = args.title.map_or(default_title, |title| title.value());
+
+        key_arms.push(quote! {
+            Self::#variant_ident => #key,
+        });
+        title_arms.push(quote! {
+            Self::#variant_ident => #title.into(),
+        });
+    }
+
+    quote! {
+        impl ::gpui_storybook::Substory for #enum_name {
+            fn capture_key(&self) -> &'static str {
+                match self {
+                    #(#key_arms)*
+                }
+            }
+
+            fn title(&self) -> ::gpui::SharedString {
+                match self {
+                    #(#title_arms)*
+                }
+            }
+        }
+    }
+}
+
 fn component_story_impl(input: TokenStream2) -> TokenStream2 {
-    let input: DeriveInput = syn::parse2(input).expect("ComponentStory derive expects a type");
+    let input: DeriveInput = match syn::parse2(input) {
+        Ok(input) => input,
+        Err(err) => return err.to_compile_error(),
+    };
 
     if !matches!(input.data, Data::Struct(_)) {
         return syn::Error::new_spanned(
@@ -301,7 +478,10 @@ pub fn story(args: TokenStream, input: TokenStream) -> TokenStream {
 }
 
 fn story_init_impl(_args: TokenStream2, input: TokenStream2) -> TokenStream2 {
-    let input_fn: ItemFn = syn::parse2(input).expect("story_init macro expects a function");
+    let input_fn: ItemFn = match syn::parse2(input) {
+        Ok(input_fn) => input_fn,
+        Err(err) => return err.to_compile_error(),
+    };
     let fn_name = &input_fn.sig.ident;
     let fn_name_str = fn_name.to_string();
 
@@ -343,6 +523,31 @@ pub fn component_story(input: TokenStream) -> TokenStream {
     component_story_impl(input.into()).into()
 }
 
+/// Derive stable capture metadata for sub-story sections.
+///
+/// Variants become capture-addressable section descriptors that can be passed
+/// to `gpui_storybook::section(...)` or `gpui_storybook::StorySectionBase::new(...)`.
+/// By default, the route key is the variant name in kebab case and the visible
+/// title is title case. Use
+/// `#[substory(title = "...")]` to change the visible title without changing
+/// the route key. Use `#[substory(key = "...")]` to set an explicit route key
+/// independent of the variant name.
+///
+/// ```ignore
+/// #[derive(gpui_storybook::Substory)]
+/// enum ButtonSubstory {
+///     NormalButton,
+///     #[substory(title = "Button with Icon")]
+///     ButtonWithIcon,
+///     #[substory(key = "progress", title = "With Progress")]
+///     WithProgress,
+/// }
+/// ```
+#[proc_macro_derive(Substory, attributes(substory))]
+pub fn substory(input: TokenStream) -> TokenStream {
+    substory_impl(input.into()).into()
+}
+
 /// Attribute macro to register an init function
 #[proc_macro_attribute]
 pub fn story_init(_args: TokenStream, input: TokenStream) -> TokenStream {
@@ -360,6 +565,15 @@ mod tests {
         let file =
             syn::parse2::<syn::File>(tokens).expect("generated code should be valid Rust syntax");
         unparse(&file)
+    }
+
+    fn assert_compile_error(tokens: TokenStream2, message: &str) {
+        let tokens = tokens.to_string();
+        assert!(
+            tokens.contains("compile_error"),
+            "expected compile error: {tokens}"
+        );
+        assert!(tokens.contains(message), "missing `{message}` in: {tokens}");
     }
 
     #[test]
@@ -386,6 +600,27 @@ mod tests {
         assert_snapshot!(
             "story_attribute_with_section_generates_registry_entry",
             snapshot_tokens(expanded)
+        );
+    }
+
+    #[test]
+    fn story_with_enum_section_generates_ordered_registry_entry() {
+        let expanded = story_impl(
+            quote! { crate::StorySection::Components, },
+            quote! { pub struct ButtonStory; },
+        );
+        let expanded = snapshot_tokens(expanded);
+        let compact = expanded.split_whitespace().collect::<String>();
+
+        assert!(expanded.contains("Some(\"Components\")"));
+        assert!(compact.contains("Some(crate::StorySection::Componentsasusize)"));
+    }
+
+    #[test]
+    fn malformed_story_arguments_report_compile_error() {
+        assert_compile_error(
+            story_impl(quote! { 42 }, quote! { pub struct ButtonStory; }),
+            "expected identifier",
         );
     }
 
@@ -442,6 +677,25 @@ mod tests {
     }
 
     #[test]
+    fn substory_derive_generates_stable_keys_and_titles() {
+        let input = quote! {
+            pub enum ButtonSubstory {
+                NormalButton,
+                #[substory(title = "Button with Icon")]
+                ButtonWithIcon,
+                #[substory(key = "progress", title = "With Progress")]
+                WithProgress,
+            }
+        };
+
+        let expanded = substory_impl(input);
+        assert_snapshot!(
+            "substory_derive_generates_stable_keys_and_titles",
+            snapshot_tokens(expanded)
+        );
+    }
+
+    #[test]
     fn story_init_generates_init_entry() {
         let input = quote! {
             pub fn setup() {}
@@ -450,6 +704,197 @@ mod tests {
         let expanded = story_init_impl(TokenStream2::new(), input);
         assert_snapshot!(
             "story_init_attribute_generates_registry_entry",
+            snapshot_tokens(expanded)
+        );
+    }
+
+    #[test]
+    fn story_attribute_on_non_struct_reports_compile_error() {
+        let input = quote! {
+            pub fn button_story() {}
+        };
+
+        let expanded = story_impl(TokenStream2::new(), input);
+        assert_snapshot!(
+            "story_attribute_on_non_struct_reports_compile_error",
+            snapshot_tokens(expanded)
+        );
+    }
+
+    #[test]
+    fn component_story_duplicate_metadata_reports_compile_error() {
+        let input = quote! {
+            #[storybook(title = "Button", title = "Button Again")]
+            pub struct ButtonChip;
+        };
+
+        let expanded = component_story_impl(input);
+        assert_snapshot!(
+            "component_story_duplicate_metadata_reports_compile_error",
+            snapshot_tokens(expanded)
+        );
+    }
+
+    #[test]
+    fn component_story_rejects_unsupported_inputs() {
+        assert_compile_error(
+            component_story_impl(quote! { pub enum ButtonChip { Default } }),
+            "ComponentStory can only be derived for structs",
+        );
+        assert_compile_error(
+            component_story_impl(quote! { pub struct ButtonChip<T>(T); }),
+            "ComponentStory does not support generic structs yet",
+        );
+        assert_compile_error(
+            component_story_impl(quote! {
+                #[storybook(section = 42)]
+                pub struct ButtonChip;
+            }),
+            "`section` must be a string literal or enum variant path",
+        );
+        assert_compile_error(
+            component_story_impl(quote! {
+                #[storybook(unknown = "value")]
+                pub struct ButtonChip;
+            }),
+            "unsupported #[storybook(...)] argument",
+        );
+    }
+
+    #[test]
+    fn component_story_rejects_each_duplicate_metadata_field() {
+        for (input, name) in [
+            (
+                quote! {
+                    #[storybook(description = "one", description = "two")]
+                    pub struct ButtonChip;
+                },
+                "description",
+            ),
+            (
+                quote! {
+                    #[storybook(section = "one", section = "two")]
+                    pub struct ButtonChip;
+                },
+                "section",
+            ),
+            (
+                quote! {
+                    #[storybook(example = one(), example = two())]
+                    pub struct ButtonChip;
+                },
+                "example",
+            ),
+        ] {
+            assert_compile_error(
+                component_story_impl(input),
+                &format!("duplicate `{name}` argument"),
+            );
+        }
+    }
+
+    #[test]
+    fn unrelated_attributes_do_not_change_component_defaults() {
+        let expanded = component_story_impl(quote! {
+            #[derive(Clone)]
+            pub struct MenuButtonStory;
+        });
+        let expanded = snapshot_tokens(expanded);
+
+        assert!(expanded.contains("\"Menu Button\""));
+        assert!(expanded.contains("<MenuButtonStory as ::std::default::Default>::default()"));
+    }
+
+    #[test]
+    fn substory_rejects_unsupported_inputs_and_metadata() {
+        for (input, message) in [
+            (
+                quote! { pub struct ButtonSubstory; },
+                "Substory can only be derived for enums",
+            ),
+            (
+                quote! { pub enum ButtonSubstory<T> { Default(T) } },
+                "Substory does not support generic enums yet",
+            ),
+            (
+                quote! { pub enum ButtonSubstory { Default(String) } },
+                "Substory variants must be fieldless",
+            ),
+            (
+                quote! {
+                    pub enum ButtonSubstory {
+                        #[substory(unknown = "value")]
+                        Default,
+                    }
+                },
+                "unsupported #[substory(...)] argument",
+            ),
+            (
+                quote! {
+                    pub enum ButtonSubstory {
+                        #[substory(key = "Not Stable")]
+                        Default,
+                    }
+                },
+                "substory key must use lowercase ASCII letters, numbers, or `-`",
+            ),
+            (
+                quote! {
+                    pub enum ButtonSubstory {
+                        #[substory(key = "")]
+                        Default,
+                    }
+                },
+                "substory key must use lowercase ASCII letters, numbers, or `-`",
+            ),
+        ] {
+            assert_compile_error(substory_impl(input), message);
+        }
+    }
+
+    #[test]
+    fn substory_rejects_duplicate_metadata_fields() {
+        for (input, name) in [
+            (
+                quote! {
+                    pub enum ButtonSubstory {
+                        #[substory(title = "One", title = "Two")]
+                        Default,
+                    }
+                },
+                "title",
+            ),
+            (
+                quote! {
+                    pub enum ButtonSubstory {
+                        #[substory(key = "one", key = "two")]
+                        Default,
+                    }
+                },
+                "key",
+            ),
+        ] {
+            assert_compile_error(
+                substory_impl(input),
+                &format!("duplicate `{name}` argument"),
+            );
+        }
+    }
+
+    #[test]
+    fn malformed_substory_input_reports_compile_error() {
+        assert_compile_error(substory_impl(quote! { impl }), "expected");
+    }
+
+    #[test]
+    fn story_init_attribute_on_non_function_reports_compile_error() {
+        let input = quote! {
+            pub struct Setup;
+        };
+
+        let expanded = story_init_impl(TokenStream2::new(), input);
+        assert_snapshot!(
+            "story_init_attribute_on_non_function_reports_compile_error",
             snapshot_tokens(expanded)
         );
     }

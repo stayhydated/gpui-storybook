@@ -1,20 +1,12 @@
-use es_fluent::EsFluent;
-use es_fluent_lang::es_fluent_language;
 use gpui_storybook::Assets;
 #[cfg(not(feature = "dock"))]
 use gpui_storybook::Gallery;
 #[cfg(feature = "dock")]
 use gpui_storybook::StoryWorkspace;
-use strum::EnumIter;
-
-es_fluent_manager_embedded::define_i18n_module!();
+use gpui_storybook_example_component::i18n::Languages;
 
 #[allow(unused_imports)]
 use gpui_storybook_example_component::*;
-
-#[es_fluent_language]
-#[derive(Clone, Copy, Debug, EnumIter, EsFluent, PartialEq)]
-pub enum Languages {}
 
 fn main() {
     tracing_subscriber::fmt()
@@ -28,7 +20,8 @@ fn main() {
 
     app.run(move |app_cx| {
         gpui_storybook::init(app_cx, Languages::default());
-        gpui_storybook::change_locale(app_cx, Languages::default()).unwrap();
+        gpui_storybook::change_locale(app_cx, Languages::default())
+            .expect("default component example language should be registered");
 
         let http_client = std::sync::Arc::new(reqwest_client::ReqwestClient::new());
         app_cx.set_http_client(http_client);
@@ -41,7 +34,10 @@ fn main() {
             move |window, cx| {
                 // Stories are filtered by examples/component/storybook.toml.
                 let all_stories = gpui_storybook::generate_stories(window, cx);
-                Gallery::view(all_stories, None, window, cx)
+
+                let view = Gallery::view(all_stories, None, window, cx);
+
+                view
             },
             app_cx,
         );
@@ -53,7 +49,9 @@ fn main() {
                 // Stories are filtered by examples/component/storybook.toml.
                 let all_stories = gpui_storybook::generate_stories(window, cx);
 
-                StoryWorkspace::view(all_stories, window, cx)
+                let view = StoryWorkspace::view(all_stories, window, cx);
+
+                view
             },
             app_cx,
         );

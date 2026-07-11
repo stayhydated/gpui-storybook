@@ -1,7 +1,8 @@
 use gpui::{
     Action, AnyElement, AnyView, App, AppContext as _, ClickEvent, Div, Entity, EventEmitter,
     Focusable, Hsla, InteractiveElement as _, IntoElement, ParentElement, Render, RenderOnce,
-    SharedString, StyleRefinement, Styled, Window, div, prelude::FluentBuilder as _, rems,
+    ScrollHandle, SharedString, StatefulInteractiveElement as _, StyleRefinement, Styled, Window,
+    div, prelude::FluentBuilder as _, rems,
 };
 
 use serde::{Deserialize, Serialize};
@@ -19,6 +20,13 @@ use gpui_component::{
 };
 
 use super::state::AppState;
+use crate::{
+    capture_region::{
+        capture_scroll_scope, capture_story_view, capture_story_view_with_scroll, capture_substory,
+        capture_substory_with_key, current_capture_scroll_handle,
+    },
+    registry::{RegisteredStoryMetadata, StoryKey, StoryName},
+};
 
 pub const STORY_LIST_KLASS_PREFIX: &str = "__gpui_storybook_list__:";
 
@@ -26,10 +34,123 @@ pub const STORY_LIST_KLASS_PREFIX: &str = "__gpui_storybook_list__:";
 #[action(namespace = story)]
 pub struct ShowPanelInfo;
 
+/// Stable descriptor for a capture-addressable section inside a story.
+///
+/// Derive this with `#[derive(gpui_storybook::Substory)]` on a fieldless enum,
+/// then pass variants to [`section`] or [`StorySectionBase::new`] so capture
+/// routes use stable enum-derived keys instead of display-title slugs.
+pub trait Substory: 'static {
+    /// Stable route segment used in `story-key/substory-key` capture routes.
+    fn capture_key(&self) -> &'static str;
+
+    /// Visible section title shown in the story UI.
+    fn title(&self) -> SharedString;
+}
+
+/// Input accepted by [`section`] and [`StorySectionBase::new`] for visible
+/// titles and stable capture keys.
+#[derive(Clone, Debug)]
+pub struct StorySectionTitle {
+    title: SharedString,
+    capture_key: Option<SharedString>,
+}
+
+impl StorySectionTitle {
+    /// Create a section whose capture key is derived from the visible title.
+    pub fn new(title: impl Into<SharedString>) -> Self {
+        Self {
+            title: title.into(),
+            capture_key: None,
+        }
+    }
+
+    /// Create a section with an explicit stable capture key.
+    pub fn with_capture_key(
+        capture_key: impl Into<SharedString>,
+        title: impl Into<SharedString>,
+    ) -> Self {
+        Self {
+            title: title.into(),
+            capture_key: Some(capture_key.into()),
+        }
+    }
+
+    /// Split the descriptor into its visible title and optional capture key.
+    pub fn into_parts(self) -> (SharedString, Option<SharedString>) {
+        (self.title, self.capture_key)
+    }
+}
+
+impl From<&str> for StorySectionTitle {
+    fn from(title: &str) -> Self {
+        Self::new(title)
+    }
+}
+
+impl From<String> for StorySectionTitle {
+    fn from(title: String) -> Self {
+        Self::new(title)
+    }
+}
+
+impl From<SharedString> for StorySectionTitle {
+    fn from(title: SharedString) -> Self {
+        Self::new(title)
+    }
+}
+
+impl<T: Substory> From<T> for StorySectionTitle {
+    fn from(substory: T) -> Self {
+        Self::with_capture_key(substory.capture_key(), substory.title())
+    }
+}
+
+/// Base capture metadata for a user-defined story section component.
+///
+/// Store this inside a custom section component, render the component with the
+/// app's own layout and chrome, then call [`capture`](Self::capture) with the
+/// rendered element from `RenderOnce`. The styled [`section`] helper uses this
+/// same base type internally.
+#[derive(Clone, Debug)]
+pub struct StorySectionBase {
+    title: SharedString,
+    capture_key: Option<SharedString>,
+}
+
+impl StorySectionBase {
+    /// Create capture metadata from a visible title, explicit section title, or
+    /// `#[derive(Substory)]` enum variant.
+    pub fn new(title: impl Into<StorySectionTitle>) -> Self {
+        let (title, capture_key) = title.into().into_parts();
+
+        Self { title, capture_key }
+    }
+
+    /// Visible title supplied for this section.
+    pub fn title(&self) -> &SharedString {
+        &self.title
+    }
+
+    /// Explicit stable capture key, when one was supplied by a `Substory`
+    /// variant or [`StorySectionTitle::with_capture_key`].
+    pub fn capture_key(&self) -> Option<&SharedString> {
+        self.capture_key.as_ref()
+    }
+
+    /// Wrap a rendered custom section in the capture marker.
+    pub fn capture(self, child: impl IntoElement) -> AnyElement {
+        if let Some(capture_key) = self.capture_key {
+            capture_substory_with_key(capture_key, child).into_any_element()
+        } else {
+            capture_substory(self.title, child).into_any_element()
+        }
+    }
+}
+
 #[derive(IntoElement)]
 pub struct StorySection {
+    capture: StorySectionBase,
     base: Div,
-    title: SharedString,
     sub_title: Vec<AnyElement>,
     children: Vec<AnyElement>,
 }
@@ -79,15 +200,17 @@ impl Styled for StorySection {
 
 impl RenderOnce for StorySection {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
-        GroupBox::new()
-            .id(self.title.clone())
+        let capture = self.capture;
+        let title = capture.title().clone();
+        let group = GroupBox::new()
+            .id(title.clone())
             .outline()
             .title(
                 h_flex()
                     .justify_between()
                     .w_full()
                     .gap_4()
-                    .child(self.title)
+                    .child(title)
                     .children(self.sub_title),
             )
             .content_style(
@@ -97,13 +220,15 @@ impl RenderOnce for StorySection {
                     .items_center()
                     .justify_center(),
             )
-            .child(self.base.children(self.children))
+            .child(self.base.children(self.children));
+
+        capture.capture(group)
     }
 }
 
-pub fn section(title: impl Into<SharedString>) -> StorySection {
+pub fn section(title: impl Into<StorySectionTitle>) -> StorySection {
     StorySection {
-        title: title.into(),
+        capture: StorySectionBase::new(title),
         sub_title: vec![],
         base: h_flex()
             .flex_wrap()
@@ -122,11 +247,19 @@ pub struct StoryContainer {
     pub section: Option<SharedString>,
     pub title_bg: Option<Hsla>,
     pub description: SharedString,
+    pub(crate) list_members: Vec<Entity<StoryContainer>>,
+    scroll_handle: ScrollHandle,
     width: Option<gpui::Pixels>,
     height: Option<gpui::Pixels>,
     tab_panel: Option<gpui::WeakEntity<gpui_component::dock::TabPanel>>,
     story: Option<AnyView>,
     pub story_klass: Option<SharedString>,
+    registration_metadata: Option<RegisteredStoryMetadata>,
+    pub story_key: Option<SharedString>,
+    pub story_name: Option<SharedString>,
+    pub crate_name: Option<SharedString>,
+    pub source_file: Option<SharedString>,
+    pub source_line: Option<u32>,
     closable: bool,
     is_active: bool,
     zoomable: Option<PanelControl>,
@@ -211,8 +344,9 @@ impl Render for StoryList {
                         let description = story.display_description(cx);
                         let story_klass = story.story_klass.clone().unwrap_or_default();
                         let story_view = story.story.clone();
+                        let story_key = story.story_key_label().map(str::to_owned);
 
-                        v_flex()
+                        let item = v_flex()
                             .id(format!("storybook-story-list-item-{index}"))
                             .w_full()
                             .border_1()
@@ -246,7 +380,18 @@ impl Render for StoryList {
                             )
                             .when_some(story_view, |this, story| {
                                 this.child(div().w_full().p_4().child(story))
-                            })
+                            });
+
+                        if let Some(story_key) = story_key {
+                            capture_story_view_with_scroll(
+                                story_key,
+                                current_capture_scroll_handle(),
+                                item,
+                            )
+                            .into_any_element()
+                        } else {
+                            item.into_any_element()
+                        }
                     }),
             )
     }
@@ -309,11 +454,19 @@ impl StoryContainer {
             section: None,
             title_bg: None,
             description: "".into(),
+            list_members: Vec::new(),
+            scroll_handle: ScrollHandle::new(),
             width: None,
             height: None,
             tab_panel: None,
             story: None,
             story_klass: None,
+            registration_metadata: None,
+            story_key: None,
+            story_name: None,
+            crate_name: None,
+            source_file: None,
+            source_line: None,
             closable: true,
             is_active: false,
             zoomable: Some(PanelControl::default()),
@@ -376,6 +529,7 @@ impl StoryContainer {
         let name = name.into();
         let story_klass = story_list_klass(&stories, cx);
         let description = format!("{} story variants", stories.len());
+        let list_members = stories.clone();
         let list = cx.new(|cx| StoryList::new(stories, cx));
         let focus_handle = list.focus_handle(cx);
 
@@ -386,6 +540,7 @@ impl StoryContainer {
             story.focus_handle = focus_handle;
             story.name = name;
             story.description = description.into();
+            story.list_members = list_members;
             story
         })
     }
@@ -409,6 +564,83 @@ impl StoryContainer {
     pub fn on_active(mut self, on_active: fn(AnyView, bool, &mut Window, &mut App)) -> Self {
         self.on_active = Some(on_active);
         self
+    }
+
+    /// Store typed registry metadata on this runtime container.
+    ///
+    /// This also populates the string metadata fields exposed by this
+    /// container.
+    pub fn set_registration_metadata(&mut self, metadata: RegisteredStoryMetadata) {
+        self.story_key = Some(metadata.key().as_str().into());
+        self.story_name = Some(metadata.name().as_str().into());
+        self.crate_name = Some(metadata.crate_name().into());
+        self.source_file = Some(metadata.source_file().into());
+        self.source_line = Some(metadata.source_line());
+        self.registration_metadata = Some(metadata);
+    }
+
+    /// Returns the typed metadata copied from the inventory registry.
+    pub fn registration_metadata(&self) -> Option<RegisteredStoryMetadata> {
+        self.registration_metadata
+    }
+
+    /// Returns this story's typed stable key when it came from the registry.
+    pub fn story_key(&self) -> Option<StoryKey> {
+        self.registration_metadata.map(RegisteredStoryMetadata::key)
+    }
+
+    /// Returns this story's typed registered name when it came from the
+    /// registry.
+    pub fn story_name(&self) -> Option<StoryName> {
+        self.registration_metadata
+            .map(RegisteredStoryMetadata::name)
+    }
+
+    /// Returns this story's stable key as a string label.
+    pub fn story_key_label(&self) -> Option<&str> {
+        self.registration_metadata
+            .map(|metadata| metadata.key().as_str())
+            .or_else(|| self.story_key.as_ref().map(|story_key| story_key.as_ref()))
+    }
+
+    /// Returns this story's registered name as a string label.
+    pub fn story_name_label(&self) -> Option<&str> {
+        self.registration_metadata
+            .map(|metadata| metadata.name().as_str())
+            .or_else(|| {
+                self.story_name
+                    .as_ref()
+                    .map(|story_name| story_name.as_ref())
+            })
+    }
+
+    /// Returns the crate package name that registered this story.
+    pub fn crate_name_label(&self) -> Option<&str> {
+        self.registration_metadata
+            .map(RegisteredStoryMetadata::crate_name)
+            .or_else(|| {
+                self.crate_name
+                    .as_ref()
+                    .map(|crate_name| crate_name.as_ref())
+            })
+    }
+
+    /// Returns the source file recorded for this story.
+    pub fn source_file_label(&self) -> Option<&str> {
+        self.registration_metadata
+            .map(RegisteredStoryMetadata::source_file)
+            .or_else(|| {
+                self.source_file
+                    .as_ref()
+                    .map(|source_file| source_file.as_ref())
+            })
+    }
+
+    /// Returns the source line recorded for this story.
+    pub fn source_line(&self) -> Option<u32> {
+        self.registration_metadata
+            .map(RegisteredStoryMetadata::source_line)
+            .or(self.source_line)
     }
 
     pub fn display_title(&self, cx: &impl Borrow<App>) -> String {
@@ -588,13 +820,238 @@ impl Focusable for StoryContainer {
 }
 impl Render for StoryContainer {
     fn render(&mut self, _: &mut Window, _cx: &mut gpui::Context<Self>) -> impl IntoElement {
-        div()
+        let scroll_handle = self.scroll_handle.clone();
+        let story_key = self.story_key_label().map(str::to_owned);
+        let content = div()
             .id("story-container")
             .size_full()
+            .track_scroll(&scroll_handle)
             .overflow_y_scrollbar()
             .track_focus(&self.focus_handle)
             .when_some(self.story.clone(), |this, story| {
                 this.child(div().size_full().p_4().child(story))
+            });
+
+        if let Some(story_key) = story_key {
+            capture_story_view(story_key, scroll_handle, content).into_any_element()
+        } else {
+            capture_scroll_scope(scroll_handle, content).into_any_element()
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::registry::{StoryKey, StoryName, StorySectionName};
+    use gpui::{div, px};
+
+    enum DemoSubstory {
+        WithIcon,
+    }
+
+    impl Substory for DemoSubstory {
+        fn capture_key(&self) -> &'static str {
+            "with-icon"
+        }
+
+        fn title(&self) -> SharedString {
+            "With Icon".into()
+        }
+    }
+
+    struct DefaultStoryContract;
+
+    impl Focusable for DefaultStoryContract {
+        fn focus_handle(&self, _: &App) -> gpui::FocusHandle {
+            unreachable!("the static Story defaults do not require a focus handle")
+        }
+    }
+
+    impl Render for DefaultStoryContract {
+        fn render(&mut self, _: &mut Window, _: &mut gpui::Context<Self>) -> impl IntoElement {
+            div()
+        }
+    }
+
+    impl Story for DefaultStoryContract {
+        fn title(_: &App) -> String {
+            "Default Story".to_string()
+        }
+
+        fn new_view(_: &mut Window, cx: &mut App) -> Entity<impl Render + Focusable> {
+            cx.new(|_| DefaultStoryContract)
+        }
+    }
+
+    #[test]
+    fn section_titles_support_visible_and_stable_capture_identity() {
+        let (title, key) = StorySectionTitle::new("Visible").into_parts();
+        assert_eq!(title.as_ref(), "Visible");
+        assert_eq!(key, None);
+
+        let (title, key) = StorySectionTitle::with_capture_key("stable", "Visible").into_parts();
+        assert_eq!(title.as_ref(), "Visible");
+        assert_eq!(key.as_deref(), Some("stable"));
+
+        for descriptor in [
+            StorySectionTitle::from("Borrowed"),
+            StorySectionTitle::from(String::from("Owned")),
+            StorySectionTitle::from(SharedString::from("Shared")),
+        ] {
+            assert_eq!(descriptor.capture_key, None);
+        }
+
+        let descriptor = StorySectionTitle::from(DemoSubstory::WithIcon);
+        let base = StorySectionBase::new(descriptor);
+        assert_eq!(base.title().as_ref(), "With Icon");
+        assert_eq!(base.capture_key().map(AsRef::as_ref), Some("with-icon"));
+        let _captured = base.capture(div());
+
+        let visible = StorySectionBase::new("Visible");
+        assert_eq!(visible.title().as_ref(), "Visible");
+        assert_eq!(visible.capture_key(), None);
+        let _captured = visible.capture(div());
+    }
+
+    #[test]
+    fn styled_section_builder_collects_subtitles_children_and_widths() {
+        let mut section = section("Examples")
+            .sub_title(div().child("Subtitle"))
+            .max_w_md()
+            .max_w_lg()
+            .max_w_xl()
+            .max_w_2xl();
+        section.extend([div().child("First").into_any_element()]);
+        let _style = section.style();
+
+        assert_eq!(section.capture.title().as_ref(), "Examples");
+        assert_eq!(section.sub_title.len(), 1);
+        assert_eq!(section.children.len(), 1);
+    }
+
+    #[cfg(feature = "dock")]
+    #[test]
+    fn story_list_class_round_trips_sorted_members() {
+        assert_eq!(parse_story_list_klass("ButtonStory"), None);
+        assert_eq!(
+            parse_story_list_klass(STORY_LIST_KLASS_PREFIX),
+            Some(Vec::new())
+        );
+        assert_eq!(
+            parse_story_list_klass("__gpui_storybook_list__:TableStory||ButtonStory"),
+            Some(vec!["TableStory".to_string(), "ButtonStory".to_string()])
+        );
+    }
+
+    #[gpui::test]
+    fn story_trait_defaults_are_stable(cx: &mut App) {
+        assert_eq!(DefaultStoryContract::klass(), "DefaultStoryContract");
+        assert_eq!(DefaultStoryContract::title(cx), "Default Story");
+        assert_eq!(DefaultStoryContract::description(cx), "");
+        assert!(DefaultStoryContract::closable());
+        assert!(DefaultStoryContract::zoomable().is_some());
+        assert_eq!(DefaultStoryContract::title_bg(), None);
+    }
+
+    #[gpui::test]
+    fn story_container_builders_and_metadata_expose_runtime_contract(cx: &mut App) {
+        gpui_component::init(cx);
+        let window: gpui::WindowHandle<StoryContainer> = cx
+            .open_window(Default::default(), |window, cx| {
+                cx.new(|cx| StoryContainer::new(window, cx))
             })
+            .expect("test window should open");
+
+        window
+            .update(cx, |container, window, cx| {
+                assert_eq!(container.sidebar_group(), None);
+                assert_eq!(container.sidebar_section(), None);
+                assert_eq!(container.display_title(cx), "");
+                assert_eq!(container.display_description(cx), "");
+
+                *container = StoryContainer::new(window, cx)
+                    .group("Examples")
+                    .section("Components")
+                    .width(px(800.))
+                    .height(px(600.));
+                container.name = "Button".into();
+                container.description = "Button states".into();
+                assert_eq!(container.sidebar_group().as_deref(), Some("Examples"));
+                assert_eq!(container.sidebar_section().as_deref(), Some("Components"));
+                assert_eq!(container.display_title(cx), "Button");
+                assert_eq!(container.display_description(cx), "Button states");
+                assert_eq!(container.width, Some(px(800.)));
+                assert_eq!(container.height, Some(px(600.)));
+
+                let metadata = RegisteredStoryMetadata::new(
+                    StoryKey::new("crate-ButtonStory"),
+                    StoryName::new("ButtonStory"),
+                    Some(StorySectionName::new("Components")),
+                    "crate",
+                    "src/button.rs",
+                    42,
+                );
+                container.set_registration_metadata(metadata);
+                assert_eq!(container.registration_metadata(), Some(metadata));
+                assert_eq!(
+                    container.story_key(),
+                    Some(StoryKey::new("crate-ButtonStory"))
+                );
+                assert_eq!(container.story_name(), Some(StoryName::new("ButtonStory")));
+                assert_eq!(container.story_key_label(), Some("crate-ButtonStory"));
+                assert_eq!(container.story_name_label(), Some("ButtonStory"));
+                assert_eq!(container.crate_name_label(), Some("crate"));
+                assert_eq!(container.source_file_label(), Some("src/button.rs"));
+                assert_eq!(container.source_line(), Some(42));
+
+                container.title_fn = Some(Box::new(|_| "Localized Button".to_string()));
+                container.description_fn = Some(Box::new(|_| "Localized description".to_string()));
+                assert_eq!(container.display_title(cx), "Localized Button");
+                assert_eq!(container.display_description(cx), "Localized description");
+            })
+            .expect("container should update");
+    }
+
+    #[gpui::test]
+    fn story_list_class_sorts_entities_and_ignores_missing_classes(cx: &mut App) {
+        gpui_component::init(cx);
+        let window: gpui::WindowHandle<StoryContainer> = cx
+            .open_window(Default::default(), |window, cx| {
+                cx.new(|cx| StoryContainer::new(window, cx))
+            })
+            .expect("test window should open");
+
+        window
+            .update(cx, |_, window, cx| {
+                let table = cx.new(|cx| {
+                    let mut story = StoryContainer::new(window, cx);
+                    story.story_klass = Some("TableStory".into());
+                    story
+                });
+                let button = cx.new(|cx| {
+                    let mut story = StoryContainer::new(window, cx);
+                    story.story_klass = Some("ButtonStory".into());
+                    story
+                });
+                let missing = cx.new(|cx| StoryContainer::new(window, cx));
+
+                assert_eq!(
+                    story_list_klass(&[table, missing, button], cx).as_ref(),
+                    "__gpui_storybook_list__:ButtonStory|TableStory"
+                );
+            })
+            .expect("story classes should be computed");
+    }
+
+    #[test]
+    fn story_state_serializes_panel_identity() {
+        let state = StoryState {
+            story_klass: "ButtonStory".into(),
+        };
+        assert_eq!(
+            state.to_value(),
+            serde_json::json!({ "story_klass": "ButtonStory" })
+        );
     }
 }

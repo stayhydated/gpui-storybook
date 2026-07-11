@@ -3,7 +3,6 @@ use gpui::{
     IntoElement, ParentElement as _, Render, Styled as _, Window, prelude::FluentBuilder, px,
 };
 
-use crate::section::section;
 use gpui_component::{
     ActiveTheme, Disableable as _, Icon, IconName, Selectable as _, Sizable as _, Theme,
     button::{Button, ButtonCustomVariant, ButtonGroup, ButtonVariants as _},
@@ -12,6 +11,7 @@ use gpui_component::{
     progress::ProgressCircle,
     v_flex,
 };
+use gpui_storybook::section;
 use serde::Deserialize;
 
 #[derive(Action, Clone, Deserialize, Eq, PartialEq)]
@@ -21,6 +21,15 @@ enum ButtonAction {
     Loading,
     Selected,
     Compact,
+}
+
+#[derive(gpui_storybook::Substory)]
+enum ButtonSubstory {
+    NormalButton,
+    #[substory(title = "Button with Icon")]
+    ButtonWithIcon,
+    #[substory(title = "With Progress")]
+    WithProgress,
 }
 
 #[gpui_storybook::story(crate::StorySection::Buttons)]
@@ -146,7 +155,7 @@ impl Render for ButtonStory {
                     ),
             )
             .child(
-                section("Normal Button")
+                section(ButtonSubstory::NormalButton)
                     .max_w_lg()
                     .child(
                         Button::new("button-0")
@@ -259,7 +268,7 @@ impl Render for ButtonStory {
                     ),
             )
             .child(
-                section("Button with Icon")
+                section(ButtonSubstory::ButtonWithIcon)
                     .child(
                         Button::new("button-icon-1")
                             .outline()
@@ -344,7 +353,7 @@ impl Render for ButtonStory {
                     ),
             )
             .child(
-                section("With Progress").child(
+                section(ButtonSubstory::WithProgress).child(
                     h_flex()
                         .gap_4()
                         .child(

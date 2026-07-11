@@ -53,3 +53,41 @@ impl<V> StorybookWindow<V> {
         self
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use gpui::{AppContext as _, Context, ParentElement as _, Render, div};
+
+    struct TestView;
+
+    impl Render for TestView {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            div()
+        }
+    }
+
+    #[gpui::test]
+    fn window_ui_and_wrapper_preserve_custom_builders(cx: &mut App) {
+        let default_ui = StorybookWindowUi::new();
+        assert!(default_ui.app_menu_items.is_none());
+        assert!(default_ui.title_bar_items.is_none());
+
+        let ui = default_ui
+            .with_app_menu_items(|_| Vec::new())
+            .with_title_bar_items(|_, _| div().child("Custom"));
+        assert!(
+            ui.app_menu_items
+                .as_ref()
+                .expect("menu builder should exist")(cx)
+            .is_empty()
+        );
+        assert!(ui.title_bar_items.is_some());
+
+        let view = cx.new(|_| TestView);
+        let wrapper = StorybookWindow::new(view.clone()).with_ui(ui);
+        assert_eq!(wrapper.view, view);
+        assert!(wrapper.ui.app_menu_items.is_some());
+        assert!(wrapper.ui.title_bar_items.is_some());
+    }
+}

@@ -1,0 +1,21 @@
+---
+source: crates/gpui-storybook-macros/src/lib.rs
+assertion_line: 651
+expression: snapshot_tokens(expanded)
+---
+impl ::gpui_storybook::Substory for ButtonSubstory {
+    fn capture_key(&self) -> &'static str {
+        match self {
+            Self::NormalButton => "normal-button",
+            Self::ButtonWithIcon => "button-with-icon",
+            Self::WithProgress => "progress",
+        }
+    }
+    fn title(&self) -> ::gpui::SharedString {
+        match self {
+            Self::NormalButton => "Normal Button".into(),
+            Self::ButtonWithIcon => "Button with Icon".into(),
+            Self::WithProgress => "With Progress".into(),
+        }
+    }
+}

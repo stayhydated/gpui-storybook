@@ -1,19 +1,45 @@
+//! Loader and schema boundary for `storybook.toml`.
+//!
+//! This crate deliberately does not know about GPUI, inventory, story
+//! containers, or runtime config selection. It only loads a config file from a
+//! directory, deserializes the schema, and evaluates group/story filters for a
+//! caller-supplied candidate.
+//!
+//! `gpui-storybook` is the crate that decides which config is the active
+//! runtime config for a process and whether a candidate group comes from a
+//! story crate's `group` or from a story's declared section.
+
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 
+/// File name loaded by [`load_from_dir`].
 pub const STORYBOOK_TOML_FILE_NAME: &str = "storybook.toml";
 
+/// Parsed `storybook.toml` schema.
+///
+/// The `group` key has no serde default, so it is required when the file
+/// exists. `allow` defaults to `None`, which means only the config's own
+/// normalized group is allowed. `disable_story` defaults to an empty denylist.
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct StorybookToml {
+    /// Top-level group for stories from the crate that owns this config.
     pub group: String,
+    /// Optional runtime group allowlist. `["*"]` allows every group.
     #[serde(default)]
     pub allow: Option<Vec<String>>,
+    /// Registered story type names to hide.
     #[serde(default)]
     pub disable_story: Vec<String>,
 }
 
 impl StorybookToml {
+    /// Returns whether the supplied group is allowed by this config.
+    ///
+    /// Candidate groups and allow entries are trimmed before comparison. When
+    /// `allow` is omitted, only this config's own normalized [`group`](Self::group)
+    /// is allowed. When `allow` is present, `"*"` allows every group and an
+    /// empty list allows none.
     pub fn allows_group(&self, group: Option<&str>) -> bool {
         let group = group.map(str::trim).filter(|group| !group.is_empty());
         let self_group = self.group();
@@ -28,23 +54,28 @@ impl StorybookToml {
         })
     }
 
+    /// Returns whether `story_name` exactly matches a disabled story name.
     pub fn is_story_disabled(&self, story_name: &str) -> bool {
         self.disable_story
             .iter()
             .any(|disabled| disabled == story_name)
     }
 
+    /// Returns the normalized group, or `None` if it is blank.
     pub fn group(&self) -> Option<&str> {
         Some(str::trim(self.group.as_str())).filter(|group| !group.is_empty())
     }
 }
 
+/// Errors produced while loading or parsing `storybook.toml`.
 #[derive(Debug)]
 pub enum StorybookTomlError {
+    /// The file existed but could not be read.
     Read {
         path: PathBuf,
         source: std::io::Error,
     },
+    /// The file contents were not valid for the schema.
     Parse {
         path: PathBuf,
         source: toml::de::Error,
@@ -73,6 +104,10 @@ impl std::error::Error for StorybookTomlError {
     }
 }
 
+/// Loads `<dir>/storybook.toml`.
+///
+/// Missing files return `Ok(None)`. Read and parse failures preserve the full
+/// path in [`StorybookTomlError`] so callers can log actionable diagnostics.
 pub fn load_from_dir(dir: impl AsRef<Path>) -> Result<Option<StorybookToml>, StorybookTomlError> {
     let path = dir.as_ref().join(STORYBOOK_TOML_FILE_NAME);
 
@@ -95,8 +130,8 @@ pub fn load_from_dir(dir: impl AsRef<Path>) -> Result<Option<StorybookToml>, Sto
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::Path;
     use std::time::{SystemTime, UNIX_EPOCH};
+    use std::{error::Error as _, path::Path};
 
     fn with_temp_dir(test_fn: impl FnOnce(&Path)) {
         let timestamp = SystemTime::now()
@@ -231,6 +266,64 @@ mod tests {
 
             let error = load_from_dir(dir).expect_err("missing group should fail parsing");
             assert!(error.to_string().contains("missing field `group`"));
+        });
+    }
+
+    #[test]
+    fn filters_normalize_blank_and_whitespace_groups() {
+        let config = StorybookToml {
+            group: "  Examples  ".to_string(),
+            allow: None,
+            disable_story: Vec::new(),
+        };
+
+        assert_eq!(config.group(), Some("Examples"));
+        assert!(config.allows_group(Some("  Examples ")));
+        assert!(!config.allows_group(None));
+        assert!(!config.allows_group(Some("   ")));
+
+        let blank = StorybookToml {
+            group: "   ".to_string(),
+            ..StorybookToml::default()
+        };
+        assert_eq!(blank.group(), None);
+        assert!(!blank.allows_group(None));
+
+        let allow = StorybookToml {
+            group: "Examples".to_string(),
+            allow: Some(vec![" Other ".to_string()]),
+            disable_story: Vec::new(),
+        };
+        assert!(allow.allows_group(Some(" Other ")));
+    }
+
+    #[test]
+    fn parse_errors_preserve_path_and_source() {
+        with_temp_dir(|dir| {
+            let path = dir.join(STORYBOOK_TOML_FILE_NAME);
+            std::fs::write(&path, "unknown = true\n").expect("should write invalid config");
+
+            let error = load_from_dir(dir).expect_err("invalid config should fail parsing");
+            assert!(error.to_string().contains(&path.display().to_string()));
+            assert!(error.source().is_some());
+            assert!(
+                matches!(error, StorybookTomlError::Parse { path: error_path, .. } if error_path == path)
+            );
+        });
+    }
+
+    #[test]
+    fn read_errors_preserve_path_and_source() {
+        with_temp_dir(|dir| {
+            let path = dir.join(STORYBOOK_TOML_FILE_NAME);
+            std::fs::create_dir(&path).expect("should create unreadable config path");
+
+            let error = load_from_dir(dir).expect_err("a directory should not parse as a file");
+            assert!(error.to_string().contains(&path.display().to_string()));
+            assert!(error.source().is_some());
+            assert!(
+                matches!(error, StorybookTomlError::Read { path: error_path, .. } if error_path == path)
+            );
         });
     }
 }

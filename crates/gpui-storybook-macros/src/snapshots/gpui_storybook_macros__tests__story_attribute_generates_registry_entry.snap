@@ -1,13 +1,23 @@
 ---
 source: crates/gpui-storybook-macros/src/lib.rs
-assertion_line: 147
 expression: snapshot_tokens(expanded)
 ---
 pub struct ButtonStory;
+#[doc(hidden)]
+#[used]
+#[unsafe(
+    export_name = concat!(
+        "__gpui_storybook_story_key__",
+        env!("CARGO_PKG_NAME"),
+        "__",
+        "ButtonStory",
+    )
+)]
+static __gpui_storybook_story_key_marker_ButtonStory: u8 = 0;
 gpui_storybook::__inventory::submit! {
-    ::gpui_storybook::__registry::StoryEntry { name : "ButtonStory", section : None,
-    section_order : None, create_fn : | window, cx | {
-    ::gpui_storybook::StoryContainer::panel:: < ButtonStory > (window, cx) }, crate_name
-    : ::std::env!("CARGO_PKG_NAME"), crate_dir : ::std::env!("CARGO_MANIFEST_DIR"), file
-    : ::std::file!(), line : ::std::line!(), }
+    ::gpui_storybook::__registry::StoryEntry::new(concat!(::std::env!("CARGO_PKG_NAME"),
+    "-", "ButtonStory"), "ButtonStory", None, None, | window, cx | {
+    ::gpui_storybook::StoryContainer::panel:: < ButtonStory > (window, cx) },
+    ::gpui_storybook::__registry::StoryRegistrationSource::new(::std::env!("CARGO_PKG_NAME"),
+    ::std::env!("CARGO_MANIFEST_DIR"), ::std::file!(), ::std::line!(),),)
 }

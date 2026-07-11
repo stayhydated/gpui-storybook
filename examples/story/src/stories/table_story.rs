@@ -13,7 +13,7 @@ use gpui_component::{
     v_flex,
 };
 
-use crate::section::section;
+use gpui_storybook::section;
 
 #[gpui_storybook::story(crate::StorySection::Tables)]
 pub struct TableStory {
@@ -118,12 +118,15 @@ impl Render for TableStory {
                                 .selected(self.size == Size::Large),
                         )
                         .on_click(cx.listener(|this, selecteds: &Vec<usize>, window, cx| {
-                            let size = match selecteds[0] {
+                            let Some(selected) = selecteds.first() else {
+                                return;
+                            };
+                            let size = match *selected {
                                 0 => Size::XSmall,
                                 1 => Size::Small,
                                 2 => Size::Medium,
                                 3 => Size::Large,
-                                _ => unreachable!(),
+                                _ => return,
                             };
                             this.set_size(size, window, cx);
                         })),

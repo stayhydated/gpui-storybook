@@ -164,3 +164,109 @@ fn disabled_language_menu() -> MenuItem {
         disabled: true,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use anyhow::{Result, anyhow};
+    use std::rc::Rc;
+    use unic_langid::LanguageIdentifier;
+
+    enum FakeLocales {
+        Available,
+        Empty,
+        AvailableError,
+        CurrentError,
+    }
+
+    impl LocaleStore for FakeLocales {
+        fn available_locales(&self, _: &App) -> Result<Vec<(String, LanguageIdentifier)>> {
+            match self {
+                Self::Available | Self::CurrentError => Ok(vec![
+                    (
+                        "English".to_string(),
+                        "en-US".parse().expect("valid locale"),
+                    ),
+                    ("French".to_string(), "fr".parse().expect("valid locale")),
+                ]),
+                Self::Empty => Ok(Vec::new()),
+                Self::AvailableError => Err(anyhow!("locales unavailable")),
+            }
+        }
+
+        fn current_locale(&self, _: &App) -> Result<LanguageIdentifier> {
+            match self {
+                Self::CurrentError => Err(anyhow!("current locale unavailable")),
+                _ => Ok("en-US".parse().expect("valid locale")),
+            }
+        }
+
+        fn set_current_locale(&self, _: LanguageIdentifier, _: &mut App) -> Result<()> {
+            Ok(())
+        }
+    }
+
+    fn install_locales(cx: &mut App, locales: FakeLocales) {
+        cx.set_global(Box::new(locales) as Box<dyn LocaleStore>);
+    }
+
+    #[test]
+    fn disabled_language_menu_is_empty_and_disabled() {
+        let MenuItem::Submenu(menu) = disabled_language_menu() else {
+            panic!("language menu should be a submenu");
+        };
+        assert_eq!(menu.name.as_ref(), "Language");
+        assert!(menu.items.is_empty());
+        assert!(menu.disabled);
+    }
+
+    #[gpui::test]
+    fn menu_building_handles_locales_extras_and_errors(cx: &mut App) {
+        gpui_component::init(cx);
+        install_locales(cx, FakeLocales::Available);
+
+        let extra: AppMenuItemsBuilder =
+            Rc::new(|_| vec![MenuItem::action("Extra", SwitchTheme("Adventure".into()))]);
+        let menus = build_menus("Storybook", Some(extra), cx);
+        assert_eq!(menus.len(), 1);
+        assert_eq!(menus[0].name.as_ref(), "Storybook");
+        assert_eq!(menus[0].items.len(), 7);
+
+        let MenuItem::Submenu(language) = &menus[0].items[2] else {
+            panic!("third item should be language submenu");
+        };
+        assert!(!language.disabled);
+        assert_eq!(language.items.len(), 2);
+        let MenuItem::Action { checked, .. } = &language.items[0] else {
+            panic!("locale should be an action");
+        };
+        assert!(*checked);
+
+        install_locales(cx, FakeLocales::Empty);
+        let MenuItem::Submenu(language) = language_menu(cx) else {
+            panic!("language menu should be a submenu");
+        };
+        assert!(language.disabled);
+
+        install_locales(cx, FakeLocales::AvailableError);
+        let MenuItem::Submenu(language) = language_menu(cx) else {
+            panic!("language menu should be a submenu");
+        };
+        assert!(language.disabled);
+
+        install_locales(cx, FakeLocales::CurrentError);
+        let MenuItem::Submenu(language) = language_menu(cx) else {
+            panic!("language menu should be a submenu");
+        };
+        assert!(
+            language
+                .items
+                .iter()
+                .all(|item| { matches!(item, MenuItem::Action { checked: false, .. }) })
+        );
+
+        install_locales(cx, FakeLocales::Available);
+        let app_menu = init("Storybook", Some(Rc::new(|_| Vec::new())), cx);
+        let _menu = app_menu.read(cx);
+    }
+}

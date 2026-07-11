@@ -115,3 +115,36 @@ impl Render for FontSizeSelector {
             )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use gpui::{App, AppContext as _};
+
+    #[gpui::test]
+    fn selector_actions_update_theme_settings(cx: &mut App) {
+        gpui_component::init(cx);
+        let window: gpui::WindowHandle<FontSizeSelector> = cx
+            .open_window(Default::default(), |window, cx| {
+                cx.new(|cx| FontSizeSelector::new(window, cx))
+            })
+            .expect("selector window should open");
+
+        window
+            .update(cx, |selector, window, cx| {
+                selector.on_select_font(&SelectFont(18), window, cx);
+                assert_eq!(cx.theme().font_size, px(18.));
+
+                selector.on_select_radius(&SelectRadius(8), window, cx);
+                assert_eq!(cx.theme().radius, px(8.));
+
+                selector.on_select_scrollbar_show(
+                    &SelectScrollbarShow(ScrollbarShow::Always),
+                    window,
+                    cx,
+                );
+                assert_eq!(cx.theme().scrollbar_show, ScrollbarShow::Always);
+            })
+            .expect("selector should update");
+    }
+}

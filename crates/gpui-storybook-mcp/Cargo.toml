@@ -1,0 +1,25 @@
+[package]
+name = "gpui-storybook-mcp"
+description = """
+MCP integration for gpui-storybook automation and capture.
+"""
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+repository.workspace = true
+readme = "README.md"
+
+[dependencies]
+component-shape-mcp = { workspace = true }
+frame-capture = { workspace = true }
+frame-capture-routes = { workspace = true }
+gpui-storybook-core = { features = [ "capture" ], workspace = true }
+serde = { features = [ "derive" ], workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { features = [ "rt-multi-thread", "sync", "time" ], workspace = true }
+
+[lints]
+workspace = true

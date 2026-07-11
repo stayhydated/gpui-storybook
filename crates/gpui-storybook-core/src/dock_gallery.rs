@@ -1,4 +1,13 @@
 use crate::{
+    automation::{
+        SharedStorybookAutomation, StoryCurrentSnapshot, StoryScreenshotRequest, StorySnapshot,
+        StorybookAutomationCommand, StorybookAutomationError, apply_capture_target_size,
+        default_storybook_automation, schedule_story_capture, story_snapshots_from_containers,
+        validate_capture_target_size,
+    },
+    capture_region::capture_route_story_key,
+    dock_layout_store::DockLayoutStore,
+    dock_sidebar_index::{SidebarStoryMetadata, group_matching_stories},
     registry::StoryEntry,
     story::{StoryContainer, StoryState, parse_story_list_klass, reveal_story_panel},
     storybook_window_ui::StorybookWindowUi,
@@ -25,7 +34,6 @@ use gpui_component::{
 use gpui_storybook_components::{StoryDrag, StorySidebarItem};
 use std::{
     collections::BTreeMap,
-    path::Path,
     sync::{Arc, LazyLock, Mutex},
 };
 
@@ -68,86 +76,10 @@ static STORY_SEEDS: LazyLock<Mutex<StorySeedRegistries>> =
 #[derive(Clone, Debug)]
 struct StorySeed {
     name: String,
+    story_key: Option<String>,
     story_klass: String,
     group: Option<String>,
     section: Option<String>,
-}
-
-struct DockLayoutStore;
-
-impl DockLayoutStore {
-    fn sanitize_state_json(value: &mut serde_json::Value) {
-        match value {
-            serde_json::Value::Object(map) => {
-                for child in map.values_mut() {
-                    Self::sanitize_state_json(child);
-                }
-
-                let is_tab_panel = map
-                    .get("panel_name")
-                    .and_then(serde_json::Value::as_str)
-                    .is_some_and(|name| name == "TabPanel");
-                if !is_tab_panel {
-                    return;
-                }
-
-                if let Some(info) = map.get_mut("info")
-                    && info
-                        .as_object()
-                        .and_then(|info| info.get("panel"))
-                        .is_some_and(serde_json::Value::is_null)
-                {
-                    *info = serde_json::json!({
-                        "tabs": {
-                            "active_index": 0
-                        }
-                    });
-                }
-            },
-            serde_json::Value::Array(items) => {
-                for item in items {
-                    Self::sanitize_state_json(item);
-                }
-            },
-            _ => {},
-        }
-    }
-
-    fn to_json(state: &DockAreaState) -> Result<String> {
-        let mut state_json = serde_json::to_value(state)?;
-        Self::sanitize_state_json(&mut state_json);
-        Ok(serde_json::to_string_pretty(&state_json)?)
-    }
-
-    fn sanitize_state(state: DockAreaState) -> Result<DockAreaState> {
-        let mut state_json = serde_json::to_value(state)?;
-        Self::sanitize_state_json(&mut state_json);
-        Ok(serde_json::from_value(state_json)?)
-    }
-
-    fn from_json(json: &str) -> Result<DockAreaState> {
-        let mut state_json = serde_json::from_str::<serde_json::Value>(json)?;
-        Self::sanitize_state_json(&mut state_json);
-        Ok(serde_json::from_value::<DockAreaState>(state_json)?)
-    }
-
-    fn save_to_path(path: &str, state: &DockAreaState) -> Result<()> {
-        let json = Self::to_json(state)?;
-        let path_ref = Path::new(path);
-        if let Some(parent) = path_ref.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-
-        let tmp_path = format!("{path}.tmp");
-        std::fs::write(&tmp_path, json)?;
-        std::fs::rename(&tmp_path, path)?;
-        Ok(())
-    }
-
-    fn load_from_path(path: &str) -> Result<DockAreaState> {
-        let json = std::fs::read_to_string(path)?;
-        Self::from_json(&json)
-    }
 }
 
 /// Sidebar panel for navigating stories
@@ -156,6 +88,7 @@ pub struct StorySidebar {
     search_input: Entity<InputState>,
     stories: Vec<Entity<StoryContainer>>,
     dock_area: gpui::WeakEntity<DockArea>,
+    automation: Option<SharedStorybookAutomation>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -163,6 +96,7 @@ impl StorySidebar {
     pub fn new(
         stories: Vec<Entity<StoryContainer>>,
         dock_area: gpui::WeakEntity<DockArea>,
+        automation: Option<SharedStorybookAutomation>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
@@ -184,6 +118,7 @@ impl StorySidebar {
             search_input,
             stories,
             dock_area,
+            automation,
             _subscriptions: subscriptions,
         }
     }
@@ -192,18 +127,25 @@ impl StorySidebar {
     fn open_story(
         dock_area: gpui::WeakEntity<DockArea>,
         story: Entity<StoryContainer>,
+        automation: Option<SharedStorybookAutomation>,
         window: &mut Window,
         cx: &mut App,
     ) {
         let Some(dock_area) = dock_area.upgrade() else {
             return;
         };
+        let story_key = story.read(cx).story_key_label().map(str::to_owned);
 
         if reveal_story_panel(&story, window, cx) {
+            if let Some(automation) = automation
+                && let Some(story_key) = story_key
+            {
+                let _ = automation.confirm_current_story(story_key.as_ref());
+            }
             return;
         }
 
-        let panel: Arc<dyn PanelView> = Arc::new(story);
+        let panel: Arc<dyn PanelView> = Arc::new(story.clone());
         let state = dock_area.update(cx, |dock_area, cx| {
             // Keep the declarative DockItem tree synced with runtime state before adding.
             // This avoids stale split children on gpui-component/main.
@@ -219,6 +161,12 @@ impl StorySidebar {
         if let Err(err) = DockLayoutStore::save_to_path(STATE_FILE, &state) {
             eprintln!("failed to save dock layout after open to {STATE_FILE}: {err:#}");
         }
+
+        if let Some(automation) = automation
+            && let Some(story_key) = story_key
+        {
+            let _ = automation.confirm_current_story(story_key.as_ref());
+        }
     }
 
     fn register_story(
@@ -233,6 +181,9 @@ impl StorySidebar {
         if let Ok(mut registries) = STORY_PANELS.lock() {
             let registry = registries.entry(dock_area.entity_id()).or_default();
             registry.insert(story_klass.to_string(), story.downgrade());
+            if let Some(story_key) = story.read(cx).story_key_label() {
+                registry.insert(story_key.to_string(), story.downgrade());
+            }
         }
     }
 
@@ -259,6 +210,7 @@ impl StorySidebar {
 
                 Some(StorySeed {
                     name: story_data.display_title(cx),
+                    story_key: story_data.story_key_label().map(str::to_owned),
                     story_klass,
                     group: story_data.group.as_ref().map(ToString::to_string),
                     section: story_data.section.as_ref().map(ToString::to_string),
@@ -269,6 +221,18 @@ impl StorySidebar {
         if let Ok(mut registries) = STORY_SEEDS.lock() {
             registries.insert(dock_area.entity_id(), seeds);
         }
+    }
+
+    fn story_seed_by_key(
+        dock_area: &gpui::WeakEntity<DockArea>,
+        story_key: &str,
+    ) -> Option<StorySeed> {
+        let registries = STORY_SEEDS.lock().ok()?;
+        registries
+            .get(&dock_area.entity_id())?
+            .iter()
+            .find(|seed| seed.story_key.as_deref() == Some(story_key))
+            .cloned()
     }
 
     fn story_seed(dock_area: &gpui::WeakEntity<DockArea>, story_klass: &str) -> Option<StorySeed> {
@@ -342,11 +306,58 @@ impl StorySidebar {
             return Some(story);
         }
 
-        let entry = inventory::iter::<StoryEntry>().find(|entry| entry.name == story_klass)?;
+        let entry =
+            inventory::iter::<StoryEntry>().find(|entry| entry.name.as_str() == story_klass)?;
         let panel = (entry.create_fn)(window, cx);
         panel.update(cx, |c, _| {
             c.group = group.map(Into::into);
             c.section = section.map(Into::into);
+            c.set_registration_metadata(entry.metadata());
+        });
+        Self::register_story(dock_area, &panel, cx);
+        Some(panel)
+    }
+
+    fn create_story_by_key(
+        story_key: &str,
+        dock_area: &gpui::WeakEntity<DockArea>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Option<Entity<StoryContainer>> {
+        if let Some(story) = Self::find_story_by_klass(dock_area, story_key) {
+            return Some(story);
+        }
+
+        let story_seed = Self::story_seed_by_key(dock_area, story_key);
+        Self::create_story_panel_by_key(
+            story_key,
+            story_seed.as_ref().and_then(|seed| seed.group.as_deref()),
+            story_seed.as_ref().and_then(|seed| seed.section.as_deref()),
+            dock_area,
+            window,
+            cx,
+        )
+    }
+
+    fn create_story_panel_by_key(
+        story_key: &str,
+        group: Option<&str>,
+        section: Option<&str>,
+        dock_area: &gpui::WeakEntity<DockArea>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Option<Entity<StoryContainer>> {
+        if let Some(story) = Self::find_story_by_klass(dock_area, story_key) {
+            return Some(story);
+        }
+
+        let entry =
+            inventory::iter::<StoryEntry>().find(|entry| entry.key().as_str() == story_key)?;
+        let panel = (entry.create_fn)(window, cx);
+        panel.update(cx, |c, _| {
+            c.group = group.map(Into::into);
+            c.section = section.map(Into::into);
+            c.set_registration_metadata(entry.metadata());
         });
         Self::register_story(dock_area, &panel, cx);
         Some(panel)
@@ -398,8 +409,20 @@ impl StorySidebar {
         cx: &mut App,
     ) {
         if let Some(story) = Self::create_story_by_klass(story_klass, &dock_area, window, cx) {
-            Self::open_story(dock_area, story, window, cx);
+            Self::open_story(dock_area, story, None, window, cx);
         }
+    }
+
+    fn open_story_by_key(
+        dock_area: gpui::WeakEntity<DockArea>,
+        story_key: &str,
+        automation: Option<SharedStorybookAutomation>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Option<Entity<StoryContainer>> {
+        let story = Self::create_story_by_key(story_key, &dock_area, window, cx)?;
+        Self::open_story(dock_area, story.clone(), automation, window, cx);
+        Some(story)
     }
 }
 
@@ -431,50 +454,22 @@ impl Focusable for StorySidebar {
 
 impl Render for StorySidebar {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let query = self.search_input.read(cx).value().trim().to_lowercase();
-
-        let filtered_stories: Vec<Entity<StoryContainer>> = self
+        let query = self.search_input.read(cx).value();
+        let story_metadata = self
             .stories
             .iter()
-            .filter(|story| {
+            .map(|story| {
                 let story_data = story.read(cx);
-                let title = story_data.display_title(cx);
-                let section = story_data
-                    .section
-                    .as_ref()
-                    .map(|s| s.to_string())
-                    .unwrap_or_default();
-                let group = story_data
-                    .group
-                    .as_ref()
-                    .map(|s| s.to_string())
-                    .unwrap_or_default();
-                title.to_lowercase().contains(&query)
-                    || group.to_lowercase().contains(&query)
-                    || section.to_lowercase().contains(&query)
+                SidebarStoryMetadata {
+                    title: story_data.display_title(cx),
+                    group: story_data.sidebar_group().map(|group| group.to_string()),
+                    section: story_data
+                        .sidebar_section()
+                        .map(|section| section.to_string()),
+                }
             })
-            .cloned()
-            .collect();
-
-        // Group stories by crate group, then optional section.
-        let mut groups: BTreeMap<
-            Option<SharedString>,
-            BTreeMap<Option<SharedString>, Vec<Entity<StoryContainer>>>,
-        > = BTreeMap::new();
-
-        for story_entity in filtered_stories.iter() {
-            let (group, section) = {
-                let story_data = story_entity.read(cx);
-                (story_data.sidebar_group(), story_data.sidebar_section())
-            };
-
-            groups
-                .entry(group)
-                .or_default()
-                .entry(section)
-                .or_default()
-                .push(story_entity.clone());
-        }
+            .collect::<Vec<_>>();
+        let groups = group_matching_stories(&story_metadata, query.as_ref());
 
         Sidebar::new("story-sidebar")
             .side(gpui_component::Side::Left)
@@ -514,7 +509,8 @@ impl Render for StorySidebar {
                                     );
                                 }
 
-                                items.extend(stories_in_section.into_iter().map(|story_entity| {
+                                items.extend(stories_in_section.into_iter().map(|story_index| {
+                                    let story_entity = &self.stories[story_index];
                                     let story_data = story_entity.read(cx);
                                     let name: SharedString = story_data.display_title(cx).into();
                                     let story_klass_for_drag =
@@ -522,6 +518,7 @@ impl Render for StorySidebar {
 
                                     let story_for_click = story_entity.clone();
                                     let dock_area_for_click = self.dock_area.clone();
+                                    let automation_for_click = self.automation.clone();
                                     StorySidebarItem::new(name, story_klass_for_drag)
                                         .indented(has_section)
                                         .on_click(cx.listener(
@@ -529,10 +526,13 @@ impl Render for StorySidebar {
                                                 let dock_area_for_open =
                                                     dock_area_for_click.clone();
                                                 let story_for_open = story_for_click.clone();
+                                                let automation_for_open =
+                                                    automation_for_click.clone();
                                                 window.defer(cx, move |window, cx| {
                                                     Self::open_story(
                                                         dock_area_for_open,
                                                         story_for_open,
+                                                        automation_for_open,
                                                         window,
                                                         cx,
                                                     );
@@ -555,6 +555,7 @@ impl Render for StorySidebar {
 pub struct StoryWorkspace {
     title_bar: Entity<AppTitleBar>,
     dock_area: Entity<DockArea>,
+    automation: Option<SharedStorybookAutomation>,
     last_layout_state: Option<DockAreaState>,
     toggle_button_visible: bool,
 }
@@ -563,9 +564,14 @@ impl StoryWorkspace {
     pub fn new(
         stories: Vec<Entity<StoryContainer>>,
         ui: StorybookWindowUi,
+        automation: Option<SharedStorybookAutomation>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
+        if let Some(automation) = &automation {
+            automation.set_stories(story_snapshots_from_containers(&stories, cx));
+        }
+
         let dock_area =
             cx.new(|cx| DockArea::new(MAIN_DOCK_AREA.id, Some(MAIN_DOCK_AREA.version), window, cx));
         let weak_dock_area = dock_area.downgrade();
@@ -578,7 +584,13 @@ impl StoryWorkspace {
                 // The saved layout is mounted.
             },
             Err(_) => {
-                Self::reset_default_layout(weak_dock_area, &stories, window, cx);
+                Self::reset_default_layout(
+                    weak_dock_area,
+                    &stories,
+                    automation.clone(),
+                    window,
+                    cx,
+                );
             },
         };
 
@@ -608,12 +620,19 @@ impl StoryWorkspace {
 
         let title_bar = cx.new(|cx| AppTitleBar::new("Storybook", ui, window, cx));
 
-        Self {
+        let this = Self {
             dock_area,
             title_bar,
+            automation,
             last_layout_state: None,
             toggle_button_visible: true,
+        };
+
+        if let Some(automation) = this.automation.clone() {
+            this.attach_automation_host(automation, window, cx);
         }
+
+        this
     }
 
     fn save_layout(
@@ -647,7 +666,7 @@ impl StoryWorkspace {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Result<()> {
-        let state = DockLayoutStore::load_from_path(STATE_FILE)?;
+        let state: DockAreaState = DockLayoutStore::load_from_path(STATE_FILE)?;
 
         // Saved layouts must match the active dock schema.
         if state.version != Some(MAIN_DOCK_AREA.version) {
@@ -673,13 +692,14 @@ impl StoryWorkspace {
     fn reset_default_layout(
         dock_area: gpui::WeakEntity<DockArea>,
         stories: &[Entity<StoryContainer>],
+        automation: Option<SharedStorybookAutomation>,
         window: &mut Window,
         cx: &mut App,
     ) {
         let dock_item = Self::build_center_layout(stories, &dock_area, window, cx);
 
         // Create sidebar panel for the left dock
-        let sidebar_panel = Self::build_sidebar(stories, &dock_area, window, cx);
+        let sidebar_panel = Self::build_sidebar(stories, &dock_area, automation, window, cx);
 
         _ = dock_area.update(cx, |view, cx| {
             view.set_version(MAIN_DOCK_AREA.version, window, cx);
@@ -701,12 +721,13 @@ impl StoryWorkspace {
     fn build_sidebar(
         stories: &[Entity<StoryContainer>],
         dock_area: &gpui::WeakEntity<DockArea>,
+        automation: Option<SharedStorybookAutomation>,
         window: &mut Window,
         cx: &mut App,
     ) -> DockItem {
-        let sidebar: Arc<dyn PanelView> = Arc::new(
-            cx.new(|cx| StorySidebar::new(stories.to_vec(), dock_area.clone(), window, cx)),
-        );
+        let sidebar: Arc<dyn PanelView> = Arc::new(cx.new(|cx| {
+            StorySidebar::new(stories.to_vec(), dock_area.clone(), automation, window, cx)
+        }));
 
         DockItem::panel(sidebar)
     }
@@ -735,13 +756,144 @@ impl StoryWorkspace {
         Self::view_with_ui(stories, StorybookWindowUi::default(), window, cx)
     }
 
+    pub fn view_with_automation(
+        stories: Vec<Entity<StoryContainer>>,
+        automation: SharedStorybookAutomation,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Entity<Self> {
+        Self::view_with_ui_and_automation(
+            stories,
+            StorybookWindowUi::default(),
+            automation,
+            window,
+            cx,
+        )
+    }
+
     pub fn view_with_ui(
         stories: Vec<Entity<StoryContainer>>,
         ui: StorybookWindowUi,
         window: &mut Window,
         cx: &mut App,
     ) -> Entity<Self> {
-        cx.new(|cx| Self::new(stories, ui, window, cx))
+        let automation = default_storybook_automation(cx);
+        cx.new(|cx| Self::new(stories, ui, automation, window, cx))
+    }
+
+    pub fn view_with_ui_and_automation(
+        stories: Vec<Entity<StoryContainer>>,
+        ui: StorybookWindowUi,
+        automation: SharedStorybookAutomation,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Entity<Self> {
+        cx.new(|cx| Self::new(stories, ui, Some(automation), window, cx))
+    }
+
+    fn attach_automation_host(
+        &self,
+        automation: SharedStorybookAutomation,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(mut receiver) = automation.take_command_receiver() else {
+            return;
+        };
+
+        cx.spawn_in(window, async move |this, cx| {
+            while let Some(command) = receiver.recv().await {
+                let _ = this.update_in(cx, |workspace, window, cx| {
+                    workspace.handle_automation_command(command, window, cx);
+                });
+            }
+        })
+        .detach();
+    }
+
+    fn handle_automation_command(
+        &mut self,
+        command: StorybookAutomationCommand,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        match command {
+            StorybookAutomationCommand::OpenStory { key, response } => {
+                let result = self.open_story_by_key(&key, window, cx);
+                let _ = response.send(result);
+            },
+            StorybookAutomationCommand::CaptureCurrentStory {
+                request_id,
+                request,
+                response,
+            } => {
+                let quit_after_capture = request.quit_after_capture;
+                match self.prepare_capture_current_story(&request, window, cx) {
+                    Ok(story) => {
+                        schedule_story_capture(
+                            request_id,
+                            request,
+                            story,
+                            response,
+                            quit_after_capture,
+                            window,
+                        );
+                    },
+                    Err(error) => {
+                        eprintln!("gpui-storybook capture session failed: {error}");
+                        let _ = response.send(Err(error));
+                        if quit_after_capture {
+                            std::process::exit(1);
+                        }
+                    },
+                }
+            },
+        }
+    }
+
+    fn open_story_by_key(
+        &mut self,
+        key: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Result<StoryCurrentSnapshot, StorybookAutomationError> {
+        let story_key = capture_route_story_key(key);
+        StorySidebar::open_story_by_key(
+            self.dock_area.downgrade(),
+            story_key,
+            self.automation.clone(),
+            window,
+            cx,
+        )
+        .ok_or_else(|| StorybookAutomationError::StoryNotFound {
+            key: key.to_string(),
+        })?;
+
+        self.automation
+            .as_ref()
+            .expect("automation command requires automation")
+            .confirm_current_story(key)
+    }
+
+    fn prepare_capture_current_story(
+        &mut self,
+        request: &StoryScreenshotRequest,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Result<StorySnapshot, StorybookAutomationError> {
+        let story = self
+            .automation
+            .as_ref()
+            .and_then(|automation| automation.current_story().story)
+            .ok_or_else(|| StorybookAutomationError::CaptureUnavailable {
+                message: "no current story is selected for capture".to_string(),
+            })?;
+
+        apply_capture_target_size(window, validate_capture_target_size(request)?);
+        cx.notify();
+        window.refresh();
+
+        Ok(story)
     }
 
     fn on_action_toggle_dock_toggle_button(
@@ -765,7 +917,13 @@ impl StoryWorkspace {
     ) {
         let weak_dock_area = self.dock_area.downgrade();
         let stories = StorySidebar::seeded_stories(&weak_dock_area, window, cx);
-        Self::reset_default_layout(weak_dock_area, &stories, window, cx);
+        Self::reset_default_layout(
+            weak_dock_area,
+            &stories,
+            self.automation.clone(),
+            window,
+            cx,
+        );
 
         // Delete saved state file
         let _ = std::fs::remove_file(STATE_FILE);
@@ -838,7 +996,7 @@ pub fn register_story_panels(cx: &mut App) {
         |dock_area, _state, _info, window, cx| {
             let stories = StorySidebar::seeded_stories(&dock_area, window, cx);
 
-            Box::new(cx.new(|cx| StorySidebar::new(stories, dock_area, window, cx)))
+            Box::new(cx.new(|cx| StorySidebar::new(stories, dock_area, None, window, cx)))
         },
     );
 }
@@ -858,19 +1016,15 @@ where
     ]);
 
     cx.spawn(async move |cx| {
-        let window = cx
-            .open_window(options, |window, cx| {
-                let view = create_view_fn(window, cx);
-                cx.new(|cx| Root::new(view, window, cx))
-            })
-            .expect("failed to open window");
+        let window = cx.open_window(options, |window, cx| {
+            let view = create_view_fn(window, cx);
+            cx.new(|cx| Root::new(view, window, cx))
+        })?;
 
-        window
-            .update(cx, |_, window, _| {
-                window.activate_window();
-                window.set_window_title(&title);
-            })
-            .expect("failed to update window");
+        window.update(cx, |_, window, _| {
+            window.activate_window();
+            window.set_window_title(&title);
+        })?;
 
         Ok::<_, anyhow::Error>(())
     })

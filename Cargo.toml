@@ -1,10 +1,11 @@
 [workspace]
-default-members = ["examples/story"]
+default-members = [ "examples/story" ]
 members = [
   "crates/gpui-storybook",
   "crates/gpui-storybook-components",
   "crates/gpui-storybook-core",
   "crates/gpui-storybook-macros",
+  "crates/gpui-storybook-mcp",
   "crates/gpui-storybook-toml",
   "examples/story",
   "examples/component",
@@ -22,12 +23,16 @@ version = "0.5.0"
 
 [workspace.dependencies]
 anyhow = "1.0"
+component-shape-mcp = { git = "https://github.com/stayhydated/component-shape" }
 darling = "0.23"
-es-fluent = "0.16"
-es-fluent-build = "0.16"
-es-fluent-lang = "0.16"
-es-fluent-manager-embedded = "0.16"
-gpui = { git = "https://github.com/zed-industries/zed", rev = "b077f41a9f26ae5ed7fadfea55a501d34afb25de" }
+derive_more = "2.1"
+es-fluent = "0.18"
+es-fluent-build = "0.18"
+es-fluent-lang = "0.18"
+es-fluent-manager-embedded = "0.18"
+frame-capture = { git = "https://github.com/stayhydated/frame-capture" }
+frame-capture-routes = { git = "https://github.com/stayhydated/frame-capture" }
+gpui = { branch = "linux-headless-renderer", git = "https://github.com/stayhydated/zed", version = "0.2.2" }
 gpui-component = { git = "https://github.com/longbridge/gpui-component" }
 gpui-component-assets = { git = "https://github.com/longbridge/gpui-component" }
 gpui-es-fluent = { git = "https://github.com/stayhydated/gpui-es-fluent" }
@@ -35,41 +40,55 @@ gpui-storybook = { path = "crates/gpui-storybook", version = "0.5.0" }
 gpui-storybook-components = { path = "crates/gpui-storybook-components", version = "0.5.0" }
 gpui-storybook-core = { path = "crates/gpui-storybook-core", version = "0.5.0" }
 gpui-storybook-macros = { path = "crates/gpui-storybook-macros", version = "0.5.0" }
+gpui-storybook-mcp = { path = "crates/gpui-storybook-mcp", version = "0.5.0" }
 gpui-storybook-toml = { path = "crates/gpui-storybook-toml", version = "0.5.0" }
-gpui_platform = { features = [
+gpui_platform = { branch = "linux-headless-renderer", features = [
   "font-kit",
   "x11",
   "wayland",
   "runtime_shaders",
-], git = "https://github.com/zed-industries/zed", rev = "b077f41a9f26ae5ed7fadfea55a501d34afb25de" }
+], git = "https://github.com/stayhydated/zed" }
 heck = "0.5"
-insta = "1.46"
+image = { default-features = false, features = [ "png" ], version = "0.25" }
+insta = "1.48"
 inventory = "0.3"
 itertools = "0.14"
 prettyplease = "0.2"
 proc-macro2 = "1.0"
 quote = "1.0"
-reqwest_client = { git = "https://github.com/zed-industries/zed", rev = "b077f41a9f26ae5ed7fadfea55a501d34afb25de" }
-rust-embed = "8.11"
+reqwest_client = { branch = "linux-headless-renderer", git = "https://github.com/stayhydated/zed" }
+rust-embed = "8.12"
 serde = "1.0"
 serde_json = "1.0"
 strum = "0.28"
 syn = "2.0"
 thiserror = "2.0"
-tokio = "1.49"
-toml = "1.0"
+tokio = "1.52"
+toml = "1.1"
 tracing = "0.1"
 tracing-subscriber = "0.3"
 unic-langid = "0.9"
-unicode-segmentation = "1.12"
+unicode-segmentation = "1.13"
 
-[replace]
-"https://github.com/zed-industries/zed#gpui@0.2.2" = { git = "https://github.com/zed-industries/zed", rev = "b077f41a9f26ae5ed7fadfea55a501d34afb25de" }
+[patch."https://github.com/zed-industries/zed"]
+gpui = { branch = "linux-headless-renderer", git = "https://github.com/stayhydated/zed", version = "=0.2.2" }
+gpui_macros = { branch = "linux-headless-renderer", git = "https://github.com/stayhydated/zed", version = "0.1.0" }
+gpui_platform = { branch = "linux-headless-renderer", git = "https://github.com/stayhydated/zed" }
+reqwest_client = { branch = "linux-headless-renderer", git = "https://github.com/stayhydated/zed" }
 
 [workspace.lints.rust]
-unexpected_cfgs = { level = "deny" }
+future_incompatible = "deny"
+nonstandard_style = "deny"
+unexpected_cfgs = { check-cfg = [ "cfg(coverage)" ], level = "deny" }
+unsafe_op_in_unsafe_fn = "deny"
+unused_must_use = "deny"
+
+[workspace.lints.rustdoc]
+bare_urls = "deny"
+broken_intra_doc_links = "deny"
 
 [workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
 dbg_macro = "deny"
 derive_partial_eq_without_eq = "warn"
 err_expect = "warn"
@@ -83,10 +102,16 @@ uninlined_format_args = "allow"
 unused_trait_names = "warn"
 useless_conversion = "warn"
 
+[profile.dev]
+codegen-units = 16
+debug = "limited"
+opt-level = 1
+split-debuginfo = "unpacked"
+
 [profile.dev.package."*"]
 opt-level = 3
 
 [profile.release]
 codegen-units = 1
-lto = true
+lto = "thin"
 opt-level = 3

@@ -38,9 +38,9 @@ cargo run -p gpui-storybook-example-component --features dock
 The examples contain the full `Cargo.toml` setup. The minimal runtime shape looks like this:
 
 ```rs
+// src/i18n.rs
 use es_fluent::EsFluent;
 use es_fluent_lang::es_fluent_language;
-use gpui_storybook::{Assets, Gallery};
 use strum::EnumIter;
 
 es_fluent_manager_embedded::define_i18n_module!();
@@ -48,6 +48,13 @@ es_fluent_manager_embedded::define_i18n_module!();
 #[es_fluent_language]
 #[derive(Clone, Copy, Debug, EnumIter, EsFluent, PartialEq)]
 pub enum Languages {}
+
+// src/lib.rs
+pub mod i18n;
+
+// src/main.rs
+use my_app::i18n::Languages;
+use gpui_storybook::{Assets, Gallery};
 
 fn main() {
     let app = gpui_platform::application().with_assets(Assets);
@@ -64,7 +71,7 @@ fn main() {
 }
 ```
 
-The locale setup has three parts: define the embedded i18n module in the binary, derive the app language enum with `EsFluent`, then call `init` and `change_locale` with the selected language.
+The locale setup has three parts: define the embedded i18n module in library-reachable `src/i18n.rs`, derive the app language enum with `EsFluent`, then call `init` and `change_locale` with the selected language.
 
 Turn on the `dock` feature when you want a panel-based workspace instead of the gallery layout:
 
@@ -72,6 +79,69 @@ Turn on the `dock` feature when you want a panel-based workspace instead of the 
 [dependencies]
 gpui-storybook = { version = "*", features = ["dock"] }
 ```
+
+Turn on the `mcp` feature when another process needs to list stories, open a
+story by key, or capture the active story:
+
+```toml
+[dependencies]
+gpui-storybook = { version = "*", features = ["mcp"] }
+```
+
+No constructor changes are required. `gpui_storybook::init(...)` installs the
+MCP automation controller when the feature is enabled, and `Gallery::view(...)`
+or `StoryWorkspace::view(...)` attach it automatically.
+The six storybook tools publish closed, typed input and output schemas plus MCP
+read-only, idempotence, destructive, and open-world annotations. Invalid,
+missing, and unknown arguments return machine-readable structured errors.
+
+Run an MCP-enabled example over stdio:
+
+```bash
+GPUI_STORYBOOK_MCP_STDIO=1 cargo run -p gpui-storybook-example-story --features mcp
+```
+
+Capture a story without starting an MCP client:
+
+```bash
+WGPU_CAPTURE_ROUTE=gpui-storybook-example-story-ButtonStory \
+WGPU_CAPTURE_PATH=target/storybook-captures/button.png \
+cargo run -p gpui-storybook-example-story --features mcp
+```
+
+`WGPU_CAPTURE_WIDTH` and `WGPU_CAPTURE_HEIGHT` must be set together and greater
+than zero; they request a live window resize before capture. Captures are
+cropped to the story view, excluding the sidebar and storybook header or dock
+chrome. MCP capture results report the actual rendered pixel size, which can
+differ on scaled or compositor-managed displays.
+
+Sub-story routes use `story-key/substory-key`. Plain string sections derive
+their slug from the visible title through `gpui_storybook::capture_substory(...)`;
+sections passed a `#[derive(gpui_storybook::Substory)]` enum variant use the
+variant's stable key instead. The built-in styled `section(...)` helper and
+custom components built on `StorySectionBase` both do this automatically, so
+the Button story can also be captured with routes such as
+`gpui-storybook-example-story-ButtonStory/normal-button`,
+`gpui-storybook-example-story-ButtonStory/button-with-icon`, and
+`gpui-storybook-example-story-ButtonStory/with-progress`.
+
+```rs
+#[derive(gpui_storybook::Substory)]
+enum ButtonSubstory {
+    NormalButton,
+    #[substory(title = "Button with Icon")]
+    ButtonWithIcon,
+    #[substory(title = "With Progress")]
+    WithProgress,
+}
+
+gpui_storybook::section(ButtonSubstory::WithProgress)
+```
+
+Define a custom section component when you want application-specific layout or
+chrome. Store `gpui_storybook::StorySectionBase::new(...)` on the component and
+call `base.capture(...)` from its `RenderOnce` implementation after building
+the component's own element tree.
 
 ## Choose a registration style
 
@@ -164,6 +234,31 @@ pub struct CardStory;
 
 `#[storybook(section = StorySection::Patterns)]` follows the same rules.
 
+The macros store registered story and section labels as typed
+`StoryName`/`StorySectionName` values in the inventory registry. This mostly
+matters for manual registry integrations; normal story declarations can keep
+using string literals or enum variants.
+
+Each registered story also receives a stable `StoryKey` for automation and
+capture. Macro-generated keys use `{crate-package-name}-{registered-story-name}`;
+for example, `gpui-storybook-example-story-ButtonStory` or
+`gpui-storybook-example-component-WelcomeCard`. Explicit `#[story]` entries use
+the story struct name. `ComponentStory` entries use the component type name.
+Duplicate macro-generated keys fail to build, and `generate_stories` rejects
+duplicate keys from manual registry entries.
+
+Generated containers keep that identity as typed `RegisteredStoryMetadata`.
+Use `StoryContainer::registration_metadata()` or the `story_key()` /
+`story_name()` accessors when integrations need the registered story identity.
+
+For capture-addressable sections inside a story, derive `Substory` on a
+fieldless enum and pass variants to `gpui_storybook::section(...)` for the
+standard styled section, or store `gpui_storybook::StorySectionBase` in a
+custom section component. The default capture key is the variant name in kebab
+case; `#[substory(title = "...")]` changes only the visible title, and
+`#[substory(key = "...")]` sets an explicit route key independent of the
+variant name.
+
 ## Filter stories with `storybook.toml`
 
 Put a `storybook.toml` next to the crate whose stories you want to group or filter:
@@ -180,5 +275,6 @@ disable_story = ["ExperimentalCardStory"]
 - `allow = []` includes none.
 - `disable_story` matches the registered story type name.
 - For `ComponentStory`, the registered story name is the component type name.
+- `disable_story` does not use the full automation `StoryKey`.
 
 At runtime, `generate_stories` uses the `storybook.toml` from the registered story crate whose package name matches the running binary.

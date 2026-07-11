@@ -13,20 +13,25 @@ readme = "README.md"
 include = [ "src/**/*", "assets/**/*", "i18n.toml" ]
 
 [features]
+capture = [ "dep:gpui_platform", "dep:image", "gpui/test-support", "gpui_platform/test-support" ]
 dock = [  ]
 
 [dependencies]
 anyhow = { workspace = true }
+derive_more = { features = [ "as_ref", "display", "from" ], workspace = true }
 es-fluent = { workspace = true }
 gpui = { workspace = true }
 gpui-component = { features = [ "inspector" ], workspace = true }
 gpui-component-assets = { workspace = true }
 gpui-es-fluent = { workspace = true }
 gpui-storybook-components = { workspace = true }
+gpui_platform = { optional = true, workspace = true }
+image = { optional = true, workspace = true }
 inventory = { workspace = true }
 rust-embed = { features = [ "interpolate-folder-path" ], workspace = true }
 serde = { features = [ "derive" ], workspace = true }
 serde_json = { workspace = true }
+tokio = { features = [ "sync" ], workspace = true }
 tracing = { workspace = true }
 unic-langid = { features = [ "serde" ], workspace = true }
 
@@ -35,6 +40,10 @@ gtk = { version = "0.18" }
 
 [build-dependencies]
 es-fluent-build = { workspace = true }
+
+[dev-dependencies]
+strum.workspace = true
+tokio = { features = [ "rt" ], workspace = true }
 
 [lints]
 workspace = true

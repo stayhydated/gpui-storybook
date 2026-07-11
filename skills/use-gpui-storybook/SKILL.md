@@ -1,21 +1,19 @@
 ---
 name: use-gpui-storybook
-description: "Use when Codex needs to help application developers adopt GPUI Storybook in an app: setting up a storybook binary, adding stories with #[story] or #[derive(ComponentStory)], configuring storybook.toml group/allow/disable_story behavior, choosing gallery versus dock mode, wiring locale initialization, or troubleshooting missing stories."
+description: "Use when helping application developers adopt GPUI Storybook in an app: setting up a storybook binary, adding stories with #[story] or #[derive(ComponentStory)], configuring storybook.toml group/allow/disable_story behavior, choosing gallery versus dock mode, wiring locale initialization, enabling MCP automation/capture, or troubleshooting missing stories."
 ---
 
 # Use GPUI Storybook
 
 ## Scope Boundary
 
-Treat this skill as a hosted public-usage guide for GPUI Storybook consumers.
-Use it only for user-facing application workflows: setting up a storybook
-binary, adding stories, configuring `storybook.toml`, choosing gallery or dock
-mode, wiring locale initialization, and troubleshooting missing stories.
+Use this public skill for application-level GPUI Storybook integration:
+setting up a storybook binary, adding stories, configuring `storybook.toml`,
+choosing gallery or dock mode, wiring locale initialization, enabling MCP
+automation/capture, and troubleshooting missing stories.
 
-Do not use this skill as a contributor guide for `gpui-storybook` repository
-internals. For build, test, format, lint, maintenance, release, or architecture
-work, read the repository source, `AGENTS.md`, and the relevant crate
-documentation directly.
+Do not use this skill for maintaining the GPUI Storybook implementation itself,
+release workflows, repository architecture, or crate internals.
 
 ## Core Workflow
 
@@ -36,26 +34,23 @@ Start from the user-facing facade. Most application code uses
    data and storybook should generate the wrapper view.
 7. Put `storybook.toml` next to the crate whose stories need a runtime group or
    filter.
+8. Enable the `mcp` feature only when callers need external automation, MCP
+   tools, or PNG capture.
 
 ## Reference Selection
 
-This skill has no extra reference files. Prefer the current public READMEs,
-example applications, and source snippets over memory when details matter:
-
-- `README.md`: top-level setup and usage guidance.
-- `crates/gpui-storybook/README.md`: facade API guidance.
-- `examples/story/README.md`: explicit `#[story]` workflow.
-- `examples/component/README.md`: `#[derive(ComponentStory)]` workflow.
-- `crates/gpui-storybook-toml/README.md`: `storybook.toml` semantics.
+This skill has no extra reference files. When exact details matter, prefer the
+project's public README, crate documentation, examples, and source snippets over
+memory.
 
 ## Implementation Rules
 
 Use this shape for a storybook binary:
 
 ```rust
+// src/i18n.rs
 use es_fluent::EsFluent;
 use es_fluent_lang::es_fluent_language;
-use gpui_storybook::{Assets, Gallery};
 use strum::EnumIter;
 
 es_fluent_manager_embedded::define_i18n_module!();
@@ -63,6 +58,13 @@ es_fluent_manager_embedded::define_i18n_module!();
 #[es_fluent_language]
 #[derive(Clone, Copy, Debug, EnumIter, EsFluent, PartialEq)]
 pub enum Languages {}
+
+// src/lib.rs
+pub mod i18n;
+
+// src/main.rs
+use my_app::i18n::Languages;
+use gpui_storybook::{Assets, Gallery};
 
 fn main() {
     let app = gpui_platform::application().with_assets(Assets);
@@ -82,6 +84,20 @@ fn main() {
 For the dock workspace, enable the `dock` feature and use
 `create_dock_window` plus `StoryWorkspace::view(...)` instead of
 `create_new_window` plus `Gallery::view(...)`.
+
+For MCP automation or capture, enable the `mcp` feature. No constructor changes
+are required: `gpui_storybook::init(...)` installs the automation controller,
+and `Gallery::view(...)` or `StoryWorkspace::view(...)` attach it
+automatically. Set `GPUI_STORYBOOK_MCP_STDIO=1` to serve MCP over stdio. Set
+`WGPU_CAPTURE_ROUTE` to a story key and `WGPU_CAPTURE_PATH` to capture one
+story during startup. Captures are cropped to the story view, excluding the
+sidebar and storybook header or dock chrome.
+Storybook MCP tools publish closed typed input/output schemas and structured
+argument errors; use the advertised `key` and capture option properties instead
+of sending additional arguments.
+`WGPU_CAPTURE_WIDTH` and `WGPU_CAPTURE_HEIGHT` must be set together and greater
+than zero; they request a live resize. Use the capture result's pixel
+dimensions as the source of truth.
 
 Use explicit `#[story]` when the story owns state:
 
@@ -134,6 +150,36 @@ generated wrapper renders `<Component as Default>::default()`.
 `title` and `description` expressions are emitted inside methods that receive
 `cx: &gpui::App`, so they can call `gpui_storybook::localize_message(cx, ...)`.
 
+Story registration also emits a stable automation key:
+
+- Explicit `#[story]`: `{crate-package-name}-{story-struct-name}`.
+- `ComponentStory`: `{crate-package-name}-{component-type-name}`.
+
+When code needs the registered identity from generated `StoryContainer` values,
+prefer `registration_metadata()`, `story_key()`, or `story_name()` over manual
+string field coordination.
+
+For example, `gpui-storybook-example-story-ButtonStory` and
+`gpui-storybook-example-component-WelcomeCard` are valid capture routes.
+Sub-story routes use `story-key/substory-key`. Plain string sections use
+title-derived slugs through `gpui_storybook::capture_substory(...)`; sections
+passed a `#[derive(gpui_storybook::Substory)]` enum variant use the variant's
+stable kebab-case key. For example:
+`gpui-storybook-example-story-ButtonStory/with-progress`.
+Use `gpui_storybook::section(...)` for the standard styled section. For custom
+section components, store `gpui_storybook::StorySectionBase::new(...)` and call
+`base.capture(...)` from `RenderOnce` after building the component's own layout
+and chrome.
+
+```rust
+#[derive(gpui_storybook::Substory)]
+enum ButtonSubstory {
+    NormalButton,
+    #[substory(title = "Button with Icon")]
+    ButtonWithIcon,
+}
+```
+
 Use `#[gpui_storybook::story_init]` for one-time setup that must run after
 `gpui_storybook::init(...)` and before stories are shown:
 
@@ -170,6 +216,7 @@ disable_story = ["ExperimentalCardStory"]
 - `allow = []` includes none.
 - `disable_story` matches the registered story type name exactly.
 - For `ComponentStory`, `disable_story` uses the component type name, not the generated wrapper type.
+- `disable_story` does not use the full automation story key.
 - `generate_stories` uses the `storybook.toml` from the registered story crate whose package name matches the running binary.
 
 If stories are unexpectedly missing, inspect runtime logs for discovered story
