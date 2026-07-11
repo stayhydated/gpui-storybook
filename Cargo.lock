@@ -2480,17 +2480,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "frame-capture-routes"
-version = "0.1.0"
-source = "git+https://github.com/stayhydated/frame-capture#57cb4ec31bf0f697b0b407e4921199dd39c1ef95"
-dependencies = [
- "frame-capture",
- "frame-capture-macros",
- "inventory",
- "thiserror 2.0.18",
-]
-
-[[package]]
 name = "frame-capture-toml"
 version = "0.1.0"
 source = "git+https://github.com/stayhydated/frame-capture#57cb4ec31bf0f697b0b407e4921199dd39c1ef95"
@@ -3271,7 +3260,6 @@ version = "0.5.0"
 dependencies = [
  "component-shape-mcp",
  "frame-capture",
- "frame-capture-routes",
  "gpui-storybook-core",
  "rmcp 2.2.0",
  "serde",

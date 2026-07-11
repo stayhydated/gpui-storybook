@@ -31,7 +31,6 @@ es-fluent-build = "0.18"
 es-fluent-lang = "0.18"
 es-fluent-manager-embedded = "0.18"
 frame-capture = { git = "https://github.com/stayhydated/frame-capture" }
-frame-capture-routes = { git = "https://github.com/stayhydated/frame-capture" }
 gpui = { branch = "linux-headless-renderer", git = "https://github.com/stayhydated/zed", version = "0.2.2" }
 gpui-component = { git = "https://github.com/longbridge/gpui-component" }
 gpui-component-assets = { git = "https://github.com/longbridge/gpui-component" }
