@@ -2,8 +2,8 @@
 
 use component_shape_mcp::{
     McpSchema, McpSchemaProperties, McpServer, McpToolError, McpToolInput, McpToolMetadata,
-    McpTypedTool, ServeStdioResult, ToolCallResult, nullable_schema,
-    tool_definition_for_input_with_metadata, tool_error_result_for, tool_structured_result,
+    McpTypedTool, ServeStdioResult, nullable_schema, tool_definition_for_input_with_metadata,
+    tool_error_result_for, tool_structured_result,
 };
 use frame_capture::{
     CaptureConfig, CaptureEnv, CaptureEnvError, CaptureLaunchEnv as FrameCaptureLaunchEnv,
@@ -15,6 +15,7 @@ pub use gpui_storybook_core::automation::{
     StoryDefaultSize, StoryScreenshotRequest, StorySnapshot, StorybookAutomation,
     StorybookAutomationError,
 };
+use rmcp::model::CallToolResult as ToolCallResult;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{collections::BTreeMap, path::PathBuf, thread, time::Duration};
