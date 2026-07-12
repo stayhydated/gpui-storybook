@@ -715,10 +715,7 @@ mod tests {
         };
 
         let expanded = story_impl(TokenStream2::new(), input);
-        assert_snapshot!(
-            "story_attribute_on_non_struct_reports_compile_error",
-            snapshot_tokens(expanded)
-        );
+        assert_compile_error(expanded, "expected `struct`");
     }
 
     #[test]
@@ -729,10 +726,7 @@ mod tests {
         };
 
         let expanded = component_story_impl(input);
-        assert_snapshot!(
-            "component_story_duplicate_metadata_reports_compile_error",
-            snapshot_tokens(expanded)
-        );
+        assert_compile_error(expanded, "duplicate `title` argument");
     }
 
     #[test]
@@ -893,9 +887,6 @@ mod tests {
         };
 
         let expanded = story_init_impl(TokenStream2::new(), input);
-        assert_snapshot!(
-            "story_init_attribute_on_non_function_reports_compile_error",
-            snapshot_tokens(expanded)
-        );
+        assert_compile_error(expanded, "expected `fn`");
     }
 }

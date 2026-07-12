@@ -1,7 +1,0 @@
----
-source: crates/gpui-storybook-macros/src/lib.rs
-expression: snapshot_tokens(expanded)
----
-::core::compile_error! {
-    "expected `fn`"
-}
