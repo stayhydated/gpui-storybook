@@ -130,17 +130,22 @@ pub fn load_from_dir(dir: impl AsRef<Path>) -> Result<Option<StorybookToml>, Sto
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicU64, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
     use std::{error::Error as _, path::Path};
+
+    static NEXT_TEMP_DIR: AtomicU64 = AtomicU64::new(0);
 
     fn with_temp_dir(test_fn: impl FnOnce(&Path)) {
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("time should be monotonic")
             .as_nanos();
-        let dir = std::env::temp_dir().join(format!("gpui_storybook_toml_tests_{timestamp}"));
+        let sequence = NEXT_TEMP_DIR.fetch_add(1, Ordering::Relaxed);
+        let dir =
+            std::env::temp_dir().join(format!("gpui_storybook_toml_tests_{timestamp}_{sequence}"));
 
-        std::fs::create_dir_all(&dir).expect("should create temp dir");
+        std::fs::create_dir(&dir).expect("should create temp dir");
         test_fn(&dir);
         std::fs::remove_dir_all(&dir).expect("should remove temp dir");
     }
