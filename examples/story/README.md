@@ -25,7 +25,9 @@ GPUI_STORYBOOK_MCP_STDIO=1 cargo run -p gpui-storybook-example-story --features 
 
 ## What to inspect
 
-- `src/main.rs`: app startup, embedded i18n module setup, locale initialization, feature-gated MCP automation, and window creation
+- `build.rs`: rebuild tracking for embedded locale assets
+- `src/i18n.rs`: embedded i18n module and typed language enum
+- `src/main.rs`: app startup, locale initialization, feature-gated MCP automation, and window creation
 - `src/lib.rs`: shared `StorySection` enum for stable ordering
 - `src/stories/*.rs`: explicit story structs and `impl gpui_storybook::Story`
 - `src/stories/grouped_story.rs`: two story structs with the same title, grouped into one sidebar item
@@ -65,9 +67,16 @@ one storybook page. `grouped_story.rs` registers `GroupedSummaryStory` and
 
 ## Locale setup
 
-The example library defines its embedded i18n module in `src/i18n.rs`, derives the app language enum with `EsFluent`, and the binary initializes Storybook with the default language before selecting the active locale:
+The example build script tracks locale assets, the library defines its embedded
+i18n module and typed language enum in `src/i18n.rs`, and the binary initializes
+Storybook with the default language before selecting the active locale:
 
 ```rs
+// build.rs
+fn main() {
+    es_fluent_build::track_i18n_assets();
+}
+
 // src/i18n.rs
 es_fluent_manager_embedded::define_i18n_module!();
 

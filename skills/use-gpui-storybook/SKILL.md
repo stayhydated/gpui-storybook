@@ -24,17 +24,20 @@ Start from the user-facing facade. Most application code uses
    `gpui-storybook`, and feature setup.
 2. Inspect any existing storybook binary, example app, `storybook.toml` files,
    section enums, and naming conventions.
-3. Initialize the storybook runtime before creating the story window:
+3. Add `es-fluent-build` as a build dependency, define the embedded i18n module
+   in library-reachable code, and call `es_fluent_build::track_i18n_assets()`
+   from `build.rs` so locale asset changes trigger rebuilds.
+4. Initialize the storybook runtime before creating the story window:
    `gpui_storybook::init(cx, Languages::default())`.
-4. Choose gallery mode for a focused story browser, or enable the `dock` feature
+5. Choose gallery mode for a focused story browser, or enable the `dock` feature
    and use the dock workspace when stories need docked panels.
-5. Use explicit `#[story]` when the story needs its own GPUI view state, focus
+6. Use explicit `#[story]` when the story needs its own GPUI view state, focus
    handle, actions, lifecycle, or wrapper UI.
-6. Use `#[derive(ComponentStory)]` when the component can render from example
+7. Use `#[derive(ComponentStory)]` when the component can render from example
    data and storybook should generate the wrapper view.
-7. Put `storybook.toml` next to the crate whose stories need a runtime group or
+8. Put `storybook.toml` next to the crate whose stories need a runtime group or
    filter.
-8. Enable the `mcp` feature only when callers need external automation, MCP
+9. Enable the `mcp` feature only when callers need external automation, MCP
    tools, or PNG capture.
 
 ## Reference Selection
@@ -48,6 +51,11 @@ memory.
 Use this shape for a storybook binary:
 
 ```rust
+// build.rs
+fn main() {
+    es_fluent_build::track_i18n_assets();
+}
+
 // src/i18n.rs
 use es_fluent::EsFluent;
 use es_fluent_lang::es_fluent_language;
@@ -98,6 +106,7 @@ of sending additional arguments.
 `WGPU_CAPTURE_WIDTH` and `WGPU_CAPTURE_HEIGHT` must be set together and greater
 than zero; they request a live resize. Use the capture result's pixel
 dimensions as the source of truth.
+`WGPU_CAPTURE_FRAME`, when set, must be a one-based value greater than zero.
 
 Use explicit `#[story]` when the story owns state:
 
@@ -177,8 +186,14 @@ enum ButtonSubstory {
     NormalButton,
     #[substory(title = "Button with Icon")]
     ButtonWithIcon,
+    #[substory(key = "progress", title = "With Progress")]
+    WithProgress,
 }
 ```
+
+The default capture key is the variant name in kebab case. Use `title` to
+change display text without changing the route, and use `key` to set an
+explicit lowercase ASCII route segment containing letters, numbers, or `-`.
 
 Use `#[gpui_storybook::story_init]` for one-time setup that must run after
 `gpui_storybook::init(...)` and before stories are shown:

@@ -38,6 +38,11 @@ cargo run -p gpui-storybook-example-component --features dock
 The examples contain the full `Cargo.toml` setup. The minimal runtime shape looks like this:
 
 ```rs
+// build.rs
+fn main() {
+    es_fluent_build::track_i18n_assets();
+}
+
 // src/i18n.rs
 use es_fluent::EsFluent;
 use es_fluent_lang::es_fluent_language;
@@ -71,7 +76,10 @@ fn main() {
 }
 ```
 
-The locale setup has three parts: define the embedded i18n module in library-reachable `src/i18n.rs`, derive the app language enum with `EsFluent`, then call `init` and `change_locale` with the selected language.
+The locale setup has four parts: add `es-fluent-build` as a build dependency and
+track locale assets from `build.rs`, define the embedded i18n module in
+library-reachable `src/i18n.rs`, derive the app language enum with `EsFluent`,
+then call `init` and `change_locale` with the selected language.
 
 Turn on the `dock` feature when you want a panel-based workspace instead of the gallery layout:
 

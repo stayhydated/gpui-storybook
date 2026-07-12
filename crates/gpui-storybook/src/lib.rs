@@ -31,6 +31,11 @@
 //! - `dock`: re-exports the dock workspace helpers from `gpui-storybook-core`
 //! - `mcp`: installs a default automation controller during [`init`] and
 //!   re-exports MCP automation and capture helpers
+//!
+//! Applications with embedded locale assets should call
+//! `es_fluent_build::track_i18n_assets()` from `build.rs`. Define the embedded
+//! i18n module and typed language enum in library-reachable code, then pass the
+//! selected language to [`init`] before creating a story window.
 
 #[cfg(feature = "macros")]
 pub use gpui_storybook_macros::*;
@@ -292,6 +297,11 @@ fn compare_resolved_story_entries(
 /// locale manager, initializes the core runtime shell, registers dock panel
 /// types when the `dock` feature is enabled, and then runs all discovered
 /// `#[story_init]` hooks.
+///
+/// The language type normally comes from `#[es_fluent_language]`. Applications
+/// with embedded locale assets should also configure
+/// `es_fluent_build::track_i18n_assets()` in `build.rs` so Cargo rebuilds when
+/// locale files or directories change.
 pub fn init<L>(cx: &mut ::gpui::App, language: L)
 where
     L: Language,
