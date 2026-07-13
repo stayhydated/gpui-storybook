@@ -26,10 +26,10 @@ anyhow = "1.0"
 component-shape-mcp = { git = "https://github.com/stayhydated/component-shape" }
 darling = "0.23"
 derive_more = "2.1"
-es-fluent = "0.18"
-es-fluent-build = "0.18"
-es-fluent-lang = "0.18"
-es-fluent-manager-embedded = "0.18"
+es-fluent = { git = "https://github.com/stayhydated/es-fluent" }
+es-fluent-build = { git = "https://github.com/stayhydated/es-fluent" }
+es-fluent-lang = { git = "https://github.com/stayhydated/es-fluent" }
+es-fluent-manager-embedded = { git = "https://github.com/stayhydated/es-fluent" }
 frame-capture = { git = "https://github.com/stayhydated/frame-capture" }
 gpui = { branch = "linux-headless-renderer", git = "https://github.com/stayhydated/zed", version = "0.2.2" }
 gpui-component = { git = "https://github.com/longbridge/gpui-component" }

@@ -663,7 +663,7 @@ dependencies = [
  "bitflags 2.13.0",
  "cexpr",
  "clang-sys",
- "itertools 0.13.0",
+ "itertools 0.11.0",
  "log",
  "prettyplease",
  "proc-macro2",
@@ -1949,29 +1949,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
 name = "es-fluent"
 version = "0.18.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ddbc41e43442c1fde3a43cc052b8287e04f295072fba208171a313d545d9280"
+source = "git+https://github.com/stayhydated/es-fluent#d7766591402ea94af885abf5f4b333925b8a0560"
 dependencies = [
  "es-fluent-derive",
  "es-fluent-manager-core",
  "es-fluent-shared",
  "fluent-bundle",
  "inventory",
- "tracing",
  "unic-langid",
 ]
 
 [[package]]
 name = "es-fluent-build"
 version = "0.18.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "344ecd8ece6d0ce441a9b8b853136baf82592730766242d316ea2a98f5334511"
+source = "git+https://github.com/stayhydated/es-fluent#d7766591402ea94af885abf5f4b333925b8a0560"
 dependencies = [
  "es-fluent-toml",
 ]
@@ -1979,8 +1976,7 @@ dependencies = [
 [[package]]
 name = "es-fluent-derive"
 version = "0.18.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "92c891c2bf3894907ab1f53edafbd25dd0b3fd8e1dbcb6879811c5147fe04085"
+source = "git+https://github.com/stayhydated/es-fluent#d7766591402ea94af885abf5f4b333925b8a0560"
 dependencies = [
  "darling",
  "es-fluent-derive-core",
@@ -1993,8 +1989,7 @@ dependencies = [
 [[package]]
 name = "es-fluent-derive-core"
 version = "0.18.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c09c6532cc5fc3683f69c49d15598355fc5184229c791632179d1ca14e52f9bc"
+source = "git+https://github.com/stayhydated/es-fluent#d7766591402ea94af885abf5f4b333925b8a0560"
 dependencies = [
  "bon",
  "darling",
@@ -2013,8 +2008,7 @@ dependencies = [
 [[package]]
 name = "es-fluent-lang"
 version = "0.18.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "980099327a1a7c25ff2cce4953d4b210f31cef7d9ec2098ab1ac1b9c4dc818b6"
+source = "git+https://github.com/stayhydated/es-fluent#d7766591402ea94af885abf5f4b333925b8a0560"
 dependencies = [
  "es-fluent-lang-macro",
  "es-fluent-manager-core",
@@ -2030,8 +2024,7 @@ dependencies = [
 [[package]]
 name = "es-fluent-lang-macro"
 version = "0.18.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb966d5eb5e4c6363b9c2ca21240e88b87520c59dcbd57876737337123102f12"
+source = "git+https://github.com/stayhydated/es-fluent#d7766591402ea94af885abf5f4b333925b8a0560"
 dependencies = [
  "es-fluent-derive-core",
  "es-fluent-toml",
@@ -2045,8 +2038,7 @@ dependencies = [
 [[package]]
 name = "es-fluent-manager-core"
 version = "0.18.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d428c52252f96eaefff8358f15495161e392a457cab05cf9ab593dc12abd91c6"
+source = "git+https://github.com/stayhydated/es-fluent#d7766591402ea94af885abf5f4b333925b8a0560"
 dependencies = [
  "es-fluent-shared",
  "fluent-bundle",
@@ -2065,8 +2057,7 @@ dependencies = [
 [[package]]
 name = "es-fluent-manager-embedded"
 version = "0.18.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d1cdcbe9131084c935a3826b4b3fd8699a570d648efb1407eb097a5fc97ea103"
+source = "git+https://github.com/stayhydated/es-fluent#d7766591402ea94af885abf5f4b333925b8a0560"
 dependencies = [
  "es-fluent",
  "es-fluent-manager-core",
@@ -2079,8 +2070,7 @@ dependencies = [
 [[package]]
 name = "es-fluent-manager-macros"
 version = "0.18.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43a32687d9d2ee4b99723d2c28cf10dbb2cc5fd2193dff722334742d5615759e"
+source = "git+https://github.com/stayhydated/es-fluent#d7766591402ea94af885abf5f4b333925b8a0560"
 dependencies = [
  "es-fluent-derive-core",
  "es-fluent-shared",
@@ -2095,8 +2085,7 @@ dependencies = [
 [[package]]
 name = "es-fluent-shared"
 version = "0.18.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1ecefb31b992b63784a0a9ed25669c9b666c94c2627e7118e01837aae1e4e461"
+source = "git+https://github.com/stayhydated/es-fluent#d7766591402ea94af885abf5f4b333925b8a0560"
 dependencies = [
  "anyhow",
  "camino",
@@ -2119,8 +2108,7 @@ dependencies = [
 [[package]]
 name = "es-fluent-toml"
 version = "0.18.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4e33bc08e59f6891c1c930f885a378e59759169d774bf2cc15e447517e3c8681"
+source = "git+https://github.com/stayhydated/es-fluent#d7766591402ea94af885abf5f4b333925b8a0560"
 dependencies = [
  "bon",
  "es-fluent-shared",
@@ -3149,7 +3137,7 @@ dependencies = [
 [[package]]
 name = "gpui-es-fluent"
 version = "0.1.0"
-source = "git+https://github.com/stayhydated/gpui-es-fluent#c1609302332c3bba76e1986424c48d395c77d340"
+source = "git+https://github.com/stayhydated/gpui-es-fluent#909334b0bc24e6c60e1428c59264dc78725d5efa"
 dependencies = [
  "es-fluent",
  "es-fluent-manager-embedded",
@@ -6266,7 +6254,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -6859,7 +6847,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.4.15",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -6872,7 +6860,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -6940,7 +6928,7 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "webpki-root-certs 0.26.11",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -7907,7 +7895,7 @@ dependencies = [
  "getrandom 0.4.3",
  "once_cell",
  "rustix 1.1.4",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -9205,7 +9193,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
