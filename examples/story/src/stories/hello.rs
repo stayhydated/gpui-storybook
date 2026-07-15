@@ -8,7 +8,7 @@ enum StoryItems {
     Title,
 }
 
-#[gpui_storybook::story("aaaaaaaaaaa")]
+#[gpui_storybook::story("Basics")]
 pub struct HelloWorld {
     focus_handle: FocusHandle,
 }

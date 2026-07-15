@@ -158,10 +158,35 @@ the component's own element tree.
 Use this when the story needs its own state, focus management, or view wrapper.
 
 ```rs
-use gpui::{App, Focusable, Render, Window};
+use gpui::{
+    App, AppContext as _, Context, Entity, FocusHandle, Focusable, IntoElement,
+    ParentElement as _, Render, Window, div,
+};
 
 #[gpui_storybook::story("Components")]
-pub struct ButtonStory;
+pub struct ButtonStory {
+    focus_handle: FocusHandle,
+}
+
+impl ButtonStory {
+    pub fn view(_: &mut Window, cx: &mut App) -> Entity<Self> {
+        cx.new(|cx| Self {
+            focus_handle: cx.focus_handle(),
+        })
+    }
+}
+
+impl Focusable for ButtonStory {
+    fn focus_handle(&self, _: &App) -> FocusHandle {
+        self.focus_handle.clone()
+    }
+}
+
+impl Render for ButtonStory {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div().child("Button preview")
+    }
+}
 
 impl gpui_storybook::Story for ButtonStory {
     fn title(_: &App) -> String {

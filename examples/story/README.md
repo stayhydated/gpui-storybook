@@ -38,14 +38,43 @@ GPUI_STORYBOOK_MCP_STDIO=1 cargo run -p gpui-storybook-example-story --features 
 
 ```rs
 #[gpui_storybook::story(crate::StorySection::Buttons)]
-pub struct ButtonStory;
+pub struct ButtonStory {
+    focus_handle: gpui::FocusHandle,
+}
+
+impl ButtonStory {
+    pub fn view(_: &mut gpui::Window, cx: &mut gpui::App) -> gpui::Entity<Self> {
+        gpui::AppContext::new(cx, |cx| Self {
+            focus_handle: cx.focus_handle(),
+        })
+    }
+}
+
+impl gpui::Focusable for ButtonStory {
+    fn focus_handle(&self, _: &gpui::App) -> gpui::FocusHandle {
+        self.focus_handle.clone()
+    }
+}
+
+impl gpui::Render for ButtonStory {
+    fn render(
+        &mut self,
+        _: &mut gpui::Window,
+        _: &mut gpui::Context<Self>,
+    ) -> impl gpui::IntoElement {
+        gpui::div()
+    }
+}
 
 impl gpui_storybook::Story for ButtonStory {
-    fn title(_: &App) -> String {
+    fn title(_: &gpui::App) -> String {
         "Button".into()
     }
 
-    fn new_view(window: &mut Window, cx: &mut App) -> Entity<impl Render + Focusable> {
+    fn new_view(
+        window: &mut gpui::Window,
+        cx: &mut gpui::App,
+    ) -> gpui::Entity<impl gpui::Render + gpui::Focusable> {
         Self::view(window, cx)
     }
 }

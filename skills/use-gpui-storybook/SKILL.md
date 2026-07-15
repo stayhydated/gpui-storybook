@@ -118,9 +118,25 @@ pub struct ButtonStory {
 
 impl ButtonStory {
     pub fn view(_: &mut gpui::Window, cx: &mut gpui::App) -> gpui::Entity<Self> {
-        cx.new(|cx| Self {
+        gpui::AppContext::new(cx, |cx| Self {
             focus_handle: cx.focus_handle(),
         })
+    }
+}
+
+impl gpui::Focusable for ButtonStory {
+    fn focus_handle(&self, _: &gpui::App) -> gpui::FocusHandle {
+        self.focus_handle.clone()
+    }
+}
+
+impl gpui::Render for ButtonStory {
+    fn render(
+        &mut self,
+        _: &mut gpui::Window,
+        _: &mut gpui::Context<Self>,
+    ) -> impl gpui::IntoElement {
+        gpui::div()
     }
 }
 
@@ -186,7 +202,7 @@ enum ButtonSubstory {
     NormalButton,
     #[substory(title = "Button with Icon")]
     ButtonWithIcon,
-    #[substory(key = "progress", title = "With Progress")]
+    #[substory(title = "With Progress")]
     WithProgress,
 }
 ```
