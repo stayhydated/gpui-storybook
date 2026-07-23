@@ -739,11 +739,11 @@ impl Panel for StoryContainer {
     }
 
     fn set_zoomed(&mut self, zoomed: bool, _window: &mut Window, _cx: &mut gpui::Context<Self>) {
-        println!("panel: {} zoomed: {}", self.name, zoomed);
+        tracing::debug!(panel = %self.name, zoomed, "Storybook panel zoom changed");
     }
 
     fn set_active(&mut self, active: bool, _window: &mut Window, cx: &mut gpui::Context<Self>) {
-        println!("panel: {} active: {}", self.name, active);
+        tracing::debug!(panel = %self.name, active, "Storybook panel activation changed");
         self.is_active = active;
         if let Some(on_active) = self.on_active
             && let Some(story) = self.story.clone()

@@ -7,7 +7,7 @@ use crate::{
 use gpui::{
     AnyView, App, AppContext as _, Context, Entity, FocusHandle, Focusable,
     InteractiveElement as _, IntoElement, ParentElement as _, Render, SharedString, Styled as _,
-    Window, div,
+    Subscription, Window, div,
 };
 use gpui_component::{Root, v_flex};
 
@@ -66,6 +66,7 @@ struct StoryRoot {
     focus_handle: FocusHandle,
     title_bar: Entity<AppTitleBar>,
     view: AnyView,
+    _preference_subscriptions: Vec<Subscription>,
 }
 
 impl StoryRoot {
@@ -77,10 +78,20 @@ impl StoryRoot {
         cx: &mut Context<Self>,
     ) -> Self {
         let title_bar = cx.new(|cx| AppTitleBar::new(title, ui, window, cx));
+        let preference_subscriptions = vec![
+            cx.observe_window_appearance(window, |_, window, cx| {
+                crate::preferences::window_appearance_changed(window, cx);
+            }),
+            cx.observe_window_activation(window, |_, window, cx| {
+                crate::preferences::window_activated(window, cx);
+            }),
+        ];
+        crate::preferences::window_appearance_changed(window, cx);
         Self {
             focus_handle: cx.focus_handle(),
             title_bar,
             view: view.into(),
+            _preference_subscriptions: preference_subscriptions,
         }
     }
 }
@@ -112,5 +123,55 @@ impl Render for StoryRoot {
                 .children(dialog_layer)
                 .children(notification_layer),
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct DirectCoreView;
+
+    impl Render for DirectCoreView {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            div().child("direct core view")
+        }
+    }
+
+    impl SimpleWindowView for DirectCoreView {}
+
+    #[gpui::test]
+    fn direct_core_window_does_not_require_the_preference_global(cx: &mut App) {
+        gpui_component::init(cx);
+        crate::i18n::init(cx).expect("Storybook localization should initialize");
+        assert!(
+            cx.try_global::<crate::preferences::StorybookPreferencesGlobal>()
+                .is_none()
+        );
+
+        let window: gpui::WindowHandle<StoryRoot> = cx
+            .open_window(Default::default(), |window, cx| {
+                let view = cx.new(|_| DirectCoreView);
+                cx.new(|cx| {
+                    StoryRoot::new(
+                        "Direct Core",
+                        view,
+                        StorybookWindowUi::default(),
+                        window,
+                        cx,
+                    )
+                })
+            })
+            .expect("direct core window should open without facade preferences");
+
+        window
+            .update(cx, |_, window, cx| {
+                crate::preferences::window_activated(window, cx);
+                crate::preferences::select_scrollbar(
+                    gpui_storybook_preferences::PreferredScrollbar::Always,
+                    cx,
+                );
+            })
+            .expect("optional preference forwarding should remain a no-op");
     }
 }

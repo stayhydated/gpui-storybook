@@ -55,24 +55,61 @@ es_fluent_manager_embedded::define_i18n_module!();
 #[derive(Clone, Copy, Debug, EnumIter, EsFluent, PartialEq)]
 pub enum Languages {}
 
+pub fn apply_locale(
+    language: Languages,
+    cx: &mut gpui::App,
+) -> Result<(), gpui_es_fluent::EmbeddedInitError> {
+    let _linked_module = &MY_APP_I18N_MODULE;
+    gpui_es_fluent::replace_with_language(cx, language)
+}
+
 // src/lib.rs
 pub mod i18n;
 
 // src/main.rs
-use my_app::i18n::Languages;
-use gpui_storybook::{Assets, Gallery};
+use my_app::i18n::{self, Languages};
+use gpui_storybook::{Assets, ConsumerId, Gallery, StorybookOptions};
 
 fn main() {
     let app = gpui_platform::application().with_assets(Assets);
 
     app.run(|cx| {
-        gpui_storybook::init(cx, Languages::default());
-        gpui_storybook::change_locale(cx, Languages::default()).unwrap();
+        let consumer_id = match ConsumerId::new("my-app-storybook") {
+            Ok(consumer_id) => consumer_id,
+            Err(_) => {
+                cx.quit();
+                return;
+            },
+        };
+        let options = StorybookOptions::new(
+            consumer_id,
+            Languages::default(),
+            i18n::apply_locale,
+        );
+        let readiness = match gpui_storybook::init(cx, options) {
+            Ok(readiness) => readiness,
+            Err(_) => {
+                cx.quit();
+                return;
+            },
+        };
 
-        gpui_storybook::create_new_window("My App - Stories", |window, cx| {
-            let stories = gpui_storybook::generate_stories(window, cx);
-            Gallery::view(stories, None, window, cx)
-        }, cx);
+        cx.spawn(async move |cx| {
+            let ready = readiness.await;
+            if !ready.diagnostics.is_empty() {
+                tracing::warn!(
+                    persistence_status = ?ready.persistence_status,
+                    diagnostics = ?ready.diagnostics,
+                    "Storybook initialized with preference diagnostics"
+                );
+            }
+            cx.update(|cx| {
+                gpui_storybook::create_new_window("My App - Stories", |window, cx| {
+                    let stories = gpui_storybook::generate_stories(window, cx);
+                    Gallery::view(stories, None, window, cx)
+                }, cx);
+            });
+        }).detach();
     });
 }
 ```
@@ -80,7 +117,65 @@ fn main() {
 The locale setup has four parts: add `es-fluent-build` as a build dependency and
 track locale assets from `build.rs`, define the embedded i18n module in
 library-reachable `src/i18n.rs`, derive the app language enum with `EsFluent`,
-then call `init` and `change_locale` with the selected language.
+then pass its fallback and GPUI locale adapter through `StorybookOptions`. Keep
+an explicit same-module reference to the private static emitted by
+`define_i18n_module!`; its name is the Cargo package name in upper snake case
+plus `_I18N_MODULE`. This keeps the consumer module linked before
+`replace_with_language` installs its manager. Storybook owns a separate shell
+localizer and falls back to its embedded English resources when the consumer
+selects a locale the shell does not embed.
+`init` returns a readiness task; await it before constructing the first window
+so saved appearance and language intent is applied before the first frame.
+
+## Local preferences
+
+`StorybookOptions::new` requires a stable `ConsumerId`. Give every Storybook
+binary its own ID: persistent documents and their default paths are
+consumer-scoped, so IDs isolate unrelated apps while remaining stable across
+launches.
+
+Storybook keeps user intent separate from effective presentation:
+
+- `PreferenceState::saved` retains `System` or explicit appearance/language
+  intent, independent light and dark theme slots, and scrollbar behavior.
+- `PreferenceState::resolved` reports the effective scheme, theme, language,
+  source, and fallback diagnostics after system detection, registry
+  availability, and deterministic overrides are applied.
+- `System` appearance follows live window appearance changes. `System`
+  language negotiates ordered device locales at startup and re-detects them
+  when a Storybook window becomes active. Explicit choices ignore later system
+  changes.
+- Changing the inactive light or dark theme slot saves that slot without
+  changing the current scheme; it becomes effective when the scheme changes.
+
+`StorybookOptions::with_overrides(PreferenceOverrides { ... })` and the active
+runtime config's `[overrides]` table change only the resolved presentation for
+that launch. Overrides never rewrite saved user intent. Programmatic values win
+field by field over `storybook.toml`; deterministic MCP capture or stdio values
+win over both.
+
+Persistent storage is the default and writes
+`.gpui-storybook/{consumer-id}.json` plus one shared
+`.gpui-storybook/preferences.schema.json` at the Cargo workspace root, or at the
+package root for a standalone crate. Storybook creates
+`.gpui-storybook/.gitignore` with `*` so the local state stays out of Git.
+`PersistenceMode::Temporary` uses a unique JSON file and generated schema
+removed with the repository, while `Disabled` keeps only in-memory session
+state. Use `StorybookOptions::with_json_path(...)` for an explicit persistent
+JSON location. The generated schema exposes named consumer ID, theme ID, and
+BCP 47 language-tag definitions with descriptions and validation constraints.
+
+Configuration errors detected before preference loading make `init` return
+`StorybookInitError`. Repository open or load failures instead complete
+readiness with `PersistenceStatus::Error` and diagnostics so the app can still
+open with fallbacks. Locale-adapter failures add diagnostics without changing
+the storage-only persistence status and are retried when a window becomes
+active. Optimistic menu changes remain active for the session after a save
+failure; open windows show a localized **Retry Save** notification action. The
+Preferences menu exposes the current loading/saving/error state and a generic
+**Retry Preferences** action. Retrying a startup load failure reloads existing
+stored intent; only an actual dirty/save failure retries an upsert. Use
+`gpui_storybook::try_preference_state` for a read-only snapshot.
 
 Turn on the `dock` feature when you want a panel-based workspace instead of the gallery layout:
 
@@ -97,9 +192,9 @@ story by key, or capture the active story:
 gpui-storybook = { version = "*", features = ["mcp"] }
 ```
 
-No constructor changes are required. `gpui_storybook::init(...)` installs the
-MCP automation controller when the feature is enabled, and `Gallery::view(...)`
-or `StoryWorkspace::view(...)` attach it automatically.
+The same `StorybookOptions` initialization installs the MCP automation
+controller when the feature is enabled, and `Gallery::view(...)` or
+`StoryWorkspace::view(...)` attach it automatically.
 The six storybook tools publish closed, typed input and output schemas plus MCP
 read-only, idempotence, destructive, and open-world annotations. Invalid,
 missing, and unknown arguments return machine-readable structured errors.
@@ -117,6 +212,11 @@ WGPU_CAPTURE_ROUTE=gpui-storybook-example-story-ButtonStory \
 WGPU_CAPTURE_PATH=target/storybook-captures/button.png \
 cargo run -p gpui-storybook-example-story --features mcp
 ```
+
+Capture startup uses a deterministic, non-persistent profile: light appearance,
+the registered `Default Light` theme, the configured fallback language, and
+disabled preference storage. Stdio-only MCP startup uses the same presentation
+with temporary storage, so automation does not overwrite interactive choices.
 
 `WGPU_CAPTURE_WIDTH` and `WGPU_CAPTURE_HEIGHT` must be set together and greater
 than zero; they request a live window resize before capture. Captures are
@@ -240,7 +340,9 @@ See [`examples/component`](examples/component/README.md) for the full derive-bas
 
 ### One-time app setup with `#[story_init]`
 
-Use `#[gpui_storybook::story_init]` for initialization that should run once after `gpui_storybook::init(...)` and before stories are shown.
+Use `#[gpui_storybook::story_init]` for initialization that should run once
+during `gpui_storybook::init(...)`, after the core runtime is installed and
+before preference readiness begins.
 
 ```rs
 #[gpui_storybook::story_init]
@@ -293,14 +395,20 @@ case; `#[substory(title = "...")]` changes only the visible title, and
 `#[substory(key = "...")]` sets an explicit route key independent of the
 variant name.
 
-## Filter stories with `storybook.toml`
+## Configure stories and preferences with `storybook.toml`
 
-Put a `storybook.toml` next to the crate whose stories you want to group or filter:
+Put a `storybook.toml` next to the crate whose stories and launch presentation
+you want to configure:
 
 ```toml
 group = "UI Kit"
 allow = ["UI Kit", "Shared"]
 disable_story = ["ExperimentalCardStory"]
+
+[overrides]
+color_scheme = "dark"
+theme = "Default Dark"
+language = "en"
 ```
 
 - `group` is required when `storybook.toml` exists.
@@ -310,5 +418,16 @@ disable_story = ["ExperimentalCardStory"]
 - `disable_story` matches the registered story type name.
 - For `ComponentStory`, the registered story name is the component type name.
 - `disable_story` does not use the full automation `StoryKey`.
+- `[overrides]` and each of its fields are optional.
+- `color_scheme` accepts `"light"` or `"dark"` and bypasses live system
+  appearance changes for the launch.
+- `theme` names a registered theme for the effective color scheme.
+- `language` is a BCP 47 tag from the application's typed embedded language
+  set and bypasses system locale negotiation for the launch.
 
-At runtime, `generate_stories` uses the `storybook.toml` from the registered story crate whose package name matches the running binary.
+At runtime, `init` applies preference overrides and `generate_stories` applies
+story filters from the `storybook.toml` in the registered story crate whose
+package name matches the running binary. Invalid runtime config or a language
+outside the typed embedded set makes `init` return `StorybookInitError`; an
+unavailable named theme uses the registered fallback and reports a resolution
+diagnostic.

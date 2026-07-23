@@ -168,6 +168,11 @@ locale setup or message keys change.
   Docs: [README](crates/gpui-storybook-components/README.md), crate Rustdocs
   Role: shared dock-sidebar UI pieces such as `StorySidebarItem` and `StoryDrag` used by the runtime. This is primarily an implementation detail of `gpui-storybook-core`.
 
+- `crates/gpui-storybook-preferences`
+  Audience: **Internal**
+  Docs: [README](crates/gpui-storybook-preferences/README.md), crate Rustdocs
+  Role: typed consumer-scoped Storybook preference intent, atomic JSON documents, Rust-derived JSON Schema, project-local/temporary/disabled storage modes, invalid-file recovery, injected system detectors, and deterministic theme/language resolution. Application code uses the `gpui-storybook` facade.
+
 ## Validation and Editing Rules
 
 ### Validation After Changes
@@ -179,13 +184,17 @@ locale setup or message keys change.
 - Use `just fmt`, `just check`, `just clippy`, `just test`, `just test-docs`,
   `just cov`, or a more specific command when the change spans multiple surfaces.
   `just check` and `just clippy` exclude both example packages; `just test`
-  matches CI's workspace test command. `just cov` measures every publishable
+  matches CI's workspace test scope. `just cov` measures every publishable
   crate and excludes the two example applications.
 - CI also runs an es-fluent FTL check, `cargo fmt --check`,
   `cargo clippy --workspace --all-features`,
   `cargo doc --workspace --all-features --no-deps --locked`,
   `cargo package --workspace --list`, workspace coverage uploaded to Codecov,
+  the full workspace test suite on Rust stable across Linux, macOS, and Windows,
   and a cargo-machete action.
+- Use `cargo test -p gpui-storybook-preferences --locked` for focused changes
+  to typed preference values, JSON/schema repository behavior, invalid-file
+  recovery, system detectors, or theme/language resolution.
 - If validation cannot be run, state why and what remains unvalidated.
 - Do not claim a change works unless it was validated or the remaining risk is
   explicitly documented.

@@ -558,6 +558,7 @@ pub struct StoryWorkspace {
     automation: Option<SharedStorybookAutomation>,
     last_layout_state: Option<DockAreaState>,
     toggle_button_visible: bool,
+    _preference_subscriptions: Vec<Subscription>,
 }
 
 impl StoryWorkspace {
@@ -620,12 +621,23 @@ impl StoryWorkspace {
 
         let title_bar = cx.new(|cx| AppTitleBar::new("Storybook", ui, window, cx));
 
+        let preference_subscriptions = vec![
+            cx.observe_window_appearance(window, |_, window, cx| {
+                crate::preferences::window_appearance_changed(window, cx);
+            }),
+            cx.observe_window_activation(window, |_, window, cx| {
+                crate::preferences::window_activated(window, cx);
+            }),
+        ];
+        crate::preferences::window_appearance_changed(window, cx);
+
         let this = Self {
             dock_area,
             title_bar,
             automation,
             last_layout_state: None,
             toggle_button_visible: true,
+            _preference_subscriptions: preference_subscriptions,
         };
 
         if let Some(automation) = this.automation.clone() {

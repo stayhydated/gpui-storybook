@@ -16,7 +16,39 @@ This crate is for applications that need runtime-level control over the window s
 - `create_new_window` and `create_new_window_with_ui` for the standard storybook shell
 - `StorybookWindowUi` for custom app-menu and title-bar additions
 - `StoryWorkspace` and `create_dock_window` behind the `dock` feature
-- built-in theme persistence, locale wiring, and embedded assets
+- GPUI-owned saved and resolved preference state for appearance, independent
+  light/dark theme slots, locale, scrollbar behavior, and persistence status
+- embedded localization resources and assets
+
+## Preference runtime
+
+The public facade initializes this runtime from typed `StorybookOptions` and
+returns a readiness task. Await readiness before opening the first window so a
+consumer's saved appearance and locale intent is applied before the first
+frame. Each standard gallery or dock window then forwards appearance changes
+and activation events to the runtime.
+
+Saved intent and effective presentation remain separate. `System` appearance
+tracks live window appearance, and `System` language re-detects ordered device
+locales when a window activates. Light and dark theme selections occupy
+independent slots. The active slot follows the resolved scheme; changing the
+inactive slot does not force a scheme change.
+
+`PersistenceStatus` describes storage only: loading, ready, saving, or error.
+Storage and locale-application diagnostics remain available on
+`PreferenceState` and `StorybookReady`. A locale-adapter failure does not turn
+the storage status into an error; the typed Storybook/component locale remains
+installed and activation retries the consumer adapter. A failed save keeps the
+optimistic session value active, gives open windows a localized **Retry Save**
+notification action, and exposes generic **Retry Preferences** in the
+Preferences menu. Retrying a startup load failure reloads existing intent; only
+pending or failed user changes are upserted.
+
+Storybook shell messages use a core-owned embedded localizer. The consumer
+locale adapter owns the application's separate GPUI Fluent manager, including
+consumer language labels and story messages. If the consumer selects a locale
+the shell does not embed, shell messages use embedded English while consumer
+messages remain in the selected locale.
 
 Enable the `capture` feature when automation needs to render the active story
 to a PNG through GPUI's platform test-support image path. Most applications

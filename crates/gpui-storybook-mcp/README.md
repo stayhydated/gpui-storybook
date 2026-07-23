@@ -21,14 +21,21 @@ gpui-storybook = { version = "*", features = ["mcp"] }
 ```
 
 ```rs
-gpui_storybook::create_new_window("Stories", move |window, cx| {
-    let stories = gpui_storybook::generate_stories(window, cx);
-    gpui_storybook::Gallery::view(stories, None, window, cx)
-}, cx);
+app_cx.spawn(async move |cx| {
+    let _ready = readiness.await;
+    cx.update(|app_cx| {
+        gpui_storybook::create_new_window("Stories", move |window, cx| {
+            let stories = gpui_storybook::generate_stories(window, cx);
+            gpui_storybook::Gallery::view(stories, None, window, cx)
+        }, app_cx);
+    });
+}).detach();
 ```
 
-`gpui_storybook::init(...)` installs and starts MCP automation when the feature
-is enabled. Use `StoryWorkspace::view(...)` for dock mode. The explicit
+Pass the same typed `StorybookOptions` used by an interactive Storybook to
+`gpui_storybook::init(...)`, await its readiness task, and only then construct
+the gallery or dock window. Initialization installs MCP automation when the
+feature is enabled. Use `StoryWorkspace::view(...)` for dock mode. The explicit
 `view_with_automation(...)` constructors remain available for direct core users
 or custom controllers.
 
@@ -71,6 +78,14 @@ together and greater than zero; they request a live window resize before
 capture. Captures are cropped to the story view, excluding the sidebar and
 storybook header or dock chrome. The capture result reports the actual rendered
 pixel size, which can differ on scaled or compositor-managed displays.
+
+The facade derives its automation preference profile from these real launch
+variables. A route or output path selects capture mode: persistence is disabled
+and resolved presentation is forced to light appearance, the registered
+`Default Light` theme, and the application's configured fallback language.
+Stdio without capture uses the same deterministic presentation with temporary
+storage. Capture takes precedence when both are requested, and neither profile
+replaces the user's saved interactive intent.
 
 Sub-story routes use `story-key/substory-key`. Plain string sections use
 title-derived slugs through `gpui_storybook::capture_substory(...)`; sections

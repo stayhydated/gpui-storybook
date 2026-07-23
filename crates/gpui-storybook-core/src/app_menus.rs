@@ -1,14 +1,42 @@
-use gpui::{App, BorrowAppContext as _, Entity, Menu, MenuItem, SharedString};
-use gpui_component::{
-    ActiveTheme as _, GlobalState, Theme, ThemeMode, ThemeRegistry, menu::AppMenuBar,
+use gpui::{App, Entity, Menu, MenuItem, SharedString};
+use gpui_component::{GlobalState, Theme, ThemeMode, ThemeRegistry, menu::AppMenuBar};
+use gpui_storybook_preferences::{
+    PreferredColorScheme, PreferredLanguage, SystemColorScheme, ThemeId,
 };
 
 use crate::{
-    actions::{Quit, SelectLocale},
-    locale::LocaleStore,
-    story::themes::{SwitchTheme, SwitchThemeMode},
+    actions::{
+        Quit, RetryPreferences, SelectColorScheme, SelectLocale, SelectTheme, UseSystemLocale,
+    },
+    messages::{StorybookMessage, text},
+    preferences::{self, PersistenceStatus, StorybookPreferencesGlobal},
     storybook_window_ui::AppMenuItemsBuilder,
 };
+
+/// Installs the one-time preference action routing owned by the core runtime.
+pub(crate) fn register_actions(cx: &mut App) {
+    cx.on_action(|action: &SelectColorScheme, cx| {
+        preferences::select_color_scheme(action.0, cx);
+    });
+    cx.on_action(|action: &SelectTheme, cx| {
+        let Ok(theme) = ThemeId::new(action.theme.as_ref()) else {
+            tracing::error!("rejected invalid Storybook theme action");
+            return;
+        };
+        preferences::select_theme(action.scheme, theme, cx);
+    });
+    cx.on_action(|action: &SelectLocale, cx| {
+        if let Some(language) = preferences::explicit_language(action.0.clone()) {
+            preferences::select_language(language, cx);
+        }
+    });
+    cx.on_action(|_: &UseSystemLocale, cx| {
+        preferences::select_language(PreferredLanguage::System, cx);
+    });
+    cx.on_action(|_: &RetryPreferences, cx| {
+        preferences::retry_preferences(cx);
+    });
+}
 
 pub fn init(
     title: impl Into<SharedString>,
@@ -18,35 +46,45 @@ pub fn init(
     let app_menu_bar = AppMenuBar::new(cx);
     let title: SharedString = title.into();
     update_app_menu(title.clone(), extra_items.clone(), app_menu_bar.clone(), cx);
+    install_reload_handlers(title, extra_items, app_menu_bar.clone(), cx);
+    app_menu_bar
+}
 
-    cx.on_action({
+fn install_reload_handlers(
+    title: SharedString,
+    extra_items: Option<AppMenuItemsBuilder>,
+    app_menu_bar: Entity<AppMenuBar>,
+    cx: &mut App,
+) {
+    cx.observe_global::<StorybookPreferencesGlobal>({
         let title = title.clone();
         let extra_items = extra_items.clone();
         let app_menu_bar = app_menu_bar.clone();
-        move |action: &SelectLocale, cx: &mut App| {
-            let selected_locale = action.0.clone();
-            if let Err(err) = cx.update_global::<Box<dyn LocaleStore>, _>(|locale_store, cx| {
-                locale_store.set_current_locale(selected_locale.clone(), cx)
-            }) {
-                tracing::error!("Failed to switch locale to '{}': {err:#}", selected_locale);
-                return;
-            }
-
-            update_app_menu(title.clone(), extra_items.clone(), app_menu_bar.clone(), cx);
-            cx.refresh_windows();
-        }
-    });
-
-    // Observe theme changes to update the menu to refresh the checked state
-    cx.observe_global::<Theme>({
-        let app_menu_bar = app_menu_bar.clone();
         move |cx| {
-            update_app_menu(title.clone(), extra_items.clone(), app_menu_bar.clone(), cx);
+            schedule_app_menu_update(title.clone(), extra_items.clone(), app_menu_bar.clone(), cx);
         }
     })
     .detach();
+    cx.observe_global::<Theme>(move |cx| {
+        schedule_app_menu_update(title.clone(), extra_items.clone(), app_menu_bar.clone(), cx);
+    })
+    .detach();
+}
 
-    app_menu_bar
+fn schedule_app_menu_update(
+    title: SharedString,
+    extra_items: Option<AppMenuItemsBuilder>,
+    app_menu_bar: Entity<AppMenuBar>,
+    cx: &mut App,
+) {
+    // A Wayland appearance callback updates the Theme global while its client
+    // state is mutably borrowed. Calling `App::set_menus` from that global
+    // observer re-enters the platform and panics, so cross the foreground-task
+    // boundary before touching native menus.
+    cx.spawn(async move |cx| {
+        cx.update(|cx| update_app_menu(title, extra_items, app_menu_bar, cx));
+    })
+    .detach();
 }
 
 fn update_app_menu(
@@ -59,13 +97,13 @@ fn update_app_menu(
     cx.set_menus(build_menus(title.clone(), extra_items.clone(), cx));
     let menus = build_menus(title, extra_items, cx)
         .into_iter()
-        .map(|menu| menu.owned())
+        .map(Menu::owned)
         .collect();
     GlobalState::global_mut(cx).set_app_menus(menus);
 
     app_menu_bar.update(cx, |menu_bar, cx| {
         menu_bar.reload(cx);
-    })
+    });
 }
 
 fn build_menus(
@@ -73,19 +111,12 @@ fn build_menus(
     extra_items: Option<AppMenuItemsBuilder>,
     cx: &App,
 ) -> Vec<Menu> {
-    let mode = cx.theme().mode;
     let mut items = vec![
-        MenuItem::Submenu(Menu {
-            name: "Appearance".into(),
-            items: vec![
-                MenuItem::action("Light", SwitchThemeMode(ThemeMode::Light))
-                    .checked(!mode.is_dark()),
-                MenuItem::action("Dark", SwitchThemeMode(ThemeMode::Dark)).checked(mode.is_dark()),
-            ],
-            disabled: false,
-        }),
-        theme_menu(cx),
+        appearance_menu(cx),
+        theme_menu(SystemColorScheme::Light, cx),
+        theme_menu(SystemColorScheme::Dark, cx),
         language_menu(cx),
+        persistence_menu(cx),
     ];
 
     if let Some(extra_items) = extra_items
@@ -98,7 +129,7 @@ fn build_menus(
     }
 
     items.push(MenuItem::Separator);
-    items.push(MenuItem::action("Quit", Quit));
+    items.push(MenuItem::action(text(cx, StorybookMessage::Quit), Quit));
 
     vec![Menu {
         name: title.into(),
@@ -107,166 +138,220 @@ fn build_menus(
     }]
 }
 
-fn theme_menu(cx: &App) -> MenuItem {
-    let themes = ThemeRegistry::global(cx).sorted_themes();
-    let current_name = cx.theme().theme_name();
+fn appearance_menu(cx: &App) -> MenuItem {
+    let selected = preferences::try_state(cx).map(|state| state.saved.color_scheme);
     MenuItem::Submenu(Menu {
-        name: "Theme".into(),
-        items: themes
-            .iter()
-            .map(|theme| {
-                let checked = current_name == &theme.name;
-                MenuItem::action(theme.name.clone(), SwitchTheme(theme.name.clone()))
-                    .checked(checked)
-            })
-            .collect(),
-        disabled: false,
+        name: text(cx, StorybookMessage::Appearance).into(),
+        items: [
+            (
+                StorybookMessage::UseSystemAppearance,
+                PreferredColorScheme::System,
+            ),
+            (StorybookMessage::Light, PreferredColorScheme::Light),
+            (StorybookMessage::Dark, PreferredColorScheme::Dark),
+        ]
+        .into_iter()
+        .map(|(label, value)| {
+            MenuItem::action(text(cx, label), SelectColorScheme(value))
+                .checked(selected == Some(value))
+        })
+        .collect(),
+        disabled: selected.is_none(),
+    })
+}
+
+fn theme_menu(scheme: SystemColorScheme, cx: &App) -> MenuItem {
+    let selected = preferences::try_state(cx).and_then(|state| match scheme {
+        SystemColorScheme::Light => state.saved.light_theme.as_ref(),
+        SystemColorScheme::Dark => state.saved.dark_theme.as_ref(),
+    });
+    let mode = match scheme {
+        SystemColorScheme::Light => ThemeMode::Light,
+        SystemColorScheme::Dark => ThemeMode::Dark,
+    };
+    let items = ThemeRegistry::global(cx)
+        .sorted_themes()
+        .into_iter()
+        .filter(|theme| theme.mode == mode)
+        .map(|theme| {
+            let checked = selected.map_or(theme.is_default, |selected| {
+                selected.as_str() == theme.name.as_ref()
+            });
+            MenuItem::action(
+                theme.name.clone(),
+                SelectTheme {
+                    scheme,
+                    theme: theme.name.clone(),
+                },
+            )
+            .checked(checked)
+        })
+        .collect::<Vec<_>>();
+
+    MenuItem::Submenu(Menu {
+        name: text(
+            cx,
+            match scheme {
+                SystemColorScheme::Light => StorybookMessage::LightTheme,
+                SystemColorScheme::Dark => StorybookMessage::DarkTheme,
+            },
+        )
+        .into(),
+        disabled: items.is_empty(),
+        items,
     })
 }
 
 fn language_menu(cx: &App) -> MenuItem {
-    let locale_store = cx.global::<Box<dyn LocaleStore>>();
-    let available_locales = match locale_store.available_locales(cx) {
-        Ok(available_locales) => available_locales,
-        Err(err) => {
-            tracing::error!("Failed to load available locales: {err:#}");
-            return disabled_language_menu();
-        },
-    };
-    let current_locale = match locale_store.current_locale(cx) {
-        Ok(current_locale) => Some(current_locale),
-        Err(err) => {
-            tracing::error!("Failed to load current locale: {err:#}");
-            None
-        },
-    };
+    let state = preferences::try_state(cx);
+    let mut items = vec![
+        MenuItem::action(
+            text(cx, StorybookMessage::UseSystemLanguage),
+            UseSystemLocale,
+        )
+        .checked(
+            state.is_some_and(|state| matches!(state.saved.language, PreferredLanguage::System)),
+        ),
+    ];
+    items.extend(
+        preferences::available_locales(cx)
+            .into_iter()
+            .map(|(name, tag)| {
+                let checked = state.is_some_and(|state| {
+                    matches!(
+                        &state.saved.language,
+                        PreferredLanguage::Explicit(selected) if selected == &tag
+                    )
+                });
+                MenuItem::action(name, SelectLocale(tag.as_identifier().clone())).checked(checked)
+            }),
+    );
 
     MenuItem::Submenu(Menu {
-        name: "Language".into(),
-        items: available_locales
-            .iter()
-            .map(|(name, lang_id)| {
-                let checked = current_locale
-                    .as_ref()
-                    .map(|current_locale| current_locale == lang_id)
-                    .unwrap_or(false);
-                MenuItem::action(name, SelectLocale(lang_id.clone())).checked(checked)
-            })
-            .collect(),
-        disabled: available_locales.is_empty(),
+        name: text(cx, StorybookMessage::Language).into(),
+        items,
+        disabled: state.is_none(),
     })
 }
 
-fn disabled_language_menu() -> MenuItem {
+fn persistence_menu(cx: &App) -> MenuItem {
+    let status = preferences::try_state(cx).map(|state| state.persistence_status);
+    persistence_menu_for_status(status, cx)
+}
+
+fn persistence_menu_for_status(status: Option<PersistenceStatus>, cx: &App) -> MenuItem {
+    let status_label = match status.unwrap_or(PersistenceStatus::Loading) {
+        PersistenceStatus::Loading => StorybookMessage::PersistenceLoading,
+        PersistenceStatus::Ready => StorybookMessage::PersistenceReady,
+        PersistenceStatus::Saving => StorybookMessage::PersistenceSaving,
+        PersistenceStatus::Error => StorybookMessage::PersistenceError,
+    };
+    let mut items = vec![MenuItem::action(text(cx, status_label), RetryPreferences).disabled(true)];
+    if status == Some(PersistenceStatus::Error) {
+        items.push(MenuItem::action(
+            text(cx, StorybookMessage::RetryPreferences),
+            RetryPreferences,
+        ));
+    }
+
     MenuItem::Submenu(Menu {
-        name: "Language".into(),
-        items: Vec::new(),
-        disabled: true,
+        name: text(cx, StorybookMessage::Preferences).into(),
+        items,
+        disabled: false,
     })
 }
 
 #[cfg(test)]
 mod tests {
+    use std::{cell::Cell, rc::Rc};
+
     use super::*;
-    use anyhow::{Result, anyhow};
-    use std::rc::Rc;
-    use unic_langid::LanguageIdentifier;
 
-    enum FakeLocales {
-        Available,
-        Empty,
-        AvailableError,
-        CurrentError,
-    }
-
-    impl LocaleStore for FakeLocales {
-        fn available_locales(&self, _: &App) -> Result<Vec<(String, LanguageIdentifier)>> {
-            match self {
-                Self::Available | Self::CurrentError => Ok(vec![
-                    (
-                        "English".to_string(),
-                        "en-US".parse().expect("valid locale"),
-                    ),
-                    ("French".to_string(), "fr".parse().expect("valid locale")),
-                ]),
-                Self::Empty => Ok(Vec::new()),
-                Self::AvailableError => Err(anyhow!("locales unavailable")),
-            }
-        }
-
-        fn current_locale(&self, _: &App) -> Result<LanguageIdentifier> {
-            match self {
-                Self::CurrentError => Err(anyhow!("current locale unavailable")),
-                _ => Ok("en-US".parse().expect("valid locale")),
-            }
-        }
-
-        fn set_current_locale(&self, _: LanguageIdentifier, _: &mut App) -> Result<()> {
-            Ok(())
-        }
-    }
-
-    fn install_locales(cx: &mut App, locales: FakeLocales) {
-        cx.set_global(Box::new(locales) as Box<dyn LocaleStore>);
-    }
-
-    #[test]
-    fn disabled_language_menu_is_empty_and_disabled() {
-        let MenuItem::Submenu(menu) = disabled_language_menu() else {
-            panic!("language menu should be a submenu");
+    fn first_item_name(item: MenuItem) -> SharedString {
+        let MenuItem::Submenu(menu) = item else {
+            panic!("persistence menu should be a submenu");
         };
-        assert_eq!(menu.name.as_ref(), "Language");
-        assert!(menu.items.is_empty());
-        assert!(menu.disabled);
+        let Some(MenuItem::Action { name, .. }) = menu.items.into_iter().next() else {
+            panic!("persistence menu should contain a status action");
+        };
+        name
     }
 
     #[gpui::test]
-    fn menu_building_handles_locales_extras_and_errors(cx: &mut App) {
+    fn menu_status_tracks_saving_ready_and_error_transitions(cx: &mut App) {
+        crate::i18n::init(cx).expect("Storybook test localization initializes");
+
+        assert_eq!(
+            first_item_name(persistence_menu_for_status(
+                Some(PersistenceStatus::Saving),
+                cx,
+            )),
+            text(cx, StorybookMessage::PersistenceSaving)
+        );
+        assert_eq!(
+            first_item_name(persistence_menu_for_status(
+                Some(PersistenceStatus::Ready),
+                cx,
+            )),
+            text(cx, StorybookMessage::PersistenceReady)
+        );
+        let MenuItem::Submenu(error_menu) =
+            persistence_menu_for_status(Some(PersistenceStatus::Error), cx)
+        else {
+            panic!("error status should be a submenu");
+        };
+        assert_eq!(error_menu.items.len(), 2);
+        let MenuItem::Action { name, .. } = &error_menu.items[0] else {
+            panic!("first error item should report status");
+        };
+        assert_eq!(name.as_ref(), text(cx, StorybookMessage::PersistenceError));
+    }
+
+    #[gpui::test]
+    fn appearance_and_language_menus_expose_system_intent(cx: &mut App) {
         gpui_component::init(cx);
-        install_locales(cx, FakeLocales::Available);
+        crate::i18n::init(cx).expect("Storybook test localization initializes");
 
-        let extra: AppMenuItemsBuilder =
-            Rc::new(|_| vec![MenuItem::action("Extra", SwitchTheme("Adventure".into()))]);
-        let menus = build_menus("Storybook", Some(extra), cx);
-        assert_eq!(menus.len(), 1);
-        assert_eq!(menus[0].name.as_ref(), "Storybook");
-        assert_eq!(menus[0].items.len(), 7);
-
-        let MenuItem::Submenu(language) = &menus[0].items[2] else {
-            panic!("third item should be language submenu");
+        let MenuItem::Submenu(appearance) = appearance_menu(cx) else {
+            panic!("appearance should be a submenu");
         };
-        assert!(!language.disabled);
-        assert_eq!(language.items.len(), 2);
-        let MenuItem::Action { checked, .. } = &language.items[0] else {
-            panic!("locale should be an action");
+        assert_eq!(appearance.items.len(), 3);
+        let MenuItem::Action { name, .. } = &appearance.items[0] else {
+            panic!("first appearance item should be an action");
         };
-        assert!(*checked);
-
-        install_locales(cx, FakeLocales::Empty);
-        let MenuItem::Submenu(language) = language_menu(cx) else {
-            panic!("language menu should be a submenu");
-        };
-        assert!(language.disabled);
-
-        install_locales(cx, FakeLocales::AvailableError);
-        let MenuItem::Submenu(language) = language_menu(cx) else {
-            panic!("language menu should be a submenu");
-        };
-        assert!(language.disabled);
-
-        install_locales(cx, FakeLocales::CurrentError);
-        let MenuItem::Submenu(language) = language_menu(cx) else {
-            panic!("language menu should be a submenu");
-        };
-        assert!(
-            language
-                .items
-                .iter()
-                .all(|item| { matches!(item, MenuItem::Action { checked: false, .. }) })
+        assert_eq!(
+            name.as_ref(),
+            text(cx, StorybookMessage::UseSystemAppearance)
         );
 
-        install_locales(cx, FakeLocales::Available);
-        let app_menu = init("Storybook", Some(Rc::new(|_| Vec::new())), cx);
-        let _menu = app_menu.read(cx);
+        let MenuItem::Submenu(language) = language_menu(cx) else {
+            panic!("language should be a submenu");
+        };
+        let MenuItem::Action { name, .. } = &language.items[0] else {
+            panic!("first language item should be an action");
+        };
+        assert_eq!(name.as_ref(), text(cx, StorybookMessage::UseSystemLanguage));
+    }
+
+    #[gpui::test]
+    fn menu_reload_crosses_a_foreground_task_boundary(cx: &mut gpui::TestAppContext) {
+        let build_count = Rc::new(Cell::new(0));
+        let extra_items: AppMenuItemsBuilder = {
+            let build_count = build_count.clone();
+            Rc::new(move |_| {
+                build_count.set(build_count.get() + 1);
+                Vec::new()
+            })
+        };
+        cx.update(|cx| {
+            gpui_component::init(cx);
+            crate::i18n::init(cx).expect("Storybook test localization initializes");
+            let app_menu_bar = AppMenuBar::new(cx);
+            schedule_app_menu_update("Storybook".into(), Some(extra_items), app_menu_bar, cx);
+        });
+
+        assert_eq!(build_count.get(), 0);
+        cx.run_until_parked();
+        assert_eq!(build_count.get(), 2);
     }
 }

@@ -13,12 +13,13 @@
 //! `__inventory` re-exports are the stable expansion path used by those
 //! macros.
 //!
-//! `generate_stories` loads crate-local `storybook.toml` files for discovered
-//! story crates, selects a runtime config by matching the running binary name
-//! against registered story crate names, applies `allow` and `disable_story`
-//! filtering, then materializes sorted [`StoryContainer`] values. A story crate
-//! config's `group` becomes the sidebar's outer group; a story's declared
-//! section remains the nested label.
+//! [`init`] and `generate_stories` load crate-local `storybook.toml` files for
+//! discovered story crates and select a runtime config by matching the running
+//! binary name against registered story crate names. Initialization applies
+//! launch-only preference overrides; story generation applies `allow` and
+//! `disable_story` filtering, then materializes sorted [`StoryContainer`]
+//! values. A story crate config's `group` becomes the sidebar's outer group; a
+//! story's declared section remains the nested label.
 //!
 //! Macro-generated stories carry stable [`StoryKey`] values in the form
 //! `{crate-package-name}-{registered-story-name}`. These keys are copied into
@@ -34,19 +35,38 @@
 //!
 //! Applications with embedded locale assets should call
 //! `es_fluent_build::track_i18n_assets()` from `build.rs`. Define the embedded
-//! i18n module and typed language enum in library-reachable code, then pass the
-//! selected language to [`init`] before creating a story window.
+//! i18n module and typed language enum in library-reachable code, then pass
+//! typed [`StorybookOptions`] to [`init`] and await readiness before creating a
+//! story window.
+//!
+//! [`PreferenceState::saved`] retains durable user intent, including `System`
+//! choices and independent light/dark theme slots. [`PreferenceState::resolved`]
+//! reports effective values and their sources after live system detection,
+//! registry fallback, and deterministic overrides. [`PersistenceStatus`] is
+//! storage-only; locale-adapter failures are reported as diagnostics and are
+//! retried on later window activation without falsifying storage state.
 
 #[cfg(feature = "macros")]
 pub use gpui_storybook_macros::*;
 
-use gpui_storybook_core::locale::LocaleStore;
 use std::{
     collections::{BTreeMap, HashMap},
     fmt,
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
+pub mod preferences;
+pub use preferences::{
+    ColorSchemeResolution, ColorSchemeSource, ConsumerId, ConsumerIdError, LanguageResolution,
+    LanguageSource, LanguageTag, LocaleApplicationError, PersistenceMode, PersistenceStatus,
+    PreferenceDiagnostic, PreferenceOverrides, PreferenceState, PreferredColorScheme,
+    PreferredLanguage, PreferredLanguageMode, PreferredScrollbar, RecoveryDiagnostic,
+    RecoveryReason, ResolutionDiagnostic, ResolvedPreferences, StorybookInitError,
+    StorybookOptions, StorybookPreferences, StorybookReady, SystemColorScheme, ThemeId,
+    ThemeIdError, ThemeResolution, ThemeSource, UnsupportedValueSource,
+};
+
+pub use gpui_es_fluent::try_localize_message as localize_message;
 #[cfg(feature = "dock")]
 pub use gpui_storybook_core::dock_gallery::{
     StoryWorkspace, create_dock_window, register_story_panels,
@@ -63,8 +83,6 @@ pub use gpui_storybook_core::{
         capture_substory_route_id_with_key, capture_substory_with_key,
     },
     gallery::Gallery,
-    i18n::change_locale,
-    i18n::localize_message,
     language::{CurrentLanguage, Language},
     story::{
         Story, StoryContainer, StorySection, StorySectionBase, StorySectionTitle, Substory,
@@ -219,16 +237,114 @@ fn load_runtime_storybook_config(
     all_entries: &[&'static __registry::StoryEntry],
     crate_configs: &mut HashMap<&'static str, Option<gpui_storybook_toml::StorybookToml>>,
 ) -> Option<gpui_storybook_toml::StorybookToml> {
-    let bin_name = current_binary_name()?;
-    let entry = all_entries
-        .iter()
-        .copied()
-        .find(|entry| entry.crate_name == bin_name)?;
+    let entry = runtime_story_entry(all_entries)?;
 
     crate_configs
         .entry(entry.crate_dir)
         .or_insert_with(|| load_storybook_config(entry))
         .clone()
+}
+
+fn runtime_story_entry(
+    all_entries: &[&'static __registry::StoryEntry],
+) -> Option<&'static __registry::StoryEntry> {
+    let bin_name = current_binary_name()?;
+    all_entries
+        .iter()
+        .copied()
+        .find(|entry| entry.crate_name == bin_name)
+}
+
+struct InitContext {
+    runtime_config: Option<gpui_storybook_toml::StorybookToml>,
+    project_root: PathBuf,
+}
+
+fn find_cargo_project_root(start: &Path) -> PathBuf {
+    let mut nearest_manifest_dir = None;
+
+    for directory in start.ancestors() {
+        let manifest_path = directory.join("Cargo.toml");
+        if !manifest_path.is_file() {
+            continue;
+        }
+        nearest_manifest_dir.get_or_insert_with(|| directory.to_path_buf());
+
+        let declares_workspace = std::fs::read_to_string(&manifest_path)
+            .ok()
+            .and_then(|contents| contents.parse::<toml::Table>().ok())
+            .is_some_and(|manifest| manifest.contains_key("workspace"));
+        if declares_workspace {
+            return directory.to_path_buf();
+        }
+    }
+
+    nearest_manifest_dir.unwrap_or_else(|| start.to_path_buf())
+}
+
+fn load_init_context() -> Result<InitContext, StorybookInitError> {
+    let all_entries = inventory::iter::<__registry::StoryEntry>().collect::<Vec<_>>();
+    if let Some(entry) = runtime_story_entry(&all_entries) {
+        let runtime_config = gpui_storybook_toml::load_from_dir(entry.crate_dir)
+            .map_err(|source| StorybookInitError::RuntimeConfig { source })?;
+        return Ok(InitContext {
+            runtime_config,
+            project_root: find_cargo_project_root(Path::new(entry.crate_dir)),
+        });
+    }
+
+    let working_directory = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    Ok(InitContext {
+        runtime_config: None,
+        project_root: find_cargo_project_root(&working_directory),
+    })
+}
+
+fn apply_toml_preference_overrides<L>(
+    overrides: &mut PreferenceOverrides<L>,
+    config: &gpui_storybook_toml::StorybookToml,
+) -> Result<(), StorybookInitError>
+where
+    L: Language,
+{
+    let configured = &config.overrides;
+
+    if overrides.color_scheme.is_none() {
+        overrides.color_scheme = configured.color_scheme.map(|scheme| match scheme {
+            gpui_storybook_toml::StorybookColorScheme::Light => SystemColorScheme::Light,
+            gpui_storybook_toml::StorybookColorScheme::Dark => SystemColorScheme::Dark,
+        });
+    }
+
+    if overrides.theme.is_none()
+        && let Some(theme) = configured.theme.as_ref()
+    {
+        let theme = ThemeId::new(theme).map_err(|_| StorybookInitError::InvalidTomlOverride {
+            field: "overrides.theme",
+            value: theme.clone(),
+        })?;
+        overrides.theme = Some(theme);
+    }
+
+    if overrides.language.is_none()
+        && let Some(language) = configured.language.as_ref()
+    {
+        let tag = gpui_storybook_preferences::LanguageTag::new(language).map_err(|_| {
+            StorybookInitError::InvalidTomlOverride {
+                field: "overrides.language",
+                value: language.clone(),
+            }
+        })?;
+        let typed = L::try_from(tag.as_identifier().clone()).map_err(|_| {
+            StorybookInitError::InvalidTomlOverride {
+                field: "overrides.language",
+                value: language.clone(),
+            }
+        })?;
+        overrides.language = Some(typed);
+    }
+
+    Ok(())
 }
 
 fn resolve_story_entry(
@@ -290,31 +406,165 @@ fn compare_resolved_story_entries(
     }
 }
 
-/// Initializes Storybook runtime state and locale wiring.
+struct StorybookInitialized;
+
+impl ::gpui::Global for StorybookInitialized {}
+
+#[cfg(feature = "mcp")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum AutomationPreferenceProfile {
+    Capture,
+    Stdio,
+}
+
+#[cfg(feature = "mcp")]
+fn apply_automation_preference_profile<L>(
+    profile: AutomationPreferenceProfile,
+    persistence: &mut PersistenceMode,
+    json_path: &mut Option<PathBuf>,
+    overrides: &mut PreferenceOverrides<L>,
+    fallback_language: L,
+) -> Result<(), StorybookInitError>
+where
+    L: Copy,
+{
+    *persistence = match profile {
+        AutomationPreferenceProfile::Capture => PersistenceMode::Disabled,
+        AutomationPreferenceProfile::Stdio => PersistenceMode::Temporary,
+    };
+    *json_path = None;
+    overrides.color_scheme = Some(SystemColorScheme::Light);
+    overrides.theme = Some(ThemeId::new("Default Light").map_err(|_| {
+        StorybookInitError::CoreInitialization {
+            category: "deterministic_theme".to_owned(),
+        }
+    })?);
+    overrides.language = Some(fallback_language);
+    Ok(())
+}
+
+/// Initializes Storybook and starts loading one consumer's local preferences.
 ///
-/// Call this once before creating the story window or calling
-/// [`generate_stories`]. The function stores the current language, installs the
-/// locale manager, initializes the core runtime shell, registers dock panel
-/// types when the `dock` feature is enabled, and then runs all discovered
-/// `#[story_init]` hooks.
+/// The facade installs the GPUI Tokio runtime, component and Storybook state,
+/// localization, story registrations, and optional automation hooks. Await the
+/// returned task before opening the first window so saved theme and language
+/// intent is applied before the first frame.
 ///
-/// The language type normally comes from `#[es_fluent_language]`. Applications
-/// with embedded locale assets should also configure
-/// `es_fluent_build::track_i18n_assets()` in `build.rs` so Cargo rebuilds when
-/// locale files or directories change.
-pub fn init<L>(cx: &mut ::gpui::App, language: L)
+/// The active runtime `storybook.toml` may provide launch-only preference
+/// overrides. Values supplied through [`StorybookOptions::with_overrides`] take
+/// precedence field by field, and deterministic automation profiles take
+/// precedence over both.
+///
+/// Storage failures are represented by [`PersistenceStatus::Error`] in the
+/// successful [`StorybookReady`] value; system and configured fallbacks remain
+/// usable. Only invalid static configuration returns an error immediately.
+///
+/// # Errors
+///
+/// Returns [`StorybookInitError`] when the typed language contract, path/mode
+/// combination, runtime `storybook.toml`, preference override, embedded
+/// localization setup, or one-time initialization contract is invalid.
+pub fn init<L>(
+    cx: &mut ::gpui::App,
+    mut options: StorybookOptions<L>,
+) -> Result<::gpui::Task<StorybookReady>, StorybookInitError>
 where
     L: Language,
 {
-    cx.set_global(CurrentLanguage(language));
-    cx.set_global(
-        Box::new(gpui_storybook_core::locale::LocaleManager::<L>::new()) as Box<dyn LocaleStore>,
-    );
-    gpui_storybook_core::story::init(cx);
+    if cx.try_global::<StorybookInitialized>().is_some() {
+        return Err(StorybookInitError::AlreadyInitialized);
+    }
+    if options.persistence != PersistenceMode::Persistent && options.json_path.is_some() {
+        return Err(StorybookInitError::PathOverrideRequiresPersistent);
+    }
+
+    let init_context = load_init_context()?;
+    if let Some(runtime_config) = init_context.runtime_config.as_ref() {
+        apply_toml_preference_overrides(&mut options.overrides, runtime_config)?;
+    }
+
+    #[cfg(feature = "mcp")]
+    {
+        let profile = if gpui_storybook_mcp::capture_requested() {
+            Some(AutomationPreferenceProfile::Capture)
+        } else if gpui_storybook_mcp::stdio_requested() {
+            Some(AutomationPreferenceProfile::Stdio)
+        } else {
+            None
+        };
+        if let Some(profile) = profile {
+            apply_automation_preference_profile(
+                profile,
+                &mut options.persistence,
+                &mut options.json_path,
+                &mut options.overrides,
+                options.fallback_language,
+            )?;
+        }
+    }
+
+    let mut languages = Vec::new();
+    for language in L::iter() {
+        let identifier: unic_langid::LanguageIdentifier =
+            language
+                .try_into()
+                .map_err(|_| StorybookInitError::InvalidLanguage {
+                    language: format!("{language:?}"),
+                })?;
+        let tag =
+            gpui_storybook_preferences::LanguageTag::new(identifier.to_string()).map_err(|_| {
+                StorybookInitError::InvalidLanguage {
+                    language: format!("{language:?}"),
+                }
+            })?;
+        languages.push((language, tag));
+    }
+
+    let fallback_identifier: unic_langid::LanguageIdentifier = options
+        .fallback_language
+        .try_into()
+        .map_err(|_| StorybookInitError::InvalidLanguage {
+            language: format!("{:?}", options.fallback_language),
+        })?;
+    let fallback_tag = gpui_storybook_preferences::LanguageTag::new(
+        fallback_identifier.to_string(),
+    )
+    .map_err(|_| StorybookInitError::InvalidLanguage {
+        language: format!("{:?}", options.fallback_language),
+    })?;
+    let supported_languages = gpui_storybook_preferences::SupportedLanguages::new(
+        languages.iter().map(|(_, tag)| tag.clone()),
+        fallback_tag,
+    )
+    .map_err(|_| StorybookInitError::UnsupportedFallback)?;
+
+    let override_language = options
+        .overrides
+        .language
+        .map(|language| {
+            let identifier: unic_langid::LanguageIdentifier =
+                language
+                    .try_into()
+                    .map_err(|_| StorybookInitError::InvalidLanguage {
+                        language: format!("{language:?}"),
+                    })?;
+            gpui_storybook_preferences::LanguageTag::new(identifier.to_string()).map_err(|_| {
+                StorybookInitError::InvalidLanguage {
+                    language: format!("{language:?}"),
+                }
+            })
+        })
+        .transpose()?;
+
+    gpui_tokio::init(cx);
+    gpui_storybook_core::story::init(cx).map_err(|error| {
+        tracing::error!(error = %error, error_debug = ?error, "failed to initialize Storybook localization");
+        StorybookInitError::CoreInitialization {
+            category: "embedded_localization".to_owned(),
+        }
+    })?;
     #[cfg(feature = "dock")]
     register_story_panels(cx);
-    #[cfg(feature = "mcp")]
-    init_mcp_automation(cx);
 
     let global_init_count = inventory::iter::<__registry::InitEntry>().count();
     if global_init_count > 0 {
@@ -324,6 +574,64 @@ where
             (entry.init_fn)(cx);
         }
     }
+
+    let apply_locale = options.apply_locale;
+    let runtime = gpui_storybook_core::preferences::RuntimeOptions {
+        repository: gpui_storybook_core::preferences::repository_options(
+            options.consumer_id,
+            options.persistence,
+            options.json_path,
+            init_context.project_root,
+        ),
+        languages,
+        supported_languages,
+        locale_detector: std::sync::Arc::new(gpui_storybook_preferences::SystemLocaleDetector),
+        initial_scheme: gpui_storybook_core::preferences::color_scheme(cx.window_appearance()),
+        overrides: gpui_storybook_preferences::ResolutionOverrides {
+            color_scheme: options.overrides.color_scheme,
+            theme: options.overrides.theme,
+            language: override_language,
+        },
+        apply_consumer_locale: std::rc::Rc::new(move |language, cx| {
+            apply_locale(language, cx).map_err(|error| {
+                tracing::error!(
+                    error = %error,
+                    error_debug = ?error,
+                    "consumer Storybook locale adapter failed"
+                );
+                "consumer_locale".to_owned()
+            })
+        }),
+        localize_consumer_language: std::rc::Rc::new(|language, cx| {
+            gpui_es_fluent::try_localize_message(cx, &language)
+        }),
+    };
+    let readiness = gpui_storybook_core::preferences::initialize(runtime, cx).map_err(|error| {
+        tracing::error!(error = %error, "failed to resolve initial Storybook preferences");
+        StorybookInitError::CoreInitialization {
+            category: "preference_resolution".to_owned(),
+        }
+    })?;
+    cx.set_global(StorybookInitialized);
+
+    Ok(cx.spawn(async move |_cx| {
+        let ready = readiness.await;
+        #[cfg(feature = "mcp")]
+        {
+            _cx.update(init_mcp_automation);
+        }
+        ready
+    }))
+}
+
+/// Returns the read-only saved and resolved preference snapshot after
+/// initialization has begun.
+///
+/// The snapshot reports `Loading` until the readiness task completes. It stays
+/// available in `Error` state when storage fails and fallback presentation is
+/// active.
+pub fn try_preference_state(cx: &::gpui::App) -> Option<&PreferenceState> {
+    gpui_storybook_core::preferences::try_state(cx)
 }
 
 #[cfg(feature = "mcp")]
@@ -475,10 +783,58 @@ fn validate_unique_story_keys(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use es_fluent::{FluentMessage, FluentMessageLookup};
+    use gpui::AppContext as _;
     use std::{
+        convert::Infallible,
         path::Path,
         time::{SystemTime, UNIX_EPOCH},
     };
+    use unic_langid::LanguageIdentifier;
+
+    #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+    enum TestLanguage {
+        #[default]
+        English,
+    }
+
+    impl strum::IntoEnumIterator for TestLanguage {
+        type Iterator = std::array::IntoIter<Self, 1>;
+
+        fn iter() -> Self::Iterator {
+            [Self::English].into_iter()
+        }
+    }
+
+    impl From<TestLanguage> for LanguageIdentifier {
+        fn from(_: TestLanguage) -> Self {
+            "en".parse().expect("test language tag should be valid")
+        }
+    }
+
+    impl TryFrom<LanguageIdentifier> for TestLanguage {
+        type Error = ();
+
+        fn try_from(identifier: LanguageIdentifier) -> Result<Self, Self::Error> {
+            (identifier.language.as_str() == "en")
+                .then_some(Self::English)
+                .ok_or(())
+        }
+    }
+
+    impl FluentMessage for TestLanguage {
+        fn to_fluent_string_with(&self, _: &mut FluentMessageLookup<'_>) -> String {
+            "English".to_owned()
+        }
+    }
+
+    fn test_options() -> StorybookOptions<TestLanguage> {
+        StorybookOptions::new(
+            ConsumerId::new("facade-preference-test").expect("test consumer id should be valid"),
+            TestLanguage::English,
+            |_, _| Ok::<(), Infallible>(()),
+        )
+    }
 
     fn unused_create_fn(
         _: &mut ::gpui::Window,
@@ -573,7 +929,211 @@ mod tests {
             group: "storybook-app".into(),
             allow: Some(allow.iter().map(|group| (*group).to_string()).collect()),
             disable_story: Vec::new(),
+            overrides: gpui_storybook_toml::StorybookPreferenceOverrides::default(),
         }
+    }
+
+    #[test]
+    fn toml_preference_overrides_map_to_typed_runtime_values() {
+        let config = gpui_storybook_toml::StorybookToml {
+            group: "storybook-app".to_owned(),
+            overrides: gpui_storybook_toml::StorybookPreferenceOverrides {
+                color_scheme: Some(gpui_storybook_toml::StorybookColorScheme::Dark),
+                theme: Some("Default Dark".to_owned()),
+                language: Some("en".to_owned()),
+            },
+            ..gpui_storybook_toml::StorybookToml::default()
+        };
+        let mut overrides = PreferenceOverrides::<TestLanguage>::default();
+
+        apply_toml_preference_overrides(&mut overrides, &config)
+            .expect("valid TOML overrides should map to typed values");
+
+        assert_eq!(overrides.color_scheme, Some(SystemColorScheme::Dark));
+        assert_eq!(
+            overrides.theme.as_ref().map(ThemeId::as_str),
+            Some("Default Dark")
+        );
+        assert_eq!(overrides.language, Some(TestLanguage::English));
+    }
+
+    #[test]
+    fn programmatic_overrides_take_precedence_over_toml() {
+        let config = gpui_storybook_toml::StorybookToml {
+            group: "storybook-app".to_owned(),
+            overrides: gpui_storybook_toml::StorybookPreferenceOverrides {
+                color_scheme: Some(gpui_storybook_toml::StorybookColorScheme::Light),
+                theme: Some("Default Light".to_owned()),
+                language: Some("fr".to_owned()),
+            },
+            ..gpui_storybook_toml::StorybookToml::default()
+        };
+        let mut overrides = PreferenceOverrides {
+            color_scheme: Some(SystemColorScheme::Dark),
+            theme: Some(ThemeId::new("Custom Dark").expect("test theme id should be valid")),
+            language: Some(TestLanguage::English),
+        };
+
+        apply_toml_preference_overrides(&mut overrides, &config)
+            .expect("programmatic values should bypass conflicting TOML values");
+
+        assert_eq!(overrides.color_scheme, Some(SystemColorScheme::Dark));
+        assert_eq!(
+            overrides.theme.as_ref().map(ThemeId::as_str),
+            Some("Custom Dark")
+        );
+        assert_eq!(overrides.language, Some(TestLanguage::English));
+    }
+
+    #[test]
+    fn unsupported_toml_language_is_an_initialization_error() {
+        let config = gpui_storybook_toml::StorybookToml {
+            group: "storybook-app".to_owned(),
+            overrides: gpui_storybook_toml::StorybookPreferenceOverrides {
+                language: Some("fr".to_owned()),
+                ..gpui_storybook_toml::StorybookPreferenceOverrides::default()
+            },
+            ..gpui_storybook_toml::StorybookToml::default()
+        };
+        let mut overrides = PreferenceOverrides::<TestLanguage>::default();
+
+        let error = apply_toml_preference_overrides(&mut overrides, &config)
+            .expect_err("unsupported typed language should fail initialization");
+
+        assert!(matches!(
+            error,
+            StorybookInitError::InvalidTomlOverride {
+                field: "overrides.language",
+                value,
+            } if value == "fr"
+        ));
+    }
+
+    #[cfg(feature = "mcp")]
+    #[test]
+    fn capture_profile_is_deterministic_and_disables_storage() {
+        let mut persistence = PersistenceMode::Persistent;
+        let mut json_path = Some(PathBuf::from("portable/preferences.json"));
+        let mut overrides = PreferenceOverrides {
+            color_scheme: Some(SystemColorScheme::Dark),
+            theme: Some(ThemeId::new("Custom Dark").expect("test theme id should be valid")),
+            language: Some(1_u8),
+        };
+
+        apply_automation_preference_profile(
+            AutomationPreferenceProfile::Capture,
+            &mut persistence,
+            &mut json_path,
+            &mut overrides,
+            7_u8,
+        )
+        .expect("the built-in deterministic theme should be valid");
+
+        assert_eq!(persistence, PersistenceMode::Disabled);
+        assert_eq!(json_path, None);
+        assert_eq!(overrides.color_scheme, Some(SystemColorScheme::Light));
+        assert_eq!(
+            overrides.theme.as_ref().map(ThemeId::as_str),
+            Some("Default Light")
+        );
+        assert_eq!(overrides.language, Some(7));
+    }
+
+    #[cfg(feature = "mcp")]
+    #[test]
+    fn stdio_profile_is_deterministic_and_uses_temporary_storage() {
+        let mut persistence = PersistenceMode::Persistent;
+        let mut json_path = Some(PathBuf::from("portable/preferences.json"));
+        let mut overrides = PreferenceOverrides {
+            color_scheme: Some(SystemColorScheme::Dark),
+            theme: Some(ThemeId::new("Custom Dark").expect("test theme id should be valid")),
+            language: Some(1_u8),
+        };
+
+        apply_automation_preference_profile(
+            AutomationPreferenceProfile::Stdio,
+            &mut persistence,
+            &mut json_path,
+            &mut overrides,
+            7_u8,
+        )
+        .expect("the built-in deterministic theme should be valid");
+
+        assert_eq!(persistence, PersistenceMode::Temporary);
+        assert_eq!(json_path, None);
+        assert_eq!(overrides.color_scheme, Some(SystemColorScheme::Light));
+        assert_eq!(
+            overrides.theme.as_ref().map(ThemeId::as_str),
+            Some("Default Light")
+        );
+        assert_eq!(overrides.language, Some(7));
+    }
+
+    #[gpui::test]
+    fn init_rejects_a_path_override_for_non_persistent_storage(cx: &mut ::gpui::App) {
+        let options = test_options()
+            .with_persistence(PersistenceMode::Temporary)
+            .with_json_path("portable/preferences.json");
+
+        let result = init(cx, options);
+
+        assert!(matches!(
+            result,
+            Err(StorybookInitError::PathOverrideRequiresPersistent)
+        ));
+        assert!(cx.try_global::<StorybookInitialized>().is_none());
+    }
+
+    #[gpui::test]
+    async fn init_rejects_a_second_initialization(cx: &mut ::gpui::TestAppContext) {
+        cx.executor().allow_parking();
+        let first = cx.update(|cx| {
+            init(
+                cx,
+                test_options().with_persistence(PersistenceMode::Disabled),
+            )
+            .expect("the first initialization should start")
+        });
+
+        let second = cx.update(|cx| {
+            init(
+                cx,
+                test_options().with_persistence(PersistenceMode::Disabled),
+            )
+        });
+        assert!(matches!(
+            second,
+            Err(StorybookInitError::AlreadyInitialized)
+        ));
+
+        let _ready = first.await;
+    }
+
+    #[gpui::test]
+    async fn readiness_completes_before_the_caller_constructs_a_window(
+        cx: &mut ::gpui::TestAppContext,
+    ) {
+        cx.executor().allow_parking();
+        assert!(cx.windows().is_empty());
+
+        let readiness = cx.update(|cx| {
+            init(
+                cx,
+                test_options().with_persistence(PersistenceMode::Disabled),
+            )
+            .expect("valid facade options should initialize")
+        });
+        assert!(cx.windows().is_empty());
+
+        let ready = readiness.await;
+        assert_eq!(ready.persistence_status, PersistenceStatus::Ready);
+        assert!(cx.windows().is_empty());
+
+        cx.update(|cx| {
+            cx.open_window(Default::default(), |_, cx| cx.new(|_| ::gpui::EmptyView))
+                .expect("caller should be able to create a window after readiness")
+        });
+        assert_eq!(cx.windows().len(), 1);
     }
 
     #[test]
@@ -794,6 +1354,41 @@ mod tests {
 
             let unmatched = load_runtime_storybook_config(&[], &mut cache);
             assert_eq!(unmatched, None);
+        });
+    }
+
+    #[test]
+    fn project_root_prefers_the_workspace_and_supports_standalone_crates() {
+        with_temp_dir(|dir| {
+            let workspace = dir.join("workspace");
+            let member = workspace.join("crates/member");
+            let member_source = member.join("src");
+            std::fs::create_dir_all(&member_source).expect("workspace member directories create");
+            std::fs::write(
+                workspace.join("Cargo.toml"),
+                "[workspace]\nmembers = [\"crates/member\"]\n",
+            )
+            .expect("workspace manifest writes");
+            std::fs::write(
+                member.join("Cargo.toml"),
+                "[package]\nname = \"member\"\nversion = \"0.1.0\"\n",
+            )
+            .expect("member manifest writes");
+            assert_eq!(find_cargo_project_root(&member_source), workspace);
+
+            let standalone = dir.join("standalone");
+            let standalone_source = standalone.join("src");
+            std::fs::create_dir_all(&standalone_source)
+                .expect("standalone source directory creates");
+            std::fs::write(
+                standalone.join("Cargo.toml"),
+                "[package]\nname = \"standalone\"\nversion = \"0.1.0\"\n",
+            )
+            .expect("standalone manifest writes");
+            assert_eq!(find_cargo_project_root(&standalone_source), standalone);
+
+            let no_manifest = dir.join("no-manifest");
+            assert_eq!(find_cargo_project_root(&no_manifest), no_manifest);
         });
     }
 }

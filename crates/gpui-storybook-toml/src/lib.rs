@@ -2,24 +2,55 @@
 //!
 //! This crate deliberately does not know about GPUI, inventory, story
 //! containers, or runtime config selection. It only loads a config file from a
-//! directory, deserializes the schema, and evaluates group/story filters for a
-//! caller-supplied candidate.
+//! directory, deserializes the schema, exposes deterministic preference
+//! overrides, and evaluates group/story filters for a caller-supplied
+//! candidate.
 //!
 //! `gpui-storybook` is the crate that decides which config is the active
 //! runtime config for a process and whether a candidate group comes from a
 //! story crate's `group` or from a story's declared section.
 
-use serde::Deserialize;
 use std::path::{Path, PathBuf};
+
+use serde::Deserialize;
 
 /// File name loaded by [`load_from_dir`].
 pub const STORYBOOK_TOML_FILE_NAME: &str = "storybook.toml";
+
+/// Effective light/dark scheme selected by a TOML preference override.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum StorybookColorScheme {
+    /// Force light appearance.
+    Light,
+    /// Force dark appearance.
+    Dark,
+}
+
+/// Deterministic runtime preference overrides from `storybook.toml`.
+///
+/// Every field is optional. These values affect effective presentation for the
+/// current launch without replacing saved user intent.
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct StorybookPreferenceOverrides {
+    /// Effective light/dark scheme override.
+    #[serde(default)]
+    pub color_scheme: Option<StorybookColorScheme>,
+    /// Effective registered theme name override.
+    #[serde(default)]
+    pub theme: Option<String>,
+    /// Effective BCP 47 language override.
+    #[serde(default)]
+    pub language: Option<String>,
+}
 
 /// Parsed `storybook.toml` schema.
 ///
 /// The `group` key has no serde default, so it is required when the file
 /// exists. `allow` defaults to `None`, which means only the config's own
-/// normalized group is allowed. `disable_story` defaults to an empty denylist.
+/// normalized group is allowed. `disable_story` defaults to an empty denylist,
+/// and `overrides` defaults to no preference overrides.
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct StorybookToml {
@@ -31,6 +62,9 @@ pub struct StorybookToml {
     /// Registered story type names to hide.
     #[serde(default)]
     pub disable_story: Vec<String>,
+    /// Deterministic effective preference overrides for the runtime config.
+    #[serde(default)]
+    pub overrides: StorybookPreferenceOverrides,
 }
 
 impl StorybookToml {
@@ -264,6 +298,50 @@ mod tests {
     }
 
     #[test]
+    fn preference_overrides_parse_as_optional_nested_values() {
+        with_temp_dir(|dir| {
+            std::fs::write(
+                dir.join(STORYBOOK_TOML_FILE_NAME),
+                concat!(
+                    "group = \"Examples\"\n",
+                    "[overrides]\n",
+                    "color_scheme = \"dark\"\n",
+                    "theme = \"Midnight\"\n",
+                    "language = \"fr-CA\"\n",
+                ),
+            )
+            .expect("should write config file");
+
+            let config = load_from_dir(dir)
+                .expect("valid config should parse")
+                .expect("config should exist");
+
+            assert_eq!(
+                config.overrides,
+                StorybookPreferenceOverrides {
+                    color_scheme: Some(StorybookColorScheme::Dark),
+                    theme: Some("Midnight".to_owned()),
+                    language: Some("fr-CA".to_owned()),
+                }
+            );
+        });
+    }
+
+    #[test]
+    fn invalid_preference_override_is_a_parse_error() {
+        with_temp_dir(|dir| {
+            std::fs::write(
+                dir.join(STORYBOOK_TOML_FILE_NAME),
+                "group = \"Examples\"\n[overrides]\ncolor_scheme = \"sepia\"\n",
+            )
+            .expect("should write config file");
+
+            let error = load_from_dir(dir).expect_err("unknown scheme should fail parsing");
+            assert!(error.to_string().contains("unknown variant `sepia`"));
+        });
+    }
+
+    #[test]
     fn group_is_required_when_storybook_toml_exists() {
         with_temp_dir(|dir| {
             std::fs::write(dir.join(STORYBOOK_TOML_FILE_NAME), "allow = [\"*\"]\n")
@@ -280,6 +358,7 @@ mod tests {
             group: "  Examples  ".to_string(),
             allow: None,
             disable_story: Vec::new(),
+            overrides: StorybookPreferenceOverrides::default(),
         };
 
         assert_eq!(config.group(), Some("Examples"));
@@ -298,6 +377,7 @@ mod tests {
             group: "Examples".to_string(),
             allow: Some(vec![" Other ".to_string()]),
             disable_story: Vec::new(),
+            overrides: StorybookPreferenceOverrides::default(),
         };
         assert!(allow.allows_group(Some(" Other ")));
     }

@@ -4,6 +4,10 @@ use std::{path::PathBuf, process::Command};
 fn duplicate_story_keys_fail_to_build() {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let fixture = manifest_dir.join("tests/fixtures/duplicate-story-key");
+    let target_dir = std::env::var_os("CARGO_TARGET_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| manifest_dir.join("../../target"))
+        .join("duplicate-story-key-fixture");
 
     let output = Command::new(env!("CARGO"))
         .arg("build")
@@ -19,7 +23,7 @@ fn duplicate_story_keys_fail_to_build() {
         .env_remove("CARGO_LLVM_COV_TARGET_DIR")
         .env(
             "CARGO_TARGET_DIR",
-            manifest_dir.join("../../target/duplicate-story-key-fixture"),
+            target_dir,
         )
         .env_remove("LLVM_PROFILE_FILE")
         .env_remove("RUSTDOCFLAGS")
