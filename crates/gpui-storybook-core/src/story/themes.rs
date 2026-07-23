@@ -1,150 +1,21 @@
 use std::path::PathBuf;
 
-use gpui::{Action, App, SharedString};
-use gpui_component::{ActiveTheme as _, Theme, ThemeMode, ThemeRegistry, scroll::ScrollbarShow};
-use serde::{Deserialize, Serialize};
+use gpui::App;
+use gpui_component::ThemeRegistry;
 
-const STATE_FILE: &str = "target/state.json";
 const THEMES_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/themes");
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-struct State {
-    theme: SharedString,
-    scrollbar_show: Option<ScrollbarShow>,
-}
-
-impl Default for State {
-    fn default() -> Self {
-        Self {
-            theme: SharedString::from("Default Dark"),
-            scrollbar_show: None,
-        }
-    }
-}
-
 pub fn init(cx: &mut App) {
-    let json = std::fs::read_to_string(STATE_FILE).unwrap_or_default();
-    let state = serde_json::from_str::<State>(&json).unwrap_or_default();
-    let saved_theme = state.theme.clone();
-    let saved_theme_for_watch = saved_theme.clone();
-
     #[cfg(debug_assertions)]
     {
         let themes_dir = PathBuf::from(THEMES_DIR);
         if themes_dir.exists()
-            && let Err(err) = ThemeRegistry::watch_dir(themes_dir, cx, move |cx| {
-                if let Some(theme) = ThemeRegistry::global(cx)
-                    .themes()
-                    .get(&saved_theme_for_watch)
-                    .cloned()
-                {
-                    Theme::global_mut(cx).apply_config(&theme);
-                }
+            && let Err(err) = ThemeRegistry::watch_dir(themes_dir, cx, |cx| {
+                crate::preferences::theme_registry_changed(cx);
+                cx.refresh_windows();
             })
         {
-            eprintln!("Failed to watch themes directory: {}", err);
+            tracing::error!(error = %err, "failed to watch Storybook themes directory");
         }
-    }
-
-    // Restore the persisted theme on startup.
-    if let Some(theme) = ThemeRegistry::global(cx)
-        .themes()
-        .get(&saved_theme)
-        .cloned()
-    {
-        Theme::global_mut(cx).apply_config(&theme);
-    }
-
-    if let Some(scrollbar_show) = state.scrollbar_show {
-        Theme::global_mut(cx).scrollbar_show = scrollbar_show;
-    }
-    cx.refresh_windows();
-
-    cx.observe_global::<Theme>(|cx| {
-        let snapshot = State {
-            theme: cx.theme().theme_name().clone(),
-            scrollbar_show: Some(cx.theme().scrollbar_show),
-        };
-
-        if let Ok(json) = serde_json::to_string_pretty(&snapshot) {
-            let state_path = std::path::Path::new(STATE_FILE);
-            if let Some(parent) = state_path.parent() {
-                let _ = std::fs::create_dir_all(parent);
-            }
-            let _ = std::fs::write(state_path, json);
-        }
-    })
-    .detach();
-
-    cx.on_action(|switch: &SwitchTheme, cx| {
-        if let Some(theme_config) = ThemeRegistry::global(cx).themes().get(&switch.0).cloned() {
-            Theme::global_mut(cx).apply_config(&theme_config);
-            cx.refresh_windows();
-        }
-    });
-
-    cx.on_action(|switch: &SwitchThemeMode, cx| {
-        Theme::change(switch.0, None, cx);
-        cx.refresh_windows();
-    });
-}
-
-#[derive(Action, Clone, PartialEq)]
-#[action(namespace = story_themes, no_json)]
-pub(crate) struct SwitchTheme(pub(crate) SharedString);
-
-#[derive(Action, Clone, PartialEq)]
-#[action(namespace = story_themes, no_json)]
-pub(crate) struct SwitchThemeMode(pub(crate) ThemeMode);
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn persisted_theme_state_defaults_and_round_trips() {
-        let state = State::default();
-        assert_eq!(state.theme.as_ref(), "Default Dark");
-        assert_eq!(state.scrollbar_show, None);
-
-        let json = serde_json::to_string(&state).expect("state should serialize");
-        let restored: State = serde_json::from_str(&json).expect("state should deserialize");
-        assert_eq!(restored.theme, state.theme);
-        assert_eq!(restored.scrollbar_show, state.scrollbar_show);
-    }
-
-    #[test]
-    fn theme_actions_preserve_selected_values() {
-        let theme = SwitchTheme("Adventure".into());
-        assert!(theme == theme.clone());
-
-        let mode = SwitchThemeMode(ThemeMode::Light);
-        assert!(mode == mode.clone());
-    }
-
-    #[gpui::test]
-    fn registered_theme_actions_apply_mode_and_named_theme(cx: &mut App) {
-        gpui_component::init(cx);
-        init(cx);
-
-        let target_mode = if cx.theme().mode.is_dark() {
-            ThemeMode::Light
-        } else {
-            ThemeMode::Dark
-        };
-        cx.dispatch_action(&SwitchThemeMode(target_mode));
-        assert_eq!(cx.theme().mode, target_mode);
-
-        let theme_name = ThemeRegistry::global(cx)
-            .sorted_themes()
-            .first()
-            .expect("component themes should be registered")
-            .name
-            .clone();
-        cx.dispatch_action(&SwitchTheme(theme_name.clone()));
-        assert_eq!(cx.theme().theme_name(), &theme_name);
-
-        cx.dispatch_action(&SwitchTheme("missing-theme".into()));
-        assert_eq!(cx.theme().theme_name(), &theme_name);
     }
 }

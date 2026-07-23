@@ -55,11 +55,11 @@ impl ButtonStory {
     }
 
     fn on_click(ev: &ClickEvent, _: &mut Window, _: &mut App) {
-        println!("Button clicked {:?}", ev);
+        tracing::debug!(event = ?ev, "story button clicked");
     }
 
     fn on_hover(hovered: &bool, _: &mut Window, _: &mut App) {
-        println!("Button hovered {:?}", hovered);
+        tracing::debug!(hovered, "story button hover changed");
     }
 }
 

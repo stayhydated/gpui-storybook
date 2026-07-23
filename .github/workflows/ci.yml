@@ -47,7 +47,7 @@ jobs:
         uses: ./.github/actions/install-linux-deps
 
       - name: Run tests
-        run: cargo test --workspace --all-features
+        run: cargo test --workspace --all-features --locked
 
   fmt:
     runs-on: ubuntu-latest

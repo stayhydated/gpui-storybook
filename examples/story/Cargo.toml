@@ -16,12 +16,14 @@ es-fluent-lang = { workspace = true }
 es-fluent-manager-embedded = { workspace = true }
 gpui = { workspace = true }
 gpui-component = { workspace = true }
+gpui-es-fluent = { workspace = true }
 gpui-storybook = { workspace = true }
 gpui_platform = { workspace = true }
 reqwest_client = { workspace = true }
 rust-embed = { workspace = true }
 serde = { workspace = true }
 strum = { workspace = true }
+tracing = { workspace = true }
 tracing-subscriber = { features = [ "env-filter" ], workspace = true }
 
 [build-dependencies]

@@ -1,4 +1,10 @@
 //! MCP tools for driving a live `gpui-storybook` window.
+//!
+//! The facade recognizes the same frame-capture route/path variables emitted by
+//! this crate. Capture launches use disabled storage plus deterministic light,
+//! `Default Light`, and fallback-language overrides. Stdio-only launches use
+//! the same presentation with temporary storage, preventing automation from
+//! overwriting persistent interactive choices.
 
 use component_shape_mcp::{
     McpSchema, McpSchemaProperties, McpServer, McpToolError, McpToolInput, McpToolMetadata,
@@ -133,6 +139,12 @@ pub enum StorybookMcpError {
 
 pub fn stdio_requested() -> bool {
     std::env::var(STDIO_ENV_VAR).is_ok_and(|value| value == "1")
+}
+
+/// Returns whether frame-capture route or output configuration is present.
+pub fn capture_requested() -> bool {
+    let env = storybook_capture_env();
+    std::env::var_os(env.route_var()).is_some() || std::env::var_os(env.path_var()).is_some()
 }
 
 pub fn start_stdio(
@@ -1052,6 +1064,26 @@ mod tests {
         {
             let _enabled = EnvGuard::set(&[(STDIO_ENV_VAR, "1")]);
             assert!(stdio_requested());
+        }
+    }
+
+    #[test]
+    fn capture_request_uses_the_frame_capture_route_and_path_contract() {
+        let _lock = ENV_LOCK.lock().expect("env lock should not be poisoned");
+        let capture_env = storybook_capture_env();
+        let route_var = capture_env.route_var().to_owned();
+        let path_var = capture_env.path_var().to_owned();
+        let _unset = EnvGuard::remove(&[&route_var, &path_var]);
+
+        assert!(!capture_requested());
+
+        {
+            let _route = EnvGuard::set(&[(&route_var, "example-ButtonStory")]);
+            assert!(capture_requested());
+        }
+        {
+            let _path = EnvGuard::set(&[(&path_var, "target/storybook-captures/button.png")]);
+            assert!(capture_requested());
         }
     }
 

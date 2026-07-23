@@ -663,7 +663,7 @@ dependencies = [
  "bitflags 2.13.0",
  "cexpr",
  "clang-sys",
- "itertools 0.11.0",
+ "itertools 0.13.0",
  "log",
  "prettyplease",
  "proc-macro2",
@@ -1949,7 +1949,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3150,13 +3150,21 @@ dependencies = [
 name = "gpui-storybook"
 version = "0.5.0"
 dependencies = [
+ "es-fluent",
  "gpui",
+ "gpui-es-fluent",
  "gpui-storybook-core",
  "gpui-storybook-macros",
  "gpui-storybook-mcp",
+ "gpui-storybook-preferences",
  "gpui-storybook-toml",
+ "gpui_tokio",
  "inventory",
+ "strum 0.28.0",
+ "thiserror 2.0.18",
+ "toml 1.1.2+spec-1.1.0",
  "tracing",
+ "unic-langid",
 ]
 
 [[package]]
@@ -3175,12 +3183,16 @@ dependencies = [
  "derive_more",
  "es-fluent",
  "es-fluent-build",
+ "es-fluent-manager-core",
+ "es-fluent-manager-embedded",
  "gpui",
  "gpui-component",
  "gpui-component-assets",
  "gpui-es-fluent",
  "gpui-storybook-components",
+ "gpui-storybook-preferences",
  "gpui_platform",
+ "gpui_tokio",
  "gtk",
  "image",
  "inventory",
@@ -3203,11 +3215,13 @@ dependencies = [
  "es-fluent-manager-embedded",
  "gpui",
  "gpui-component",
+ "gpui-es-fluent",
  "gpui-storybook",
  "gpui_platform",
  "reqwest_client",
  "rust-embed",
  "strum 0.28.0",
+ "tracing",
  "tracing-subscriber",
 ]
 
@@ -3221,12 +3235,14 @@ dependencies = [
  "es-fluent-manager-embedded",
  "gpui",
  "gpui-component",
+ "gpui-es-fluent",
  "gpui-storybook",
  "gpui_platform",
  "reqwest_client",
  "rust-embed",
  "serde",
  "strum 0.28.0",
+ "tracing",
  "tracing-subscriber",
 ]
 
@@ -3254,6 +3270,25 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.18",
  "tokio",
+]
+
+[[package]]
+name = "gpui-storybook-preferences"
+version = "0.5.0"
+dependencies = [
+ "fluent-langneg",
+ "gpui",
+ "gpui_tokio",
+ "schemars",
+ "serde",
+ "serde_json",
+ "strum 0.28.0",
+ "sys-locale",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+ "unic-langid",
 ]
 
 [[package]]
@@ -3395,6 +3430,17 @@ dependencies = [
  "schemars",
  "serde",
  "smol_str",
+]
+
+[[package]]
+name = "gpui_tokio"
+version = "0.1.0"
+source = "git+https://github.com/stayhydated/zed?branch=linux-headless-renderer#46e305cf83522decb6547a1604f71c39e18eec0c"
+dependencies = [
+ "anyhow",
+ "gpui",
+ "gpui_util",
+ "tokio",
 ]
 
 [[package]]
@@ -6254,7 +6300,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -6847,7 +6893,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.4.15",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -6860,7 +6906,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -6928,7 +6974,7 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "webpki-root-certs 0.26.11",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -7895,7 +7941,7 @@ dependencies = [
  "getrandom 0.4.3",
  "once_cell",
  "rustix 1.1.4",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -9193,7 +9239,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

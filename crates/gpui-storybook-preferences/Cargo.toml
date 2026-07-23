@@ -1,0 +1,30 @@
+[package]
+name = "gpui-storybook-preferences"
+description = "Internal storage boundary for GPUI Storybook preferences"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "README.md"
+
+[dependencies]
+fluent-langneg = { workspace = true }
+schemars = { workspace = true }
+serde = { features = [ "derive" ], workspace = true }
+serde_json = { workspace = true }
+strum = { features = [ "derive" ], workspace = true }
+sys-locale = { workspace = true }
+tempfile = { workspace = true }
+thiserror = { workspace = true }
+tokio = { features = [ "fs", "rt", "sync" ], workspace = true }
+tracing = { workspace = true }
+unic-langid = { workspace = true }
+
+[dev-dependencies]
+gpui = { features = [ "test-support" ], workspace = true }
+gpui_tokio = { workspace = true }
+tokio = { features = [ "macros", "rt-multi-thread", "sync" ], workspace = true }
+
+[lints]
+workspace = true

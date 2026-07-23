@@ -1,5 +1,6 @@
 use gpui::Action;
 use gpui_component::scroll::ScrollbarShow;
+use gpui_storybook_preferences::{PreferredColorScheme, SystemColorScheme};
 use serde::Deserialize;
 use unic_langid::LanguageIdentifier;
 
@@ -10,6 +11,25 @@ pub struct SelectScrollbarShow(pub ScrollbarShow);
 #[derive(Action, Clone, Deserialize, Eq, PartialEq)]
 #[action(namespace = story, no_json)]
 pub struct SelectLocale(pub LanguageIdentifier);
+
+#[derive(Action, Clone, Eq, PartialEq)]
+#[action(namespace = story, no_json)]
+pub struct SelectColorScheme(pub PreferredColorScheme);
+
+#[derive(Action, Clone, Eq, PartialEq)]
+#[action(namespace = story, no_json)]
+pub struct SelectTheme {
+    pub scheme: SystemColorScheme,
+    pub theme: gpui::SharedString,
+}
+
+#[derive(Action, Clone, Debug, Default, Eq, PartialEq)]
+#[action(namespace = story)]
+pub struct UseSystemLocale;
+
+#[derive(Action, Clone, Debug, Default, Eq, PartialEq)]
+#[action(namespace = story)]
+pub struct RetryPreferences;
 
 #[derive(Action, Clone, Deserialize, Eq, PartialEq)]
 #[action(namespace = story, no_json)]

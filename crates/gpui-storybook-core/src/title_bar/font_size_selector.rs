@@ -48,7 +48,12 @@ impl FontSizeSelector {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        Theme::global_mut(cx).scrollbar_show = show.0;
+        let preference = match show.0 {
+            ScrollbarShow::Scrolling => gpui_storybook_preferences::PreferredScrollbar::Scrolling,
+            ScrollbarShow::Hover => gpui_storybook_preferences::PreferredScrollbar::Hover,
+            ScrollbarShow::Always => gpui_storybook_preferences::PreferredScrollbar::Always,
+        };
+        crate::preferences::select_scrollbar(preference, cx);
         window.refresh();
     }
 }
@@ -137,13 +142,6 @@ mod tests {
 
                 selector.on_select_radius(&SelectRadius(8), window, cx);
                 assert_eq!(cx.theme().radius, px(8.));
-
-                selector.on_select_scrollbar_show(
-                    &SelectScrollbarShow(ScrollbarShow::Always),
-                    window,
-                    cx,
-                );
-                assert_eq!(cx.theme().scrollbar_show, ScrollbarShow::Always);
             })
             .expect("selector should update");
     }
