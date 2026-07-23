@@ -147,6 +147,8 @@ where
     save_in_flight: bool,
     in_flight_edits: PreferenceEdits,
     pending_edits: PreferenceEdits,
+    #[cfg(test)]
+    next_save_completion: Option<tokio::sync::oneshot::Sender<Result<(), String>>>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -400,6 +402,8 @@ where
             save_in_flight: false,
             in_flight_edits: PreferenceEdits::default(),
             pending_edits: PreferenceEdits::default(),
+            #[cfg(test)]
+            next_save_completion: None,
         })
     }
 
@@ -768,6 +772,8 @@ where
     }
 
     fn finish_save(&mut self, result: Result<(), String>, cx: &mut App) {
+        #[cfg(test)]
+        let completion_result = result.clone();
         self.save_in_flight = false;
         let completed_edits = mem::take(&mut self.in_flight_edits);
         match result {
@@ -787,6 +793,10 @@ where
                     .push(PreferenceDiagnostic::SaveFailed { category });
                 self.notify_save_failure(cx);
             },
+        }
+        #[cfg(test)]
+        if let Some(completion) = self.next_save_completion.take() {
+            let _ = completion.send(completion_result);
         }
         cx.refresh_windows();
     }
@@ -1858,6 +1868,7 @@ mod tests {
             .await
             .expect("repository setup task should join");
         let options_for_runtime = repository_options.clone();
+        let (save_completion, save_completed) = tokio::sync::oneshot::channel();
 
         cx.update(|cx| {
             init_test_runtime(cx);
@@ -1871,6 +1882,7 @@ mod tests {
             )
             .expect("runtime resolves");
             runtime.repository_options = options_for_runtime;
+            runtime.next_save_completion = Some(save_completion);
             runtime.state.persistence_status = PersistenceStatus::Error;
             runtime
                 .state
@@ -1888,24 +1900,19 @@ mod tests {
         let mut expected = baseline;
         expected.scrollbar = PreferredScrollbar::Always;
         let options_for_verification = repository_options;
+        save_completed
+            .await
+            .expect("save completion should be reported")
+            .expect("merged preferences should be stored");
         let stored_task = cx.update(|cx| {
             gpui_tokio::Tokio::spawn(cx, async move {
-                for _ in 0..1_000 {
-                    if let Ok(bytes) = tokio::fs::read(&path).await
-                        && let Ok(document) = serde_json::from_slice::<serde_json::Value>(&bytes)
-                        && document["preferences"]["scrollbar"] == "always"
-                    {
-                        return PreferenceRepository::open(options_for_verification)
-                            .await
-                            .expect("merged repository should reopen")
-                            .repository
-                            .load()
-                            .await
-                            .expect("stored preferences should remain readable");
-                    }
-                    tokio::task::yield_now().await;
-                }
-                panic!("merged preferences should be stored")
+                PreferenceRepository::open(options_for_verification)
+                    .await
+                    .expect("merged repository should reopen")
+                    .repository
+                    .load()
+                    .await
+                    .expect("stored preferences should remain readable")
             })
         });
         let stored = stored_task
@@ -1949,6 +1956,7 @@ mod tests {
         let repository = repository_task.await.expect("repository task should join");
         let repository_for_runtime = repository.clone();
         let baseline_for_runtime = baseline.clone();
+        let (save_completion, save_completed) = tokio::sync::oneshot::channel();
 
         cx.update(|cx| {
             init_test_runtime(cx);
@@ -1962,6 +1970,7 @@ mod tests {
             )
             .expect("runtime resolves");
             runtime.save_in_flight = true;
+            runtime.next_save_completion = Some(save_completion);
             runtime.state.persistence_status = PersistenceStatus::Loading;
             runtime.select_color_scheme(PreferredColorScheme::Dark, cx);
             runtime.select_color_scheme(PreferredColorScheme::System, cx);
@@ -1990,22 +1999,16 @@ mod tests {
         expected.language = PreferredLanguage::Explicit(
             LanguageTag::new("en-US").expect("valid regional English tag"),
         );
-        let expected_for_storage = expected.clone();
+        save_completed
+            .await
+            .expect("save completion should be reported")
+            .expect("merged preferences should be stored");
         let stored_task = cx.update(|cx| {
             gpui_tokio::Tokio::spawn(cx, async move {
-                for _ in 0..1_000 {
-                    let stored = repository
-                        .load()
-                        .await
-                        .expect("stored preferences should remain readable");
-                    if stored.as_ref().map(|record| &record.preferences)
-                        == Some(&expected_for_storage)
-                    {
-                        return stored;
-                    }
-                    tokio::task::yield_now().await;
-                }
-                panic!("merged preferences should be stored")
+                repository
+                    .load()
+                    .await
+                    .expect("stored preferences should remain readable")
             })
         });
         let stored = stored_task
