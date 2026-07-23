@@ -31,7 +31,7 @@ GPUI_STORYBOOK_MCP_STDIO=1 cargo run -p gpui-storybook-example-component --featu
   diagnostic reporting, and gallery/dock window creation
 - `src/lib.rs`: shared `StorySection` enum for stable ordering and `StoryItems` i18n messages
 - `src/components/*.rs`: components annotated with `#[derive(ComponentStory)]`
-- `storybook.toml`: crate-level runtime group for discovery
+- `storybook.toml`: runtime group plus optional launch-only preference overrides
 
 ## Core pattern
 
@@ -145,11 +145,10 @@ through a separate manager and uses embedded English when the selected consumer
 locale is unavailable to the shell.
 
 The consumer ID remains stable across launches and differs from the explicit
-story example's ID, keeping their workspace-local
-`.gpui-storybook/{consumer-id}.json` files and rows isolated. Readiness applies
-saved intent before the first frame. Storage and locale diagnostics are
-reported independently; a storage error still allows the example to open with
-resolved fallbacks.
+story example's ID, keeping their workspace-local preference documents
+isolated. Readiness applies saved intent before the first frame. Storage and
+locale diagnostics are reported independently; a storage error still allows
+the example to open with resolved fallbacks.
 
 ## Example config
 
@@ -173,8 +172,9 @@ example's typed embedded BCP 47 languages.
 
 ## Capture a story
 
-The `mcp` feature enables live story automation and PNG capture. This example
-wires `StorybookAutomation` into both gallery and dock modes.
+The `mcp` feature enables live story automation and PNG capture. The facade
+installs `StorybookAutomation`, and the standard gallery and dock constructors
+attach it automatically.
 The stdio tools expose typed input/output schemas and structured argument
 errors, so clients can discover story keys and capture options from MCP tool
 metadata.

@@ -129,8 +129,9 @@ so saved appearance and language intent is applied before the first frame.
 ## Local preferences
 
 `StorybookOptions::new` requires a stable `ConsumerId`. Give every Storybook
-binary its own ID: persistent paths and rows are consumer-scoped, so IDs isolate
-unrelated apps while remaining stable across launches.
+binary its own ID: persistent documents and their default paths are
+consumer-scoped, so IDs isolate unrelated apps while remaining stable across
+launches.
 
 Storybook keeps user intent separate from effective presentation:
 
@@ -163,15 +164,16 @@ state. Use `StorybookOptions::with_json_path(...)` for an explicit persistent
 JSON location. The generated schema exposes named consumer ID, theme ID, and
 BCP 47 language-tag definitions with descriptions and validation constraints.
 
-Static option errors make `init` return `StorybookInitError`. Storage failures
-instead complete readiness with `PersistenceStatus::Error` and diagnostics so
-the app can still open with fallbacks. Locale-adapter failures add diagnostics
-without changing the storage-only persistence status and are retried when a
-window becomes active. Optimistic menu changes remain active for the session
-after a save failure; open windows show a localized **Retry Save** notification
-action. The Preferences menu exposes the current loading/saving/error state and
-a generic **Retry Preferences** action. Retrying a startup load failure reloads
-existing stored intent; only an actual dirty/save failure retries an upsert. Use
+Configuration errors detected before preference loading make `init` return
+`StorybookInitError`. Repository open or load failures instead complete
+readiness with `PersistenceStatus::Error` and diagnostics so the app can still
+open with fallbacks. Locale-adapter failures add diagnostics without changing
+the storage-only persistence status and are retried when a window becomes
+active. Optimistic menu changes remain active for the session after a save
+failure; open windows show a localized **Retry Save** notification action. The
+Preferences menu exposes the current loading/saving/error state and a generic
+**Retry Preferences** action. Retrying a startup load failure reloads existing
+stored intent; only an actual dirty/save failure retries an upsert. Use
 `gpui_storybook::try_preference_state` for a read-only snapshot.
 
 Turn on the `dock` feature when you want a panel-based workspace instead of the gallery layout:

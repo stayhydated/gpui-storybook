@@ -14,7 +14,7 @@ pub const MAX_THEME_ID_LEN: usize = 256;
 /// Maximum byte length accepted for a BCP 47 language tag.
 pub const MAX_LANGUAGE_TAG_LEN: usize = 128;
 
-/// Stable identifier that isolates one Storybook consumer's preference row.
+/// Stable identifier that isolates one Storybook consumer's preference document.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct ConsumerId(String);
 

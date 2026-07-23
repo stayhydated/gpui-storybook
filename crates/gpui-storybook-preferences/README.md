@@ -28,9 +28,10 @@ default persistent filename and is embedded in the document so a file cannot
 be loaded by a different Storybook binary accidentally. Applications give each
 Storybook binary a distinct ID and keep it unchanged across launches.
 
-`Persistent` repositories use an explicit `with_json_path(...)` override or an
-automatic `.gpui-storybook/{consumer-id}.json` path at the supplied Cargo
-workspace or standalone package root. The default directory contains a
+`Persistent` repositories use `RepositoryOptions::json_path` when it is set or
+an automatic `.gpui-storybook/{consumer-id}.json` path at the supplied Cargo
+workspace or standalone package root. Facade consumers set the same override
+with `StorybookOptions::with_json_path(...)`. The default directory contains a
 generated `.gitignore` with `*`; an existing ignore file remains unchanged.
 `Temporary` repositories own a unique JSON file for their lifetime, and
 `Disabled` repositories retain only session memory. A path override is valid

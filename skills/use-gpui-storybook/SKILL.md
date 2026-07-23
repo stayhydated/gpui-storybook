@@ -169,14 +169,14 @@ For the dock workspace, enable the `dock` feature and use
   re-detects on window activation. Explicit choices ignore later detection.
 - Light and dark themes are independent slots. Selecting the inactive slot
   saves it without changing the current scheme.
-- `PersistenceStatus` is storage-only. Static option errors are returned by
-  `init`; storage and locale-application failures are reported through
-  readiness/state diagnostics. A locale-adapter failure is retried on window
-  activation. A failed save keeps the optimistic session value, shows a
-  localized **Retry Save** notification action, and exposes generic **Retry
-  Preferences** in the Preferences menu. Retrying a startup load failure
-  reloads existing stored intent; only pending or failed user changes are
-  upserted.
+- `PersistenceStatus` is storage-only. Configuration errors detected before
+  preference loading are returned by `init`; repository and locale-application
+  failures are reported through readiness/state diagnostics. A locale-adapter
+  failure is retried on window activation. A failed save keeps the optimistic
+  session value, shows a localized **Retry Save** notification action, and
+  exposes generic **Retry Preferences** in the Preferences menu. Retrying a
+  startup load failure reloads existing stored intent; only pending or failed
+  user changes are upserted.
 - Use `gpui_storybook::try_preference_state(cx)` when application code needs a
   read-only snapshot of saved/resolved state, status, or diagnostics.
 

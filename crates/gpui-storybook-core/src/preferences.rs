@@ -28,7 +28,7 @@ use crate::{i18n, language::Language};
 /// Locale application and resolution diagnostics do not change this status.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum PersistenceStatus {
-    /// The local repository is opening and the saved row is loading.
+    /// The local repository is opening and the saved document is loading.
     #[default]
     Loading,
     /// Saved intent is loaded and no write is outstanding.

@@ -9,10 +9,9 @@
 //!
 //! [`StorybookPreferences`] retains saved intent. [`ResolvedPreferences`]
 //! explains effective values and their sources without rewriting that intent.
-//! [`ConsumerId`] isolates default persistent paths and row keys, including
-//! files and default persistent paths. Persistent, temporary, and disabled
-//! modes make filesystem behavior explicit; only persistent mode accepts a JSON
-//! path override.
+//! [`ConsumerId`] identifies each preference document and scopes its default
+//! persistent path. Persistent, temporary, and disabled modes make filesystem
+//! behavior explicit; only persistent mode accepts a JSON path override.
 
 mod detection;
 mod repository;
