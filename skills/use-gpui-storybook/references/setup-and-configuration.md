@@ -1,0 +1,88 @@
+# Setup and configuration
+
+Read this reference when adding or changing a Storybook binary, locale adapter,
+preferences, window mode, or `storybook.toml`.
+
+## Startup sequence
+
+Use the facade's startup order:
+
+1. Build the GPUI application with `gpui_storybook::Assets`.
+2. Construct a stable `ConsumerId` unique to the Storybook binary.
+3. Construct typed `StorybookOptions` with the fallback language and locale
+   adapter.
+4. Call `gpui_storybook::init` and handle `StorybookInitError`.
+5. Await the returned `Task<StorybookReady>`.
+6. Inspect readiness diagnostics.
+7. Generate stories and construct the first gallery or dock window.
+
+Opening the window before step 5 can render a first frame with default
+preferences.
+
+## Locale contract
+
+Keep these pieces aligned:
+
+- call `es_fluent_build::track_i18n_assets()` from `build.rs`;
+- define the embedded module and `#[es_fluent_language]` enum in
+  library-reachable code;
+- reference the private embedded-module static inside the locale adapter;
+- call `gpui_es_fluent::replace_with_language`;
+- pass the enum's fallback and adapter to `StorybookOptions::new`.
+
+The private static name is the Cargo package name in upper snake case followed
+by `_I18N_MODULE`.
+
+## Window selection
+
+Use `create_new_window` plus `Gallery::view` for the default browser.
+
+For the dock workspace, forward the feature and use `create_dock_window` plus
+`StoryWorkspace::view`:
+
+```toml
+[features]
+dock = ["gpui-storybook/dock"]
+```
+
+## Configuration rules
+
+Put `storybook.toml` beside the story crate's `Cargo.toml`:
+
+```toml
+group = "UI Kit"
+allow = ["UI Kit", "Shared"]
+disable_story = ["ExperimentalCardStory"]
+
+[overrides]
+color_scheme = "dark"
+theme = "Default Dark"
+language = "en"
+```
+
+Apply these semantics:
+
+- `group` is required when the file exists.
+- Omitted `allow` includes only the file's own normalized group.
+- `allow = ["*"]` includes every group.
+- `allow = []` includes no groups.
+- `disable_story` matches the registered type name exactly.
+- Component registrations use the component type, not the generated wrapper.
+- The active runtime config belongs to the registered story package whose name
+  matches the running binary.
+- Programmatic overrides win field by field over TOML.
+- MCP deterministic overrides win over programmatic and TOML values.
+- Overrides change resolved presentation without rewriting saved intent.
+
+Invalid static configuration makes `init` return `StorybookInitError`.
+Unavailable registered theme names fall back with a diagnostic.
+
+## Preference contract
+
+Persistent mode stores `.gpui-storybook/{consumer-id}.json` at the workspace
+or standalone package root. `Temporary` uses isolated temporary files.
+`Disabled` keeps state in memory. Use `with_json_path` only with persistent
+mode.
+
+Treat `PreferenceState::saved` as user intent and `resolved` as effective
+presentation. Use `try_preference_state` for a read-only snapshot.

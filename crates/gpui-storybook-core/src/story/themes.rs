@@ -1,12 +1,15 @@
+#[cfg(all(debug_assertions, not(target_family = "wasm")))]
 use std::path::PathBuf;
 
 use gpui::App;
+#[cfg(all(debug_assertions, not(target_family = "wasm")))]
 use gpui_component::ThemeRegistry;
 
+#[cfg(all(debug_assertions, not(target_family = "wasm")))]
 const THEMES_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/themes");
 
 pub fn init(cx: &mut App) {
-    #[cfg(debug_assertions)]
+    #[cfg(all(debug_assertions, not(target_family = "wasm")))]
     {
         let themes_dir = PathBuf::from(THEMES_DIR);
         if themes_dir.exists()
@@ -18,4 +21,7 @@ pub fn init(cx: &mut App) {
             tracing::error!(error = %err, "failed to watch Storybook themes directory");
         }
     }
+
+    #[cfg(any(not(debug_assertions), target_family = "wasm"))]
+    let _ = cx;
 }

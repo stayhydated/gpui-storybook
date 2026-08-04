@@ -32,10 +32,9 @@ gpui-es-fluent = { workspace = true }
 gpui-storybook-components = { workspace = true }
 gpui-storybook-preferences = { workspace = true }
 gpui_platform = { optional = true, workspace = true }
-gpui_tokio = { workspace = true }
 image = { optional = true, workspace = true }
 inventory = { workspace = true }
-rust-embed = { features = [ "interpolate-folder-path" ], workspace = true }
+rust-embed = { features = [ "include-exclude", "interpolate-folder-path" ], workspace = true }
 serde = { features = [ "derive" ], workspace = true }
 serde_json = { workspace = true }
 tokio = { features = [ "sync" ], workspace = true }
@@ -44,6 +43,9 @@ unic-langid = { features = [ "serde" ], workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 gtk = { version = "0.18" }
+
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+gpui_tokio = { workspace = true }
 
 [build-dependencies]
 es-fluent-build = { workspace = true }

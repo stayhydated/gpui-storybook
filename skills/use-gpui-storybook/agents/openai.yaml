@@ -1,4 +1,4 @@
 interface:
   display_name: "Use GPUI Storybook"
-  short_description: "Adopt and automate GPUI Storybook"
-  default_prompt: "Use $use-gpui-storybook to integrate or troubleshoot GPUI Storybook in this GPUI app."
+  short_description: "Integrate and automate GPUI Storybook"
+  default_prompt: "Use $use-gpui-storybook to add, configure, automate, or troubleshoot GPUI Storybook in this application."

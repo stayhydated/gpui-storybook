@@ -1,6 +1,7 @@
+#[cfg(not(target_family = "wasm"))]
+use std::io::Write as _;
 use std::{
-    fmt,
-    io::{self, Write as _},
+    fmt, io,
     path::{Path, PathBuf},
     sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
@@ -12,11 +13,15 @@ use strum::{EnumString, IntoStaticStr};
 
 use crate::{ConsumerId, PreferenceRecord, StorybookPreferences};
 
+#[cfg(not(target_family = "wasm"))]
 const JSON_FILE_NAME: &str = "preferences.json";
+#[cfg(not(target_family = "wasm"))]
 const JSON_SCHEMA_FILE_NAME: &str = "preferences.schema.json";
 const JSON_SCHEMA_ID: &str = "https://stayhydated.github.io/gpui-storybook/preferences.schema.json";
 const STORYBOOK_DIR: &str = ".gpui-storybook";
+#[cfg(not(target_family = "wasm"))]
 const STORYBOOK_GITIGNORE_FILE_NAME: &str = ".gitignore";
+#[cfg(not(target_family = "wasm"))]
 const STORYBOOK_GITIGNORE_CONTENTS: &[u8] = b"*\n";
 
 /// JSON document stored for one Storybook consumer.
@@ -33,6 +38,7 @@ struct PreferenceDocument {
 }
 
 impl PreferenceDocument {
+    #[cfg(not(target_family = "wasm"))]
     fn new(consumer_id: ConsumerId, schema_path: &Path, record: PreferenceRecord) -> Self {
         Self {
             schema: schema_path.file_name().map_or_else(
@@ -44,6 +50,7 @@ impl PreferenceDocument {
         }
     }
 
+    #[cfg(not(target_family = "wasm"))]
     fn into_record(
         self,
         expected_consumer: &ConsumerId,
@@ -289,6 +296,7 @@ impl PreferenceRepository {
                 repository: Self::from_parts(options, None, None, None, None),
                 recovery: None,
             }),
+            #[cfg(not(target_family = "wasm"))]
             PersistenceMode::Temporary => {
                 let temporary_directory = tokio::task::spawn_blocking(tempfile::tempdir)
                     .await
@@ -309,6 +317,7 @@ impl PreferenceRepository {
                     recovery: None,
                 })
             },
+            #[cfg(not(target_family = "wasm"))]
             PersistenceMode::Persistent => {
                 let uses_default_path = options.json_path.is_none();
                 let path = match &options.json_path {
@@ -374,6 +383,10 @@ impl PreferenceRepository {
                     ),
                     recovery,
                 })
+            },
+            #[cfg(target_family = "wasm")]
+            persistence @ (PersistenceMode::Temporary | PersistenceMode::Persistent) => {
+                Err(RepositoryOpenError::UnsupportedPersistence { persistence })
             },
         }
     }
@@ -488,39 +501,59 @@ impl PreferenceRepository {
             return Ok(());
         };
 
-        let Some(record) = record else {
-            return match tokio::fs::remove_file(path).await {
-                Ok(()) => Ok(()),
-                Err(source) if source.kind() == io::ErrorKind::NotFound => Ok(()),
-                Err(source) => Err(PreferenceStoreError::Io {
+        #[cfg(target_family = "wasm")]
+        {
+            let _ = record;
+            return Err(PreferenceStoreError::Io {
+                operation,
+                path: path.clone(),
+                source: io::Error::new(
+                    io::ErrorKind::Unsupported,
+                    "file-backed Storybook preferences are unavailable in the browser",
+                ),
+            });
+        }
+
+        #[cfg(not(target_family = "wasm"))]
+        {
+            let Some(record) = record else {
+                return match tokio::fs::remove_file(path).await {
+                    Ok(()) => Ok(()),
+                    Err(source) if source.kind() == io::ErrorKind::NotFound => Ok(()),
+                    Err(source) => Err(PreferenceStoreError::Io {
+                        operation,
+                        path: path.clone(),
+                        source,
+                    }),
+                };
+            };
+
+            let schema_path = self
+                .inner
+                .schema_path
+                .as_deref()
+                .expect("file-backed repositories always have a schema path");
+            let document = PreferenceDocument::new(
+                self.inner.consumer_id.clone(),
+                schema_path,
+                record.clone(),
+            );
+            let mut bytes = serde_json::to_vec_pretty(&document).map_err(|source| {
+                PreferenceStoreError::Json {
                     operation,
                     path: path.clone(),
                     source,
-                }),
-            };
-        };
-
-        let schema_path = self
-            .inner
-            .schema_path
-            .as_deref()
-            .expect("file-backed repositories always have a schema path");
-        let document =
-            PreferenceDocument::new(self.inner.consumer_id.clone(), schema_path, record.clone());
-        let mut bytes =
-            serde_json::to_vec_pretty(&document).map_err(|source| PreferenceStoreError::Json {
-                operation,
-                path: path.clone(),
-                source,
+                }
             })?;
-        bytes.push(b'\n');
-        write_atomic(path, bytes)
-            .await
-            .map_err(|source| PreferenceStoreError::Io {
-                operation,
-                path: path.clone(),
-                source,
-            })
+            bytes.push(b'\n');
+            write_atomic(path, bytes)
+                .await
+                .map_err(|source| PreferenceStoreError::Io {
+                    operation,
+                    path: path.clone(),
+                    source,
+                })
+        }
     }
 }
 
@@ -537,6 +570,7 @@ pub fn persistent_json_path(project_root: impl AsRef<Path>, consumer_id: &Consum
         .join(format!("{consumer_id}.json"))
 }
 
+#[cfg(not(target_family = "wasm"))]
 fn validate_json_path(path: &Path) -> Result<(), RepositoryOpenError> {
     if path.as_os_str().is_empty() || path.file_name().is_none() {
         return Err(RepositoryOpenError::InvalidJsonPath {
@@ -546,10 +580,12 @@ fn validate_json_path(path: &Path) -> Result<(), RepositoryOpenError> {
     Ok(())
 }
 
+#[cfg(not(target_family = "wasm"))]
 fn schema_path_for(path: &Path) -> PathBuf {
     path.with_file_name(JSON_SCHEMA_FILE_NAME)
 }
 
+#[cfg(not(target_family = "wasm"))]
 fn validate_distinct_schema_path(
     preference_path: &Path,
     schema_path: &Path,
@@ -567,6 +603,7 @@ fn validate_distinct_schema_path(
     Ok(())
 }
 
+#[cfg(not(target_family = "wasm"))]
 async fn prepare_parent(path: &Path) -> Result<(), RepositoryOpenError> {
     let Some(parent) = path
         .parent()
@@ -582,6 +619,7 @@ async fn prepare_parent(path: &Path) -> Result<(), RepositoryOpenError> {
         })
 }
 
+#[cfg(not(target_family = "wasm"))]
 async fn ensure_storybook_gitignore(json_path: &Path) -> Result<(), RepositoryOpenError> {
     let Some(parent) = json_path.parent() else {
         return Ok(());
@@ -600,6 +638,7 @@ async fn ensure_storybook_gitignore(json_path: &Path) -> Result<(), RepositoryOp
     })
 }
 
+#[cfg(not(target_family = "wasm"))]
 fn create_gitignore_if_missing(path: &Path) -> io::Result<()> {
     let parent = path.parent().unwrap_or_else(|| Path::new("."));
     let mut temporary = tempfile::NamedTempFile::new_in(parent)?;
@@ -612,6 +651,7 @@ fn create_gitignore_if_missing(path: &Path) -> io::Result<()> {
     }
 }
 
+#[cfg(not(target_family = "wasm"))]
 async fn write_schema(path: &Path) -> Result<(), RepositoryOpenError> {
     let bytes = preference_json_schema_pretty().into_bytes();
     write_atomic(path, bytes)
@@ -622,6 +662,7 @@ async fn write_schema(path: &Path) -> Result<(), RepositoryOpenError> {
         })
 }
 
+#[cfg(not(target_family = "wasm"))]
 async fn read_document(
     path: &Path,
     consumer_id: &ConsumerId,
@@ -640,6 +681,7 @@ async fn read_document(
         .map_err(|source| ReadDocumentError::Invalid { source })
 }
 
+#[cfg(not(target_family = "wasm"))]
 async fn write_atomic(path: &Path, bytes: Vec<u8>) -> io::Result<()> {
     let path = path.to_path_buf();
     tokio::task::spawn_blocking(move || {
@@ -657,6 +699,7 @@ async fn write_atomic(path: &Path, bytes: Vec<u8>) -> io::Result<()> {
     .map_err(io::Error::other)?
 }
 
+#[cfg(not(target_family = "wasm"))]
 async fn archive_invalid_json(path: &Path, suffix: i64) -> Result<PathBuf, RepositoryOpenError> {
     let Some(file_name) = path.file_name() else {
         return Err(RepositoryOpenError::InvalidJsonPath {
@@ -676,12 +719,14 @@ async fn archive_invalid_json(path: &Path, suffix: i64) -> Result<PathBuf, Repos
     Ok(archived_path)
 }
 
+#[cfg(not(target_family = "wasm"))]
 enum ReadDocumentError {
     Io { source: io::Error },
     Invalid { source: InvalidJsonDocument },
 }
 
 #[derive(Debug, thiserror::Error)]
+#[cfg(not(target_family = "wasm"))]
 enum InvalidJsonDocument {
     #[error("invalid preference JSON: {0}")]
     Decode(serde_json::Error),
@@ -698,6 +743,9 @@ pub enum RepositoryOpenError {
     /// A JSON override was supplied for a nonpersistent mode.
     #[error("JSON path override requires persistent mode, not {persistence:?}")]
     PathOverrideRequiresPersistent { persistence: PersistenceMode },
+    /// File-backed persistence was selected on a target without filesystem storage.
+    #[error("persistence mode {persistence:?} is unavailable on this target")]
+    UnsupportedPersistence { persistence: PersistenceMode },
     /// Tokio could not join temporary-directory creation.
     #[error("failed to join temporary preference directory creation: {source}")]
     TemporaryDirectoryTask {

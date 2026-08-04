@@ -12,6 +12,8 @@ Use it to decide:
 4. which validation command should run before handoff.
 
 For most application-facing code and docs, start with `crates/gpui-storybook`.
+Use `book/src/SUMMARY.md` for user-guide routing and `web/src/lib.rs` for the
+public catalog.
 
 Reach for the example apps when you need to understand or demonstrate the two
 supported registration styles:
@@ -28,8 +30,8 @@ Before editing, classify the change:
 1. **Find the surface in the workspace map.** Use its audience label to decide
    how much public explanation the change needs.
 2. **Choose the right source of truth.** Public workflows belong in READMEs,
-   examples, and `skills/use-gpui-storybook`; API and internal behavior belong
-   in Rustdocs, source-local comments, tests, and snapshots.
+   `book/src`, examples, and `skills/use-gpui-storybook`; API and internal
+   behavior belong in Rustdocs, source-local comments, tests, and snapshots.
 3. **Sync workflow changes.** If story registration, `storybook.toml`
    semantics, dock behavior, MCP/capture behavior, macro expansion behavior,
    locale wiring, or public usage guidance changes, update the relevant public
@@ -48,9 +50,9 @@ being edited:
 
 ## Documentation Placement
 
-Treat the root `README.md`, crate-level `README.md` files, example READMEs under
-`examples/`, and `skills/use-gpui-storybook/SKILL.md` as user-facing
-documentation.
+Treat the root `README.md`, crate-level `README.md` files, `book/src`, example
+READMEs under `examples/`, and `skills/use-gpui-storybook/SKILL.md` as
+user-facing documentation.
 
 Even README files for public-integration or internal crates should explain:
 
@@ -81,8 +83,10 @@ locale wiring, macro expansion behavior, or other user-visible runtime behavior:
    contract changed.
 4. Update the matching example README when the change affects one registration style.
 5. Update `skills/use-gpui-storybook/SKILL.md` when public usage guidance changes.
-6. Update Rustdocs for changed public APIs, macro contracts, crate responsibilities, or internal behavior formerly described only in prose docs.
-7. Update tests, `insta` snapshots, example code, or fixture crates when they
+6. Update matching `book/src` chapters and the catalog copy in `web/src/lib.rs`
+   when they describe the changed workflow.
+7. Update Rustdocs for changed public APIs, macro contracts, crate responsibilities, or internal behavior formerly described only in prose docs.
+8. Update tests, `insta` snapshots, example code, or fixture crates when they
    are the executable source of truth.
 
 Keep the root `README.md` and `crates/gpui-storybook/README.md` aligned for
@@ -112,6 +116,10 @@ or screenshot behavior changes.
 Keep `crates/gpui-storybook-core/i18n.toml`, `examples/*/i18n.toml`,
 `examples/*/i18n/*/*.ftl`, Rust locale code, examples, and docs aligned when
 locale setup or message keys change.
+
+Build `web/public/book`, `web/public/llms*`, `web/public/gpui-demo`, and
+`web/dist` through `cargo xtask`; edit `book/src`, `web/src`, and
+`examples/story` as their sources.
 
 ## Workspace Map
 
@@ -173,6 +181,26 @@ locale setup or message keys change.
   Docs: [README](crates/gpui-storybook-preferences/README.md), crate Rustdocs
   Role: typed consumer-scoped Storybook preference intent, atomic JSON documents, Rust-derived JSON Schema, project-local/temporary/disabled storage modes, invalid-file recovery, injected system detectors, and deterministic theme/language resolution. Application code uses the `gpui-storybook` facade.
 
+### Documentation, Demo, and Publishing
+
+- `book/src`
+  Audience: **User-facing**
+  Role: mdBook source for setup, story registration, configuration,
+  preferences, and automation.
+
+- `examples/story/examples/demo.rs`
+  Audience: **User-facing**
+  Role: native and nightly Trunk entry point for the full searchable Storybook
+  gallery from the `examples/story` package.
+
+- `web`
+  Audience: **User-facing**
+  Role: Dioxus catalog for the book, GPUI demo, API docs, and source.
+
+- `xtask`
+  Audience: **Internal**
+  Role: book, `llms.txt`, GPUI demo, and Pages-site build orchestration.
+
 ## Validation and Editing Rules
 
 ### Validation After Changes
@@ -184,8 +212,12 @@ locale setup or message keys change.
 - Use `just fmt`, `just check`, `just clippy`, `just test`, `just test-docs`,
   `just cov`, or a more specific command when the change spans multiple surfaces.
   `just check` and `just clippy` exclude both example packages; `just test`
-  matches CI's workspace test scope. `just cov` measures every publishable
-  crate and excludes the two example applications.
+  matches CI's workspace test scope. `just cov` measures publishable crates and
+  excludes example applications and publication tooling.
+- Use `cargo xtask build book` and `cargo xtask build llms-txt` for book
+  changes, `cargo xtask build gpui-demo` for the nightly Wasm demo, and
+  `cargo xtask build web` for the catalog. `just web-build` assembles all
+  publication artifacts.
 - CI also runs an es-fluent FTL check, `cargo fmt --check`,
   `cargo clippy --workspace --all-features`,
   `cargo doc --workspace --all-features --no-deps --locked`,

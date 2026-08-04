@@ -25,12 +25,14 @@ gpui-storybook-macros = { optional = true, workspace = true }
 gpui-storybook-mcp = { optional = true, workspace = true }
 gpui-storybook-preferences = { workspace = true }
 gpui-storybook-toml = { workspace = true }
-gpui_tokio = { workspace = true }
 inventory = { workspace = true }
 thiserror = { workspace = true }
 toml = { workspace = true }
 tracing = { workspace = true }
 unic-langid = { workspace = true }
+
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+gpui_tokio = { workspace = true }
 
 [dev-dependencies]
 es-fluent = { workspace = true }

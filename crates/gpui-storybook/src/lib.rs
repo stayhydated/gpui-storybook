@@ -52,8 +52,11 @@ pub use gpui_storybook_macros::*;
 use std::{
     collections::{BTreeMap, HashMap},
     fmt,
-    path::{Path, PathBuf},
+    path::PathBuf,
 };
+
+#[cfg(not(target_family = "wasm"))]
+use std::path::Path;
 
 pub mod preferences;
 pub use preferences::{
@@ -209,6 +212,7 @@ fn group_duplicate_story_titles(
         .collect()
 }
 
+#[cfg(not(target_family = "wasm"))]
 fn load_storybook_config(
     entry: &__registry::StoryEntry,
 ) -> Option<gpui_storybook_toml::StorybookToml> {
@@ -224,6 +228,13 @@ fn load_storybook_config(
             None
         },
     }
+}
+
+#[cfg(target_family = "wasm")]
+fn load_storybook_config(
+    _entry: &__registry::StoryEntry,
+) -> Option<gpui_storybook_toml::StorybookToml> {
+    None
 }
 
 fn current_binary_name() -> Option<String> {
@@ -260,6 +271,7 @@ struct InitContext {
     project_root: PathBuf,
 }
 
+#[cfg(not(target_family = "wasm"))]
 fn find_cargo_project_root(start: &Path) -> PathBuf {
     let mut nearest_manifest_dir = None;
 
@@ -282,6 +294,7 @@ fn find_cargo_project_root(start: &Path) -> PathBuf {
     nearest_manifest_dir.unwrap_or_else(|| start.to_path_buf())
 }
 
+#[cfg(not(target_family = "wasm"))]
 fn load_init_context() -> Result<InitContext, StorybookInitError> {
     let all_entries = inventory::iter::<__registry::StoryEntry>().collect::<Vec<_>>();
     if let Some(entry) = runtime_story_entry(&all_entries) {
@@ -297,6 +310,14 @@ fn load_init_context() -> Result<InitContext, StorybookInitError> {
     Ok(InitContext {
         runtime_config: None,
         project_root: find_cargo_project_root(&working_directory),
+    })
+}
+
+#[cfg(target_family = "wasm")]
+fn load_init_context() -> Result<InitContext, StorybookInitError> {
+    Ok(InitContext {
+        runtime_config: None,
+        project_root: PathBuf::from("."),
     })
 }
 
@@ -556,6 +577,7 @@ where
         })
         .transpose()?;
 
+    #[cfg(not(target_family = "wasm"))]
     gpui_tokio::init(cx);
     gpui_storybook_core::story::init(cx).map_err(|error| {
         tracing::error!(error = %error, error_debug = ?error, "failed to initialize Storybook localization");
