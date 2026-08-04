@@ -17,9 +17,12 @@ strum = { features = [ "derive" ], workspace = true }
 sys-locale = { workspace = true }
 tempfile = { workspace = true }
 thiserror = { workspace = true }
-tokio = { features = [ "fs", "rt", "sync" ], workspace = true }
+tokio = { features = [ "rt", "sync" ], workspace = true }
 tracing = { workspace = true }
 unic-langid = { workspace = true }
+
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+tokio = { features = [ "fs" ], workspace = true }
 
 [dev-dependencies]
 gpui = { features = [ "test-support" ], workspace = true }

@@ -1,6 +1,6 @@
 //! GPUI-owned resolved preference state and runtime orchestration.
 
-use std::{mem, path::PathBuf, rc::Rc, sync::Arc};
+use std::{future::Future, mem, path::PathBuf, rc::Rc, sync::Arc};
 
 use gpui::{
     App, AsyncApp, BorrowAppContext as _, Global, InteractiveElement as _, SharedString, Task,
@@ -22,6 +22,23 @@ use gpui_storybook_preferences::{
 use unic_langid::LanguageIdentifier;
 
 use crate::{i18n, language::Language};
+
+fn spawn_storage<T, F>(cx: &mut App, future: F) -> Task<Result<T, ()>>
+where
+    T: Send + 'static,
+    F: Future<Output = T> + Send + 'static,
+{
+    #[cfg(not(target_family = "wasm"))]
+    {
+        let task = gpui_tokio::Tokio::spawn(cx, future);
+        cx.spawn(async move |_cx| task.await.map_err(|_| ()))
+    }
+
+    #[cfg(target_family = "wasm")]
+    {
+        cx.spawn(async move |_cx| Ok(future.await))
+    }
+}
 
 /// Current state of local preference storage.
 ///
@@ -115,6 +132,7 @@ pub(crate) trait PreferenceRuntime: 'static {
     fn select_scrollbar(&mut self, value: PreferredScrollbar, cx: &mut App);
     fn window_appearance_changed(&mut self, window: &mut Window, cx: &mut App);
     fn window_activated(&mut self, window: &mut Window, cx: &mut App);
+    #[cfg(not(target_family = "wasm"))]
     fn theme_registry_changed(&mut self, cx: &mut App);
     fn retry_preferences(&mut self, cx: &mut App);
     fn finish_loading(&mut self, loaded: StartupLoad, cx: &mut App) -> StorybookReady;
@@ -500,7 +518,7 @@ where
         self.save_in_flight = true;
         self.state.persistence_status = PersistenceStatus::Saving;
         let path = repository.path().map(PathBuf::from);
-        let storage_task = gpui_tokio::Tokio::spawn(cx, async move {
+        let storage_task = spawn_storage(cx, async move {
             repository.upsert(saved).await.map(|_| ()).map_err(|error| {
                 let category = store_error_category(&error);
                 tracing::error!(
@@ -532,7 +550,7 @@ where
         self.save_in_flight = true;
         self.state.persistence_status = PersistenceStatus::Saving;
         let repository_options = self.repository_options.clone();
-        let storage_task = gpui_tokio::Tokio::spawn(cx, async move {
+        let storage_task = spawn_storage(cx, async move {
             match PreferenceRepository::open(repository_options).await {
                 Ok(open) => {
                     let repository = open.repository;
@@ -591,7 +609,7 @@ where
         self.state.persistence_status = PersistenceStatus::Loading;
         let repository_options = self.repository_options.clone();
         let repository = self.repository.clone();
-        let storage_task = gpui_tokio::Tokio::spawn(cx, async move {
+        let storage_task = spawn_storage(cx, async move {
             load_preferences(repository_options, repository).await
         });
         cx.spawn(async move |cx| {
@@ -707,6 +725,7 @@ where
         }
     }
 
+    #[cfg(not(target_family = "wasm"))]
     fn theme_registry_changed(&mut self, cx: &mut App) {
         self.applied_theme = None;
         if self.resolve_current(cx).is_ok() {
@@ -876,7 +895,7 @@ where
     let runtime = Runtime::new(options, cx)?;
     cx.set_global(StorybookPreferencesGlobal(Box::new(runtime)));
 
-    let storage_task = gpui_tokio::Tokio::spawn(cx, load_preferences(repository_options, None));
+    let storage_task = spawn_storage(cx, load_preferences(repository_options, None));
 
     Ok(cx.spawn(async move |cx: &mut AsyncApp| {
         let loaded = storage_task.await.unwrap_or_else(|_| StartupLoad::Failed {
@@ -976,6 +995,7 @@ pub fn window_activated(window: &mut Window, cx: &mut App) {
 }
 
 /// Re-resolves the effective slot after the development theme registry reloads.
+#[cfg(not(target_family = "wasm"))]
 pub(crate) fn theme_registry_changed(cx: &mut App) {
     if cx.try_global::<StorybookPreferencesGlobal>().is_some() {
         cx.update_global::<StorybookPreferencesGlobal, _>(|runtime, cx| {
@@ -1030,6 +1050,7 @@ fn scrollbar_show(scrollbar: PreferredScrollbar) -> ScrollbarShow {
 fn repository_open_category(error: &RepositoryOpenError) -> &'static str {
     match error {
         RepositoryOpenError::PathOverrideRequiresPersistent { .. } => "path_override",
+        RepositoryOpenError::UnsupportedPersistence { .. } => "unsupported_persistence",
         RepositoryOpenError::TemporaryDirectoryTask { .. } => "temporary_task",
         RepositoryOpenError::TemporaryDirectory { .. } => "temporary_directory",
         RepositoryOpenError::Clock(_) => "clock",

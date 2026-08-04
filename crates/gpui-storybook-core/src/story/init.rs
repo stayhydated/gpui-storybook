@@ -9,6 +9,7 @@ use gpui_component::input::{Copy, Cut, Paste, Redo, Undo};
 
 pub fn init(cx: &mut App) -> Result<(), gpui_es_fluent::EmbeddedInitError> {
     gpui_component::init(cx);
+    crate::web_fonts::init(cx);
     i18n::init(cx)?;
     AppState::init(cx);
     themes::init(cx);

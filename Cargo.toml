@@ -10,6 +10,8 @@ members = [
   "crates/gpui-storybook-toml",
   "examples/story",
   "examples/component",
+  "web",
+  "xtask",
 ]
 resolver = "3"
 
@@ -24,9 +26,11 @@ version = "0.5.0"
 
 [workspace.dependencies]
 anyhow = "1.0"
+clap = "4.6"
 component-shape-mcp = { git = "https://github.com/stayhydated/component-shape" }
 darling = "0.23"
 derive_more = "2.1"
+dioxus = { default-features = false, version = "0.7" }
 es-fluent = { git = "https://github.com/stayhydated/es-fluent" }
 es-fluent-build = { git = "https://github.com/stayhydated/es-fluent" }
 es-fluent-lang = { git = "https://github.com/stayhydated/es-fluent" }
@@ -61,22 +65,28 @@ prettyplease = "0.2"
 proc-macro2 = "1.0"
 quote = "1.0"
 reqwest_client = { branch = "linux-headless-renderer", git = "https://github.com/stayhydated/zed" }
-rmcp = "2.2.0"
+rmcp = "3.0"
 rust-embed = "8.12"
-schemars = "1.2.1"
+schemars = "1.2.2"
 serde = "1.0"
 serde_json = "1.0"
+stayhydated-dioxus = { path = "../shared/crates/stayhydated-dioxus" }
+stayhydated-site = { path = "../shared/crates/stayhydated-site" }
+stayhydated-xtask = { path = "../shared/crates/stayhydated-xtask" }
 strum = "0.28"
 syn = "2.0"
 sys-locale = "=0.3.2"
 tempfile = "3.27"
 thiserror = "2.0"
-tokio = "1.52"
+tokio = "1.53"
 toml = "1.1"
 tracing = "0.1"
 tracing-subscriber = "0.3"
 unic-langid = "0.9"
 unicode-segmentation = "1.13"
+wasm-bindgen = "0.2"
+web = { path = "web" }
+web-sys = { features = [ "Location", "Window" ], version = "0.3" }
 
 [patch."https://github.com/zed-industries/zed"]
 gpui = { branch = "linux-headless-renderer", git = "https://github.com/stayhydated/zed", version = "=0.2.2" }

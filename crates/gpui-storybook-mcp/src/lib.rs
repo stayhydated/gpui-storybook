@@ -803,6 +803,13 @@ mod tests {
     fn tools_advertise_typed_inputs_outputs_and_annotations() {
         let server = server(StorybookAutomation::with_stories(vec![sample_story()]))
             .expect("server should build");
+        let server_info = rmcp::ServerHandler::get_info(&server);
+        assert_eq!(
+            server_info.protocol_version,
+            rmcp::model::ProtocolVersion::V_2026_07_28
+        );
+        assert_eq!(server_info.server_info.name, "gpui-storybook");
+
         let tools = serde_json::to_value(server.list_tools()).expect("tools should serialize");
         let tools = tools.as_array().expect("tools should be an array");
         let find = |name: &str| {

@@ -5,6 +5,33 @@ use rust_embed::RustEmbed;
 
 pub use gpui_component_assets::Assets as ComponentAssets;
 
+#[cfg(target_family = "wasm")]
+thread_local! {
+    static COMPONENT_ASSETS: ComponentAssets = ComponentAssets::new(
+        "https://longbridge.github.io/gpui-component/gallery"
+    );
+}
+
+#[cfg(not(target_family = "wasm"))]
+fn load_component_asset(path: &str) -> gpui::Result<Option<std::borrow::Cow<'static, [u8]>>> {
+    ComponentAssets.load(path)
+}
+
+#[cfg(target_family = "wasm")]
+fn load_component_asset(path: &str) -> gpui::Result<Option<std::borrow::Cow<'static, [u8]>>> {
+    COMPONENT_ASSETS.with(|assets| assets.load(path))
+}
+
+#[cfg(not(target_family = "wasm"))]
+fn list_component_assets(path: &str) -> gpui::Result<Vec<gpui::SharedString>> {
+    ComponentAssets.list(path)
+}
+
+#[cfg(target_family = "wasm")]
+fn list_component_assets(path: &str) -> gpui::Result<Vec<gpui::SharedString>> {
+    COMPONENT_ASSETS.with(|assets| assets.list(path))
+}
+
 #[derive(RustEmbed)]
 #[folder = "assets"]
 #[include = "i18n/**/*"]
@@ -21,7 +48,7 @@ impl AssetSource for Assets {
         }
 
         if path.starts_with("icons/") {
-            return ComponentAssets.load(path);
+            return load_component_asset(path);
         }
 
         LocalAssets::get(path)
@@ -33,7 +60,7 @@ impl AssetSource for Assets {
         let mut results = Vec::new();
 
         if path.is_empty() || path.starts_with("icons") || "icons".starts_with(path) {
-            results.extend(ComponentAssets.list(path)?);
+            results.extend(list_component_assets(path)?);
         }
 
         results.extend(

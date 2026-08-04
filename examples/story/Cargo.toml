@@ -4,6 +4,19 @@ version.workspace = true
 edition.workspace = true
 license = "Unlicense"
 publish = false
+autobins = false
+autolib = false
+
+[[bin]]
+name = "gpui-storybook-example-story"
+path = "src/main.rs"
+
+[lib]
+path = "src/lib.rs"
+
+[[example]]
+name = "demo"
+path = "examples/demo.rs"
 
 [features]
 default = [  ]
@@ -17,14 +30,19 @@ es-fluent-manager-embedded = { workspace = true }
 gpui = { workspace = true }
 gpui-component = { workspace = true }
 gpui-es-fluent = { workspace = true }
-gpui-storybook = { workspace = true }
 gpui_platform = { workspace = true }
-reqwest_client = { workspace = true }
+gpui-storybook = { workspace = true }
 rust-embed = { workspace = true }
 serde = { workspace = true }
 strum = { workspace = true }
 tracing = { workspace = true }
+
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+reqwest_client = { workspace = true }
 tracing-subscriber = { features = [ "env-filter" ], workspace = true }
+
+[target.'cfg(target_family = "wasm")'.dependencies]
+wasm-bindgen = { workspace = true }
 
 [build-dependencies]
 es-fluent-build = { workspace = true }
