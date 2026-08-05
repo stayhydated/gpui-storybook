@@ -1,6 +1,5 @@
 use es_fluent::{
-    FluentArgs, FluentLocalizer, FluentLocalizerExt as _,
-    registry::{StaticFluentDomain, StaticFluentEntryId},
+    FluentArgs, FluentLocalizer, FluentLocalizerExt as _, registry::StaticFluentMessageKey,
 };
 use es_fluent_manager_core::{I18nModule as _, Localizer};
 use es_fluent_manager_embedded::{EmbeddedInitError, LocalizationError};
@@ -34,21 +33,10 @@ impl StorybookI18n {
 impl FluentLocalizer for StorybookI18n {
     fn localize<'a>(
         &self,
-        id: StaticFluentEntryId,
+        key: StaticFluentMessageKey,
         args: Option<&FluentArgs<'a>>,
     ) -> Option<String> {
-        self.localizer.localize(id, args.map(FluentArgs::as_raw))
-    }
-
-    fn localize_in_domain<'a>(
-        &self,
-        domain: StaticFluentDomain,
-        id: StaticFluentEntryId,
-        args: Option<&FluentArgs<'a>>,
-    ) -> Option<String> {
-        (domain == StaticFluentDomain::from_package_name(env!("CARGO_PKG_NAME")))
-            .then(|| self.localize(id, args))
-            .flatten()
+        self.localizer.localize(key, args.map(FluentArgs::as_raw))
     }
 }
 
