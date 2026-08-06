@@ -69,9 +69,9 @@ dependencies = [
 
 [[package]]
 name = "android_system_properties"
-version = "0.1.5"
+version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "819e7219dbd41043ac279b19830f2efc897156490d7fd6ea916720117ee66311"
+checksum = "ae221649c9976a6f6c56ae1facf410f3ddb33cc661c4b7b61020a912d4237fbc"
 dependencies = [
  "libc",
 ]
@@ -558,7 +558,7 @@ version = "3.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6dee98b0db6a962de883bf5d20362dee4d7ca0d12fe39a7c6c73c844e1cd7c1f"
 dependencies = [
- "darling",
+ "darling 0.23.0",
  "ident_case",
  "prettyplease",
  "proc-macro2",
@@ -777,9 +777,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.6.5"
+version = "4.6.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "301b56658598e48f3648647ac6fc887be7e7108eddfa4e9b63fcf3ec58c0cadf"
+checksum = "473c7e07f409a8d772161724aa8db6a765a2532a70f9667eeb7b49d3d02fbdca"
 dependencies = [
  "clap_builder",
  "clap_derive",
@@ -787,9 +787,9 @@ dependencies = [
 
 [[package]]
 name = "clap_builder"
-version = "4.6.5"
+version = "4.6.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "94a65403d1a1bd28f7dc68eb8506e8874808ee5eecb59298de588e2e1407a078"
+checksum = "7b48fea5a88e9ae728a2dcbedbfc0e730f7d60da42e1cb049a83c9fb8b789889"
 dependencies = [
  "anstream",
  "anstyle",
@@ -1157,8 +1157,18 @@ version = "0.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "25ae13da2f202d56bd7f91c25fba009e7717a1e4a1cc98a76d844b65ae912e9d"
 dependencies = [
- "darling_core",
- "darling_macro",
+ "darling_core 0.23.0",
+ "darling_macro 0.23.0",
+]
+
+[[package]]
+name = "darling"
+version = "0.24.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "88490bf1b990d87eaaa7ac8aa887f629a08e7359765b4911faf63c3763347d23"
+dependencies = [
+ "darling_core 0.24.0",
+ "darling_macro 0.24.0",
 ]
 
 [[package]]
@@ -1175,14 +1185,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "darling_core"
+version = "0.24.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "084e274f91c482280130e1e34e0b8d6e66776a060d7b6de7b84289ca778868c4"
+dependencies = [
+ "ident_case",
+ "proc-macro2",
+ "quote",
+ "strsim",
+ "syn 3.0.3",
+]
+
+[[package]]
 name = "darling_macro"
 version = "0.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac3984ec7bd6cfa798e62b4a642426a5be0e68f9401cfc2a01e3fa9ea2fcdb8d"
 dependencies = [
- "darling_core",
+ "darling_core 0.23.0",
  "quote",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "darling_macro"
+version = "0.24.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "68f5792fa0d41cd2325ce0ffa64f0a340eaebd4971a3a0c5e1ffd2cc488a355e"
+dependencies = [
+ "darling_core 0.24.0",
+ "quote",
+ "syn 3.0.3",
 ]
 
 [[package]]
@@ -1429,7 +1463,7 @@ dependencies = [
 [[package]]
 name = "es-fluent"
 version = "0.18.1"
-source = "git+https://github.com/stayhydated/es-fluent#057d06dfa9ec290092bf5b89d250c266f8579165"
+source = "git+https://github.com/stayhydated/es-fluent?rev=be9ccf8d9fc5e417e2605af3b648a6199cb39f8d#be9ccf8d9fc5e417e2605af3b648a6199cb39f8d"
 dependencies = [
  "es-fluent-derive",
  "es-fluent-manager-core",
@@ -1442,7 +1476,7 @@ dependencies = [
 [[package]]
 name = "es-fluent-build"
 version = "0.18.1"
-source = "git+https://github.com/stayhydated/es-fluent#057d06dfa9ec290092bf5b89d250c266f8579165"
+source = "git+https://github.com/stayhydated/es-fluent?rev=be9ccf8d9fc5e417e2605af3b648a6199cb39f8d#be9ccf8d9fc5e417e2605af3b648a6199cb39f8d"
 dependencies = [
  "es-fluent-toml",
 ]
@@ -1450,23 +1484,23 @@ dependencies = [
 [[package]]
 name = "es-fluent-derive"
 version = "0.18.1"
-source = "git+https://github.com/stayhydated/es-fluent#057d06dfa9ec290092bf5b89d250c266f8579165"
+source = "git+https://github.com/stayhydated/es-fluent?rev=be9ccf8d9fc5e417e2605af3b648a6199cb39f8d#be9ccf8d9fc5e417e2605af3b648a6199cb39f8d"
 dependencies = [
- "darling",
+ "darling 0.24.0",
  "es-fluent-derive-core",
  "es-fluent-shared",
  "proc-macro2",
  "quote",
- "syn 2.0.119",
+ "syn 3.0.3",
 ]
 
 [[package]]
 name = "es-fluent-derive-core"
 version = "0.18.1"
-source = "git+https://github.com/stayhydated/es-fluent#057d06dfa9ec290092bf5b89d250c266f8579165"
+source = "git+https://github.com/stayhydated/es-fluent?rev=be9ccf8d9fc5e417e2605af3b648a6199cb39f8d#be9ccf8d9fc5e417e2605af3b648a6199cb39f8d"
 dependencies = [
  "bon",
- "darling",
+ "darling 0.24.0",
  "es-fluent-shared",
  "es-fluent-toml",
  "getset",
@@ -1475,14 +1509,14 @@ dependencies = [
  "proc-macro2",
  "quote",
  "strum 0.28.0",
- "syn 2.0.119",
+ "syn 3.0.3",
  "thiserror 2.0.19",
 ]
 
 [[package]]
 name = "es-fluent-manager-core"
 version = "0.18.1"
-source = "git+https://github.com/stayhydated/es-fluent#057d06dfa9ec290092bf5b89d250c266f8579165"
+source = "git+https://github.com/stayhydated/es-fluent?rev=be9ccf8d9fc5e417e2605af3b648a6199cb39f8d#be9ccf8d9fc5e417e2605af3b648a6199cb39f8d"
 dependencies = [
  "es-fluent-shared",
  "fluent-bundle",
@@ -1501,7 +1535,7 @@ dependencies = [
 [[package]]
 name = "es-fluent-manager-embedded"
 version = "0.18.1"
-source = "git+https://github.com/stayhydated/es-fluent#057d06dfa9ec290092bf5b89d250c266f8579165"
+source = "git+https://github.com/stayhydated/es-fluent?rev=be9ccf8d9fc5e417e2605af3b648a6199cb39f8d#be9ccf8d9fc5e417e2605af3b648a6199cb39f8d"
 dependencies = [
  "es-fluent",
  "es-fluent-manager-core",
@@ -1514,7 +1548,7 @@ dependencies = [
 [[package]]
 name = "es-fluent-manager-macros"
 version = "0.18.1"
-source = "git+https://github.com/stayhydated/es-fluent#057d06dfa9ec290092bf5b89d250c266f8579165"
+source = "git+https://github.com/stayhydated/es-fluent?rev=be9ccf8d9fc5e417e2605af3b648a6199cb39f8d#be9ccf8d9fc5e417e2605af3b648a6199cb39f8d"
 dependencies = [
  "es-fluent-derive-core",
  "es-fluent-shared",
@@ -1524,18 +1558,18 @@ dependencies = [
  "path-slash",
  "proc-macro2",
  "quote",
- "syn 2.0.119",
+ "syn 3.0.3",
 ]
 
 [[package]]
 name = "es-fluent-shared"
 version = "0.18.1"
-source = "git+https://github.com/stayhydated/es-fluent#057d06dfa9ec290092bf5b89d250c266f8579165"
+source = "git+https://github.com/stayhydated/es-fluent?rev=be9ccf8d9fc5e417e2605af3b648a6199cb39f8d#be9ccf8d9fc5e417e2605af3b648a6199cb39f8d"
 dependencies = [
  "anyhow",
  "camino",
  "clap",
- "darling",
+ "darling 0.24.0",
  "derive_more",
  "fluent-syntax",
  "heck 0.5.0",
@@ -1544,7 +1578,7 @@ dependencies = [
  "quote",
  "serde",
  "strum 0.28.0",
- "syn 2.0.119",
+ "syn 3.0.3",
  "thiserror 2.0.19",
  "toml 1.1.4+spec-1.1.0",
  "unic-langid",
@@ -1553,7 +1587,7 @@ dependencies = [
 [[package]]
 name = "es-fluent-toml"
 version = "0.18.1"
-source = "git+https://github.com/stayhydated/es-fluent#057d06dfa9ec290092bf5b89d250c266f8579165"
+source = "git+https://github.com/stayhydated/es-fluent?rev=be9ccf8d9fc5e417e2605af3b648a6199cb39f8d#be9ccf8d9fc5e417e2605af3b648a6199cb39f8d"
 dependencies = [
  "bon",
  "es-fluent-shared",
@@ -2336,7 +2370,7 @@ dependencies = [
 [[package]]
 name = "gpui-component"
 version = "0.5.2"
-source = "git+https://github.com/longbridge/gpui-component#bbf7650abae59e3a984d48bd120a6f9094fed1f2"
+source = "git+https://github.com/longbridge/gpui-component#181cf147d1d68ff33bae60abb58a24917658142e"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -2384,7 +2418,7 @@ dependencies = [
 [[package]]
 name = "gpui-component-assets"
 version = "0.5.1"
-source = "git+https://github.com/longbridge/gpui-component#bbf7650abae59e3a984d48bd120a6f9094fed1f2"
+source = "git+https://github.com/longbridge/gpui-component#181cf147d1d68ff33bae60abb58a24917658142e"
 dependencies = [
  "anyhow",
  "gpui",
@@ -2398,7 +2432,7 @@ dependencies = [
 [[package]]
 name = "gpui-component-macros"
 version = "0.5.1"
-source = "git+https://github.com/longbridge/gpui-component#bbf7650abae59e3a984d48bd120a6f9094fed1f2"
+source = "git+https://github.com/longbridge/gpui-component#181cf147d1d68ff33bae60abb58a24917658142e"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2408,7 +2442,7 @@ dependencies = [
 [[package]]
 name = "gpui-es-fluent"
 version = "0.1.0"
-source = "git+https://github.com/stayhydated/gpui-es-fluent#ad90423752181c1d575f0edb11e77ad411806370"
+source = "git+https://github.com/stayhydated/gpui-es-fluent?rev=b104b172c0e365d03a2e6c0d79fbcc78b171306f#b104b172c0e365d03a2e6c0d79fbcc78b171306f"
 dependencies = [
  "es-fluent",
  "es-fluent-manager-embedded",
@@ -2485,7 +2519,7 @@ dependencies = [
  "heck 0.5.0",
  "proc-macro2",
  "quote",
- "syn 2.0.119",
+ "syn 3.0.3",
 ]
 
 [[package]]
@@ -7619,18 +7653,18 @@ dependencies = [
 
 [[package]]
 name = "zerocopy"
-version = "0.8.55"
+version = "0.8.56"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5a105cd7b140f6eeec8acff2ea38135d3cab283ada58540f629fe51e46696eb"
+checksum = "556764e583adb45a9f8d413c2a147fa7e8d821e48e12b14fd560b607998b75eb"
 dependencies = [
  "zerocopy-derive",
 ]
 
 [[package]]
 name = "zerocopy-derive"
-version = "0.8.55"
+version = "0.8.56"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fe976fb70c78cd64cccfe3a6fc142244e8a77b70959b30faf9d0ac37ee228eb"
+checksum = "f2ab42fc20575779bd240faa45f94a74256f755c0fa9e89f0ede20d91d0cdfc1"
 dependencies = [
  "proc-macro2",
  "quote",
