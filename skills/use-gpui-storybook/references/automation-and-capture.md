@@ -24,10 +24,29 @@ the controller installed by `gpui_storybook::init`.
 - `storybook_get_story`
 - `storybook_current_story`
 - `storybook_open_story`
+- `storybook_read_controls`
+- `storybook_set_control`
+- `storybook_reset_control`
 - `storybook_capture_current_story`
 - `storybook_capture_launch_env`
 
 Use advertised typed fields. Width and height are optional only as a pair.
+Control operations use tagged `ControlValue` objects shared with the UI:
+
+```json
+{
+  "key": "disabled",
+  "value": { "type": "boolean", "value": true }
+}
+```
+
+Read controls after opening the intended route. Reset with a key for one value
+or omit the key for all values. A capture request can include a `controls` map
+so it applies serialized values immediately before rendering.
+
+Capture requests also accept `responsive`, `mobile`, `tablet`, or `desktop` as
+a `viewport`. Explicit paired width and height take precedence. The launch-env
+tool accepts the same named presets when dimensions are omitted.
 
 ## Routes
 

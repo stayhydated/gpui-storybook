@@ -2,11 +2,11 @@ use gpui::{
     Action, AnyElement, AnyView, App, AppContext as _, ClickEvent, Div, Entity, EventEmitter,
     Focusable, Hsla, InteractiveElement as _, IntoElement, ParentElement, Render, RenderOnce,
     ScrollHandle, SharedString, StatefulInteractiveElement as _, StyleRefinement, Styled, Window,
-    div, prelude::FluentBuilder as _, rems,
+    div, hsla, prelude::FluentBuilder as _, px, relative, rems,
 };
 
 use serde::{Deserialize, Serialize};
-use std::{borrow::Borrow, sync::Arc};
+use std::{borrow::Borrow, rc::Rc, sync::Arc};
 
 use gpui_component::{
     ActiveTheme as _, IconName, Sizable as _,
@@ -25,6 +25,8 @@ use crate::{
         capture_scroll_scope, capture_story_view, capture_story_view_with_scroll, capture_substory,
         capture_substory_with_key, current_capture_scroll_handle,
     },
+    controls::{ControlTarget, EntityControlTarget, StoryControls},
+    presentation::{StoryCanvasBackground, StoryPresentation},
     registry::{RegisteredStoryMetadata, StoryKey, StoryName},
 };
 
@@ -253,6 +255,9 @@ pub struct StoryContainer {
     height: Option<gpui::Pixels>,
     tab_panel: Option<gpui::WeakEntity<gpui_component::dock::TabPanel>>,
     story: Option<AnyView>,
+    control_target: Option<Rc<dyn ControlTarget>>,
+    presentation: StoryPresentation,
+    workbench_state: Option<gpui::WeakEntity<crate::workbench::WorkbenchState>>,
     pub story_klass: Option<SharedString>,
     registration_metadata: Option<RegisteredStoryMetadata>,
     pub story_key: Option<SharedString>,
@@ -402,7 +407,7 @@ pub enum ContainerEvent {
     Close,
 }
 
-pub trait Story: Focusable + Render + Sized {
+pub trait Story: Focusable + Render + StoryControls + Sized {
     fn klass() -> &'static str {
         let type_name = std::any::type_name::<Self>();
         type_name.rsplit("::").next().unwrap_or(type_name)
@@ -422,7 +427,7 @@ pub trait Story: Focusable + Render + Sized {
     fn title_bg() -> Option<Hsla> {
         None
     }
-    fn new_view(window: &mut Window, cx: &mut App) -> Entity<impl Render + Focusable>;
+    fn new_view(window: &mut Window, cx: &mut App) -> Entity<Self>;
 
     fn on_active(&mut self, active: bool, window: &mut Window, cx: &mut App) {
         let _ = active;
@@ -460,6 +465,9 @@ impl StoryContainer {
             height: None,
             tab_panel: None,
             story: None,
+            control_target: None,
+            presentation: StoryPresentation::default(),
+            workbench_state: None,
             story_klass: None,
             registration_metadata: None,
             story_key: None,
@@ -501,6 +509,7 @@ impl StoryContainer {
         let name = S::title(cx);
         let description = S::description(cx);
         let story = S::new_view(window, cx);
+        let control_target = EntityControlTarget::optional(story.clone(), cx);
         let story_klass = S::klass();
         let focus_handle = story.focus_handle(cx);
 
@@ -508,6 +517,7 @@ impl StoryContainer {
             let mut story = Self::new(window, cx)
                 .story(story.into(), story_klass)
                 .on_active(S::on_active_any);
+            story.control_target = control_target;
             story.focus_handle = focus_handle;
             story.closable = S::closable();
             story.zoomable = S::zoomable();
@@ -564,6 +574,27 @@ impl StoryContainer {
     pub fn on_active(mut self, on_active: fn(AnyView, bool, &mut Window, &mut App)) -> Self {
         self.on_active = Some(on_active);
         self
+    }
+
+    /// Returns the controls for this concrete story instance.
+    pub fn control_target(&self) -> Option<Rc<dyn ControlTarget>> {
+        self.control_target.clone()
+    }
+
+    pub(crate) fn set_presentation(&mut self, presentation: StoryPresentation) {
+        self.presentation = presentation;
+    }
+
+    pub fn presentation(&self) -> StoryPresentation {
+        self.presentation
+    }
+
+    #[cfg(feature = "dock")]
+    pub(crate) fn set_workbench_state(
+        &mut self,
+        state: gpui::WeakEntity<crate::workbench::WorkbenchState>,
+    ) {
+        self.workbench_state = Some(state);
     }
 
     /// Store typed registry metadata on this runtime container.
@@ -745,6 +776,15 @@ impl Panel for StoryContainer {
     fn set_active(&mut self, active: bool, _window: &mut Window, cx: &mut gpui::Context<Self>) {
         tracing::debug!(panel = %self.name, active, "Storybook panel activation changed");
         self.is_active = active;
+        if active
+            && let Some(state) = self
+                .workbench_state
+                .as_ref()
+                .and_then(gpui::WeakEntity::upgrade)
+        {
+            let story = cx.entity();
+            state.update(cx, |state, cx| state.set_active_story(Some(story), cx));
+        }
         if let Some(on_active) = self.on_active
             && let Some(story) = self.story.clone()
         {
@@ -819,18 +859,66 @@ impl Focusable for StoryContainer {
     }
 }
 impl Render for StoryContainer {
-    fn render(&mut self, _: &mut Window, _cx: &mut gpui::Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _: &mut Window, cx: &mut gpui::Context<Self>) -> impl IntoElement {
         let scroll_handle = self.scroll_handle.clone();
         let story_key = self.story_key_label().map(str::to_owned);
+        let presentation = self.presentation;
+        let background = match presentation.background {
+            StoryCanvasBackground::Theme => cx.theme().background,
+            StoryCanvasBackground::Light => hsla(0.0, 0.0, 0.98, 1.0),
+            StoryCanvasBackground::Dark => hsla(0.0, 0.0, 0.08, 1.0),
+            StoryCanvasBackground::Transparent => hsla(0.0, 0.0, 0.0, 0.0),
+        };
+        let grid_color = match presentation.background {
+            StoryCanvasBackground::Dark => hsla(0.0, 0.0, 1.0, 0.10),
+            _ => hsla(0.0, 0.0, 0.0, 0.08),
+        };
+        let grid = (1..20).flat_map(|index| {
+            let offset = relative(index as f32 / 20.0);
+            [
+                div()
+                    .absolute()
+                    .top_0()
+                    .bottom_0()
+                    .left(offset)
+                    .w(px(1.0))
+                    .bg(grid_color)
+                    .into_any_element(),
+                div()
+                    .absolute()
+                    .left_0()
+                    .right_0()
+                    .top(offset)
+                    .h(px(1.0))
+                    .bg(grid_color)
+                    .into_any_element(),
+            ]
+        });
+        let canvas = div()
+            .relative()
+            .flex_none()
+            .min_w_full()
+            .min_h_full()
+            .bg(background)
+            .when_some(
+                presentation.viewport.dimensions(),
+                |this, (width, height)| this.w(px(width as f32)).h(px(height as f32)),
+            )
+            .when(presentation.grid, |this| this.children(grid))
+            .when_some(self.story.clone(), |this, story| {
+                this.child(div().relative().size_full().p_4().child(story))
+            });
         let content = div()
             .id("story-container")
             .size_full()
             .track_scroll(&scroll_handle)
             .overflow_y_scrollbar()
             .track_focus(&self.focus_handle)
-            .when_some(self.story.clone(), |this, story| {
-                this.child(div().size_full().p_4().child(story))
-            });
+            .child(canvas);
+        let content = crate::story_inspector::inspectable_story(
+            crate::story_inspector::StoryInspectorState::from_container(self, cx),
+            content,
+        );
 
         if let Some(story_key) = story_key {
             capture_story_view(story_key, scroll_handle, content).into_any_element()
@@ -862,6 +950,8 @@ mod tests {
 
     struct DefaultStoryContract;
 
+    impl StoryControls for DefaultStoryContract {}
+
     impl Focusable for DefaultStoryContract {
         fn focus_handle(&self, _: &App) -> gpui::FocusHandle {
             unreachable!("the static Story defaults do not require a focus handle")
@@ -879,7 +969,7 @@ mod tests {
             "Default Story".to_string()
         }
 
-        fn new_view(_: &mut Window, cx: &mut App) -> Entity<impl Render + Focusable> {
+        fn new_view(_: &mut Window, cx: &mut App) -> Entity<Self> {
             cx.new(|_| DefaultStoryContract)
         }
     }

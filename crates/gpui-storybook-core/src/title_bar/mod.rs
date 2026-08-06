@@ -14,6 +14,7 @@ use crate::storybook_window_ui::StorybookWindowUi;
 pub struct AppTitleBar {
     app_menu_bar: Entity<AppMenuBar>,
     font_size_selector: Entity<FontSizeSelector>,
+    system_child: Rc<dyn Fn(&mut Window, &mut App) -> AnyElement>,
     child: Rc<dyn Fn(&mut Window, &mut App) -> AnyElement>,
 }
 
@@ -30,10 +31,21 @@ impl AppTitleBar {
         Self {
             app_menu_bar,
             font_size_selector,
+            system_child: Rc::new(|_, _| div().into_any_element()),
             child: ui
                 .title_bar_items
                 .unwrap_or_else(|| Rc::new(|_, _| div().into_any_element())),
         }
+    }
+
+    #[cfg(feature = "dock")]
+    pub(crate) fn system_child<F, E>(mut self, f: F) -> Self
+    where
+        E: IntoElement,
+        F: Fn(&mut Window, &mut App) -> E + 'static,
+    {
+        self.system_child = Rc::new(move |window, cx| f(window, cx).into_any_element());
+        self
     }
 
     pub fn child<F, E>(mut self, f: F) -> Self
@@ -58,6 +70,7 @@ impl Render for AppTitleBar {
                     .px_2()
                     .gap_2()
                     .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    .child((self.system_child.clone())(window, cx))
                     .child((self.child.clone())(window, cx))
                     .child(self.font_size_selector.clone()),
             )

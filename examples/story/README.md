@@ -16,6 +16,8 @@ cargo run -p gpui-storybook-example-story --features dock
 ```
 
 The registrations live under `src/stories`; `ButtonStory` also demonstrates
-stable `Substory` capture routes. See [Write
+boolean, numeric, and enum-select `StoryControls`, reset behavior, preview
+presentation, and stable `Substory` capture routes. See [Write
 stories](../../book/src/stories.md) for the registration contract and
-[Automation and capture](../../book/src/automation.md) for MCP usage.
+[Use the workbench](../../book/src/workbench.md) for controls and theme editing,
+and [Automation and capture](../../book/src/automation.md) for MCP usage.

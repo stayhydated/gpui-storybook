@@ -32,6 +32,7 @@ impl ::gpui::Render for __ButtonChipComponentStoryView {
         ButtonChip::example()
     }
 }
+impl ::gpui_storybook::StoryControls for __ButtonChipComponentStoryView {}
 impl ::gpui_storybook::Story for __ButtonChipComponentStoryView {
     fn klass() -> &'static str {
         "ButtonChip"
@@ -47,7 +48,7 @@ impl ::gpui_storybook::Story for __ButtonChipComponentStoryView {
     fn new_view(
         window: &mut ::gpui::Window,
         cx: &mut ::gpui::App,
-    ) -> ::gpui::Entity<impl ::gpui::Render + ::gpui::Focusable> {
+    ) -> ::gpui::Entity<Self> {
         Self::view(window, cx)
     }
 }

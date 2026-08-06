@@ -1,5 +1,10 @@
 //! MCP tools for driving a live `gpui-storybook` window.
 //!
+//! Tools can navigate stable routes, read/set/reset the selected story's typed
+//! controls, apply a serialized control map before capture, and use named or
+//! explicit viewport dimensions. These operations reuse the core
+//! `ControlSpec` and `ControlValue` contracts.
+//!
 //! The facade recognizes the same frame-capture route/path variables emitted by
 //! this crate. Capture launches use disabled storage plus deterministic light,
 //! `Default Light`, and fallback-language overrides. Stdio-only launches use
@@ -7,7 +12,7 @@
 //! overwriting persistent interactive choices.
 
 use component_shape_mcp::{
-    McpSchema, McpSchemaProperties, McpServer, McpToolError, McpToolInput, McpToolMetadata,
+    McpAny, McpSchema, McpSchemaProperties, McpServer, McpToolError, McpToolInput, McpToolMetadata,
     McpTypedTool, ServeStdioResult, nullable_schema, tool_definition_for_input_with_metadata,
     tool_error_result_for, tool_structured_result,
 };
@@ -17,10 +22,14 @@ use frame_capture::{
 };
 pub use gpui_storybook_core::automation::{
     DEFAULT_STORY_CAPTURE_HEIGHT, DEFAULT_STORY_CAPTURE_WIDTH, SharedStoryCaptureController,
-    SharedStoryController, SharedStorybookAutomation, StoryCaptureSnapshot, StoryCurrentSnapshot,
-    StoryDefaultSize, StoryScreenshotRequest, StorySnapshot, StorybookAutomation,
-    StorybookAutomationError,
+    SharedStoryController, SharedStorybookAutomation, StoryCaptureSnapshot, StoryControlsSnapshot,
+    StoryCurrentSnapshot, StoryDefaultSize, StoryScreenshotRequest, StorySnapshot,
+    StorybookAutomation, StorybookAutomationError,
 };
+pub use gpui_storybook_core::controls::{
+    ControlBounds, ControlColor, ControlKind, ControlSnapshot, ControlSpec, ControlValue,
+};
+pub use gpui_storybook_core::presentation::StoryViewportPreset;
 use rmcp::model::CallToolResult as ToolCallResult;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -35,6 +44,9 @@ pub const TOOL_LIST_STORIES: &str = "storybook_list_stories";
 pub const TOOL_GET_STORY: &str = "storybook_get_story";
 pub const TOOL_CURRENT_STORY: &str = "storybook_current_story";
 pub const TOOL_OPEN_STORY: &str = "storybook_open_story";
+pub const TOOL_READ_CONTROLS: &str = "storybook_read_controls";
+pub const TOOL_SET_CONTROL: &str = "storybook_set_control";
+pub const TOOL_RESET_CONTROL: &str = "storybook_reset_control";
 pub const TOOL_CAPTURE_CURRENT_STORY: &str = "storybook_capture_current_story";
 pub const TOOL_CAPTURE_LAUNCH_ENV: &str = "storybook_capture_launch_env";
 
@@ -92,6 +104,26 @@ struct CaptureCurrentStoryInput {
     width: Option<u32>,
     /// Requested capture height in pixels. Set together with `width`.
     height: Option<u32>,
+    /// Named viewport (`responsive`, `mobile`, `tablet`, or `desktop`).
+    viewport: Option<String>,
+    /// Tagged `ControlValue` objects keyed by control name, applied before capture.
+    controls: Option<BTreeMap<String, McpAny>>,
+}
+
+/// Set one control on the active concrete story instance.
+#[derive(Clone, Debug, component_shape_mcp::McpToolInput)]
+struct SetControlInput {
+    /// Control key from `storybook_read_controls`.
+    key: String,
+    /// Tagged `ControlValue`, for example `{ "type": "boolean", "value": true }`.
+    value: McpAny,
+}
+
+/// Reset one active-story control, or all controls when `key` is omitted.
+#[derive(Clone, Debug, Default, component_shape_mcp::McpToolInput)]
+struct ResetControlInput {
+    /// Control key to reset. Omit to reset all controls.
+    key: Option<String>,
 }
 
 /// Build the environment and Cargo command for launching a capture-enabled storybook.
@@ -107,6 +139,8 @@ struct CaptureLaunchEnvInput {
     width: Option<u32>,
     /// Requested capture height in pixels. Set together with `width`.
     height: Option<u32>,
+    /// Named viewport used when explicit width and height are omitted.
+    viewport: Option<String>,
     /// Optional Cargo package passed with `-p`.
     package: Option<String>,
     /// Optional Cargo binary passed with `--bin`.
@@ -135,6 +169,8 @@ pub enum StorybookMcpError {
     NoStoriesRegistered,
     #[error("capture session timed out after {seconds} seconds")]
     CaptureSessionTimedOut { seconds: u64 },
+    #[error("unknown viewport preset `{value}`")]
+    InvalidViewport { value: String },
 }
 
 pub fn stdio_requested() -> bool {
@@ -269,6 +305,8 @@ async fn run_capture_session(
                         output_path: Some(capture.path),
                         width: Some(capture.size.width),
                         height: Some(capture.size.height),
+                        viewport: None,
+                        controls: BTreeMap::new(),
                         quit_after_capture: exit_after_capture,
                     })
                     .await?;
@@ -361,6 +399,82 @@ pub fn register_tools(
     )?;
 
     server.add_typed_tool_async(
+        tool::<EmptyInput>(
+            TOOL_READ_CONTROLS,
+            "Read Controls",
+            "Read control metadata and values from the active concrete story instance.",
+            story_controls_output_schema(),
+            ToolHints::read_only(),
+        )?,
+        {
+            let automation = automation.clone();
+            move |_input| {
+                let automation = automation.clone();
+                async move {
+                    match automation.read_controls().await {
+                        Ok(snapshot) => tool_structured_result(json!(snapshot)),
+                        Err(error) => automation_tool_error(error),
+                    }
+                }
+            }
+        },
+    )?;
+
+    server.add_typed_tool_async(
+        tool::<SetControlInput>(
+            TOOL_SET_CONTROL,
+            "Set Control",
+            "Set one control on the active concrete story instance and return all current values.",
+            story_controls_output_schema(),
+            ToolHints::mutation(true, false),
+        )?,
+        {
+            let automation = automation.clone();
+            move |input| {
+                let automation = automation.clone();
+                async move {
+                    let value =
+                        match serde_json::from_value::<ControlValue>(input.value.into_value()) {
+                            Ok(value) => value,
+                            Err(error) => {
+                                return tool_error_result_for(McpToolError::invalid_field_value(
+                                    "value",
+                                    error.to_string(),
+                                ));
+                            },
+                        };
+                    match automation.set_control(input.key, value).await {
+                        Ok(snapshot) => tool_structured_result(json!(snapshot)),
+                        Err(error) => automation_tool_error(error),
+                    }
+                }
+            }
+        },
+    )?;
+
+    server.add_typed_tool_async(
+        tool::<ResetControlInput>(
+            TOOL_RESET_CONTROL,
+            "Reset Control",
+            "Reset one active-story control, or every control when no key is supplied.",
+            story_controls_output_schema(),
+            ToolHints::mutation(true, false),
+        )?,
+        {
+            let automation = automation.clone();
+            move |input| {
+                let automation = automation.clone();
+                async move {
+                    match automation.reset_control(input.key).await {
+                        Ok(snapshot) => tool_structured_result(json!(snapshot)),
+                        Err(error) => automation_tool_error(error),
+                    }
+                }
+            }
+        },
+    )?;
+
+    server.add_typed_tool_async(
         capture_tool::<CaptureCurrentStoryInput>(
             TOOL_CAPTURE_CURRENT_STORY,
             "Capture Current Story",
@@ -372,10 +486,25 @@ pub fn register_tools(
         move |input| {
             let automation = automation.clone();
             async move {
+                let controls = match decode_control_map(input.controls) {
+                    Ok(controls) => controls,
+                    Err(error) => return tool_error_result_for(error),
+                };
+                let viewport = match parse_viewport(input.viewport) {
+                    Ok(viewport) => viewport,
+                    Err(error) => {
+                        return tool_error_result_for(McpToolError::invalid_field_value(
+                            "viewport",
+                            error.to_string(),
+                        ));
+                    },
+                };
                 let request = StoryScreenshotRequest {
                     output_path: input.output_path,
                     width: input.width,
                     height: input.height,
+                    viewport,
+                    controls,
                     quit_after_capture: false,
                 };
 
@@ -514,11 +643,32 @@ where
     {
         set_optional_positive_integer(properties, "width");
         set_optional_positive_integer(properties, "height");
+        set_optional_viewport_enum(properties);
         if has_frame {
             set_optional_positive_integer(properties, "frame");
         }
     }
     Ok(tool)
+}
+
+fn set_optional_viewport_enum(properties: &mut serde_json::Map<String, Value>) {
+    let Some(branches) = properties
+        .get_mut("viewport")
+        .and_then(Value::as_object_mut)
+        .and_then(|schema| schema.get_mut("anyOf"))
+        .and_then(Value::as_array_mut)
+    else {
+        return;
+    };
+    if let Some(string) = branches.iter_mut().find_map(|branch| {
+        let object = branch.as_object_mut()?;
+        (object.get("type").and_then(Value::as_str) == Some("string")).then_some(object)
+    }) {
+        string.insert(
+            "enum".to_string(),
+            json!(["responsive", "mobile", "tablet", "desktop"]),
+        );
+    }
 }
 
 fn set_optional_positive_integer(properties: &mut serde_json::Map<String, Value>, field: &str) {
@@ -548,6 +698,39 @@ fn automation_tool_error(error: StorybookAutomationError) -> ToolCallResult {
     tool_error_result_for(error)
 }
 
+fn decode_control_map(
+    controls: Option<BTreeMap<String, McpAny>>,
+) -> Result<BTreeMap<String, ControlValue>, McpToolError> {
+    controls
+        .unwrap_or_default()
+        .into_iter()
+        .map(|(key, value)| {
+            serde_json::from_value(value.into_value())
+                .map(|value| (key.clone(), value))
+                .map_err(|error| {
+                    McpToolError::invalid_field_value(format!("controls.{key}"), error.to_string())
+                })
+        })
+        .collect()
+}
+
+fn parse_viewport(
+    viewport: Option<String>,
+) -> Result<Option<StoryViewportPreset>, StorybookMcpError> {
+    viewport
+        .map(|value| {
+            let viewport = match value.as_str() {
+                "responsive" => StoryViewportPreset::Responsive,
+                "mobile" => StoryViewportPreset::Mobile,
+                "tablet" => StoryViewportPreset::Tablet,
+                "desktop" => StoryViewportPreset::Desktop,
+                _ => return Err(StorybookMcpError::InvalidViewport { value }),
+            };
+            Ok(viewport)
+        })
+        .transpose()
+}
+
 fn object_schema<const N: usize>(
     properties: [(String, McpSchema); N],
     required: impl IntoIterator<Item = &'static str>,
@@ -565,6 +748,113 @@ fn story_size_schema() -> McpSchema {
             ("height".to_string(), McpSchema::integer()),
         ],
         ["width", "height"],
+    )
+}
+
+fn control_color_schema() -> McpSchema {
+    object_schema(
+        [
+            ("h".to_string(), McpSchema::number()),
+            ("s".to_string(), McpSchema::number()),
+            ("l".to_string(), McpSchema::number()),
+            ("a".to_string(), McpSchema::number()),
+        ],
+        ["h", "s", "l", "a"],
+    )
+}
+
+fn tagged_control_value_schema(kind: &'static str, value: McpSchema) -> McpSchema {
+    object_schema(
+        [
+            ("type".to_string(), McpSchema::string().with_const(kind)),
+            ("value".to_string(), value),
+        ],
+        ["type", "value"],
+    )
+}
+
+fn control_value_schema() -> McpSchema {
+    McpSchema::one_of([
+        tagged_control_value_schema("boolean", McpSchema::boolean()),
+        tagged_control_value_schema("integer", McpSchema::integer()),
+        tagged_control_value_schema("float", McpSchema::number()),
+        tagged_control_value_schema("text", McpSchema::string()),
+        tagged_control_value_schema("color", control_color_schema()),
+        tagged_control_value_schema("choice", McpSchema::string()),
+        tagged_control_value_schema("json", McpSchema::any()),
+    ])
+}
+
+fn control_bounds_schema() -> McpSchema {
+    object_schema(
+        [
+            ("min".to_string(), nullable_schema(McpSchema::number())),
+            ("max".to_string(), nullable_schema(McpSchema::number())),
+            ("step".to_string(), nullable_schema(McpSchema::number())),
+        ],
+        ["min", "max", "step"],
+    )
+}
+
+fn control_kind_schema() -> McpSchema {
+    McpSchema::any_of([
+        McpSchema::string().with_enum_values([
+            "checkbox",
+            "number",
+            "range",
+            "text",
+            "color_picker",
+            "select",
+        ]),
+        object_schema([("custom".to_string(), McpSchema::string())], ["custom"]),
+    ])
+}
+
+fn control_spec_schema() -> McpSchema {
+    object_schema(
+        [
+            ("key".to_string(), McpSchema::string()),
+            ("label".to_string(), McpSchema::string()),
+            ("description".to_string(), McpSchema::string()),
+            ("category".to_string(), McpSchema::string()),
+            ("kind".to_string(), control_kind_schema()),
+            ("default".to_string(), control_value_schema()),
+            ("bounds".to_string(), control_bounds_schema()),
+            ("options".to_string(), McpSchema::array(McpSchema::string())),
+        ],
+        [
+            "key",
+            "label",
+            "description",
+            "category",
+            "kind",
+            "default",
+            "bounds",
+            "options",
+        ],
+    )
+}
+
+fn control_snapshot_schema() -> McpSchema {
+    object_schema(
+        [
+            ("spec".to_string(), control_spec_schema()),
+            ("value".to_string(), control_value_schema()),
+        ],
+        ["spec", "value"],
+    )
+}
+
+fn story_controls_output_schema() -> McpSchema {
+    object_schema(
+        [
+            ("story".to_string(), story_schema()),
+            (
+                "controls".to_string(),
+                McpSchema::array(control_snapshot_schema()),
+            ),
+        ],
+        ["story", "controls"],
     )
 }
 
@@ -651,7 +941,14 @@ fn capture_launch_env_output_schema() -> McpSchema {
 fn build_capture_launch_env(
     input: CaptureLaunchEnvInput,
 ) -> Result<CaptureLaunchEnv, StorybookMcpError> {
-    let size = FrameCaptureLaunchEnv::optional_size(input.width, input.height)?;
+    let viewport = parse_viewport(input.viewport)?;
+    let (width, height) = match (input.width, input.height) {
+        (None, None) => viewport
+            .and_then(StoryViewportPreset::dimensions)
+            .map_or((None, None), |(width, height)| (Some(width), Some(height))),
+        dimensions => dimensions,
+    };
+    let size = FrameCaptureLaunchEnv::optional_size(width, height)?;
     let mut env = FrameCaptureLaunchEnv::builder()
         .route_id(input.key)?
         .env(storybook_capture_env())
@@ -833,6 +1130,23 @@ mod tests {
         assert_eq!(get["inputSchema"]["properties"]["key"]["type"], "string");
         assert_eq!(get["outputSchema"]["properties"]["story"]["type"], "object");
 
+        let read_controls = find(TOOL_READ_CONTROLS);
+        assert_eq!(read_controls["annotations"]["readOnlyHint"], true);
+        assert_eq!(
+            read_controls["outputSchema"]["properties"]["controls"]["type"],
+            "array"
+        );
+
+        let set_control = find(TOOL_SET_CONTROL);
+        assert_eq!(
+            set_control["inputSchema"]["required"],
+            json!(["key", "value"])
+        );
+        assert_eq!(set_control["annotations"]["idempotentHint"], true);
+
+        let reset_control = find(TOOL_RESET_CONTROL);
+        assert_eq!(reset_control["inputSchema"]["required"], json!([]));
+
         let capture = find(TOOL_CAPTURE_CURRENT_STORY);
         assert_eq!(capture["inputSchema"]["required"], json!([]));
         assert_eq!(
@@ -848,6 +1162,10 @@ mod tests {
             json!(["height"])
         );
         assert_eq!(capture["annotations"]["destructiveHint"], true);
+        assert_eq!(
+            capture["inputSchema"]["properties"]["viewport"]["anyOf"][0]["enum"],
+            json!(["responsive", "mobile", "tablet", "desktop"])
+        );
 
         let launch = find(TOOL_CAPTURE_LAUNCH_ENV);
         assert_eq!(launch["inputSchema"]["required"], json!(["key"]));
@@ -1027,6 +1345,7 @@ mod tests {
             frame: Some(0),
             width: None,
             height: None,
+            viewport: None,
             package: None,
             bin: None,
             features: None,
@@ -1045,6 +1364,7 @@ mod tests {
             frame: None,
             width: Some(900),
             height: None,
+            viewport: None,
             package: None,
             bin: None,
             features: None,
@@ -1145,6 +1465,7 @@ mod tests {
             frame: None,
             width: None,
             height: None,
+            viewport: None,
             package: None,
             bin: None,
             features: Some(Vec::new()),
@@ -1156,6 +1477,22 @@ mod tests {
         assert_eq!(launch.command, vec!["cargo", "run"]);
         assert!(!launch.env.contains_key(STDIO_ENV_VAR));
         assert_eq!(launch.env["WGPU_CAPTURE_ROUTE"], "example-ButtonStory");
+
+        let mobile = build_capture_launch_env(CaptureLaunchEnvInput {
+            key: "example-ButtonStory".to_string(),
+            output_path: Some(PathBuf::from("mobile.png")),
+            frame: None,
+            width: None,
+            height: None,
+            viewport: Some("mobile".to_owned()),
+            package: None,
+            bin: None,
+            features: None,
+            stdio: Some(false),
+        })
+        .expect("mobile viewport should build");
+        assert_eq!(mobile.env["WGPU_CAPTURE_WIDTH"], "390");
+        assert_eq!(mobile.env["WGPU_CAPTURE_HEIGHT"], "844");
     }
 
     #[test]
@@ -1196,6 +1533,22 @@ mod tests {
         .expect("capture result should serialize");
         assert_eq!(capture["isError"], true);
         assert_eq!(capture["structuredContent"]["error"]["kind"], "handler");
+
+        let controls = serde_json::to_value(server.call_tool(TOOL_READ_CONTROLS, Some(json!({}))))
+            .expect("controls result should serialize");
+        assert_eq!(controls["isError"], true);
+        assert_eq!(controls["structuredContent"]["error"]["kind"], "handler");
+
+        let invalid = serde_json::to_value(server.call_tool(
+            TOOL_SET_CONTROL,
+            Some(json!({ "key": "disabled", "value": true })),
+        ))
+        .expect("invalid control result should serialize");
+        assert_eq!(invalid["isError"], true);
+        assert_eq!(
+            invalid["structuredContent"]["error"]["kind"],
+            "invalid_field_value"
+        );
     }
 
     #[test]

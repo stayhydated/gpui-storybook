@@ -11,7 +11,9 @@ use gpui_component::{ActiveTheme as _, Sizable as _, h_flex, tag::Tag, v_flex};
     example = SignalBoard::example(),
 )]
 pub struct SignalBoard {
+    #[storybook(control)]
     headline: SharedString,
+    #[storybook(control(skip))]
     tiles: Vec<SignalTile>,
 }
 

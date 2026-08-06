@@ -116,4 +116,11 @@ gpui_storybook::create_dock_window(
 ```
 
 Registration, filtering, preferences, and MCP routes are the same in both
-window modes.
+window modes. Both modes include the right-side workbench. Gallery mode renders
+it as a third resizable region.
+
+Dock mode installs it as an open, collapsible right dock. The saved layout
+includes its width, visibility, and selected tab. Layouts created before the
+workbench schema are replaced with the current three-region default. Choose
+**Reset layout** in the title bar to restore the left story sidebar, center
+story tabs, and right workbench.

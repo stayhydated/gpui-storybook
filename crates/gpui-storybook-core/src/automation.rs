@@ -4,6 +4,8 @@ use crate::capture_output::CaptureOutputStore;
 use crate::capture_region::capture_region_bounds;
 use crate::{
     capture_region::{capture_route_story_key, scroll_capture_region_into_view},
+    controls::{ControlSnapshot, ControlValue},
+    presentation::StoryViewportPreset,
     story::StoryContainer,
 };
 use gpui::{App, Global, Window, px};
@@ -12,6 +14,7 @@ use gpui::{Bounds, Pixels, point};
 use serde::{Deserialize, Serialize};
 use std::{
     borrow::Borrow,
+    collections::BTreeMap,
     fmt,
     path::PathBuf,
     sync::{
@@ -104,13 +107,25 @@ pub struct StoryCurrentSnapshot {
     pub revision: u64,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct StoryScreenshotRequest {
     pub output_path: Option<PathBuf>,
     pub width: Option<u32>,
     pub height: Option<u32>,
+    /// Named viewport used when explicit dimensions are omitted.
+    pub viewport: Option<StoryViewportPreset>,
+    /// Serialized controls to apply to the current story before capture.
+    #[serde(default)]
+    pub controls: BTreeMap<String, ControlValue>,
     #[serde(default)]
     pub quit_after_capture: bool,
+}
+
+/// Current values and metadata for the controls on the selected story instance.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct StoryControlsSnapshot {
+    pub story: StorySnapshot,
+    pub controls: Vec<ControlSnapshot>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -130,6 +145,9 @@ pub enum StorybookAutomationError {
     CaptureAlreadyPending,
     CaptureUnavailable { message: String },
     InvalidCaptureRequest { message: String },
+    NoActiveStory,
+    ControlsUnavailable { key: String },
+    ControlOperationFailed { message: String },
 }
 
 pub(crate) enum StorybookAutomationCommand {
@@ -141,6 +159,18 @@ pub(crate) enum StorybookAutomationCommand {
         request_id: u64,
         request: StoryScreenshotRequest,
         response: oneshot::Sender<Result<StoryCaptureSnapshot, StorybookAutomationError>>,
+    },
+    ReadControls {
+        response: oneshot::Sender<Result<StoryControlsSnapshot, StorybookAutomationError>>,
+    },
+    SetControl {
+        key: String,
+        value: ControlValue,
+        response: oneshot::Sender<Result<StoryControlsSnapshot, StorybookAutomationError>>,
+    },
+    ResetControl {
+        key: Option<String>,
+        response: oneshot::Sender<Result<StoryControlsSnapshot, StorybookAutomationError>>,
     },
 }
 
@@ -176,6 +206,11 @@ impl fmt::Display for StorybookAutomationError {
             },
             Self::CaptureUnavailable { message } => write!(formatter, "{message}"),
             Self::InvalidCaptureRequest { message } => write!(formatter, "{message}"),
+            Self::NoActiveStory => write!(formatter, "no story is selected in the live host"),
+            Self::ControlsUnavailable { key } => {
+                write!(formatter, "story `{key}` does not expose controls")
+            },
+            Self::ControlOperationFailed { message } => write!(formatter, "{message}"),
         }
     }
 }
@@ -340,6 +375,59 @@ impl StorybookAutomation {
         result?
     }
 
+    /// Reads controls from the concrete story entity displayed by the live host.
+    pub async fn read_controls(&self) -> Result<StoryControlsSnapshot, StorybookAutomationError> {
+        let (response, receiver) = self.live_command_channel()?;
+        self.command_tx
+            .send(StorybookAutomationCommand::ReadControls { response })
+            .map_err(|_| StorybookAutomationError::NoLiveHost)?;
+        receive_host_response(receiver).await
+    }
+
+    /// Updates one control on the concrete story entity displayed by the live host.
+    pub async fn set_control(
+        &self,
+        key: impl Into<String>,
+        value: ControlValue,
+    ) -> Result<StoryControlsSnapshot, StorybookAutomationError> {
+        let (response, receiver) = self.live_command_channel()?;
+        self.command_tx
+            .send(StorybookAutomationCommand::SetControl {
+                key: key.into(),
+                value,
+                response,
+            })
+            .map_err(|_| StorybookAutomationError::NoLiveHost)?;
+        receive_host_response(receiver).await
+    }
+
+    /// Resets one control, or every control when `key` is `None`.
+    pub async fn reset_control(
+        &self,
+        key: Option<String>,
+    ) -> Result<StoryControlsSnapshot, StorybookAutomationError> {
+        let (response, receiver) = self.live_command_channel()?;
+        self.command_tx
+            .send(StorybookAutomationCommand::ResetControl { key, response })
+            .map_err(|_| StorybookAutomationError::NoLiveHost)?;
+        receive_host_response(receiver).await
+    }
+
+    fn live_command_channel<T>(
+        &self,
+    ) -> Result<
+        (
+            oneshot::Sender<Result<T, StorybookAutomationError>>,
+            oneshot::Receiver<Result<T, StorybookAutomationError>>,
+        ),
+        StorybookAutomationError,
+    > {
+        if !self.live_host_attached.load(Ordering::SeqCst) {
+            return Err(StorybookAutomationError::NoLiveHost);
+        }
+        Ok(oneshot::channel())
+    }
+
     pub(crate) fn take_command_receiver(
         &self,
     ) -> Option<mpsc::UnboundedReceiver<StorybookAutomationCommand>> {
@@ -377,6 +465,16 @@ impl StorybookAutomation {
             revision: state.revision,
         })
     }
+}
+
+async fn receive_host_response<T>(
+    receiver: oneshot::Receiver<Result<T, StorybookAutomationError>>,
+) -> Result<T, StorybookAutomationError> {
+    receiver
+        .await
+        .map_err(|error| StorybookAutomationError::HostDisconnected {
+            message: error.to_string(),
+        })?
 }
 
 fn resolve_story_route(stories: &[StorySnapshot], route_id: &str) -> Option<StorySnapshot> {
@@ -501,7 +599,7 @@ pub(crate) fn validate_capture_target_size(
         (Some(_), Some(_)) => Err(StorybookAutomationError::InvalidCaptureRequest {
             message: "capture width and height must be greater than zero".to_string(),
         }),
-        (None, None) => Ok(None),
+        (None, None) => Ok(request.viewport.and_then(StoryViewportPreset::dimensions)),
         _ => Err(StorybookAutomationError::InvalidCaptureRequest {
             message: "capture width and height must be provided together".to_string(),
         }),
@@ -809,6 +907,13 @@ mod tests {
                 ..StoryScreenshotRequest::default()
             }),
             Ok(Some((800, 600)))
+        );
+        assert_eq!(
+            validate_capture_target_size(&StoryScreenshotRequest {
+                viewport: Some(StoryViewportPreset::Mobile),
+                ..StoryScreenshotRequest::default()
+            }),
+            Ok(Some((390, 844)))
         );
         assert!(matches!(
             validate_capture_target_size(&StoryScreenshotRequest {

@@ -14,6 +14,7 @@ use crate::{
     title_bar::AppTitleBar,
     window_options::default_storybook_window_options,
     window_view::DockWindowView,
+    workbench::{StoryWorkbench, WorkbenchState, WorkbenchTab},
 };
 use anyhow::{Context as _, Result};
 use gpui::{
@@ -22,7 +23,8 @@ use gpui::{
     SharedString, Styled as _, Subscription, Window, div, px, relative,
 };
 use gpui_component::{
-    ActiveTheme as _, Root,
+    ActiveTheme as _, Root, Sizable as _,
+    button::{Button, ButtonVariants as _},
     dock::{
         ClosePanel, DockArea, DockAreaState, DockEvent, DockItem, DockPlacement, Panel,
         PanelControl, PanelEvent, PanelInfo, PanelView, ToggleZoom, register_panel,
@@ -51,7 +53,7 @@ pub struct ToggleSidebar;
 
 const MAIN_DOCK_AREA: DockAreaTab = DockAreaTab {
     id: "storybook-main-dock",
-    version: 5,
+    version: 6,
 };
 
 #[cfg(debug_assertions)]
@@ -67,11 +69,34 @@ struct DockAreaTab {
 type StoryPanelMap = BTreeMap<String, gpui::WeakEntity<StoryContainer>>;
 type StoryPanelRegistries = BTreeMap<EntityId, StoryPanelMap>;
 type StorySeedRegistries = BTreeMap<EntityId, Vec<StorySeed>>;
+type WorkbenchStateRegistries = BTreeMap<EntityId, gpui::WeakEntity<WorkbenchState>>;
 
 static STORY_PANELS: LazyLock<Mutex<StoryPanelRegistries>> =
     LazyLock::new(|| Mutex::new(BTreeMap::new()));
 static STORY_SEEDS: LazyLock<Mutex<StorySeedRegistries>> =
     LazyLock::new(|| Mutex::new(BTreeMap::new()));
+static WORKBENCH_STATES: LazyLock<Mutex<WorkbenchStateRegistries>> =
+    LazyLock::new(|| Mutex::new(BTreeMap::new()));
+
+fn register_workbench_state(
+    dock_area: &gpui::WeakEntity<DockArea>,
+    state: &Entity<WorkbenchState>,
+) {
+    if let Ok(mut states) = WORKBENCH_STATES.lock() {
+        states.insert(dock_area.entity_id(), state.downgrade());
+    }
+}
+
+fn workbench_state(dock_area: &gpui::WeakEntity<DockArea>) -> Option<Entity<WorkbenchState>> {
+    let mut states = WORKBENCH_STATES.lock().ok()?;
+    let state = states
+        .get(&dock_area.entity_id())
+        .and_then(gpui::WeakEntity::upgrade);
+    if state.is_none() {
+        states.remove(&dock_area.entity_id());
+    }
+    state
+}
 
 #[derive(Clone, Debug)]
 struct StorySeed {
@@ -135,6 +160,11 @@ impl StorySidebar {
             return;
         };
         let story_key = story.read(cx).story_key_label().map(str::to_owned);
+        if let Some(workbench_state) = workbench_state(&dock_area.downgrade()) {
+            workbench_state.update(cx, |state, cx| {
+                state.set_active_story(Some(story.clone()), cx);
+            });
+        }
 
         if reveal_story_panel(&story, window, cx) {
             if let Some(automation) = automation
@@ -172,8 +202,13 @@ impl StorySidebar {
     fn register_story(
         dock_area: &gpui::WeakEntity<DockArea>,
         story: &Entity<StoryContainer>,
-        cx: &App,
+        cx: &mut App,
     ) {
+        if let Some(state) = workbench_state(dock_area) {
+            story.update(cx, |story, _| {
+                story.set_workbench_state(state.downgrade());
+            });
+        }
         let Some(story_klass) = story.read(cx).story_klass.clone() else {
             return;
         };
@@ -190,7 +225,7 @@ impl StorySidebar {
     fn register_stories(
         dock_area: &gpui::WeakEntity<DockArea>,
         stories: &[Entity<StoryContainer>],
-        cx: &App,
+        cx: &mut App,
     ) {
         for story in stories {
             Self::register_story(dock_area, story, cx);
@@ -555,6 +590,7 @@ impl Render for StorySidebar {
 pub struct StoryWorkspace {
     title_bar: Entity<AppTitleBar>,
     dock_area: Entity<DockArea>,
+    workbench_state: Entity<WorkbenchState>,
     automation: Option<SharedStorybookAutomation>,
     last_layout_state: Option<DockAreaState>,
     toggle_button_visible: bool,
@@ -576,6 +612,11 @@ impl StoryWorkspace {
         let dock_area =
             cx.new(|cx| DockArea::new(MAIN_DOCK_AREA.id, Some(MAIN_DOCK_AREA.version), window, cx));
         let weak_dock_area = dock_area.downgrade();
+        let workbench_state = cx.new(|_| WorkbenchState::new(None));
+        workbench_state.update(cx, |state, cx| {
+            state.set_active_story(stories.first().cloned(), cx);
+        });
+        register_workbench_state(&weak_dock_area, &workbench_state);
         StorySidebar::register_story_seeds(&weak_dock_area, &stories, cx);
         StorySidebar::register_stories(&weak_dock_area, &stories, cx);
 
@@ -619,9 +660,19 @@ impl StoryWorkspace {
         })
         .detach();
 
-        let title_bar = cx.new(|cx| AppTitleBar::new("Storybook", ui, window, cx));
+        let title_bar = cx.new(|cx| {
+            AppTitleBar::new("Storybook", ui, window, cx).system_child(|_, _| {
+                Button::new("reset-storybook-layout")
+                    .label("Reset layout")
+                    .xsmall()
+                    .ghost()
+                    .on_click(|_, window, cx| {
+                        window.dispatch_action(Box::new(ResetLayout), cx);
+                    })
+            })
+        });
 
-        let preference_subscriptions = vec![
+        let mut preference_subscriptions = vec![
             cx.observe_window_appearance(window, |_, window, cx| {
                 crate::preferences::window_appearance_changed(window, cx);
             }),
@@ -629,10 +680,22 @@ impl StoryWorkspace {
                 crate::preferences::window_activated(window, cx);
             }),
         ];
+        if let Some(automation) = automation.clone() {
+            preference_subscriptions.push(cx.observe(&workbench_state, move |_, state, cx| {
+                let Some(story) = state.read(cx).active_story() else {
+                    return;
+                };
+                let Some(key) = story.read(cx).story_key_label().map(str::to_owned) else {
+                    return;
+                };
+                let _ = automation.confirm_current_story(&key);
+            }));
+        }
         crate::preferences::window_appearance_changed(window, cx);
 
         let this = Self {
             dock_area,
+            workbench_state,
             title_bar,
             automation,
             last_layout_state: None,
@@ -712,11 +775,13 @@ impl StoryWorkspace {
 
         // Create sidebar panel for the left dock
         let sidebar_panel = Self::build_sidebar(stories, &dock_area, automation, window, cx);
+        let workbench_panel = Self::build_workbench(&dock_area, WorkbenchTab::Controls, window, cx);
 
         _ = dock_area.update(cx, |view, cx| {
             view.set_version(MAIN_DOCK_AREA.version, window, cx);
             view.set_center(dock_item, window, cx);
             view.set_left_dock(sidebar_panel, Some(px(260.)), true, window, cx);
+            view.set_right_dock(workbench_panel, Some(px(320.)), true, window, cx);
             view.set_dock_collapsible(
                 Edges {
                     left: true,
@@ -742,6 +807,19 @@ impl StoryWorkspace {
         }));
 
         DockItem::panel(sidebar)
+    }
+
+    fn build_workbench(
+        dock_area: &gpui::WeakEntity<DockArea>,
+        selected_tab: WorkbenchTab,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> DockItem {
+        let state = workbench_state(dock_area)
+            .expect("dock workbench state must be registered before building its panel");
+        let workbench: Arc<dyn PanelView> =
+            Arc::new(cx.new(|cx| StoryWorkbench::new(state, selected_tab, window, cx)));
+        DockItem::panel(workbench)
     }
 
     fn build_center_layout(
@@ -860,6 +938,28 @@ impl StoryWorkspace {
                     },
                 }
             },
+            StorybookAutomationCommand::ReadControls { response } => {
+                let result = self.workbench_state.read(cx).controls_snapshot(cx);
+                let _ = response.send(result);
+            },
+            StorybookAutomationCommand::SetControl {
+                key,
+                value,
+                response,
+            } => {
+                let result = self
+                    .workbench_state
+                    .update(cx, |state, cx| state.set_control(&key, value, cx));
+                cx.notify();
+                let _ = response.send(result);
+            },
+            StorybookAutomationCommand::ResetControl { key, response } => {
+                let result = self
+                    .workbench_state
+                    .update(cx, |state, cx| state.reset_control(key.as_deref(), cx));
+                cx.notify();
+                let _ = response.send(result);
+            },
         }
     }
 
@@ -893,6 +993,8 @@ impl StoryWorkspace {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Result<StorySnapshot, StorybookAutomationError> {
+        self.workbench_state
+            .update(cx, |state, cx| state.apply_controls(&request.controls, cx))?;
         let story = self
             .automation
             .as_ref()
@@ -1011,6 +1113,17 @@ pub fn register_story_panels(cx: &mut App) {
             Box::new(cx.new(|cx| StorySidebar::new(stories, dock_area, None, window, cx)))
         },
     );
+
+    register_panel(
+        cx,
+        "StoryWorkbench",
+        |dock_area, _state, info, window, cx| {
+            let selected_tab = StoryWorkbench::selected_tab_from_panel(info);
+            let state = workbench_state(&dock_area)
+                .expect("StoryWorkbench panel must have a registered window state");
+            Box::new(cx.new(|cx| StoryWorkbench::new(state, selected_tab, window, cx)))
+        },
+    );
 }
 
 /// Create a new dock-based storybook window
@@ -1041,4 +1154,36 @@ where
         Ok::<_, anyhow::Error>(())
     })
     .detach();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[gpui::test]
+    fn default_layout_contains_open_versioned_right_workbench(cx: &mut App) {
+        gpui_component::init(cx);
+        let window: gpui::WindowHandle<DockArea> = cx
+            .open_window(Default::default(), |window, cx| {
+                let dock_area = cx.new(|cx| {
+                    DockArea::new(MAIN_DOCK_AREA.id, Some(MAIN_DOCK_AREA.version), window, cx)
+                });
+                let state = cx.new(|_| WorkbenchState::new(None));
+                register_workbench_state(&dock_area.downgrade(), &state);
+                StoryWorkspace::reset_default_layout(dock_area.downgrade(), &[], None, window, cx);
+                dock_area
+            })
+            .expect("dock test window should open");
+
+        window
+            .update(cx, |dock_area, _, cx| {
+                let state = dock_area.dump(cx);
+                assert_eq!(state.version, Some(6));
+                let json = serde_json::to_string(&state).expect("dock layout serializes");
+                assert!(json.contains("StoryWorkbench"));
+                assert!(json.contains("right_dock"));
+                assert!(json.contains("320"));
+            })
+            .expect("dock test window should update");
+    }
 }

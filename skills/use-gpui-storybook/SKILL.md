@@ -5,9 +5,10 @@ description: >-
   when Codex needs to add a Storybook binary; register previews with #[story],
   #[derive(ComponentStory)], #[derive(Substory)], or #[story_init]; configure
   storybook.toml groups, filters, or launch overrides; choose gallery or dock
-  mode; wire the typed es-fluent locale adapter and preference startup; enable
-  MCP tools or PNG capture; or diagnose missing stories, unstable routes,
-  preference readiness, or capture failures.
+  mode; add typed story controls or use the controls/theme/Inspector workbench;
+  wire the typed es-fluent locale adapter and preference startup; enable MCP
+  tools or PNG capture; or diagnose missing stories, unstable routes,
+  preference readiness, control failures, or capture failures.
 ---
 
 # Integrate GPUI Storybook
@@ -36,7 +37,7 @@ description: >-
   adding the binary, locale adapter, preferences, gallery/dock mode, or
   `storybook.toml`.
 - Read [story authoring](references/story-authoring.md) when adding or changing
-  registrations, metadata, sections, substories, or one-time setup.
+  registrations, metadata, controls, sections, substories, or one-time setup.
 - Read [automation and capture](references/automation-and-capture.md) when
   enabling MCP, selecting routes, launching captures, or troubleshooting
   automation.
@@ -45,6 +46,8 @@ description: >-
 
 - Await preference readiness before the first window.
 - Treat display labels and stable route keys as separate values.
+- Keep control metadata and values on the typed story entity; use
+  `StoryControls` and `#[storybook(control...)]` rather than a second value model.
 - Match `disable_story` against the registered type name, not the display title
   or package-qualified key.
 - Forward optional package features explicitly when users launch with

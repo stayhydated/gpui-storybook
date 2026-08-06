@@ -45,6 +45,15 @@ For the dock workspace, forward the feature and use `create_dock_window` plus
 dock = ["gpui-storybook/dock"]
 ```
 
+Both modes include the right workbench. Gallery uses a third resizable region.
+Dock mode persists the right dock's width, visibility, and selected tab; use
+**Reset layout** in the title bar to restore the current default layout.
+
+For consumer theme development in a native debug build, set
+`STORYBOOK_THEME_DIR` before launch. The path becomes the process's complete
+custom-theme directory and is watched for external changes. Wasm keeps in-app
+theme edits but needs a separate development bridge for filesystem changes.
+
 ## Configuration rules
 
 Put `storybook.toml` beside the story crate's `Cargo.toml`:

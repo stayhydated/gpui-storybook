@@ -16,6 +16,8 @@ cargo run -p gpui-storybook-example-component --features dock
 ```
 
 The registrations live under `src/components` and show literal, computed, and
-localized metadata. See [Write stories](../../book/src/stories.md) for the
-derive contract and [Getting started](../../book/src/getting_started.md) for
-application setup.
+localized metadata. `WelcomeCard`, `SignalBoard`, and `FieldNotes` also show
+how `#[storybook(control)]` stores defaults from `example = ...` and overlays
+live values on each render. See [Write stories](../../book/src/stories.md) for
+the derive contract, [Use the workbench](../../book/src/workbench.md) for live
+editing, and [Getting started](../../book/src/getting_started.md) for setup.

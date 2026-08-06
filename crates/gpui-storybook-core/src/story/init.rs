@@ -12,6 +12,7 @@ pub fn init(cx: &mut App) -> Result<(), gpui_es_fluent::EmbeddedInitError> {
     crate::web_fonts::init(cx);
     i18n::init(cx)?;
     AppState::init(cx);
+    crate::story_inspector::init(cx);
     themes::init(cx);
     app_menus::register_actions(cx);
 

@@ -15,6 +15,7 @@ use gpui_component::{
 
 use gpui_storybook::section;
 
+#[derive(gpui_storybook::StoryControls)]
 #[gpui_storybook::story(crate::StorySection::Tables)]
 pub struct TableStory {
     focus_handle: FocusHandle,
@@ -44,7 +45,7 @@ impl gpui_storybook::Story for TableStory {
         "Table".into()
     }
 
-    fn new_view(window: &mut Window, cx: &mut App) -> Entity<impl Render + Focusable> {
+    fn new_view(window: &mut Window, cx: &mut App) -> Entity<Self> {
         Self::view(window, cx)
     }
 }

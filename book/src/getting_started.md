@@ -2,7 +2,7 @@
 
 This guide adds a gallery-style Storybook binary to an existing GPUI workspace.
 When setup is complete, running the package opens a window containing every
-linked and enabled story.
+linked and enabled story plus the right-side workbench.
 
 ## Prerequisites
 
@@ -149,7 +149,7 @@ cargo run -p my-app-storybook
 
 The window should list every linked story allowed by the active
 `storybook.toml`. Continue with [Write stories](stories.md) if the gallery is
-empty.
+empty, then [Use the workbench](workbench.md) to add live controls.
 
 ## Troubleshooting startup
 

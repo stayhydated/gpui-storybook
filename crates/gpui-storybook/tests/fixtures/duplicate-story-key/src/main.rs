@@ -3,6 +3,7 @@ use gpui::{App, AppContext as _, Context, FocusHandle, Focusable, IntoElement, R
 mod first {
     use super::*;
 
+    #[derive(gpui_storybook::StoryControls)]
     #[gpui_storybook::story]
     pub struct DuplicateStory {
         focus_handle: FocusHandle,
@@ -25,7 +26,7 @@ mod first {
             "Duplicate".to_string()
         }
 
-        fn new_view(window: &mut Window, cx: &mut App) -> gpui::Entity<impl Render + Focusable> {
+        fn new_view(window: &mut Window, cx: &mut App) -> gpui::Entity<Self> {
             let _ = window;
             cx.new(|cx| Self {
                 focus_handle: cx.focus_handle(),
@@ -37,6 +38,7 @@ mod first {
 mod second {
     use super::*;
 
+    #[derive(gpui_storybook::StoryControls)]
     #[gpui_storybook::story]
     pub struct DuplicateStory {
         focus_handle: FocusHandle,
@@ -59,7 +61,7 @@ mod second {
             "Duplicate".to_string()
         }
 
-        fn new_view(window: &mut Window, cx: &mut App) -> gpui::Entity<impl Render + Focusable> {
+        fn new_view(window: &mut Window, cx: &mut App) -> gpui::Entity<Self> {
             let _ = window;
             cx.new(|cx| Self {
                 focus_handle: cx.focus_handle(),

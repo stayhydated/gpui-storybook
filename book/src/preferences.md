@@ -61,6 +61,11 @@ Changing the inactive light or dark theme slot saves that slot without changing
 the current appearance. The saved theme becomes effective when its color scheme
 becomes active.
 
+Color edits in the workbench's **Theme** tab are session overrides layered over
+the selected base theme; they do not rewrite saved preference intent. Selecting
+a different base theme clears the draft. Reloading the same named theme from a
+native watched directory rebases and reapplies the session overrides.
+
 ## Follow system changes
 
 With `System` appearance, Storybook follows live window appearance changes.

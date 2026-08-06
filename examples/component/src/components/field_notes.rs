@@ -11,7 +11,9 @@ use gpui_component::{ActiveTheme as _, Sizable as _, tag::Tag, v_flex};
     example = FieldNotes::example(),
 )]
 pub struct FieldNotes {
+    #[storybook(control)]
     heading: SharedString,
+    #[storybook(control(skip))]
     notes: Vec<NoteCard>,
 }
 

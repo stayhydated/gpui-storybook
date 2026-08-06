@@ -7,6 +7,7 @@ use crate::{
     },
     capture_region::capture_route_story_key,
     story::StoryContainer,
+    workbench::{StoryWorkbench, WorkbenchState, WorkbenchTab},
 };
 use gpui::prelude::{
     Context, FluentBuilder as _, InteractiveElement as _, IntoElement, ParentElement as _, Render,
@@ -30,6 +31,8 @@ pub struct Gallery {
     collapsed: bool,
     search_input: Entity<InputState>,
     automation: Option<SharedStorybookAutomation>,
+    workbench_state: Entity<WorkbenchState>,
+    workbench: Entity<StoryWorkbench>,
 
     _subscriptions: Vec<Subscription>,
 }
@@ -44,6 +47,10 @@ impl Gallery {
     ) -> Self {
         let search_input =
             cx.new(|cx_input| InputState::new(window, cx_input).placeholder("Search..."));
+        let workbench_state = cx.new(|_| WorkbenchState::new(None));
+        let workbench = cx.new(|cx| {
+            StoryWorkbench::new(workbench_state.clone(), WorkbenchTab::Controls, window, cx)
+        });
 
         let subscriptions = vec![
             #[allow(clippy::single_match)]
@@ -86,10 +93,24 @@ impl Gallery {
                     } else {
                         this.active_index = None;
                     }
+                    this.sync_workbench_active(cx_window);
                     this.confirm_active_story(cx_window);
                     cx_window.notify();
                 },
                 _ => {},
+            }),
+            cx.observe(&workbench_state, |this, state, cx| {
+                let Some(automation) = &this.automation else {
+                    return;
+                };
+                let Some(story) = state.read(cx).active_story() else {
+                    return;
+                };
+                let Some(key) = story.read(cx).story_key_label() else {
+                    return;
+                };
+                let _ = automation.confirm_current_story(key);
+                cx.notify();
             }),
         ];
 
@@ -103,6 +124,8 @@ impl Gallery {
             },
             collapsed: false,
             automation,
+            workbench_state,
+            workbench,
             _subscriptions: subscriptions,
         };
 
@@ -111,6 +134,7 @@ impl Gallery {
         }
 
         this.sync_automation_stories(cx);
+        this.sync_workbench_active(cx);
         this.confirm_active_story(cx);
         if let Some(automation) = this.automation.clone() {
             this.attach_automation_host(automation, window, cx);
@@ -119,7 +143,7 @@ impl Gallery {
         this
     }
 
-    fn set_active_story(&mut self, name: &str, app_cx: &App) {
+    fn set_active_story(&mut self, name: &str, app_cx: &mut App) {
         let lowercase_name = name.to_lowercase().replace("story", "");
         let story_index = self.stories.iter().position(|story_entity| {
             let story_data = story_entity.read(app_cx);
@@ -129,12 +153,22 @@ impl Gallery {
 
         if let Some(index) = story_index {
             self.active_index = Some(index);
+            self.sync_workbench_active(app_cx);
         }
     }
 
+    fn sync_workbench_active(&self, cx: &mut App) {
+        let story = self
+            .active_index
+            .and_then(|index| self.stories.get(index))
+            .cloned();
+        self.workbench_state.update(cx, |state, cx| {
+            state.set_active_story(story, cx);
+        });
+    }
+
     fn active_story_snapshot(&self, cx: &impl Borrow<App>) -> Option<StorySnapshot> {
-        let active_index = self.active_index?;
-        let story = self.stories.get(active_index)?;
+        let story = self.workbench_state.read(cx.borrow()).active_story()?;
         StorySnapshot::from_container(story.read(cx.borrow()), cx)
     }
 
@@ -179,7 +213,7 @@ impl Gallery {
     fn set_active_story_by_key(
         &mut self,
         key: &str,
-        cx: &impl Borrow<App>,
+        cx: &mut App,
     ) -> Result<StoryCurrentSnapshot, StorybookAutomationError> {
         let story_key = capture_route_story_key(key);
         let Some(index) = self
@@ -193,6 +227,10 @@ impl Gallery {
         };
 
         self.active_index = Some(index);
+        let group = self.stories[index].clone();
+        self.workbench_state.update(cx, |state, cx| {
+            state.set_active_story_by_key(group, story_key, cx);
+        });
         self.automation
             .as_ref()
             .expect("automation command requires automation")
@@ -257,6 +295,28 @@ impl Gallery {
                     },
                 }
             },
+            StorybookAutomationCommand::ReadControls { response } => {
+                let result = self.workbench_state.read(cx).controls_snapshot(cx);
+                let _ = response.send(result);
+            },
+            StorybookAutomationCommand::SetControl {
+                key,
+                value,
+                response,
+            } => {
+                let result = self
+                    .workbench_state
+                    .update(cx, |state, cx| state.set_control(&key, value, cx));
+                cx.notify();
+                let _ = response.send(result);
+            },
+            StorybookAutomationCommand::ResetControl { key, response } => {
+                let result = self
+                    .workbench_state
+                    .update(cx, |state, cx| state.reset_control(key.as_deref(), cx));
+                cx.notify();
+                let _ = response.send(result);
+            },
         }
     }
 
@@ -266,6 +326,8 @@ impl Gallery {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Result<StorySnapshot, StorybookAutomationError> {
+        self.workbench_state
+            .update(cx, |state, cx| state.apply_controls(&request.controls, cx))?;
         let story = self
             .automation
             .as_ref()
@@ -464,6 +526,7 @@ impl Render for Gallery {
                                                                         {
                                                                             this.active_index = Some(original_idx);
                                                                         }
+                                                                        this.sync_workbench_active(cx_listener);
                                                                         cx_listener.notify();
                                                                     },
                                                                 ))
@@ -492,7 +555,8 @@ impl Render for Gallery {
                     ),
             )
             .child(
-                v_flex()
+                resizable_panel().child(
+                    v_flex()
                     .flex_1()
                     .h_full()
                     .overflow_x_hidden()
@@ -525,6 +589,14 @@ impl Render for Gallery {
                             }),
                     )
                     .into_any_element(),
+                ),
+            )
+            .child(
+                resizable_panel()
+                    .size(px(320.))
+                    .size_range(px(280.)..px(520.))
+                    .flex_none()
+                    .child(self.workbench.clone()),
             )
     }
 }
@@ -532,8 +604,83 @@ impl Render for Gallery {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::controls::{
+        ControlBounds, ControlError, ControlKind, ControlSpec, ControlValue, StoryControls,
+    };
     use crate::registry::{RegisteredStoryMetadata, StoryKey, StoryName};
+    use crate::story::Story;
+    use gpui::Focusable;
     use tokio::sync::oneshot;
+
+    struct ControlledStory {
+        focus_handle: gpui::FocusHandle,
+        enabled: bool,
+    }
+
+    impl StoryControls for ControlledStory {
+        fn control_specs(&self) -> Vec<ControlSpec> {
+            vec![ControlSpec {
+                key: "enabled".to_owned(),
+                label: "Enabled".to_owned(),
+                description: String::new(),
+                category: "Properties".to_owned(),
+                kind: ControlKind::Checkbox,
+                default: ControlValue::Boolean(false),
+                bounds: ControlBounds::default(),
+                options: Vec::new(),
+            }]
+        }
+
+        fn control_value(&self, key: &str) -> Result<ControlValue, ControlError> {
+            match key {
+                "enabled" => Ok(ControlValue::Boolean(self.enabled)),
+                _ => Err(ControlError::UnknownControl {
+                    key: key.to_owned(),
+                }),
+            }
+        }
+
+        fn set_control_value(
+            &mut self,
+            key: &str,
+            value: ControlValue,
+        ) -> Result<(), ControlError> {
+            match (key, value) {
+                ("enabled", ControlValue::Boolean(value)) => {
+                    self.enabled = value;
+                    Ok(())
+                },
+                _ => Err(ControlError::UnknownControl {
+                    key: key.to_owned(),
+                }),
+            }
+        }
+    }
+
+    impl Focusable for ControlledStory {
+        fn focus_handle(&self, _: &App) -> gpui::FocusHandle {
+            self.focus_handle.clone()
+        }
+    }
+
+    impl Render for ControlledStory {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            div().child(self.enabled.to_string())
+        }
+    }
+
+    impl Story for ControlledStory {
+        fn title(_: &App) -> String {
+            "Controlled".to_owned()
+        }
+
+        fn new_view(_: &mut Window, cx: &mut App) -> Entity<Self> {
+            cx.new(|cx| Self {
+                focus_handle: cx.focus_handle(),
+                enabled: false,
+            })
+        }
+    }
 
     fn story(
         key: &'static str,
@@ -630,6 +777,9 @@ mod tests {
 
                 gallery.stories.clear();
                 gallery.active_index = None;
+                gallery.workbench_state.update(cx, |state, cx| {
+                    state.set_active_story(None, cx);
+                });
                 automation.set_stories(Vec::new());
                 let error = gallery
                     .prepare_capture_current_story(&StoryScreenshotRequest::default(), window, cx)
@@ -675,5 +825,168 @@ mod tests {
                 gallery.confirm_active_story(cx);
             })
             .expect("empty gallery should update");
+    }
+
+    #[gpui::test]
+    fn automation_controls_read_set_and_reset_the_live_entity(cx: &mut App) {
+        gpui_component::init(cx);
+        let automation = crate::automation::StorybookAutomation::new();
+        let automation_for_view = automation.clone();
+        let window: gpui::WindowHandle<Gallery> = cx
+            .open_window(Default::default(), move |window, cx| {
+                let story = StoryContainer::panel::<ControlledStory>(window, cx);
+                story.update(cx, |story, _| {
+                    story.set_registration_metadata(RegisteredStoryMetadata::new(
+                        StoryKey::new("crate-ControlledStory"),
+                        StoryName::new("ControlledStory"),
+                        None,
+                        "crate",
+                        "src/controlled.rs",
+                        1,
+                    ));
+                });
+                Gallery::view_with_automation(vec![story], None, automation_for_view, window, cx)
+            })
+            .expect("gallery window should open");
+
+        window
+            .update(cx, |gallery, window, cx| {
+                let (response, mut result) = oneshot::channel();
+                gallery.handle_automation_command(
+                    StorybookAutomationCommand::ReadControls { response },
+                    window,
+                    cx,
+                );
+                let snapshot = result
+                    .try_recv()
+                    .expect("read response is sent")
+                    .expect("controls are available");
+                assert_eq!(snapshot.controls[0].value, ControlValue::Boolean(false));
+
+                let (response, mut result) = oneshot::channel();
+                gallery.handle_automation_command(
+                    StorybookAutomationCommand::SetControl {
+                        key: "enabled".to_owned(),
+                        value: ControlValue::Boolean(true),
+                        response,
+                    },
+                    window,
+                    cx,
+                );
+                let snapshot = result
+                    .try_recv()
+                    .expect("set response is sent")
+                    .expect("control update succeeds");
+                assert_eq!(snapshot.controls[0].value, ControlValue::Boolean(true));
+
+                let (response, mut result) = oneshot::channel();
+                gallery.handle_automation_command(
+                    StorybookAutomationCommand::ResetControl {
+                        key: None,
+                        response,
+                    },
+                    window,
+                    cx,
+                );
+                let snapshot = result
+                    .try_recv()
+                    .expect("reset response is sent")
+                    .expect("control reset succeeds");
+                assert_eq!(snapshot.controls[0].value, ControlValue::Boolean(false));
+            })
+            .expect("gallery should update");
+    }
+
+    #[gpui::test]
+    fn grouped_route_selects_the_exact_workbench_variant(cx: &mut App) {
+        gpui_component::init(cx);
+        let automation = crate::automation::StorybookAutomation::new();
+        let automation_for_view = automation.clone();
+        let window: gpui::WindowHandle<Gallery> = cx
+            .open_window(Default::default(), move |window, cx| {
+                let primary = story(
+                    "crate-PrimaryButtonStory",
+                    "PrimaryButtonStory",
+                    "Button",
+                    window,
+                    cx,
+                );
+                let danger = story(
+                    "crate-DangerButtonStory",
+                    "DangerButtonStory",
+                    "Button",
+                    window,
+                    cx,
+                );
+                let grouped =
+                    StoryContainer::list_panel("Button", vec![primary, danger], window, cx);
+                Gallery::view_with_automation(vec![grouped], None, automation_for_view, window, cx)
+            })
+            .expect("grouped gallery window should open");
+
+        window
+            .update(cx, |gallery, _, cx| {
+                gallery
+                    .set_active_story_by_key("crate-DangerButtonStory", cx)
+                    .expect("member route should select its group");
+                let active = gallery
+                    .workbench_state
+                    .read(cx)
+                    .active_story()
+                    .expect("active member exists");
+                assert_eq!(
+                    active.read(cx).story_key_label(),
+                    Some("crate-DangerButtonStory")
+                );
+            })
+            .expect("grouped gallery should update");
+    }
+
+    #[gpui::test]
+    fn separate_windows_keep_control_entities_independent(cx: &mut App) {
+        gpui_component::init(cx);
+        let open = |cx: &mut App| {
+            cx.open_window(Default::default(), |window, cx| {
+                let story = StoryContainer::panel::<ControlledStory>(window, cx);
+                Gallery::view(vec![story], None, window, cx)
+            })
+            .expect("gallery window should open")
+        };
+        let first: gpui::WindowHandle<Gallery> = open(cx);
+        let second: gpui::WindowHandle<Gallery> = open(cx);
+
+        first
+            .update(cx, |gallery, _, cx| {
+                let story = gallery
+                    .workbench_state
+                    .read(cx)
+                    .active_story()
+                    .expect("first story is active");
+                story
+                    .read(cx)
+                    .control_target()
+                    .expect("first story has controls")
+                    .set("enabled", ControlValue::Boolean(true), cx)
+                    .expect("first control update succeeds");
+            })
+            .expect("first gallery should update");
+
+        second
+            .update(cx, |gallery, _, cx| {
+                let story = gallery
+                    .workbench_state
+                    .read(cx)
+                    .active_story()
+                    .expect("second story is active");
+                assert_eq!(
+                    story
+                        .read(cx)
+                        .control_target()
+                        .expect("second story has controls")
+                        .value("enabled", cx),
+                    Ok(ControlValue::Boolean(false))
+                );
+            })
+            .expect("second gallery should update");
     }
 }

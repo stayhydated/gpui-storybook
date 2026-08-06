@@ -12,12 +12,17 @@
 //! `usize` ordering key.
 //!
 //! `#[derive(ComponentStory)]` supports non-generic structs and helper
-//! attributes `title`, `description`, `section`, and `example`. It generates a
-//! hidden wrapper view and registers the original component type name so
+//! attributes `title`, `description`, `section`, and `example`, plus
+//! field-level `#[storybook(control...)]` metadata. It generates a hidden
+//! wrapper view and registers the original component type name so
 //! `disable_story = ["ComponentName"]` matches the public type the user wrote.
 //! Macro-generated story entries also include a stable automation key in the
 //! form `{crate-package-name}-{registered-story-name}` and an exported marker
 //! that makes duplicate generated keys in the same package fail to build.
+//!
+//! `#[derive(StoryControls)]` generates typed metadata, reads, and setters for
+//! explicitly marked fields. Boolean, numeric, text, `SharedString`, and
+//! `Hsla` fields are inferred; enum-like fields provide string `options`.
 //!
 //! `#[derive(Substory)]` supports fieldless enums used with
 //! `gpui_storybook::section(...)` or `gpui_storybook::StorySectionBase::new(...)`.
@@ -33,8 +38,8 @@ use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{format_ident, quote};
 use syn::{
-    Data, DeriveInput, Expr, ExprLit, ExprPath, Fields, ItemFn, ItemStruct, Lit, LitStr, Token,
-    meta::ParseNestedMeta, parse::Parse, parse::ParseStream,
+    Data, DeriveInput, Expr, ExprArray, ExprLit, ExprPath, Field, Fields, ItemFn, ItemStruct, Lit,
+    LitStr, Token, Type, meta::ParseNestedMeta, parse::Parse, parse::ParseStream,
 };
 
 enum SectionArg {
@@ -58,6 +63,33 @@ struct ComponentStoryArgs {
 struct SubstoryVariantArgs {
     title: Option<LitStr>,
     key: Option<LitStr>,
+}
+
+#[derive(Default)]
+struct ControlFieldArgs {
+    skip: bool,
+    label: Option<LitStr>,
+    description: Option<LitStr>,
+    category: Option<LitStr>,
+    min: Option<Expr>,
+    max: Option<Expr>,
+    step: Option<Expr>,
+    options: Vec<LitStr>,
+}
+
+struct GeneratedControlField {
+    ident: syn::Ident,
+    ty: Type,
+    key: String,
+    label: String,
+    description: String,
+    category: String,
+    kind: TokenStream2,
+    min: TokenStream2,
+    max: TokenStream2,
+    step: TokenStream2,
+    options: Vec<String>,
+    choice: bool,
 }
 
 impl Parse for StoryArgs {
@@ -355,6 +387,413 @@ fn substory_impl(input: TokenStream2) -> TokenStream2 {
     }
 }
 
+fn parse_control_field_args(field: &Field) -> syn::Result<Option<ControlFieldArgs>> {
+    let mut control = None;
+
+    for attr in &field.attrs {
+        if !attr.path().is_ident("storybook") {
+            continue;
+        }
+
+        attr.parse_nested_meta(|meta| {
+            if !meta.path.is_ident("control") {
+                return Err(meta.error(
+                    "unsupported field #[storybook(...)] argument; expected `control`",
+                ));
+            }
+            if control.is_some() {
+                return Err(duplicate_attr_error(&meta, "control"));
+            }
+
+            let mut args = ControlFieldArgs::default();
+            if !meta.input.is_empty() {
+                meta.parse_nested_meta(|nested| {
+                    if nested.path.is_ident("skip") {
+                        args.skip = true;
+                        return Ok(());
+                    }
+                    if nested.path.is_ident("label") {
+                        let value: LitStr = nested.value()?.parse()?;
+                        if args.label.replace(value).is_some() {
+                            return Err(duplicate_attr_error(&nested, "label"));
+                        }
+                        return Ok(());
+                    }
+                    if nested.path.is_ident("description") {
+                        let value: LitStr = nested.value()?.parse()?;
+                        if args.description.replace(value).is_some() {
+                            return Err(duplicate_attr_error(&nested, "description"));
+                        }
+                        return Ok(());
+                    }
+                    if nested.path.is_ident("category") {
+                        let value: LitStr = nested.value()?.parse()?;
+                        if args.category.replace(value).is_some() {
+                            return Err(duplicate_attr_error(&nested, "category"));
+                        }
+                        return Ok(());
+                    }
+                    if nested.path.is_ident("min") {
+                        let value: Expr = nested.value()?.parse()?;
+                        if args.min.replace(value).is_some() {
+                            return Err(duplicate_attr_error(&nested, "min"));
+                        }
+                        return Ok(());
+                    }
+                    if nested.path.is_ident("max") {
+                        let value: Expr = nested.value()?.parse()?;
+                        if args.max.replace(value).is_some() {
+                            return Err(duplicate_attr_error(&nested, "max"));
+                        }
+                        return Ok(());
+                    }
+                    if nested.path.is_ident("step") {
+                        let value: Expr = nested.value()?.parse()?;
+                        if args.step.replace(value).is_some() {
+                            return Err(duplicate_attr_error(&nested, "step"));
+                        }
+                        return Ok(());
+                    }
+                    if nested.path.is_ident("options") {
+                        if !args.options.is_empty() {
+                            return Err(duplicate_attr_error(&nested, "options"));
+                        }
+                        let values: ExprArray = nested.value()?.parse()?;
+                        for value in values.elems {
+                            let Expr::Lit(ExprLit {
+                                lit: Lit::Str(value),
+                                ..
+                            }) = value
+                            else {
+                                return Err(syn::Error::new_spanned(
+                                    value,
+                                    "control options must be string literals",
+                                ));
+                            };
+                            args.options.push(value);
+                        }
+                        if args.options.is_empty() {
+                            return Err(nested.error("control options cannot be empty"));
+                        }
+                        return Ok(());
+                    }
+
+                    Err(nested.error(
+                        "unsupported control argument; expected `skip`, `label`, `description`, `category`, `min`, `max`, `step`, or `options`",
+                    ))
+                })?;
+            }
+
+            control = Some(args);
+            Ok(())
+        })?;
+    }
+
+    Ok(control)
+}
+
+fn control_type_name(ty: &Type) -> Option<String> {
+    let Type::Path(path) = ty else {
+        return None;
+    };
+    path.path
+        .segments
+        .last()
+        .map(|segment| segment.ident.to_string())
+}
+
+fn generated_control_fields(input: &DeriveInput) -> syn::Result<Vec<GeneratedControlField>> {
+    let Data::Struct(data) = &input.data else {
+        return Err(syn::Error::new_spanned(
+            &input.ident,
+            "StoryControls can only be derived for structs",
+        ));
+    };
+
+    let mut generated = Vec::new();
+    let Fields::Named(fields) = &data.fields else {
+        let has_control = data.fields.iter().any(|field| {
+            field
+                .attrs
+                .iter()
+                .any(|attr| attr.path().is_ident("storybook"))
+        });
+        if has_control {
+            return Err(syn::Error::new_spanned(
+                &data.fields,
+                "story controls require named struct fields",
+            ));
+        }
+        return Ok(generated);
+    };
+
+    for field in &fields.named {
+        let Some(args) = parse_control_field_args(field)? else {
+            continue;
+        };
+        if args.skip {
+            if args.label.is_some()
+                || args.description.is_some()
+                || args.category.is_some()
+                || args.min.is_some()
+                || args.max.is_some()
+                || args.step.is_some()
+                || !args.options.is_empty()
+            {
+                return Err(syn::Error::new_spanned(
+                    field,
+                    "`skip` cannot be combined with other control arguments",
+                ));
+            }
+            continue;
+        }
+
+        let ident = field
+            .ident
+            .clone()
+            .expect("named fields always have identifiers");
+        let key = ident.to_string();
+        let type_name = control_type_name(&field.ty);
+        let numeric = matches!(
+            type_name.as_deref(),
+            Some(
+                "i8" | "i16"
+                    | "i32"
+                    | "i64"
+                    | "isize"
+                    | "u8"
+                    | "u16"
+                    | "u32"
+                    | "usize"
+                    | "f32"
+                    | "f64"
+            )
+        );
+        let supported = matches!(
+            type_name.as_deref(),
+            Some(
+                "bool"
+                    | "i8"
+                    | "i16"
+                    | "i32"
+                    | "i64"
+                    | "isize"
+                    | "u8"
+                    | "u16"
+                    | "u32"
+                    | "usize"
+                    | "f32"
+                    | "f64"
+                    | "String"
+                    | "SharedString"
+                    | "Hsla"
+            )
+        );
+        let choice = !args.options.is_empty();
+        if !supported && !choice {
+            return Err(syn::Error::new_spanned(
+                &field.ty,
+                "unsupported story control type; use `control(skip)` or provide string `options` for an enum implementing Display and FromStr",
+            ));
+        }
+        if !numeric && (args.min.is_some() || args.max.is_some() || args.step.is_some()) {
+            return Err(syn::Error::new_spanned(
+                field,
+                "`min`, `max`, and `step` are only supported by numeric controls",
+            ));
+        }
+        if choice && (args.min.is_some() || args.max.is_some() || args.step.is_some()) {
+            return Err(syn::Error::new_spanned(
+                field,
+                "select controls cannot also define numeric bounds",
+            ));
+        }
+
+        let kind = if choice {
+            quote! { ::gpui_storybook::ControlKind::Select }
+        } else if numeric && (args.min.is_some() || args.max.is_some()) {
+            quote! { ::gpui_storybook::ControlKind::Range }
+        } else {
+            let ty = &field.ty;
+            quote! { <#ty as ::gpui_storybook::ControlValueField>::control_kind() }
+        };
+        let min = args
+            .min
+            .map_or_else(|| quote! { None }, |value| quote! { Some((#value) as f64) });
+        let max = args
+            .max
+            .map_or_else(|| quote! { None }, |value| quote! { Some((#value) as f64) });
+        let step = args
+            .step
+            .map_or_else(|| quote! { None }, |value| quote! { Some((#value) as f64) });
+
+        generated.push(GeneratedControlField {
+            ident,
+            ty: field.ty.clone(),
+            label: args
+                .label
+                .map_or_else(|| key.to_title_case(), |label| label.value()),
+            description: args
+                .description
+                .map_or_else(String::new, |value| value.value()),
+            category: args
+                .category
+                .map_or_else(|| "Properties".to_owned(), |value| value.value()),
+            options: args
+                .options
+                .into_iter()
+                .map(|value| value.value())
+                .collect(),
+            key,
+            kind,
+            min,
+            max,
+            step,
+            choice,
+        });
+    }
+
+    Ok(generated)
+}
+
+fn story_controls_impl(type_ident: &syn::Ident, fields: &[GeneratedControlField]) -> TokenStream2 {
+    let specs = fields.iter().map(|field| {
+        let ident = &field.ident;
+        let ty = &field.ty;
+        let key = &field.key;
+        let label = &field.label;
+        let description = &field.description;
+        let category = &field.category;
+        let kind = &field.kind;
+        let min = &field.min;
+        let max = &field.max;
+        let step = &field.step;
+        let options = &field.options;
+        let default = if field.choice {
+            quote! { ::gpui_storybook::choice_control_value(&self.#ident) }
+        } else {
+            quote! {
+                <#ty as ::gpui_storybook::ControlValueField>::to_control_value(&self.#ident)
+            }
+        };
+
+        quote! {
+            ::gpui_storybook::ControlSpec {
+                key: #key.to_owned(),
+                label: #label.to_owned(),
+                description: #description.to_owned(),
+                category: #category.to_owned(),
+                kind: #kind,
+                default: #default,
+                bounds: ::gpui_storybook::ControlBounds {
+                    min: #min,
+                    max: #max,
+                    step: #step,
+                },
+                options: vec![#(#options.to_owned()),*],
+            }
+        }
+    });
+    let value_arms = fields.iter().map(|field| {
+        let ident = &field.ident;
+        let ty = &field.ty;
+        let key = &field.key;
+        let value = if field.choice {
+            quote! { ::gpui_storybook::choice_control_value(&self.#ident) }
+        } else {
+            quote! {
+                <#ty as ::gpui_storybook::ControlValueField>::to_control_value(&self.#ident)
+            }
+        };
+        quote! { #key => Ok(#value), }
+    });
+    let setter_arms = fields.iter().map(|field| {
+        let ident = &field.ident;
+        let ty = &field.ty;
+        let key = &field.key;
+        if field.choice {
+            let options = &field.options;
+            quote! {
+                #key => {
+                    let options = vec![#(#options.to_owned()),*];
+                    self.#ident = ::gpui_storybook::parse_choice_control_value::<#ty>(
+                        #key,
+                        value,
+                        &options,
+                    )?;
+                    Ok(())
+                },
+            }
+        } else {
+            quote! {
+                #key => {
+                    self.#ident = <#ty as ::gpui_storybook::ControlValueField>::from_control_value(
+                        #key,
+                        value,
+                    )?;
+                    Ok(())
+                },
+            }
+        }
+    });
+
+    quote! {
+        impl ::gpui_storybook::StoryControls for #type_ident {
+            fn control_specs(&self) -> ::std::vec::Vec<::gpui_storybook::ControlSpec> {
+                vec![#(#specs),*]
+            }
+
+            fn control_value(
+                &self,
+                key: &str,
+            ) -> ::std::result::Result<
+                ::gpui_storybook::ControlValue,
+                ::gpui_storybook::ControlError,
+            > {
+                match key {
+                    #(#value_arms)*
+                    _ => Err(::gpui_storybook::ControlError::UnknownControl {
+                        key: key.to_owned(),
+                    }),
+                }
+            }
+
+            fn set_control_value(
+                &mut self,
+                key: &str,
+                value: ::gpui_storybook::ControlValue,
+            ) -> ::std::result::Result<(), ::gpui_storybook::ControlError> {
+                match key {
+                    #(#setter_arms)*
+                    _ => Err(::gpui_storybook::ControlError::UnknownControl {
+                        key: key.to_owned(),
+                    }),
+                }
+            }
+        }
+    }
+}
+
+fn story_controls_derive_impl(input: TokenStream2) -> TokenStream2 {
+    let input: DeriveInput = match syn::parse2(input) {
+        Ok(input) => input,
+        Err(err) => return err.to_compile_error(),
+    };
+    if !input.generics.params.is_empty() {
+        return syn::Error::new_spanned(
+            input.generics,
+            "StoryControls does not support generic structs",
+        )
+        .to_compile_error();
+    }
+    let fields = match generated_control_fields(&input) {
+        Ok(fields) => fields,
+        Err(err) => return err.to_compile_error(),
+    };
+
+    story_controls_impl(&input.ident, &fields)
+}
+
 fn component_story_impl(input: TokenStream2) -> TokenStream2 {
     let input: DeriveInput = match syn::parse2(input) {
         Ok(input) => input,
@@ -381,6 +820,10 @@ fn component_story_impl(input: TokenStream2) -> TokenStream2 {
         Ok(args) => args,
         Err(err) => return err.to_compile_error(),
     };
+    let control_fields = match generated_control_fields(&input) {
+        Ok(fields) => fields,
+        Err(err) => return err.to_compile_error(),
+    };
 
     let struct_name = &input.ident;
     let struct_name_str = struct_name.to_string();
@@ -395,6 +838,34 @@ fn component_story_impl(input: TokenStream2) -> TokenStream2 {
         }
     });
     let wrapper_ident = format_ident!("__{}ComponentStoryView", struct_name);
+    let wrapper_fields = control_fields.iter().map(|field| {
+        let ident = &field.ident;
+        let ty = &field.ty;
+        quote! { #ident: #ty, }
+    });
+    let wrapper_initializers = control_fields.iter().map(|field| {
+        let ident = &field.ident;
+        quote! { #ident: example.#ident.clone(), }
+    });
+    let example_overlays = control_fields.iter().map(|field| {
+        let ident = &field.ident;
+        quote! { example.#ident = self.#ident.clone(); }
+    });
+    let view_example = (!control_fields.is_empty()).then(|| quote! { let example = #example; });
+    let render_example = if control_fields.is_empty() {
+        quote! { #example }
+    } else {
+        quote! {
+            let mut example = #example;
+            #(#example_overlays)*
+            example
+        }
+    };
+    let controls_impl = if control_fields.is_empty() {
+        quote! { impl ::gpui_storybook::StoryControls for #wrapper_ident {} }
+    } else {
+        story_controls_impl(&wrapper_ident, &control_fields)
+    };
     let registration = registration_tokens(
         quote! { #wrapper_ident },
         &struct_name_str,
@@ -404,12 +875,15 @@ fn component_story_impl(input: TokenStream2) -> TokenStream2 {
     quote! {
         struct #wrapper_ident {
             focus_handle: ::gpui::FocusHandle,
+            #(#wrapper_fields)*
         }
 
         impl #wrapper_ident {
             fn view(_window: &mut ::gpui::Window, cx: &mut ::gpui::App) -> ::gpui::Entity<Self> {
+                #view_example
                 ::gpui::AppContext::new(cx, |cx| Self {
                     focus_handle: cx.focus_handle(),
+                    #(#wrapper_initializers)*
                 })
             }
         }
@@ -429,9 +903,11 @@ fn component_story_impl(input: TokenStream2) -> TokenStream2 {
                 let _ = &self.focus_handle;
                 let _ = window;
                 let _ = cx;
-                #example
+                #render_example
             }
         }
+
+        #controls_impl
 
         impl ::gpui_storybook::Story for #wrapper_ident {
             fn klass() -> &'static str {
@@ -451,7 +927,7 @@ fn component_story_impl(input: TokenStream2) -> TokenStream2 {
             fn new_view(
                 window: &mut ::gpui::Window,
                 cx: &mut ::gpui::App,
-            ) -> ::gpui::Entity<impl ::gpui::Render + ::gpui::Focusable> {
+            ) -> ::gpui::Entity<Self> {
                 Self::view(window, cx)
             }
         }
@@ -465,16 +941,38 @@ fn component_story_impl(input: TokenStream2) -> TokenStream2 {
 /// Optionally accepts a section name as a string literal or enum variant:
 /// ```ignore
 /// // String literal (sorted alphabetically by section name)
+/// #[derive(gpui_storybook::StoryControls)]
 /// #[story("Components")]
 /// pub struct ButtonStory;
 ///
 /// // Enum variant (sorted by enum discriminant order)
+/// #[derive(gpui_storybook::StoryControls)]
 /// #[story(StorySection::Components)]
 /// pub struct ButtonStory;
 /// ```
 #[proc_macro_attribute]
 pub fn story(args: TokenStream, input: TokenStream) -> TokenStream {
     story_impl(args.into(), input.into()).into()
+}
+
+/// Derives typed access to fields marked with `#[storybook(control...)]`.
+///
+/// Supported fields are `bool`, integer and floating-point primitives,
+/// `String`, `SharedString`, and `Hsla`. Enum-like fields can provide
+/// `options = ["..."]` when they implement `Display` and `FromStr`.
+///
+/// ```ignore
+/// #[derive(gpui_storybook::StoryControls)]
+/// struct ButtonStory {
+///     #[storybook(control)]
+///     disabled: bool,
+///     #[storybook(control(min = 0.0, max = 32.0, step = 1.0))]
+///     padding: f32,
+/// }
+/// ```
+#[proc_macro_derive(StoryControls, attributes(storybook))]
+pub fn story_controls(input: TokenStream) -> TokenStream {
+    story_controls_derive_impl(input.into()).into()
 }
 
 fn story_init_impl(_args: TokenStream2, input: TokenStream2) -> TokenStream2 {
@@ -516,7 +1014,10 @@ fn story_init_impl(_args: TokenStream2, input: TokenStream2) -> TokenStream2 {
 ///     section = StorySection::Components,
 ///     example = ButtonChip::example(),
 /// )]
-/// pub struct ButtonChip;
+/// pub struct ButtonChip {
+///     #[storybook(control(category = "Content"))]
+///     label: gpui::SharedString,
+/// }
 /// ```
 #[proc_macro_derive(ComponentStory, attributes(storybook))]
 pub fn component_story(input: TokenStream) -> TokenStream {
@@ -673,6 +1174,78 @@ mod tests {
         assert_snapshot!(
             "component_story_derive_with_string_expressions_generates_wrapper_story_and_registry_entry",
             snapshot_tokens(expanded)
+        );
+    }
+
+    #[test]
+    fn story_controls_derive_generates_typed_metadata_and_setters() {
+        let input = quote! {
+            pub struct ButtonStory {
+                #[storybook(control(label = "Disabled", category = "State"))]
+                disabled: bool,
+                #[storybook(control(min = 0.0, max = 32.0, step = 1.0))]
+                padding: f32,
+                #[storybook(control(options = ["Primary", "Danger"]))]
+                intent: ButtonIntent,
+                #[storybook(control(skip))]
+                focus_handle: FocusHandle,
+            }
+        };
+
+        assert_snapshot!(
+            "story_controls_derive_generates_typed_metadata_and_setters",
+            snapshot_tokens(story_controls_derive_impl(input))
+        );
+    }
+
+    #[test]
+    fn component_story_controls_store_defaults_and_overlay_live_values() {
+        let input = quote! {
+            #[storybook(example = WelcomeCard::example())]
+            pub struct WelcomeCard {
+                #[storybook(control(category = "Content"))]
+                headline: gpui::SharedString,
+                #[storybook(control)]
+                selected: bool,
+                #[storybook(control(skip))]
+                items: Vec<String>,
+            }
+        };
+
+        assert_snapshot!(
+            "component_story_controls_store_defaults_and_overlay_live_values",
+            snapshot_tokens(component_story_impl(input))
+        );
+    }
+
+    #[test]
+    fn explicitly_requested_unsupported_controls_report_compile_errors() {
+        assert_compile_error(
+            story_controls_derive_impl(quote! {
+                pub struct UnsupportedStory {
+                    #[storybook(control)]
+                    items: Vec<String>,
+                }
+            }),
+            "unsupported story control type",
+        );
+        assert_compile_error(
+            story_controls_derive_impl(quote! {
+                pub struct InvalidBoundStory {
+                    #[storybook(control(min = 1.0))]
+                    label: String,
+                }
+            }),
+            "only supported by numeric controls",
+        );
+        assert_compile_error(
+            story_controls_derive_impl(quote! {
+                pub struct InvalidSkipStory {
+                    #[storybook(control(skip, label = "Hidden"))]
+                    label: String,
+                }
+            }),
+            "`skip` cannot be combined",
         );
     }
 
