@@ -20,6 +20,70 @@ GPUI_STORYBOOK_MCP_STDIO=1 \
 cargo run -p my-app-storybook --features mcp
 ```
 
+On Linux, install Sway and Mesa's software graphics drivers. For Debian or
+Ubuntu:
+
+```bash
+sudo apt-get install --no-install-recommends \
+  libgl1-mesa-dri mesa-vulkan-drivers sway
+```
+
+Then run MCP sessions through a headless Wayland compositor:
+
+```bash
+(
+  runtime_dir="$(mktemp -d)"
+  chmod 700 "$runtime_dir"
+  printf '%s\n' \
+    'output * mode 1920x1200' \
+    'seat seat0 fallback true' \
+    'for_window [app_id=".*"] floating enable' \
+    > "$runtime_dir/sway.conf"
+
+  cleanup() {
+    kill "$sway_pid" 2>/dev/null || true
+    wait "$sway_pid" 2>/dev/null || true
+    rm -rf "$runtime_dir"
+  }
+  trap cleanup EXIT
+
+  export XDG_RUNTIME_DIR="$runtime_dir"
+  unset DISPLAY I3SOCK SWAYSOCK WAYLAND_DISPLAY WAYLAND_SOCKET ZED_HEADLESS
+  WLR_BACKENDS=headless \
+  WLR_HEADLESS_OUTPUTS=1 \
+  WLR_LIBINPUT_NO_DEVICES=1 \
+  WLR_RENDERER=gles2 \
+  WLR_RENDERER_ALLOW_SOFTWARE=1 \
+  LIBGL_ALWAYS_SOFTWARE=1 \
+  sway --unsupported-gpu --config "$runtime_dir/sway.conf" \
+    > "$runtime_dir/sway.log" 2>&1 &
+  sway_pid=$!
+
+  until wayland_socket="$(find "$runtime_dir" -maxdepth 1 \
+    -type s -name 'wayland-*' -print -quit)" && \
+    [ -n "$wayland_socket" ]; do
+    if ! kill -0 "$sway_pid" 2>/dev/null; then
+      cat "$runtime_dir/sway.log" >&2
+      exit 1
+    fi
+    sleep 0.05
+  done
+
+  export WAYLAND_DISPLAY="${wayland_socket##*/}"
+  export LIBGL_ALWAYS_SOFTWARE=1
+  GPUI_STORYBOOK_MCP_STDIO=1 \
+  cargo run -p my-app-storybook --features mcp
+)
+```
+
+This uses the normal Wayland-backed GPUI application. The private
+`XDG_RUNTIME_DIR` and discovered `WAYLAND_DISPLAY` select Sway's in-memory
+wlroots compositor, which provides a compatibility seat, window management,
+and frame callbacks. Mesa renders both compositor and application in software.
+macOS and Windows continue to use their native launch paths.
+`--unsupported-gpu` bypasses Sway's host-driver startup check; the explicit
+headless backend and software renderer keep this wrapper off the physical GPU.
+
 This launch exposes route, control, and capture tools. Generic input can invoke
 arbitrary application behavior, so enable it separately and only against a
 safe Storybook backend:
@@ -53,7 +117,7 @@ language. It does not overwrite interactive preferences.
 | `storybook_set_control` | Set one control on the active story instance |
 | `storybook_reset_control` | Reset one control, or all controls when `key` is omitted |
 | `storybook_capture_current_story` | Capture the active story region |
-| `storybook_capture_launch_env` | Build environment variables and a Cargo launch command |
+| `storybook_capture_launch_env` | Build environment variables and a platform launch command |
 | `storybook_list_actions` | List runtime GPUI actions, documentation, and argument schemas; interaction gate required |
 | `storybook_run_steps` | Run one ordered in-process interaction batch with optional capture; interaction gate required |
 
@@ -224,7 +288,8 @@ cargo run -p my-app-storybook --features mcp
 
 Storybook opens the route, creates missing parent directories, writes the PNG,
 and exits after capture. Capture startup disables preference persistence and
-uses the deterministic light presentation.
+uses the deterministic light presentation. On Linux, wrap this command with
+headless Sway as shown above.
 
 | Environment variable | Meaning |
 |---|---|
@@ -236,6 +301,10 @@ uses the deterministic light presentation.
 
 Set width and height together, and make both values greater than zero.
 `WGPU_CAPTURE_FRAME`, when present, must also be greater than zero.
+On Linux, the `command` returned by `storybook_capture_launch_env` creates a
+private Wayland runtime, starts headless Sway with a software GLES renderer,
+waits for its socket, and then runs Cargo. Its `env` object still holds the
+capture and stdio variables that must be supplied to that command.
 
 ## Capture a live session
 
@@ -267,9 +336,9 @@ batch and can observe intermediate rendered state. A successful capture result
 contains the request ID, actual path, rendered pixel dimensions, and story
 metadata.
 
-`storybook_capture_launch_env` can construct the environment and command for
-an external launcher. It accepts a route plus optional output path, frame,
-paired dimensions, package, binary, feature list, and stdio selection.
+`storybook_capture_launch_env` can construct the environment and platform
+command for an external launcher. It accepts a route plus optional output path,
+frame, paired dimensions, package, binary, feature list, and stdio selection.
 It also accepts a named viewport when paired dimensions are omitted.
 
 ## Understand capture bounds and size

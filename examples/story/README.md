@@ -35,6 +35,10 @@ GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1 \
 cargo run -p gpui-storybook-example-story --features mcp
 ```
 
+On Linux, supply the headless Sway wrapper documented in the automation guide
+for the same stdio session. The application remains on GPUI's normal Wayland
+backend and receives compositor-driven frame callbacks.
+
 Add `dock` to the feature list to run the identical executor through the dock
 host. Rediscover registered actions after each launch before dispatching one.
 Opening a route for an interaction batch focuses that story's focus handle. The

@@ -45,9 +45,81 @@ jobs:
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
         uses: ./.github/actions/install-linux-deps
+        with:
+          sway: true
 
       - name: Run tests
         run: cargo test --workspace --all-features --locked
+
+      - name: Smoke test Storybook capture through headless Sway
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          env -u DISPLAY -u WAYLAND_DISPLAY -u WAYLAND_SOCKET -u ZED_HEADLESS \
+            RUST_LOG=warn \
+            WGPU_CAPTURE_ROUTE=gpui-storybook-example-story-ButtonStory \
+            WGPU_CAPTURE_PATH=target/storybook-captures/ci-sway-button.png \
+            WGPU_CAPTURE_WIDTH=390 \
+            WGPU_CAPTURE_HEIGHT=844 \
+            timeout 90s sh -c '
+              storybook_runtime_dir=$(mktemp -d) || exit 1
+              chmod 700 "$storybook_runtime_dir"
+              export XDG_RUNTIME_DIR="$storybook_runtime_dir"
+              unset I3SOCK SWAYSOCK
+              storybook_sway_config="$storybook_runtime_dir/sway.conf"
+              storybook_sway_log="$storybook_runtime_dir/sway.log"
+              printf "%s\n" \
+                "output * mode 1920x1200" \
+                "seat seat0 fallback true" \
+                "for_window [app_id=\".*\"] floating enable" \
+                > "$storybook_sway_config"
+              WLR_BACKENDS=headless \
+              WLR_HEADLESS_OUTPUTS=1 \
+              WLR_LIBINPUT_NO_DEVICES=1 \
+              WLR_RENDERER=gles2 \
+              WLR_RENDERER_ALLOW_SOFTWARE=1 \
+              LIBGL_ALWAYS_SOFTWARE=1 \
+              sway --unsupported-gpu --config "$storybook_sway_config" \
+                > "$storybook_sway_log" 2>&1 &
+              storybook_sway_pid=$!
+              storybook_cleanup() {
+                kill "$storybook_sway_pid" 2>/dev/null || true
+                wait "$storybook_sway_pid" 2>/dev/null || true
+                rm -rf "$storybook_runtime_dir"
+              }
+              trap storybook_cleanup EXIT
+              storybook_wayland_socket=
+              storybook_sway_attempts=0
+              while [ -z "$storybook_wayland_socket" ]; do
+                for storybook_socket_candidate in "$XDG_RUNTIME_DIR"/wayland-*; do
+                  if [ -S "$storybook_socket_candidate" ]; then
+                    storybook_wayland_socket=$storybook_socket_candidate
+                    break
+                  fi
+                done
+                if ! kill -0 "$storybook_sway_pid" 2>/dev/null; then
+                  if [ -f "$storybook_sway_log" ]; then
+                    cat "$storybook_sway_log" >&2
+                  fi
+                  echo "gpui-storybook: Sway exited before its Wayland socket was ready" >&2
+                  exit 1
+                fi
+                storybook_sway_attempts=$((storybook_sway_attempts + 1))
+                if [ "$storybook_sway_attempts" -ge 100 ]; then
+                  if [ -f "$storybook_sway_log" ]; then
+                    cat "$storybook_sway_log" >&2
+                  fi
+                  echo "gpui-storybook: Sway did not become ready" >&2
+                  exit 1
+                fi
+                sleep 0.05
+              done
+              export WAYLAND_DISPLAY="${storybook_wayland_socket##*/}"
+              export LIBGL_ALWAYS_SOFTWARE=1
+              "$@"
+            ' sh \
+              cargo run -p gpui-storybook-example-story --features mcp --locked
+          test -s target/storybook-captures/ci-sway-button.png
 
   fmt:
     runs-on: ubuntu-latest

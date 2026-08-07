@@ -23,13 +23,15 @@ description: >-
    integration.
 3. Keep the story-bearing library linked from the binary so inventory
    registrations are retained.
-4. Create a stable, binary-specific `ConsumerId`, call
+4. Build native apps with `gpui_platform::application()` and the facade's
+   embedded assets.
+5. Create a stable, binary-specific `ConsumerId`, call
    `gpui_storybook::init`, await readiness, and only then open the gallery or
    dock window.
-5. Update the manifest, entry point, locale assets, story modules, and
+6. Update the manifest, entry point, locale assets, story modules, and
    `storybook.toml` together when the requested workflow crosses those
    surfaces.
-6. Preserve the application's error handling, localization, section naming,
+7. Preserve the application's error handling, localization, section naming,
    feature-forwarding, and GPUI component conventions.
 
 ## Load only the needed reference
@@ -54,6 +56,8 @@ description: >-
 - Forward optional package features explicitly when users launch with
   `--features dock` or `--features mcp`.
 - Send logs to standard error during MCP stdio sessions.
+- Run Linux MCP and startup-capture sessions through Sway's wlroots headless
+  backend; keep the application on its normal Wayland platform backend.
 - Require `GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1` before generic focus,
   keyboard, action, pointer, scroll, or frame-wait automation. Keep typed
   controls as the preferred reproducible input.

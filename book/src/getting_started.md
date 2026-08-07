@@ -147,6 +147,10 @@ Run the package that owns the entry point:
 cargo run -p my-app-storybook
 ```
 
+Linux MCP and startup-capture sessions use the same application under Sway's
+wlroots headless backend. The [automation guide](automation.md) covers the
+required packages and launch command.
+
 The window should list every linked story allowed by the active
 `storybook.toml`. Continue with [Write stories](stories.md) if the gallery is
 empty, then [Use the workbench](workbench.md) to add live controls.

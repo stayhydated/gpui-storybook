@@ -15,6 +15,62 @@ mcp = ["gpui-storybook/mcp"]
 Set `GPUI_STORYBOOK_MCP_STDIO=1` to serve MCP over stdio. Route tracing and
 diagnostic logs to standard error.
 
+On Linux, install Sway plus `libgl1-mesa-dri` and `mesa-vulkan-drivers`, then
+run stdio and startup-capture sessions through a headless Wayland compositor:
+
+```bash
+(
+  runtime_dir="$(mktemp -d)"
+  chmod 700 "$runtime_dir"
+  printf '%s\n' \
+    'output * mode 1920x1200' \
+    'seat seat0 fallback true' \
+    'for_window [app_id=".*"] floating enable' \
+    > "$runtime_dir/sway.conf"
+
+  cleanup() {
+    kill "$sway_pid" 2>/dev/null || true
+    wait "$sway_pid" 2>/dev/null || true
+    rm -rf "$runtime_dir"
+  }
+  trap cleanup EXIT
+
+  export XDG_RUNTIME_DIR="$runtime_dir"
+  unset DISPLAY I3SOCK SWAYSOCK WAYLAND_DISPLAY WAYLAND_SOCKET ZED_HEADLESS
+  WLR_BACKENDS=headless \
+  WLR_HEADLESS_OUTPUTS=1 \
+  WLR_LIBINPUT_NO_DEVICES=1 \
+  WLR_RENDERER=gles2 \
+  WLR_RENDERER_ALLOW_SOFTWARE=1 \
+  LIBGL_ALWAYS_SOFTWARE=1 \
+  sway --unsupported-gpu --config "$runtime_dir/sway.conf" \
+    > "$runtime_dir/sway.log" 2>&1 &
+  sway_pid=$!
+
+  until wayland_socket="$(find "$runtime_dir" -maxdepth 1 \
+    -type s -name 'wayland-*' -print -quit)" && \
+    [ -n "$wayland_socket" ]; do
+    if ! kill -0 "$sway_pid" 2>/dev/null; then
+      cat "$runtime_dir/sway.log" >&2
+      exit 1
+    fi
+    sleep 0.05
+  done
+
+  export WAYLAND_DISPLAY="${wayland_socket##*/}"
+  export LIBGL_ALWAYS_SOFTWARE=1
+  GPUI_STORYBOOK_MCP_STDIO=1 \
+  cargo run -p my-app-storybook --features mcp
+)
+```
+
+Sway provides a compatibility seat, window management, and frame callbacks
+while retaining GPUI's normal Wayland backend. The launch-env tool emits a
+bounded-readiness version of this wrapper on Linux and continues to emit a
+direct Cargo command elsewhere.
+The `--unsupported-gpu` flag only bypasses Sway's host-driver check; the
+headless backend and software GLES renderer remain explicitly selected.
+
 Set `GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1` only when the client should receive
 generic in-process interaction tools. The value must be exactly `1`; otherwise
 the tools are omitted. This capability can trigger any effect reachable from a
@@ -120,7 +176,9 @@ Optional variables:
 
 Capture startup disables persistence and forces light appearance, the
 `Default Light` theme, and the typed fallback language. Stdio-only startup
-uses the same presentation with temporary storage.
+uses the same presentation with temporary storage. On Linux, commands from
+`storybook_capture_launch_env` create a private Wayland runtime, wait for
+headless Sway, and then run Cargo.
 
 Captures exclude gallery or dock chrome. A substory route crops to its section.
 Paired dimensions target the story region rather than collapsing the complete

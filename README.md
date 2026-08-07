@@ -56,6 +56,12 @@ GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1 \
 cargo run -p my-app-storybook --features mcp
 ```
 
+Linux automation uses the normal Wayland-backed GPUI application under Sway's
+wlroots headless backend. Install Sway and Mesa's software graphics drivers;
+`storybook_capture_launch_env` generates the complete compositor wrapper
+automatically on Linux. macOS and Windows keep their normal native launch
+commands.
+
 Interaction runs inside the live GPUI window; it does not require compositor
 or operating-system input injection. Named and paired capture dimensions target
 the story region while the gallery or dock chrome stays mounted. See [Automation and

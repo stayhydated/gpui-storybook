@@ -15,7 +15,9 @@
 //! this crate. Capture launches use disabled storage plus deterministic light,
 //! `Default Light`, and fallback-language overrides. Stdio-only launches use
 //! the same presentation with temporary storage, preventing automation from
-//! overwriting persistent interactive choices.
+//! overwriting persistent interactive choices. On Linux, generated launch
+//! commands run the Wayland application through Sway's wlroots headless backend
+//! so GPUI receives compositor-driven frame callbacks without a physical display.
 
 use component_shape_mcp::{
     McpAny, McpSchema, McpSchemaProperties, McpServer, McpToolError, McpToolInput, McpToolMetadata,
@@ -185,7 +187,7 @@ struct ResetControlInput {
     key: Option<String>,
 }
 
-/// Build the environment and Cargo command for launching a capture-enabled storybook.
+/// Build the environment and platform command for launching a capture-enabled storybook.
 #[derive(Clone, Debug, component_shape_mcp::McpToolInput)]
 struct CaptureLaunchEnvInput {
     /// Stable story key or `story-key/substory-key` capture route.
@@ -637,7 +639,7 @@ pub fn register_tools_with_options(
         capture_tool::<CaptureLaunchEnvInput>(
             TOOL_CAPTURE_LAUNCH_ENV,
             "Capture Launch Env",
-            "Build frame-capture environment variables and a Cargo launch command for a story route.",
+            "Build frame-capture environment variables and a platform launch command for a story route.",
             capture_launch_env_output_schema(),
             ToolHints::read_only(),
             true,
@@ -1480,8 +1482,7 @@ fn build_capture_launch_env(
         cargo_args.extend(["--bin".to_string(), bin]);
     }
 
-    let mut command = vec!["cargo".to_string()];
-    command.extend(cargo_args.clone());
+    let command = cargo_launch_command(&cargo_args);
 
     Ok(CaptureLaunchEnv {
         env,
@@ -1489,6 +1490,111 @@ fn build_capture_launch_env(
         command,
     })
 }
+
+fn cargo_launch_command(cargo_args: &[String]) -> Vec<String> {
+    #[cfg(target_os = "linux")]
+    let mut command = vec![
+        "env".to_string(),
+        "-u".to_string(),
+        "DISPLAY".to_string(),
+        "-u".to_string(),
+        "WAYLAND_DISPLAY".to_string(),
+        "-u".to_string(),
+        "WAYLAND_SOCKET".to_string(),
+        "-u".to_string(),
+        "ZED_HEADLESS".to_string(),
+        "sh".to_string(),
+        "-c".to_string(),
+        LINUX_SWAY_HEADLESS_SCRIPT.to_string(),
+        "sh".to_string(),
+        "cargo".to_string(),
+    ];
+
+    #[cfg(not(target_os = "linux"))]
+    let mut command = vec!["cargo".to_string()];
+
+    command.extend(cargo_args.iter().cloned());
+    command
+}
+
+#[cfg(target_os = "linux")]
+const LINUX_SWAY_HEADLESS_SCRIPT: &str = r#"storybook_runtime_dir=$(mktemp -d) || exit 1
+if ! chmod 700 "$storybook_runtime_dir"; then
+    rm -rf "$storybook_runtime_dir"
+    exit 1
+fi
+storybook_sway_config="$storybook_runtime_dir/sway.conf"
+storybook_sway_log="$storybook_runtime_dir/sway.log"
+storybook_sway_pid=
+
+if ! printf '%s\n' \
+    'output * mode 1920x1200' \
+    'seat seat0 fallback true' \
+    'for_window [app_id=".*"] floating enable' \
+    > "$storybook_sway_config"; then
+    rm -rf "$storybook_runtime_dir"
+    exit 1
+fi
+
+storybook_cleanup() {
+    if [ -n "$storybook_sway_pid" ]; then
+        kill "$storybook_sway_pid" 2>/dev/null || true
+        wait "$storybook_sway_pid" 2>/dev/null || true
+    fi
+    rm -rf "$storybook_runtime_dir"
+}
+
+trap storybook_cleanup EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+export XDG_RUNTIME_DIR="$storybook_runtime_dir"
+unset DISPLAY I3SOCK SWAYSOCK WAYLAND_DISPLAY WAYLAND_SOCKET ZED_HEADLESS
+
+WLR_BACKENDS=headless \
+WLR_HEADLESS_OUTPUTS=1 \
+WLR_LIBINPUT_NO_DEVICES=1 \
+WLR_RENDERER=gles2 \
+WLR_RENDERER_ALLOW_SOFTWARE=1 \
+LIBGL_ALWAYS_SOFTWARE=1 \
+sway --unsupported-gpu --config "$storybook_sway_config" \
+    > "$storybook_sway_log" 2>&1 &
+storybook_sway_pid=$!
+
+storybook_wayland_socket=
+storybook_sway_attempts=0
+while [ -z "$storybook_wayland_socket" ]; do
+    for storybook_socket_candidate in "$XDG_RUNTIME_DIR"/wayland-*; do
+        if [ -S "$storybook_socket_candidate" ]; then
+            storybook_wayland_socket=$storybook_socket_candidate
+            break
+        fi
+    done
+    if ! kill -0 "$storybook_sway_pid" 2>/dev/null; then
+        if [ -f "$storybook_sway_log" ]; then
+            cat "$storybook_sway_log" >&2
+        fi
+        echo 'gpui-storybook: Sway exited before its Wayland socket was ready' >&2
+        exit 1
+    fi
+    storybook_sway_attempts=$((storybook_sway_attempts + 1))
+    if [ "$storybook_sway_attempts" -ge 100 ]; then
+        if [ -f "$storybook_sway_log" ]; then
+            cat "$storybook_sway_log" >&2
+        fi
+        echo 'gpui-storybook: Sway did not become ready' >&2
+        exit 1
+    fi
+    sleep 0.05
+done
+
+export WAYLAND_DISPLAY="${storybook_wayland_socket##*/}"
+export LIBGL_ALWAYS_SOFTWARE=1
+
+"$@"
+storybook_status=$?
+exit "$storybook_status""#;
 
 fn default_capture_size() -> PixelSize {
     PixelSize::new(DEFAULT_STORY_CAPTURE_WIDTH, DEFAULT_STORY_CAPTURE_HEIGHT)
@@ -1951,6 +2057,34 @@ mod tests {
         assert_eq!(structured["env"]["WGPU_CAPTURE_WIDTH"], "900");
         assert_eq!(structured["env"]["WGPU_CAPTURE_HEIGHT"], "700");
         assert_eq!(structured["env"][STDIO_ENV_VAR], "1");
+        #[cfg(target_os = "linux")]
+        assert_eq!(
+            structured["command"],
+            json!([
+                "env",
+                "-u",
+                "DISPLAY",
+                "-u",
+                "WAYLAND_DISPLAY",
+                "-u",
+                "WAYLAND_SOCKET",
+                "-u",
+                "ZED_HEADLESS",
+                "sh",
+                "-c",
+                LINUX_SWAY_HEADLESS_SCRIPT,
+                "sh",
+                "cargo",
+                "run",
+                "-p",
+                "gpui-storybook-example-story",
+                "--features",
+                "mcp",
+                "--bin",
+                "story"
+            ])
+        );
+        #[cfg(not(target_os = "linux"))]
         assert_eq!(
             structured["command"],
             json!([
@@ -2131,6 +2265,28 @@ mod tests {
         .expect("minimal launch environment should build");
 
         assert_eq!(launch.cargo_args, vec!["run"]);
+        #[cfg(target_os = "linux")]
+        assert_eq!(
+            launch.command,
+            vec![
+                "env",
+                "-u",
+                "DISPLAY",
+                "-u",
+                "WAYLAND_DISPLAY",
+                "-u",
+                "WAYLAND_SOCKET",
+                "-u",
+                "ZED_HEADLESS",
+                "sh",
+                "-c",
+                LINUX_SWAY_HEADLESS_SCRIPT,
+                "sh",
+                "cargo",
+                "run",
+            ]
+        );
+        #[cfg(not(target_os = "linux"))]
         assert_eq!(launch.command, vec!["cargo", "run"]);
         assert!(!launch.env.contains_key(STDIO_ENV_VAR));
         assert_eq!(launch.env["WGPU_CAPTURE_ROUTE"], "example-ButtonStory");

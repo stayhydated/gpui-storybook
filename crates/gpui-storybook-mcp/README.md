@@ -8,6 +8,17 @@ Applications should normally enable the `mcp` feature on
 automation controller during initialization, and the standard gallery and dock
 views attach it automatically.
 
+Linux automation runs the normal Wayland-backed application through Sway's
+wlroots headless backend. On Debian or Ubuntu, install the runtime with:
+
+```bash
+sudo apt-get install --no-install-recommends \
+  libgl1-mesa-dri mesa-vulkan-drivers sway
+```
+
+Commands returned by `storybook_capture_launch_env` include the complete
+Linux wrapper; macOS and Windows commands continue to launch Cargo directly.
+
 ```toml
 [dependencies]
 gpui-storybook = { version = "0.5", features = ["mcp"] }
@@ -41,6 +52,10 @@ GPUI_STORYBOOK_MCP_STDIO=1 \
 GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1 \
 cargo run -p my-app-storybook --features mcp
 ```
+
+On Linux, apply the complete [headless Sway
+wrapper](../../book/src/automation.md#enable-mcp-support) to the same session.
+Set both MCP variables on the final Cargo command inside that wrapper.
 
 The gate adds `storybook_list_actions` and `storybook_run_steps`. When it is
 unset or has any other value, both tools are absent from discovery. Direct

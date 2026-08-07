@@ -32,4 +32,6 @@ the explicit story example's inert `InteractionStory` when testing the complete
 interaction surface.
 
 Named and paired capture dimensions target the selected component story region;
-the gallery or dock chrome remains mounted around that region.
+the gallery or dock chrome remains mounted around that region. On Linux, run
+MCP and startup-capture sessions through Sway's wlroots headless backend as
+described in the automation guide; the normal application remains Wayland-backed.

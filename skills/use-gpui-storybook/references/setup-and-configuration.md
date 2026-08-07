@@ -7,7 +7,8 @@ preferences, window mode, or `storybook.toml`.
 
 Use the facade's startup order:
 
-1. Build the GPUI application with `gpui_storybook::Assets`.
+1. Build the native GPUI application with
+   `gpui_platform::application().with_assets(gpui_storybook::Assets)`.
 2. Construct a stable `ConsumerId` unique to the Storybook binary.
 3. Construct typed `StorybookOptions` with the fallback language and locale
    adapter.
@@ -18,6 +19,11 @@ Use the facade's startup order:
 
 Opening the window before step 5 can render a first frame with default
 preferences.
+
+On Linux, run MCP and startup-capture sessions through Sway's wlroots headless
+backend. This preserves the normal Wayland-backed application path while
+providing an in-memory compositor; see the automation reference for the command
+and runtime packages.
 
 ## Locale contract
 

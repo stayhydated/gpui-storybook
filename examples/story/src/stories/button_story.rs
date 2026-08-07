@@ -1,10 +1,11 @@
 use gpui::{
-    Action, App, AppContext as _, Axis, ClickEvent, Context, Entity, Focusable, InteractiveElement,
-    IntoElement, ParentElement as _, Render, Styled as _, Window, prelude::FluentBuilder, px,
+    Action, App, AppContext as _, Axis, ClickEvent, Context, Entity, Focusable,
+    InteractiveElement as _, IntoElement, ParentElement as _, Render, Styled as _, Window,
+    prelude::FluentBuilder as _, px,
 };
 
 use gpui_component::{
-    ActiveTheme, Disableable as _, Icon, IconName, Selectable as _, Sizable as _, Theme,
+    ActiveTheme as _, Disableable as _, Icon, IconName, Selectable as _, Sizable as _, Theme,
     button::{Button, ButtonCustomVariant, ButtonGroup, ButtonVariants as _},
     checkbox::Checkbox,
     h_flex,

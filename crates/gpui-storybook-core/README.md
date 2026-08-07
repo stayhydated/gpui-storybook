@@ -26,6 +26,10 @@ Custom integrations should use `StorybookAutomation` instead of dispatching
 window input independently so validation, cancellation boundaries, and capture
 ordering remain consistent. Capture sizing preserves the surrounding shell and
 targets the rendered story region used for pointer bounds and PNG output.
+Application bootstrap remains the embedding application's responsibility. On
+Linux, non-interactive automation should run the normal Wayland application
+through Sway's wlroots headless backend; the MCP launch helper supplies that
+compositor wrapper.
 
 In native debug builds, `STORYBOOK_THEME_DIR` selects the consumer-owned custom
 theme directory watched by the runtime. With no override, the runtime watches

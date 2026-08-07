@@ -13,6 +13,10 @@
 //! honors explicit rendered-frame waits, and performs an optional capture in
 //! the same operation. Runtime failures after dispatch report partial progress
 //! and must not be retried automatically.
+//!
+//! This controller uses the application's normal platform window. Linux
+//! automation runners can provide a Wayland compositor with Sway's wlroots
+//! headless backend; the MCP launch helper generates that platform wrapper.
 
 #[cfg(feature = "capture")]
 use crate::capture_output::CaptureOutputStore;
@@ -714,7 +718,7 @@ pub(crate) fn schedule_story_capture(
     if response.is_closed() {
         return;
     }
-    window.on_next_frame(move |window, _cx| {
+    window.on_next_frame(move |window, cx| {
         if response.is_closed() {
             return;
         }
@@ -725,7 +729,7 @@ pub(crate) fn schedule_story_capture(
                 let exit_code = capture_exit_code(&result);
                 let _ = response.send(result);
                 if quit_after_capture {
-                    std::process::exit(exit_code);
+                    exit_after_capture(exit_code, cx);
                 }
                 return;
             },
@@ -785,15 +789,23 @@ fn prepare_story_capture(
     }
 
     window.refresh();
-    window.on_next_frame(move |window, _cx| {
+    window.on_next_frame(move |window, cx| {
         let _operation = operation;
         let result = render_story_capture(request_id, request, story, window);
         let exit_code = capture_exit_code(&result);
         let _ = response.send(result);
         if quit_after_capture {
-            std::process::exit(exit_code);
+            exit_after_capture(exit_code, cx);
         }
     });
+}
+
+fn exit_after_capture(exit_code: i32, cx: &mut App) {
+    if exit_code == 0 {
+        cx.quit();
+    } else {
+        std::process::exit(exit_code);
+    }
 }
 
 pub fn story_snapshots_from_containers(
