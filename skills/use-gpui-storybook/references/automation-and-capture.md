@@ -52,8 +52,10 @@ or omit the key for all values. A capture request can include a `controls` map
 so it applies serialized values immediately before rendering.
 
 Capture requests also accept `responsive`, `mobile`, `tablet`, or `desktop` as
-a `viewport`. Explicit paired width and height take precedence. The launch-env
-tool accepts the same named presets when dimensions are omitted.
+a `viewport`. Explicit paired width and height take precedence. Both forms size
+the captured story region while retaining the surrounding gallery or dock
+chrome. The launch-env tool accepts the same named presets when dimensions are
+omitted.
 
 ## Interaction batches
 
@@ -65,7 +67,12 @@ their JSON argument schemas with `storybook_list_actions` after every launch.
 dimensions or viewport, a required non-empty step list, and an optional final
 capture. Step types are `focus_next`, `focus_previous`, `blur`, `keystrokes`,
 `text`, `dispatch_action`, `pointer_move`, `pointer_click`, `scroll`, and
-`wait_frames`.
+`wait_frames`. Supplying a route focuses the selected story's focus handle
+before the first step.
+
+GPUI defers registered-action dispatch; the executor resumes with the next step
+after that dispatch is delivered. Use `wait_frames` before a later action when
+earlier widget input schedules its own next-frame state change.
 
 Pointer points default to normalized `x`/`y` values in `0.0..=1.0`. The
 `logical_pixels` space is relative to fresh active-route bounds. Points cannot
@@ -116,8 +123,8 @@ Capture startup disables persistence and forces light appearance, the
 uses the same presentation with temporary storage.
 
 Captures exclude gallery or dock chrome. A substory route crops to its section.
-Use returned pixel dimensions rather than requested dimensions as the rendered
-source of truth.
+Paired dimensions target the story region rather than collapsing the complete
+window. Use returned pixel dimensions as the rendered source of truth.
 
 ## Failure checks
 

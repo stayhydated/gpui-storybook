@@ -257,6 +257,7 @@ pub struct StoryContainer {
     story: Option<AnyView>,
     control_target: Option<Rc<dyn ControlTarget>>,
     presentation: StoryPresentation,
+    automation_size: Option<gpui::Size<gpui::Pixels>>,
     workbench_state: Option<gpui::WeakEntity<crate::workbench::WorkbenchState>>,
     pub story_klass: Option<SharedString>,
     registration_metadata: Option<RegisteredStoryMetadata>,
@@ -467,6 +468,7 @@ impl StoryContainer {
             story: None,
             control_target: None,
             presentation: StoryPresentation::default(),
+            automation_size: None,
             workbench_state: None,
             story_klass: None,
             registration_metadata: None,
@@ -583,6 +585,10 @@ impl StoryContainer {
 
     pub(crate) fn set_presentation(&mut self, presentation: StoryPresentation) {
         self.presentation = presentation;
+    }
+
+    pub(crate) fn set_automation_size(&mut self, size: Option<gpui::Size<gpui::Pixels>>) {
+        self.automation_size = size;
     }
 
     pub fn presentation(&self) -> StoryPresentation {
@@ -868,6 +874,7 @@ impl Render for StoryContainer {
         let scroll_handle = self.scroll_handle.clone();
         let story_key = self.story_key_label().map(str::to_owned);
         let presentation = self.presentation;
+        let automation_size = self.automation_size;
         let background = match presentation.background {
             StoryCanvasBackground::Theme => cx.theme().background,
             StoryCanvasBackground::Light => hsla(0.0, 0.0, 0.98, 1.0),
@@ -915,7 +922,10 @@ impl Render for StoryContainer {
             });
         let content = div()
             .id("story-container")
-            .size_full()
+            .when(automation_size.is_none(), |this| this.size_full())
+            .when_some(automation_size, |this, size| {
+                this.flex_none().w(size.width).h(size.height)
+            })
             .track_scroll(&scroll_handle)
             .overflow_y_scrollbar()
             .track_focus(&self.focus_handle)

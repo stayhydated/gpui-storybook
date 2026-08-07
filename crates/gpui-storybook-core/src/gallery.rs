@@ -1,8 +1,8 @@
 use crate::{
     automation::{
         SharedStorybookAutomation, StoryCurrentSnapshot, StoryScreenshotRequest, StorySnapshot,
-        StorybookAutomationCommand, StorybookAutomationError, apply_capture_target_size,
-        default_storybook_automation, schedule_story_capture, story_snapshots_from_containers,
+        StorybookAutomationCommand, StorybookAutomationError, default_storybook_automation,
+        schedule_story_capture, set_capture_target_size, story_snapshots_from_containers,
         validate_capture_target_size,
     },
     capture_region::capture_route_story_key,
@@ -352,9 +352,17 @@ impl Gallery {
                         .and_then(|automation| automation.current_story().story)
                         .or_else(|| self.active_story_snapshot(cx))
                         .ok_or(StorybookAutomationError::NoActiveStory)?;
-                    crate::automation::interaction::apply_interaction_target_size(
-                        &request, window,
-                    )?;
+                    let target_size =
+                        crate::automation::interaction::interaction_target_size(&request)?;
+                    let story_entity = self
+                        .workbench_state
+                        .read(cx)
+                        .active_story()
+                        .ok_or(StorybookAutomationError::NoActiveStory)?;
+                    set_capture_target_size(&story_entity, window, target_size, cx);
+                    if request.route.is_some() {
+                        gpui::Focusable::focus_handle(&story_entity, cx).focus(window, cx);
+                    }
                     cx.notify();
                     window.refresh();
                     Ok((story, steps, request.capture))
@@ -403,7 +411,13 @@ impl Gallery {
                 message: "no current story is selected for capture".to_string(),
             })?;
 
-        apply_capture_target_size(window, validate_capture_target_size(request)?);
+        let target_size = validate_capture_target_size(request)?;
+        let story_entity = self
+            .workbench_state
+            .read(cx)
+            .active_story()
+            .ok_or(StorybookAutomationError::NoActiveStory)?;
+        set_capture_target_size(&story_entity, window, target_size, cx);
         cx.notify();
         window.refresh();
 

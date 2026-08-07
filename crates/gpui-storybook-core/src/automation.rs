@@ -9,24 +9,24 @@
 //! Interaction requests are completely validated and their keystrokes and
 //! registered actions are constructed before input dispatch. The shared
 //! frame-aware executor resolves fresh story or substory capture bounds after
-//! route preparation and resize, constrains pointer input to those bounds,
+//! route preparation and story-region sizing, constrains pointer input to those bounds,
 //! honors explicit rendered-frame waits, and performs an optional capture in
 //! the same operation. Runtime failures after dispatch report partial progress
 //! and must not be retried automatically.
 
 #[cfg(feature = "capture")]
 use crate::capture_output::CaptureOutputStore;
-#[cfg(feature = "capture")]
-use crate::capture_region::capture_region_bounds;
 pub(crate) mod interaction;
 
 use crate::{
-    capture_region::{capture_route_story_key, scroll_capture_region_into_view},
+    capture_region::{
+        capture_region_bounds, capture_route_story_key, scroll_capture_region_into_view,
+    },
     controls::{ControlSnapshot, ControlValue},
     presentation::StoryViewportPreset,
     story::StoryContainer,
 };
-use gpui::{App, Global, Window, px};
+use gpui::{App, Entity, Global, Window, px};
 #[cfg(feature = "capture")]
 use gpui::{Bounds, Pixels, point};
 pub use interaction::{
@@ -134,8 +134,11 @@ pub struct StoryCurrentSnapshot {
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct StoryScreenshotRequest {
+    /// PNG destination, or the route-derived default when omitted.
     pub output_path: Option<PathBuf>,
+    /// Requested captured story-region width in physical pixels.
     pub width: Option<u32>,
+    /// Requested captured story-region height in physical pixels.
     pub height: Option<u32>,
     /// Named viewport used when explicit dimensions are omitted.
     pub viewport: Option<StoryViewportPreset>,
@@ -715,32 +718,81 @@ pub(crate) fn schedule_story_capture(
         if response.is_closed() {
             return;
         }
-        let operation = operation;
-        if !scroll_capture_region_into_view(&story.capture_route_id) {
-            let result = Err(StorybookAutomationError::CaptureUnavailable {
-                message: format!(
-                    "capture route `{}` was not rendered by the current story view",
-                    story.capture_route_id
-                ),
+        let resized = match ensure_capture_target_visible(&story.capture_route_id, window) {
+            Ok(resized) => resized,
+            Err(error) => {
+                let result = Err(error);
+                let exit_code = capture_exit_code(&result);
+                let _ = response.send(result);
+                if quit_after_capture {
+                    std::process::exit(exit_code);
+                }
+                return;
+            },
+        };
+        if resized {
+            window.refresh();
+            window.on_next_frame(move |window, _cx| {
+                prepare_story_capture(
+                    request_id,
+                    request,
+                    story,
+                    response,
+                    operation,
+                    quit_after_capture,
+                    window,
+                )
             });
-            let exit_code = capture_exit_code(&result);
-            let _ = response.send(result);
-            if quit_after_capture {
-                std::process::exit(exit_code);
-            }
-            return;
+        } else {
+            prepare_story_capture(
+                request_id,
+                request,
+                story,
+                response,
+                operation,
+                quit_after_capture,
+                window,
+            );
         }
+    });
+}
 
-        window.refresh();
-        window.on_next_frame(move |window, _cx| {
-            let _operation = operation;
-            let result = render_story_capture(request_id, request, story, window);
-            let exit_code = capture_exit_code(&result);
-            let _ = response.send(result);
-            if quit_after_capture {
-                std::process::exit(exit_code);
-            }
+fn prepare_story_capture(
+    request_id: u64,
+    request: StoryScreenshotRequest,
+    story: StorySnapshot,
+    response: oneshot::Sender<Result<StoryCaptureSnapshot, StorybookAutomationError>>,
+    operation: AutomationOperationGuard,
+    quit_after_capture: bool,
+    window: &mut Window,
+) {
+    if response.is_closed() {
+        return;
+    }
+    if !scroll_capture_region_into_view(&story.capture_route_id) {
+        let result = Err(StorybookAutomationError::CaptureUnavailable {
+            message: format!(
+                "capture route `{}` was not rendered by the current story view",
+                story.capture_route_id
+            ),
         });
+        let exit_code = capture_exit_code(&result);
+        let _ = response.send(result);
+        if quit_after_capture {
+            std::process::exit(exit_code);
+        }
+        return;
+    }
+
+    window.refresh();
+    window.on_next_frame(move |window, _cx| {
+        let _operation = operation;
+        let result = render_story_capture(request_id, request, story, window);
+        let exit_code = capture_exit_code(&result);
+        let _ = response.send(result);
+        if quit_after_capture {
+            std::process::exit(exit_code);
+        }
     });
 }
 
@@ -798,13 +850,58 @@ pub(crate) fn validate_capture_target_size(
     }
 }
 
-pub(crate) fn apply_capture_target_size(window: &mut Window, target_size: Option<(u32, u32)>) {
-    if let Some((width, height)) = target_size {
-        let scale_factor = window.scale_factor().max(f32::EPSILON);
-        window.resize(gpui::size(
+pub(crate) fn set_capture_target_size(
+    story: &Entity<StoryContainer>,
+    window: &Window,
+    target_size: Option<(u32, u32)>,
+    cx: &mut App,
+) {
+    let scale_factor = window.scale_factor().max(f32::EPSILON);
+    let size = target_size.map(|(width, height)| {
+        gpui::size(
             px(width as f32 / scale_factor),
             px(height as f32 / scale_factor),
-        ));
+        )
+    });
+    story.update(cx, |story, cx| {
+        story.set_automation_size(size);
+        cx.notify();
+    });
+}
+
+pub(crate) fn ensure_capture_target_visible(
+    route_id: &str,
+    window: &mut Window,
+) -> Result<bool, StorybookAutomationError> {
+    let story_key = capture_route_story_key(route_id);
+    let region = capture_region_bounds(story_key).ok_or_else(|| {
+        StorybookAutomationError::CaptureUnavailable {
+            message: format!(
+                "capture route `{story_key}` was not rendered before validating its target size"
+            ),
+        }
+    })?;
+    let Some(target_window_size) = expanded_window_size(window.bounds().size, region.bounds) else {
+        return Ok(false);
+    };
+    window.resize(target_window_size);
+    Ok(true)
+}
+
+fn expanded_window_size(
+    window_size: gpui::Size<gpui::Pixels>,
+    story_region: gpui::Bounds<gpui::Pixels>,
+) -> Option<gpui::Size<gpui::Pixels>> {
+    let required_width =
+        (f32::from(story_region.origin.x) + f32::from(story_region.size.width)).max(0.0);
+    let required_height =
+        (f32::from(story_region.origin.y) + f32::from(story_region.size.height)).max(0.0);
+    let width = f32::from(window_size.width).max(required_width);
+    let height = f32::from(window_size.height).max(required_height);
+    if width == f32::from(window_size.width) && height == f32::from(window_size.height) {
+        None
+    } else {
+        Some(gpui::size(px(width), px(height)))
     }
 }
 
@@ -1142,6 +1239,31 @@ mod tests {
             Err(StorybookAutomationError::InvalidCaptureRequest { message })
                 if message.contains("provided together")
         ));
+    }
+
+    #[test]
+    fn capture_target_size_only_expands_a_clipped_story_region() {
+        let window = gpui::size(px(800.), px(600.));
+        assert_eq!(
+            expanded_window_size(
+                window,
+                gpui::Bounds {
+                    origin: gpui::point(px(200.), px(100.)),
+                    size: gpui::size(px(400.), px(300.)),
+                },
+            ),
+            None
+        );
+        assert_eq!(
+            expanded_window_size(
+                window,
+                gpui::Bounds {
+                    origin: gpui::point(px(300.), px(150.)),
+                    size: gpui::size(px(600.), px(500.)),
+                },
+            ),
+            Some(gpui::size(px(900.), px(650.)))
+        );
     }
 
     #[test]

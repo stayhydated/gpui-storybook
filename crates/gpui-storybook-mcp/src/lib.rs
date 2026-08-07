@@ -140,9 +140,9 @@ struct StoryKeyInput {
 struct CaptureCurrentStoryInput {
     /// PNG output path. The capture runtime chooses its default when omitted.
     output_path: Option<PathBuf>,
-    /// Requested capture width in pixels. Set together with `height`.
+    /// Requested captured story-region width in pixels. Set together with `height`.
     width: Option<u32>,
-    /// Requested capture height in pixels. Set together with `width`.
+    /// Requested captured story-region height in pixels. Set together with `width`.
     height: Option<u32>,
     /// Named viewport (`responsive`, `mobile`, `tablet`, or `desktop`).
     viewport: Option<String>,
@@ -157,9 +157,9 @@ struct RunStepsInput {
     route: Option<String>,
     /// Tagged `ControlValue` objects applied before interaction.
     controls: Option<BTreeMap<String, McpAny>>,
-    /// Requested rendered width in physical pixels. Set together with `height`.
+    /// Requested story-region width in physical pixels. Set together with `height`.
     width: Option<u32>,
-    /// Requested rendered height in physical pixels. Set together with `width`.
+    /// Requested story-region height in physical pixels. Set together with `width`.
     height: Option<u32>,
     /// Named viewport used when explicit dimensions are omitted.
     viewport: Option<String>,
@@ -194,9 +194,9 @@ struct CaptureLaunchEnvInput {
     output_path: Option<PathBuf>,
     /// One-based frame number to capture.
     frame: Option<u32>,
-    /// Requested capture width in pixels. Set together with `height`.
+    /// Requested captured story-region width in pixels. Set together with `height`.
     width: Option<u32>,
-    /// Requested capture height in pixels. Set together with `width`.
+    /// Requested captured story-region height in pixels. Set together with `width`.
     height: Option<u32>,
     /// Named viewport used when explicit width and height are omitted.
     viewport: Option<String>,

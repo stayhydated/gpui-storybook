@@ -52,14 +52,16 @@ let options = gpui_storybook::mcp::StorybookMcpServerOptions::default()
 let server = gpui_storybook::mcp::server_with_options(automation, options)?;
 ```
 
-`storybook_list_actions` returns non-internal action names, documentation, and
-JSON argument schemas from the launched GPUI application. Registrations are
-runtime state, so rediscover actions for every launch.
+`storybook_list_actions` returns automation-visible action names,
+documentation, and JSON argument schemas from the launched GPUI application.
+GPUI keymap sentinels and Storybook-private workbench actions are omitted.
+Registrations are runtime state, so rediscover actions for every launch.
 
 `storybook_run_steps` performs one ordered batch against the active story or
-substory capture region. It can open a route, apply tagged control values,
-resize for paired rendered-pixel dimensions or a named viewport, dispatch up to 64
-steps, and optionally capture the first rendered frame after the last step:
+substory capture region. It can open a route, apply tagged control values, size
+the story region for paired rendered-pixel dimensions or a named viewport,
+dispatch up to 64 steps, and optionally capture the first rendered frame after
+the last step:
 
 ```json
 {
@@ -69,10 +71,10 @@ steps, and optionally capture the first rendered frame after the last step:
     "prefix": { "type": "text", "value": "mcp" }
   },
   "steps": [
-    { "type": "focus_next" },
     { "type": "text", "value": "héllo 世界" },
     { "type": "focus_next" },
     { "type": "keystrokes", "keys": ["enter", "down", "enter"] },
+    { "type": "wait_frames", "count": 1 },
     {
       "type": "dispatch_action",
       "name": "interaction_story::SetAutomationStatus",
@@ -87,10 +89,13 @@ steps, and optionally capture the first rendered frame after the last step:
 ```
 
 Other steps are `focus_previous`, `blur`, `pointer_move`, `pointer_click`, and
-`scroll`. Pointer points use `normalized` coordinates in `0.0..=1.0` by
-default, or non-negative `logical_pixels` relative to the freshly rendered
-route bounds. Click dispatch is move, down, then up. Coordinates cannot target
-Storybook chrome, and there is no element-selector or global-screen input.
+`scroll`. Opening the route focuses the story's focus handle, which is the
+fixture input, so the example inserts text before moving focus to the select.
+Pointer points use `normalized` coordinates in `0.0..=1.0` by default, or
+non-negative `logical_pixels`
+relative to the freshly rendered route bounds. Click dispatch is move, down,
+then up. Coordinates cannot target Storybook chrome, and there is no
+element-selector or global-screen input.
 
 One batch permits up to 64 binding strings per `keystrokes` step, 4 KiB across
 UTF-8 `text` values and keystroke syntax, and 120 explicitly waited frames. The

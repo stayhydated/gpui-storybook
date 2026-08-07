@@ -60,5 +60,7 @@ description: >-
 - Treat interaction batches as potentially destructive and non-idempotent.
   Rediscover runtime actions after each launch and never retry partial batches
   automatically.
+- Treat paired dimensions and named viewports as story-region capture sizes;
+  keep the gallery or dock chrome mounted around that region.
 - Prefer current public APIs and examples; do not add compatibility wrappers for
   older pre-1.0 shapes unless the user requires them.

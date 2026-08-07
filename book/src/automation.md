@@ -67,11 +67,11 @@ Use typed controls first when a story exposes them. Use registered actions for
 semantic application commands, keystrokes for keyboard behavior, and
 story-relative pointer coordinates as the fallback.
 
-`storybook_run_steps` can open a route, apply a `controls` map, resize for
-paired rendered-pixel `width` and `height` values or a named `viewport`, execute a
-non-empty `steps` array, and capture the resulting route. For example, the
-explicit example application's inert fixture supports text, select navigation,
-and a typed action:
+`storybook_run_steps` can open a route, apply a `controls` map, size the story
+region for paired rendered-pixel `width` and `height` values or a named
+`viewport`, execute a non-empty `steps` array, and capture the resulting route.
+For example, the explicit example application's inert fixture supports text,
+select navigation, and a typed action:
 
 ```json
 {
@@ -81,10 +81,10 @@ and a typed action:
     "prefix": { "type": "text", "value": "mcp" }
   },
   "steps": [
-    { "type": "focus_next" },
     { "type": "text", "value": "héllo 世界" },
     { "type": "focus_next" },
     { "type": "keystrokes", "keys": ["enter", "down", "enter"] },
+    { "type": "wait_frames", "count": 1 },
     {
       "type": "dispatch_action",
       "name": "interaction_story::SetAutomationStatus",
@@ -98,6 +98,10 @@ and a typed action:
 }
 ```
 
+When `route` is supplied, Storybook focuses that story's focus handle before
+the first step. The fixture maps its focus handle to the text input, so the
+first `focus_next` moves from that input to the select.
+
 The closed step variants are:
 
 | Step | Fields and behavior |
@@ -105,7 +109,7 @@ The closed step variants are:
 | `focus_next`, `focus_previous`, `blur` | Move or clear GPUI focus |
 | `keystrokes` | Parse and dispatch each GPUI binding string in `keys` |
 | `text` | Insert the UTF-8 `value` into the focused basic text input; this is not IME, clipboard, paste, or dead-key simulation |
-| `dispatch_action` | Build a registered action by `name` and optional JSON `args`, then dispatch it |
+| `dispatch_action` | Build a registered action by `name` and optional JSON `args`, dispatch it, and resume the batch after GPUI delivers that deferred dispatch |
 | `pointer_move` | Dispatch a move at the story-relative `point` |
 | `pointer_click` | Dispatch move, down, and up at `point`; optional `button`, `click_count`, and `modifiers` default to a single left click with no modifiers |
 | `scroll` | Dispatch pixel `delta_x` and `delta_y` at `point` |
@@ -120,9 +124,9 @@ Pointer points default to normalized coordinates:
 Both normalized coordinates must be finite and in `0.0..=1.0`. Use
 `"space": "logical_pixels"` for non-negative GPUI logical pixels measured
 from the current route origin. The executor resolves fresh bounds after route
-opening and resize, rejects points beyond those bounds, and translates them to
-window coordinates. It cannot target the gallery sidebar, dock panels, title
-bar, global screen, or an element selector.
+opening and story-region sizing, rejects points beyond those bounds, and
+translates them to window coordinates. It cannot target the gallery sidebar,
+dock panels, title bar, global screen, or an element selector.
 
 A batch allows at most 64 steps, up to 64 binding strings in each `keystrokes`
 step, 4 KiB across UTF-8 `text` values and keystroke syntax, 120 explicitly
@@ -136,11 +140,11 @@ succeeded.
 
 ## Discover and dispatch actions
 
-Call `storybook_list_actions` after each application launch. It lists only
-non-internal GPUI action registrations and returns each action's name,
-documentation, and JSON argument schema. Validate the desired action against
-that runtime result before placing its name and arguments in a
-`dispatch_action` step.
+Call `storybook_list_actions` after each application launch. It omits GPUI
+keymap sentinels and Storybook-private workbench actions, then returns each
+automation-visible action's name, documentation, and JSON argument schema.
+Validate the desired action against that runtime result before placing its name
+and arguments in a `dispatch_action` step.
 
 Action dispatch is deferred by GPUI and has no generic handler result. Its
 observation is therefore `dispatched`, not `handled` or `succeeded`. The
@@ -226,8 +230,8 @@ uses the deterministic light presentation.
 |---|---|
 | `WGPU_CAPTURE_ROUTE` | Story key or `story-key/substory-key` route |
 | `WGPU_CAPTURE_PATH` | PNG destination; required to write a capture |
-| `WGPU_CAPTURE_WIDTH` | Requested live window width in pixels |
-| `WGPU_CAPTURE_HEIGHT` | Requested live window height in pixels |
+| `WGPU_CAPTURE_WIDTH` | Requested captured story-region width in pixels |
+| `WGPU_CAPTURE_HEIGHT` | Requested captured story-region height in pixels |
 | `WGPU_CAPTURE_FRAME` | Optional one-based frame gate |
 
 Set width and height together, and make both values greater than zero.
@@ -274,9 +278,11 @@ Captures contain the story view, excluding the gallery sidebar and header or
 the dock workspace chrome. Substory routes crop to the registered section
 region.
 
-Width and height request a live window resize. Display scaling or compositor
-behavior can change the rendered result, so treat the returned `pixel_width`
-and `pixel_height` as authoritative.
+Width and height target the captured story region. Storybook adjusts the host
+window around the existing gallery or dock chrome so sidebars, headers, and the
+workbench remain mounted. Display scaling or compositor behavior can change the
+rendered result, so treat the returned `pixel_width` and `pixel_height` as
+authoritative.
 
 An interaction capture is part of the same exclusive UI-thread operation. It
 captures the first requested rendered frame after the final step; explicit

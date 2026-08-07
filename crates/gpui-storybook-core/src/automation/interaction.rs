@@ -1,6 +1,6 @@
 use super::{
     AutomationOperationGuard, StoryCaptureSnapshot, StoryScreenshotRequest, StorySnapshot,
-    StorybookAutomationError, apply_capture_target_size, render_story_capture,
+    StorybookAutomationError, ensure_capture_target_visible, render_story_capture,
     validate_capture_target_size,
 };
 use crate::{
@@ -185,9 +185,9 @@ pub struct StoryInteractionRequest {
     /// Typed control values applied before input.
     #[serde(default)]
     pub controls: BTreeMap<String, ControlValue>,
-    /// Requested rendered width in physical pixels, supplied with `height`.
+    /// Requested story-region width in physical pixels, supplied with `height`.
     pub width: Option<u32>,
-    /// Requested rendered height in physical pixels, supplied with `width`.
+    /// Requested story-region height in physical pixels, supplied with `width`.
     pub height: Option<u32>,
     /// Named viewport used when explicit dimensions are omitted.
     pub viewport: Option<StoryViewportPreset>,
@@ -376,12 +376,17 @@ pub(crate) fn list_registered_actions(cx: &App) -> Vec<StoryActionSnapshot> {
 
     cx.action_schemas(&mut generator)
         .into_iter()
+        .filter(|(name, _)| automation_action_is_visible(name))
         .map(|(name, schema)| StoryActionSnapshot {
             name: name.to_owned(),
             documentation: documentation.get(name).map(|value| (*value).to_owned()),
             argument_schema: schema.map(Value::from),
         })
         .collect()
+}
+
+fn automation_action_is_visible(name: &str) -> bool {
+    !matches!(name, "zed::NoAction" | "zed::Unbind") && !name.starts_with("storybook_workbench::")
 }
 
 pub(crate) enum PreparedInteractionStep {
@@ -481,18 +486,16 @@ pub(crate) struct PreparedStoryInteraction {
     pub operation: AutomationOperationGuard,
 }
 
-pub(crate) fn apply_interaction_target_size(
+pub(crate) fn interaction_target_size(
     request: &StoryInteractionRequest,
-    window: &mut Window,
-) -> Result<(), StorybookAutomationError> {
+) -> Result<Option<(u32, u32)>, StorybookAutomationError> {
     let size_request = StoryScreenshotRequest {
         width: request.width,
         height: request.height,
         viewport: request.viewport,
         ..StoryScreenshotRequest::default()
     };
-    apply_capture_target_size(window, validate_capture_target_size(&size_request)?);
-    Ok(())
+    validate_capture_target_size(&size_request)
 }
 
 pub(crate) fn schedule_story_interaction(
@@ -503,21 +506,41 @@ pub(crate) fn schedule_story_interaction(
         if interaction.response.is_closed() {
             return;
         }
-        if !scroll_capture_region_into_view(&interaction.story.capture_route_id) {
-            let _ = interaction
-                .response
-                .send(Err(StorybookAutomationError::CaptureUnavailable {
-                    message: format!(
-                        "capture route `{}` was not rendered by the current story view",
-                        interaction.story.capture_route_id
-                    ),
-                }));
-            return;
+        let resized =
+            match ensure_capture_target_visible(&interaction.story.capture_route_id, window) {
+                Ok(resized) => resized,
+                Err(error) => {
+                    let _ = interaction.response.send(Err(error));
+                    return;
+                },
+            };
+        if resized {
+            window.refresh();
+            window.on_next_frame(move |window, _cx| prepare_interaction_route(interaction, window));
+        } else {
+            prepare_interaction_route(interaction, window);
         }
-
-        window.refresh();
-        window.on_next_frame(move |window, cx| start_interaction_runner(interaction, window, cx));
     });
+}
+
+fn prepare_interaction_route(interaction: PreparedStoryInteraction, window: &mut Window) {
+    if interaction.response.is_closed() {
+        return;
+    }
+    if !scroll_capture_region_into_view(&interaction.story.capture_route_id) {
+        let _ = interaction
+            .response
+            .send(Err(StorybookAutomationError::CaptureUnavailable {
+                message: format!(
+                    "capture route `{}` was not rendered by the current story view",
+                    interaction.story.capture_route_id
+                ),
+            }));
+        return;
+    }
+
+    window.refresh();
+    window.on_next_frame(move |window, cx| start_interaction_runner(interaction, window, cx));
 }
 
 struct InteractionRunner {
@@ -677,6 +700,7 @@ fn run_interaction(mut runner: InteractionRunner, window: &mut Window, cx: &mut 
             return;
         }
 
+        let defer_continuation = matches!(&step, PreparedInteractionStep::DispatchAction(_));
         let dispatches = dispatch_step(step, window, cx);
         runner.observations.push(StoryInteractionObservation {
             step_index,
@@ -685,6 +709,13 @@ fn run_interaction(mut runner: InteractionRunner, window: &mut Window, cx: &mut 
         runner.progress.fetch_add(1, Ordering::SeqCst);
 
         if runner.response.is_closed() {
+            return;
+        }
+        if defer_continuation {
+            // GPUI queues action dispatch at the end of the current effect cycle.
+            // Queue continuation after it so the next request step cannot overtake
+            // the action handler.
+            window.defer(cx, move |window, cx| run_interaction(runner, window, cx));
             return;
         }
     }
@@ -936,6 +967,7 @@ mod tests {
         clicks: usize,
         hovered: bool,
         action_value: usize,
+        events: Vec<&'static str>,
     }
 
     impl Focusable for InteractionHarness {
@@ -955,6 +987,7 @@ mod tests {
                     .track_focus(&self.focus_handle)
                     .on_action(cx.listener(|this, action: &SetCounter, _, cx| {
                         this.action_value = action.value;
+                        this.events.push("action");
                         cx.notify();
                     }))
                     .on_hover(cx.listener(|this, hovered, _, cx| {
@@ -963,6 +996,7 @@ mod tests {
                     }))
                     .on_click(cx.listener(|this, _, _, cx| {
                         this.clicks += 1;
+                        this.events.push("click");
                         cx.notify();
                     }))
                     .child(Input::new(&self.input)),
@@ -1149,6 +1183,13 @@ mod tests {
 
     #[gpui::test]
     fn action_discovery_and_batch_preparation_use_registered_schemas(cx: &mut App) {
+        assert!(!automation_action_is_visible("zed::NoAction"));
+        assert!(!automation_action_is_visible("zed::Unbind"));
+        assert!(!automation_action_is_visible(
+            "storybook_workbench::ResetAllControls"
+        ));
+        assert!(automation_action_is_visible("example::PublicAction"));
+
         let actions = list_registered_actions(cx);
         let action = actions
             .iter()
@@ -1164,6 +1205,11 @@ mod tests {
                 .and_then(Value::as_str)),
             Some("integer")
         );
+        assert!(actions.iter().all(|action| {
+            action.name != "zed::NoAction"
+                && action.name != "zed::Unbind"
+                && !action.name.starts_with("storybook_workbench::")
+        }));
 
         assert!(matches!(
             prepare_interaction_steps(
@@ -1196,6 +1242,7 @@ mod tests {
                         clicks: 0,
                         hovered: false,
                         action_value: 0,
+                        events: Vec::new(),
                     });
                     harness = Some(entity.clone());
                     cx.new(|cx| gpui_component::Root::new(entity, window, cx))
@@ -1290,6 +1337,7 @@ mod tests {
             let harness = harness.read(cx);
             assert_eq!(harness.action_value, 7);
             assert_eq!(harness.clicks, 1);
+            assert_eq!(harness.events, ["action", "click"]);
             assert!(harness.hovered);
             assert_eq!(harness.input.read(cx).value(), "héllo 世界");
         });
@@ -1308,6 +1356,7 @@ mod tests {
                         clicks: 0,
                         hovered: false,
                         action_value: 0,
+                        events: Vec::new(),
                     });
                     cx.new(|cx| gpui_component::Root::new(entity, window, cx))
                 })
@@ -1379,6 +1428,7 @@ mod tests {
                         clicks: 0,
                         hovered: false,
                         action_value: 0,
+                        events: Vec::new(),
                     });
                     harness = Some(entity.clone());
                     cx.new(|cx| gpui_component::Root::new(entity, window, cx))

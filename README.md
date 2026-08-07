@@ -57,7 +57,8 @@ cargo run -p my-app-storybook --features mcp
 ```
 
 Interaction runs inside the live GPUI window; it does not require compositor
-or operating-system input injection. See [Automation and
+or operating-system input injection. Named and paired capture dimensions target
+the story region while the gallery or dock chrome stays mounted. See [Automation and
 capture](book/src/automation.md) for the closed step schema, safety limits, and
 capture ordering.
 

@@ -41,7 +41,8 @@ With `mcp` enabled, set both `GPUI_STORYBOOK_MCP_STDIO=1` and
 registered-action, story-relative pointer, scroll, frame-wait, and atomic
 post-interaction capture tools. The interaction gate is separate because a
 story action can have arbitrary application effects. Typed controls remain the
-preferred reproducible input contract.
+preferred reproducible input contract. Capture dimensions size the story region
+without replacing the surrounding gallery or dock layout.
 
 See the [getting-started guide](../../book/src/getting_started.md), [story
 guide](../../book/src/stories.md), [workbench guide](../../book/src/workbench.md),

@@ -37,3 +37,7 @@ cargo run -p gpui-storybook-example-story --features mcp
 
 Add `dock` to the feature list to run the identical executor through the dock
 host. Rediscover registered actions after each launch before dispatching one.
+Opening a route for an interaction batch focuses that story's focus handle. The
+fixture therefore inserts text first, moves focus once to reach the select, and
+waits a frame after confirming the selection before dispatching a final status
+action.

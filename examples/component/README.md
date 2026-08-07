@@ -30,3 +30,6 @@ route, control, and capture tools; also set
 action, pointer, scroll, and frame-wait tools are intentionally allowed. Use
 the explicit story example's inert `InteractionStory` when testing the complete
 interaction surface.
+
+Named and paired capture dimensions target the selected component story region;
+the gallery or dock chrome remains mounted around that region.
