@@ -1045,13 +1045,16 @@ impl StoryWorkbench {
                     .on_click(|_, window, cx| window.toggle_inspector(cx)),
             )
             .child(
-                v_flex().gap_1().child("Story key").child(
-                    h_flex().justify_between().gap_2().child(key.clone()).child(
-                        Clipboard::new("copy-story-key")
-                            .value(key)
-                            .tooltip("Copy story key"),
-                    ),
-                ),
+                v_flex()
+                    .gap_1()
+                    .child(
+                        h_flex().justify_between().gap_2().child("Story key").child(
+                            Clipboard::new("copy-story-key")
+                                .value(key.clone())
+                                .tooltip("Copy story key"),
+                        ),
+                    )
+                    .child(key),
             )
             .child(v_flex().gap_1().child("Source").child(source))
             .into_any_element()
