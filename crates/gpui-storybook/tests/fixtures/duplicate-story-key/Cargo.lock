@@ -2497,6 +2497,7 @@ dependencies = [
  "gtk",
  "inventory",
  "rust-embed",
+ "schemars",
  "serde",
  "serde_json",
  "tokio",

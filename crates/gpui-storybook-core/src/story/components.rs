@@ -773,7 +773,7 @@ impl Panel for StoryContainer {
         tracing::debug!(panel = %self.name, zoomed, "Storybook panel zoom changed");
     }
 
-    fn set_active(&mut self, active: bool, _window: &mut Window, cx: &mut gpui::Context<Self>) {
+    fn set_active(&mut self, active: bool, window: &mut Window, cx: &mut gpui::Context<Self>) {
         tracing::debug!(panel = %self.name, active, "Storybook panel activation changed");
         self.is_active = active;
         if active
@@ -783,12 +783,17 @@ impl Panel for StoryContainer {
                 .and_then(gpui::WeakEntity::upgrade)
         {
             let story = cx.entity();
-            state.update(cx, |state, cx| state.set_active_story(Some(story), cx));
+            // `PanelView::set_active` updates this entity while GPUI's tab panel is
+            // synchronizing its selection. Defer the workbench update so it can
+            // inspect the story after the current entity lease has been released.
+            window.defer(cx, move |_, cx| {
+                state.update(cx, |state, cx| state.set_active_story(Some(story), cx));
+            });
         }
         if let Some(on_active) = self.on_active
             && let Some(story) = self.story.clone()
         {
-            on_active(story, active, _window, cx);
+            on_active(story, active, window, cx);
         }
     }
 
@@ -932,6 +937,7 @@ impl Render for StoryContainer {
 mod tests {
     use super::*;
     use crate::registry::{StoryKey, StoryName, StorySectionName};
+    use crate::workbench::WorkbenchState;
     use gpui::{div, px};
 
     enum DemoSubstory {
@@ -1101,6 +1107,29 @@ mod tests {
                 assert_eq!(container.display_description(cx), "Localized description");
             })
             .expect("container should update");
+    }
+
+    #[gpui::test]
+    fn panel_activation_defers_workbench_story_reads(cx: &mut App) {
+        gpui_component::init(cx);
+        let state = cx.new(|_| WorkbenchState::new(None));
+        let state_for_window = state.clone();
+        let window: gpui::WindowHandle<StoryContainer> = cx
+            .open_window(Default::default(), move |window, cx| {
+                cx.new(|cx| {
+                    let mut story = StoryContainer::new(window, cx);
+                    story.set_workbench_state(state_for_window.downgrade());
+                    story
+                })
+            })
+            .expect("test window should open");
+
+        window
+            .update(cx, |story, window, cx| {
+                Panel::set_active(story, true, window, cx);
+                assert!(state.read(cx).active_story().is_none());
+            })
+            .expect("panel activation should not reenter the story entity");
     }
 
     #[gpui::test]

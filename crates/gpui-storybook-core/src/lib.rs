@@ -24,8 +24,10 @@
 //!   registry, and layout persistence
 //! - `automation`: shared controller and command types for live story
 //!   listing, story opening, control reads/edits/resets, serialized capture
-//!   controls, screenshot capture, and the optional default automation global
-//!   consumed by the base gallery and dock constructors
+//!   controls, screenshot capture, runtime action discovery, closed in-process
+//!   interaction batches, and the optional default automation global consumed
+//!   by the base gallery and dock constructors. Gallery and dock use one
+//!   frame-aware executor and one exclusive mutation/capture guard.
 //! - `capture_region`: story-view and sub-story capture bounds used by MCP
 //!   screenshot capture
 //! - `storybook_window_ui`: customization hooks for application menu and

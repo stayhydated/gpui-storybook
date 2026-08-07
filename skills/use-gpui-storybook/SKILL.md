@@ -7,8 +7,9 @@ description: >-
   storybook.toml groups, filters, or launch overrides; choose gallery or dock
   mode; add typed story controls or use the controls/theme/Inspector workbench;
   wire the typed es-fluent locale adapter and preference startup; enable MCP
-  tools or PNG capture; or diagnose missing stories, unstable routes,
-  preference readiness, control failures, or capture failures.
+  tools, opt-in in-process interaction, or PNG capture; or diagnose missing
+  stories, unstable routes, preference readiness, control failures,
+  interaction failures, or capture failures.
 ---
 
 # Integrate GPUI Storybook
@@ -53,5 +54,11 @@ description: >-
 - Forward optional package features explicitly when users launch with
   `--features dock` or `--features mcp`.
 - Send logs to standard error during MCP stdio sessions.
+- Require `GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1` before generic focus,
+  keyboard, action, pointer, scroll, or frame-wait automation. Keep typed
+  controls as the preferred reproducible input.
+- Treat interaction batches as potentially destructive and non-idempotent.
+  Rediscover runtime actions after each launch and never retry partial batches
+  automatically.
 - Prefer current public APIs and examples; do not add compatibility wrappers for
   older pre-1.0 shapes unless the user requires them.

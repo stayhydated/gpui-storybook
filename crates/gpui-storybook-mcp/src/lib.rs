@@ -4,6 +4,12 @@
 //! controls, apply a serialized control map before capture, and use named or
 //! explicit viewport dimensions. These operations reuse the core
 //! `ControlSpec` and `ControlValue` contracts.
+//! Generic actions, focus, keyboard, pointer, frame waits, and atomic
+//! post-interaction capture are registered only when interaction automation is
+//! explicitly enabled with [`StorybookMcpServerOptions`] or
+//! [`ALLOW_INTERACTION_ENV_VAR`]. The environment value must equal `1`.
+//! Interaction is destructive, non-idempotent, and open-world: the capability
+//! authorizes event dispatch but does not constrain downstream story behavior.
 //!
 //! The facade recognizes the same frame-capture route/path variables emitted by
 //! this crate. Capture launches use disabled storage plus deterministic light,
@@ -21,9 +27,13 @@ use frame_capture::{
     CaptureLaunchEnvError, CaptureRouteId, PixelSize,
 };
 pub use gpui_storybook_core::automation::{
-    DEFAULT_STORY_CAPTURE_HEIGHT, DEFAULT_STORY_CAPTURE_WIDTH, SharedStoryCaptureController,
-    SharedStoryController, SharedStorybookAutomation, StoryCaptureSnapshot, StoryControlsSnapshot,
-    StoryCurrentSnapshot, StoryDefaultSize, StoryScreenshotRequest, StorySnapshot,
+    DEFAULT_STORY_CAPTURE_HEIGHT, DEFAULT_STORY_CAPTURE_WIDTH, MAX_INTERACTION_STEPS,
+    MAX_INTERACTION_TEXT_BYTES, MAX_INTERACTION_WAITED_FRAMES, SharedStoryCaptureController,
+    SharedStoryController, SharedStorybookAutomation, StoryActionSnapshot, StoryCaptureSnapshot,
+    StoryControlsSnapshot, StoryCurrentSnapshot, StoryDefaultSize, StoryInteractionCaptureRequest,
+    StoryInteractionDispatch, StoryInteractionObservation, StoryInteractionRequest,
+    StoryInteractionSnapshot, StoryInteractionStep, StoryModifier, StoryModifiers,
+    StoryMouseButton, StoryPoint, StoryPointSpace, StoryScreenshotRequest, StorySnapshot,
     StorybookAutomation, StorybookAutomationError,
 };
 pub use gpui_storybook_core::controls::{
@@ -39,6 +49,7 @@ use thiserror::Error;
 pub use gpui_storybook_core::automation;
 
 pub const STDIO_ENV_VAR: &str = "GPUI_STORYBOOK_MCP_STDIO";
+pub const ALLOW_INTERACTION_ENV_VAR: &str = "GPUI_STORYBOOK_MCP_ALLOW_INTERACTION";
 
 pub const TOOL_LIST_STORIES: &str = "storybook_list_stories";
 pub const TOOL_GET_STORY: &str = "storybook_get_story";
@@ -49,9 +60,38 @@ pub const TOOL_SET_CONTROL: &str = "storybook_set_control";
 pub const TOOL_RESET_CONTROL: &str = "storybook_reset_control";
 pub const TOOL_CAPTURE_CURRENT_STORY: &str = "storybook_capture_current_story";
 pub const TOOL_CAPTURE_LAUNCH_ENV: &str = "storybook_capture_launch_env";
+pub const TOOL_LIST_ACTIONS: &str = "storybook_list_actions";
+pub const TOOL_RUN_STEPS: &str = "storybook_run_steps";
 
 const CAPTURE_SESSION_TIMEOUT_SECS: u64 = 30;
 const CAPTURE_ENV_PREFIX: &str = "WGPU";
+
+/// Runtime capabilities exposed by a Storybook MCP server.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct StorybookMcpServerOptions {
+    allow_interaction: bool,
+}
+
+impl StorybookMcpServerOptions {
+    /// Build options from the process environment used by stdio launches.
+    pub fn from_env() -> Self {
+        Self {
+            allow_interaction: std::env::var(ALLOW_INTERACTION_ENV_VAR)
+                .is_ok_and(|value| value == "1"),
+        }
+    }
+
+    /// Enable or disable generic in-process interaction tools.
+    pub const fn with_interaction(mut self, allow_interaction: bool) -> Self {
+        self.allow_interaction = allow_interaction;
+        self
+    }
+
+    /// Whether generic in-process interaction tools are enabled.
+    pub const fn interaction_enabled(self) -> bool {
+        self.allow_interaction
+    }
+}
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct StorybookCaptureConfig {
@@ -108,6 +148,25 @@ struct CaptureCurrentStoryInput {
     viewport: Option<String>,
     /// Tagged `ControlValue` objects keyed by control name, applied before capture.
     controls: Option<BTreeMap<String, McpAny>>,
+}
+
+/// Run an ordered in-process interaction batch.
+#[derive(Clone, Debug, component_shape_mcp::McpToolInput)]
+struct RunStepsInput {
+    /// Stable story or substory route to open before interaction.
+    route: Option<String>,
+    /// Tagged `ControlValue` objects applied before interaction.
+    controls: Option<BTreeMap<String, McpAny>>,
+    /// Requested rendered width in physical pixels. Set together with `height`.
+    width: Option<u32>,
+    /// Requested rendered height in physical pixels. Set together with `width`.
+    height: Option<u32>,
+    /// Named viewport used when explicit dimensions are omitted.
+    viewport: Option<String>,
+    /// Ordered, closed, tagged interaction step objects.
+    steps: Vec<McpAny>,
+    /// Optional `{ "output_path": "..." }` next-frame PNG capture request.
+    capture: Option<McpAny>,
 }
 
 /// Set one control on the active concrete story instance.
@@ -322,14 +381,31 @@ async fn run_capture_session(
 }
 
 pub fn server(automation: SharedStorybookAutomation) -> Result<McpServer, McpToolError> {
+    server_with_options(automation, StorybookMcpServerOptions::from_env())
+}
+
+/// Build an MCP server with explicit runtime capabilities.
+pub fn server_with_options(
+    automation: SharedStorybookAutomation,
+    options: StorybookMcpServerOptions,
+) -> Result<McpServer, McpToolError> {
     let mut server = McpServer::new("gpui-storybook", env!("CARGO_PKG_VERSION"));
-    register_tools(&mut server, automation)?;
+    register_tools_with_options(&mut server, automation, options)?;
     Ok(server)
 }
 
 pub fn register_tools(
     server: &mut McpServer,
     automation: SharedStorybookAutomation,
+) -> Result<(), McpToolError> {
+    register_tools_with_options(server, automation, StorybookMcpServerOptions::from_env())
+}
+
+/// Register Storybook tools with explicit runtime capabilities.
+pub fn register_tools_with_options(
+    server: &mut McpServer,
+    automation: SharedStorybookAutomation,
+    options: StorybookMcpServerOptions,
 ) -> Result<(), McpToolError> {
     server.add_typed_tool(
         tool::<EmptyInput>(
@@ -397,6 +473,47 @@ pub fn register_tools(
             }
         },
     )?;
+
+    if options.interaction_enabled() {
+        server.add_typed_tool_async(
+            tool::<EmptyInput>(
+                TOOL_LIST_ACTIONS,
+                "List Actions",
+                "List non-internal GPUI actions registered by this launched application. Rediscover actions after every launch because action names are runtime registrations.",
+                list_actions_output_schema(),
+                ToolHints::read_only(),
+            )?,
+            {
+                let automation = automation.clone();
+                move |_input| {
+                    let automation = automation.clone();
+                    async move {
+                        match automation.list_actions().await {
+                            Ok(actions) => tool_structured_result(json!({ "actions": actions })),
+                            Err(error) => automation_tool_error(error),
+                        }
+                    }
+                }
+            },
+        )?;
+
+        server.add_typed_tool_async(interaction_tool()?, {
+            let automation = automation.clone();
+            move |input| {
+                let automation = automation.clone();
+                async move {
+                    let request = match decode_interaction_request(input) {
+                        Ok(request) => request,
+                        Err(error) => return tool_error_result_for(error),
+                    };
+                    match automation.run_steps(request).await {
+                        Ok(snapshot) => tool_structured_result(json!(snapshot)),
+                        Err(error) => interaction_automation_tool_error(error),
+                    }
+                }
+            }
+        })?;
+    }
 
     server.add_typed_tool_async(
         tool::<EmptyInput>(
@@ -574,6 +691,7 @@ struct ToolHints {
     read_only: bool,
     destructive: bool,
     idempotent: bool,
+    open_world: bool,
 }
 
 impl ToolHints {
@@ -582,6 +700,7 @@ impl ToolHints {
             read_only: true,
             destructive: false,
             idempotent: true,
+            open_world: false,
         }
     }
 
@@ -590,6 +709,16 @@ impl ToolHints {
             read_only: false,
             destructive,
             idempotent,
+            open_world: false,
+        }
+    }
+
+    const fn interaction() -> Self {
+        Self {
+            read_only: false,
+            destructive: true,
+            idempotent: false,
+            open_world: true,
         }
     }
 }
@@ -612,7 +741,7 @@ where
             .with_read_only_hint(hints.read_only)
             .with_destructive_hint(hints.destructive)
             .with_idempotent_hint(hints.idempotent)
-            .with_open_world_hint(false),
+            .with_open_world_hint(hints.open_world),
         Some(output_schema),
     )
 }
@@ -647,6 +776,43 @@ where
         if has_frame {
             set_optional_positive_integer(properties, "frame");
         }
+    }
+    Ok(tool)
+}
+
+fn interaction_tool() -> Result<McpTypedTool<RunStepsInput>, McpToolError> {
+    let mut tool = tool::<RunStepsInput>(
+        TOOL_RUN_STEPS,
+        "Run Steps",
+        "Run one exclusive, ordered in-process interaction batch against the active story region, with optional next-frame capture. Clicks and actions can trigger arbitrary application effects.",
+        interaction_output_schema(),
+        ToolHints::interaction(),
+    )?;
+    let input_schema = std::sync::Arc::make_mut(&mut tool.definition_mut().input_schema);
+    input_schema.insert(
+        "dependentRequired".to_string(),
+        json!({
+            "width": ["height"],
+            "height": ["width"],
+        }),
+    );
+    if let Some(properties) = input_schema
+        .get_mut("properties")
+        .and_then(Value::as_object_mut)
+    {
+        properties.insert(
+            "controls".to_owned(),
+            nullable_schema(McpSchema::object().with_additional_properties(control_value_schema()))
+                .into_value(),
+        );
+        properties.insert("steps".to_owned(), interaction_steps_schema().into_value());
+        properties.insert(
+            "capture".to_owned(),
+            nullable_schema(interaction_capture_request_schema()).into_value(),
+        );
+        set_optional_positive_integer(properties, "width");
+        set_optional_positive_integer(properties, "height");
+        set_optional_viewport_enum(properties);
     }
     Ok(tool)
 }
@@ -693,9 +859,68 @@ fn automation_tool_error(error: StorybookAutomationError) -> ToolCallResult {
         StorybookAutomationError::StoryNotFound { key } => {
             McpToolError::invalid_field_value("key", key)
         },
-        error => McpToolError::handler(error.to_string()),
+        error => structured_automation_error(error),
     };
     tool_error_result_for(error)
+}
+
+fn interaction_automation_tool_error(error: StorybookAutomationError) -> ToolCallResult {
+    let error = match error {
+        StorybookAutomationError::StoryNotFound { key } => {
+            McpToolError::invalid_field_value("route", key)
+        },
+        error => structured_automation_error(error),
+    };
+    tool_error_result_for(error)
+}
+
+fn structured_automation_error(error: StorybookAutomationError) -> McpToolError {
+    let detail = match &error {
+        StorybookAutomationError::NoLiveHost => json!({ "code": "no_live_host" }),
+        StorybookAutomationError::HostDisconnected {
+            steps_dispatched, ..
+        } => json!({
+            "code": "host_disconnected",
+            "steps_dispatched": steps_dispatched,
+        }),
+        StorybookAutomationError::AutomationBusy => json!({ "code": "automation_busy" }),
+        StorybookAutomationError::CaptureUnavailable { .. } => {
+            json!({ "code": "capture_unavailable" })
+        },
+        StorybookAutomationError::InvalidCaptureRequest { .. } => {
+            json!({ "code": "invalid_capture_request" })
+        },
+        StorybookAutomationError::InvalidInteractionRequest { .. } => {
+            json!({ "code": "invalid_interaction_request" })
+        },
+        StorybookAutomationError::InvalidInteractionStep { step_index, .. } => json!({
+            "code": "invalid_interaction_step",
+            "step_index": step_index,
+            "steps_dispatched": 0,
+        }),
+        StorybookAutomationError::InteractionFailed {
+            request_id,
+            steps_dispatched,
+            ..
+        } => json!({
+            "code": "interaction_failed",
+            "request_id": request_id,
+            "steps_dispatched": steps_dispatched,
+        }),
+        StorybookAutomationError::NoActiveStory => json!({ "code": "no_active_story" }),
+        StorybookAutomationError::ControlsUnavailable { key } => json!({
+            "code": "controls_unavailable",
+            "story_key": key,
+        }),
+        StorybookAutomationError::ControlOperationFailed { .. } => {
+            json!({ "code": "control_operation_failed" })
+        },
+        StorybookAutomationError::StoryNotFound { key } => json!({
+            "code": "story_not_found",
+            "route": key,
+        }),
+    };
+    McpToolError::validation_structured_details(error.to_string(), [detail])
 }
 
 fn decode_control_map(
@@ -712,6 +937,41 @@ fn decode_control_map(
                 })
         })
         .collect()
+}
+
+fn decode_interaction_request(
+    input: RunStepsInput,
+) -> Result<StoryInteractionRequest, McpToolError> {
+    let controls = decode_control_map(input.controls)?;
+    let viewport = parse_viewport(input.viewport)
+        .map_err(|error| McpToolError::invalid_field_value("viewport", error.to_string()))?;
+    let steps = input
+        .steps
+        .into_iter()
+        .enumerate()
+        .map(|(index, step)| {
+            serde_json::from_value(step.into_value()).map_err(|error| {
+                McpToolError::invalid_field_value(format!("steps.{index}"), error.to_string())
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let capture = input
+        .capture
+        .map(|capture| {
+            serde_json::from_value(capture.into_value())
+                .map_err(|error| McpToolError::invalid_field_value("capture", error.to_string()))
+        })
+        .transpose()?;
+
+    Ok(StoryInteractionRequest {
+        route: input.route,
+        controls,
+        width: input.width,
+        height: input.height,
+        viewport,
+        steps,
+        capture,
+    })
 }
 
 fn parse_viewport(
@@ -783,6 +1043,172 @@ fn control_value_schema() -> McpSchema {
         tagged_control_value_schema("choice", McpSchema::string()),
         tagged_control_value_schema("json", McpSchema::any()),
     ])
+}
+
+fn story_point_schema() -> McpSchema {
+    let normalized_coordinate = || {
+        McpSchema::number()
+            .with_minimum(0_u64)
+            .with_extension("maximum", json!(1.0))
+    };
+    let logical_coordinate = || McpSchema::number().with_minimum(0_u64);
+    let normalized = object_schema(
+        [
+            (
+                "space".to_owned(),
+                McpSchema::string()
+                    .with_const("normalized")
+                    .with_default("normalized"),
+            ),
+            ("x".to_owned(), normalized_coordinate()),
+            ("y".to_owned(), normalized_coordinate()),
+        ],
+        ["x", "y"],
+    );
+    let logical = object_schema(
+        [
+            (
+                "space".to_owned(),
+                McpSchema::string().with_const("logical_pixels"),
+            ),
+            ("x".to_owned(), logical_coordinate()),
+            ("y".to_owned(), logical_coordinate()),
+        ],
+        ["space", "x", "y"],
+    );
+    McpSchema::one_of([normalized, logical])
+}
+
+fn story_modifiers_schema() -> McpSchema {
+    McpSchema::array(
+        McpSchema::string().with_enum_values(["control", "alt", "shift", "platform", "function"]),
+    )
+    .with_max_items(5)
+    .with_unique_items(true)
+}
+
+fn tagged_interaction_step_schema<const N: usize>(
+    kind: &'static str,
+    properties: [(String, McpSchema); N],
+    required: impl IntoIterator<Item = &'static str>,
+) -> McpSchema {
+    let mut all_properties = McpSchemaProperties::new();
+    all_properties.insert("type".to_owned(), McpSchema::string().with_const(kind));
+    for (name, schema) in properties {
+        all_properties.insert(name, schema);
+    }
+    let mut all_required = vec!["type"];
+    all_required.extend(required);
+    McpSchema::object()
+        .with_properties(all_properties)
+        .with_required(all_required)
+        .with_additional_properties(false)
+}
+
+fn interaction_step_schema() -> McpSchema {
+    let empty = |kind| tagged_interaction_step_schema(kind, [], []);
+    McpSchema::one_of([
+        empty("focus_next"),
+        empty("focus_previous"),
+        empty("blur"),
+        tagged_interaction_step_schema(
+            "keystrokes",
+            [(
+                "keys".to_owned(),
+                McpSchema::array(McpSchema::string().with_extension(
+                    "maxLength",
+                    json!(gpui_storybook_core::automation::MAX_INTERACTION_TEXT_BYTES),
+                ))
+                .with_min_items(1)
+                .with_max_items(gpui_storybook_core::automation::MAX_INTERACTION_STEPS),
+            )],
+            ["keys"],
+        ),
+        tagged_interaction_step_schema(
+            "text",
+            [(
+                "value".to_owned(),
+                McpSchema::string().with_extension(
+                    "maxLength",
+                    json!(gpui_storybook_core::automation::MAX_INTERACTION_TEXT_BYTES),
+                ),
+            )],
+            ["value"],
+        ),
+        tagged_interaction_step_schema(
+            "dispatch_action",
+            [
+                ("name".to_owned(), McpSchema::string()),
+                ("args".to_owned(), McpSchema::any()),
+            ],
+            ["name"],
+        ),
+        tagged_interaction_step_schema(
+            "pointer_move",
+            [("point".to_owned(), story_point_schema())],
+            ["point"],
+        ),
+        tagged_interaction_step_schema(
+            "pointer_click",
+            [
+                ("point".to_owned(), story_point_schema()),
+                (
+                    "button".to_owned(),
+                    McpSchema::string()
+                        .with_enum_values(["left", "right", "middle"])
+                        .with_default("left"),
+                ),
+                (
+                    "click_count".to_owned(),
+                    McpSchema::integer()
+                        .with_minimum(1_u64)
+                        .with_extension("maximum", json!(u8::MAX))
+                        .with_default(1),
+                ),
+                (
+                    "modifiers".to_owned(),
+                    story_modifiers_schema().with_default(json!([])),
+                ),
+            ],
+            ["point"],
+        ),
+        tagged_interaction_step_schema(
+            "scroll",
+            [
+                ("point".to_owned(), story_point_schema()),
+                ("delta_x".to_owned(), McpSchema::number()),
+                ("delta_y".to_owned(), McpSchema::number()),
+            ],
+            ["point", "delta_x", "delta_y"],
+        ),
+        tagged_interaction_step_schema(
+            "wait_frames",
+            [(
+                "count".to_owned(),
+                McpSchema::integer().with_minimum(1_u64).with_extension(
+                    "maximum",
+                    json!(gpui_storybook_core::automation::MAX_INTERACTION_WAITED_FRAMES),
+                ),
+            )],
+            ["count"],
+        ),
+    ])
+}
+
+fn interaction_steps_schema() -> McpSchema {
+    McpSchema::array(interaction_step_schema())
+        .with_min_items(1)
+        .with_max_items(gpui_storybook_core::automation::MAX_INTERACTION_STEPS)
+}
+
+fn interaction_capture_request_schema() -> McpSchema {
+    object_schema(
+        [(
+            "output_path".to_owned(),
+            nullable_schema(McpSchema::string()),
+        )],
+        [],
+    )
 }
 
 fn control_bounds_schema() -> McpSchema {
@@ -923,6 +1349,86 @@ fn capture_story_output_schema() -> McpSchema {
     )
 }
 
+fn action_schema() -> McpSchema {
+    object_schema(
+        [
+            ("name".to_owned(), McpSchema::string()),
+            (
+                "documentation".to_owned(),
+                nullable_schema(McpSchema::string()),
+            ),
+            ("argument_schema".to_owned(), McpSchema::any()),
+        ],
+        ["name", "documentation", "argument_schema"],
+    )
+}
+
+fn list_actions_output_schema() -> McpSchema {
+    object_schema(
+        [("actions".to_owned(), McpSchema::array(action_schema()))],
+        ["actions"],
+    )
+}
+
+fn interaction_dispatch_schema() -> McpSchema {
+    McpSchema::one_of([
+        tagged_interaction_step_schema("dispatched", [], []),
+        tagged_interaction_step_schema(
+            "input",
+            [("handled".to_owned(), McpSchema::boolean())],
+            ["handled"],
+        ),
+        tagged_interaction_step_schema(
+            "platform_event",
+            [
+                ("propagated".to_owned(), McpSchema::boolean()),
+                ("default_prevented".to_owned(), McpSchema::boolean()),
+            ],
+            ["propagated", "default_prevented"],
+        ),
+    ])
+}
+
+fn interaction_observation_schema() -> McpSchema {
+    object_schema(
+        [
+            ("step_index".to_owned(), McpSchema::integer()),
+            (
+                "dispatches".to_owned(),
+                McpSchema::array(interaction_dispatch_schema()),
+            ),
+        ],
+        ["step_index", "dispatches"],
+    )
+}
+
+fn interaction_output_schema() -> McpSchema {
+    object_schema(
+        [
+            ("request_id".to_owned(), McpSchema::integer()),
+            ("story".to_owned(), story_schema()),
+            ("steps_dispatched".to_owned(), McpSchema::integer()),
+            (
+                "observations".to_owned(),
+                McpSchema::array(interaction_observation_schema()),
+            ),
+            ("focused".to_owned(), McpSchema::boolean()),
+            (
+                "capture".to_owned(),
+                nullable_schema(capture_story_output_schema()),
+            ),
+        ],
+        [
+            "request_id",
+            "story",
+            "steps_dispatched",
+            "observations",
+            "focused",
+            "capture",
+        ],
+    )
+}
+
 fn capture_launch_env_output_schema() -> McpSchema {
     let string_array = || McpSchema::array(McpSchema::string());
     object_schema(
@@ -1015,12 +1521,17 @@ pub mod capture {
 
 pub mod prelude {
     pub use super::{
-        CaptureLaunchEnv, SharedStoryCaptureController, SharedStoryController,
-        SharedStorybookAutomation, StoryCaptureSnapshot, StoryCurrentSnapshot, StoryDefaultSize,
-        StoryScreenshotRequest, StorySnapshot, StorybookAutomation, StorybookAutomationError,
-        StorybookCaptureConfig, StorybookCaptureSession, capture_catalog, read_capture_session,
-        server, start_capture_session, start_capture_session_from_env, start_stdio,
-        stdio_requested,
+        ALLOW_INTERACTION_ENV_VAR, CaptureLaunchEnv, MAX_INTERACTION_STEPS,
+        MAX_INTERACTION_TEXT_BYTES, MAX_INTERACTION_WAITED_FRAMES, SharedStoryCaptureController,
+        SharedStoryController, SharedStorybookAutomation, StoryActionSnapshot,
+        StoryCaptureSnapshot, StoryCurrentSnapshot, StoryDefaultSize,
+        StoryInteractionCaptureRequest, StoryInteractionDispatch, StoryInteractionObservation,
+        StoryInteractionRequest, StoryInteractionSnapshot, StoryInteractionStep, StoryModifier,
+        StoryModifiers, StoryMouseButton, StoryPoint, StoryPointSpace, StoryScreenshotRequest,
+        StorySnapshot, StorybookAutomation, StorybookAutomationError, StorybookCaptureConfig,
+        StorybookCaptureSession, StorybookMcpServerOptions, capture_catalog, read_capture_session,
+        server, server_with_options, start_capture_session, start_capture_session_from_env,
+        start_stdio, stdio_requested,
     };
 }
 
@@ -1181,6 +1692,152 @@ mod tests {
             launch["outputSchema"]["properties"]["env"]["type"],
             "object"
         );
+    }
+
+    #[test]
+    fn interaction_capability_gates_closed_tools_and_annotations() {
+        let automation = StorybookAutomation::with_stories(vec![sample_story()]);
+        let disabled =
+            server_with_options(automation.clone(), StorybookMcpServerOptions::default())
+                .expect("disabled server should build");
+        let disabled_tools =
+            serde_json::to_value(disabled.list_tools()).expect("disabled tools should serialize");
+        let disabled_tools = disabled_tools.as_array().expect("tools should be an array");
+        assert!(!disabled_tools.iter().any(|tool| {
+            matches!(
+                tool["name"].as_str(),
+                Some(TOOL_LIST_ACTIONS | TOOL_RUN_STEPS)
+            )
+        }));
+
+        let enabled = server_with_options(
+            automation,
+            StorybookMcpServerOptions::default().with_interaction(true),
+        )
+        .expect("enabled server should build");
+        let tools = serde_json::to_value(enabled.list_tools()).expect("tools should serialize");
+        let tools = tools.as_array().expect("tools should be an array");
+        let find = |name: &str| {
+            tools
+                .iter()
+                .find(|tool| tool["name"] == name)
+                .unwrap_or_else(|| panic!("tool `{name}` should be registered"))
+        };
+
+        let actions = find(TOOL_LIST_ACTIONS);
+        assert_eq!(actions["annotations"]["readOnlyHint"], true);
+        assert_eq!(actions["annotations"]["openWorldHint"], false);
+        assert_eq!(actions["outputSchema"]["additionalProperties"], false);
+
+        let run_steps = find(TOOL_RUN_STEPS);
+        assert_eq!(run_steps["inputSchema"]["required"], json!(["steps"]));
+        assert_eq!(run_steps["inputSchema"]["additionalProperties"], false);
+        assert_eq!(
+            run_steps["inputSchema"]["properties"]["steps"]["minItems"],
+            1
+        );
+        assert_eq!(
+            run_steps["inputSchema"]["properties"]["steps"]["maxItems"],
+            gpui_storybook_core::automation::MAX_INTERACTION_STEPS
+        );
+        let variants = run_steps["inputSchema"]["properties"]["steps"]["items"]["oneOf"]
+            .as_array()
+            .expect("steps should use oneOf");
+        assert_eq!(variants.len(), 10);
+        assert!(
+            variants
+                .iter()
+                .all(|variant| variant["additionalProperties"] == false)
+        );
+        let variant = |kind: &str| {
+            variants
+                .iter()
+                .find(|variant| variant["properties"]["type"]["const"] == kind)
+                .unwrap_or_else(|| panic!("step variant `{kind}` should exist"))
+        };
+        let pointer = &variant("pointer_move")["properties"]["point"]["oneOf"];
+        assert_eq!(pointer[0]["properties"]["x"]["minimum"], 0);
+        assert_eq!(pointer[0]["properties"]["x"]["maximum"], 1.0);
+        assert_eq!(pointer[1]["required"], json!(["space", "x", "y"]));
+        assert_eq!(
+            variant("text")["properties"]["value"]["maxLength"],
+            gpui_storybook_core::automation::MAX_INTERACTION_TEXT_BYTES
+        );
+        assert_eq!(
+            variant("keystrokes")["properties"]["keys"]["maxItems"],
+            gpui_storybook_core::automation::MAX_INTERACTION_STEPS
+        );
+        assert_eq!(
+            variant("keystrokes")["properties"]["keys"]["items"]["maxLength"],
+            gpui_storybook_core::automation::MAX_INTERACTION_TEXT_BYTES
+        );
+        assert_eq!(
+            variant("pointer_click")["properties"]["click_count"]["maximum"],
+            u8::MAX
+        );
+        assert_eq!(
+            variant("wait_frames")["properties"]["count"]["maximum"],
+            gpui_storybook_core::automation::MAX_INTERACTION_WAITED_FRAMES
+        );
+        assert_eq!(run_steps["annotations"]["readOnlyHint"], false);
+        assert_eq!(run_steps["annotations"]["destructiveHint"], true);
+        assert_eq!(run_steps["annotations"]["idempotentHint"], false);
+        assert_eq!(run_steps["annotations"]["openWorldHint"], true);
+        assert_eq!(run_steps["outputSchema"]["additionalProperties"], false);
+    }
+
+    #[test]
+    fn interaction_tool_rejects_unknown_fields_and_bounds_before_host_dispatch() {
+        let server = server_with_options(
+            StorybookAutomation::with_stories(vec![sample_story()]),
+            StorybookMcpServerOptions::default().with_interaction(true),
+        )
+        .expect("enabled server should build");
+
+        let unknown = serde_json::to_value(server.call_tool(
+            TOOL_RUN_STEPS,
+            Some(json!({
+                "steps": [{ "type": "focus_next", "unknown": true }]
+            })),
+        ))
+        .expect("unknown-field result should serialize");
+        assert_eq!(unknown["isError"], true);
+
+        let invalid_point = serde_json::to_value(server.call_tool(
+            TOOL_RUN_STEPS,
+            Some(json!({
+                "steps": [{
+                    "type": "pointer_move",
+                    "point": { "space": "normalized", "x": 2.0, "y": 0.5 }
+                }]
+            })),
+        ))
+        .expect("invalid-point result should serialize");
+        assert_eq!(invalid_point["isError"], true);
+        assert_eq!(
+            invalid_point["structuredContent"]["error"]["details"][0]["code"],
+            "invalid_interaction_step"
+        );
+        assert_eq!(
+            invalid_point["structuredContent"]["error"]["details"][0]["steps_dispatched"],
+            0
+        );
+    }
+
+    #[test]
+    fn interaction_environment_requires_the_explicit_enabled_value() {
+        let _lock = ENV_LOCK.lock().expect("env lock should not be poisoned");
+        let _unset = EnvGuard::remove(&[ALLOW_INTERACTION_ENV_VAR]);
+        assert!(!StorybookMcpServerOptions::from_env().interaction_enabled());
+
+        {
+            let _disabled = EnvGuard::set(&[(ALLOW_INTERACTION_ENV_VAR, "0")]);
+            assert!(!StorybookMcpServerOptions::from_env().interaction_enabled());
+        }
+        {
+            let _enabled = EnvGuard::set(&[(ALLOW_INTERACTION_ENV_VAR, "1")]);
+            assert!(StorybookMcpServerOptions::from_env().interaction_enabled());
+        }
     }
 
     #[test]
@@ -1524,7 +2181,11 @@ mod tests {
         ))
         .expect("open result should serialize");
         assert_eq!(open["isError"], true);
-        assert_eq!(open["structuredContent"]["error"]["kind"], "handler");
+        assert_eq!(open["structuredContent"]["error"]["kind"], "validation");
+        assert_eq!(
+            open["structuredContent"]["error"]["details"][0]["code"],
+            "no_live_host"
+        );
 
         let capture = serde_json::to_value(server.call_tool(
             TOOL_CAPTURE_CURRENT_STORY,
@@ -1532,12 +2193,12 @@ mod tests {
         ))
         .expect("capture result should serialize");
         assert_eq!(capture["isError"], true);
-        assert_eq!(capture["structuredContent"]["error"]["kind"], "handler");
+        assert_eq!(capture["structuredContent"]["error"]["kind"], "validation");
 
         let controls = serde_json::to_value(server.call_tool(TOOL_READ_CONTROLS, Some(json!({}))))
             .expect("controls result should serialize");
         assert_eq!(controls["isError"], true);
-        assert_eq!(controls["structuredContent"]["error"]["kind"], "handler");
+        assert_eq!(controls["structuredContent"]["error"]["kind"], "validation");
 
         let invalid = serde_json::to_value(server.call_tool(
             TOOL_SET_CONTROL,

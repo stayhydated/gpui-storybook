@@ -37,7 +37,10 @@
 //! - `macros`: re-exports proc macros from `gpui-storybook-macros`
 //! - `dock`: re-exports the dock workspace helpers from `gpui-storybook-core`
 //! - `mcp`: installs a default automation controller during [`init`] and
-//!   re-exports MCP automation and capture helpers
+//!   re-exports MCP automation and capture helpers. Generic in-process input
+//!   tools are advertised only when
+//!   `GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1`; typed controls remain available
+//!   without that capability.
 //!
 //! Applications with embedded locale assets should call
 //! `es_fluent_build::track_i18n_assets()` from `build.rs`. Define the embedded

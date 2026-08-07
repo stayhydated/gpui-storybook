@@ -20,6 +20,20 @@ GPUI_STORYBOOK_MCP_STDIO=1 \
 cargo run -p my-app-storybook --features mcp
 ```
 
+This launch exposes route, control, and capture tools. Generic input can invoke
+arbitrary application behavior, so enable it separately and only against a
+safe Storybook backend:
+
+```bash
+GPUI_STORYBOOK_MCP_STDIO=1 \
+GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1 \
+cargo run -p my-app-storybook --features mcp
+```
+
+The interaction variable must equal `1`. When it is absent or has another
+value, the action-discovery and interaction tools are omitted from MCP tool
+discovery.
+
 Send application logs to standard error so they do not corrupt the MCP
 protocol stream.
 
@@ -40,10 +54,108 @@ language. It does not overwrite interactive preferences.
 | `storybook_reset_control` | Reset one control, or all controls when `key` is omitted |
 | `storybook_capture_current_story` | Capture the active story region |
 | `storybook_capture_launch_env` | Build environment variables and a Cargo launch command |
+| `storybook_list_actions` | List runtime GPUI actions, documentation, and argument schemas; interaction gate required |
+| `storybook_run_steps` | Run one ordered in-process interaction batch with optional capture; interaction gate required |
 
 Tool inputs and outputs use closed typed schemas. Use the advertised `key`,
 `output_path`, `width`, `height`, `viewport`, `controls`, and launch properties;
 unknown, missing, or invalid fields return structured errors.
+
+## Run an in-process interaction batch
+
+Use typed controls first when a story exposes them. Use registered actions for
+semantic application commands, keystrokes for keyboard behavior, and
+story-relative pointer coordinates as the fallback.
+
+`storybook_run_steps` can open a route, apply a `controls` map, resize for
+paired rendered-pixel `width` and `height` values or a named `viewport`, execute a
+non-empty `steps` array, and capture the resulting route. For example, the
+explicit example application's inert fixture supports text, select navigation,
+and a typed action:
+
+```json
+{
+  "route": "gpui-storybook-example-story-InteractionStory",
+  "viewport": "mobile",
+  "controls": {
+    "prefix": { "type": "text", "value": "mcp" }
+  },
+  "steps": [
+    { "type": "focus_next" },
+    { "type": "text", "value": "héllo 世界" },
+    { "type": "focus_next" },
+    { "type": "keystrokes", "keys": ["enter", "down", "enter"] },
+    {
+      "type": "dispatch_action",
+      "name": "interaction_story::SetAutomationStatus",
+      "args": { "value": "action-dispatched" }
+    },
+    { "type": "wait_frames", "count": 1 }
+  ],
+  "capture": {
+    "output_path": "target/storybook-captures/interaction.png"
+  }
+}
+```
+
+The closed step variants are:
+
+| Step | Fields and behavior |
+|---|---|
+| `focus_next`, `focus_previous`, `blur` | Move or clear GPUI focus |
+| `keystrokes` | Parse and dispatch each GPUI binding string in `keys` |
+| `text` | Insert the UTF-8 `value` into the focused basic text input; this is not IME, clipboard, paste, or dead-key simulation |
+| `dispatch_action` | Build a registered action by `name` and optional JSON `args`, then dispatch it |
+| `pointer_move` | Dispatch a move at the story-relative `point` |
+| `pointer_click` | Dispatch move, down, and up at `point`; optional `button`, `click_count`, and `modifiers` default to a single left click with no modifiers |
+| `scroll` | Dispatch pixel `delta_x` and `delta_y` at `point` |
+| `wait_frames` | Refresh and continue after the positive rendered-frame `count` |
+
+Pointer points default to normalized coordinates:
+
+```json
+{ "space": "normalized", "x": 0.5, "y": 0.5 }
+```
+
+Both normalized coordinates must be finite and in `0.0..=1.0`. Use
+`"space": "logical_pixels"` for non-negative GPUI logical pixels measured
+from the current route origin. The executor resolves fresh bounds after route
+opening and resize, rejects points beyond those bounds, and translates them to
+window coordinates. It cannot target the gallery sidebar, dock panels, title
+bar, global screen, or an element selector.
+
+A batch allows at most 64 steps, up to 64 binding strings in each `keystrokes`
+step, 4 KiB across UTF-8 `text` values and keystroke syntax, 120 explicitly
+waited frames, and one final capture. Zero-frame waits and non-finite point or
+scroll values are rejected. Every keystroke and action payload is constructed
+before route, control, or input dispatch begins. The result reports a request
+ID, active story, dispatched-step count, available GPUI dispatch observations,
+whether any focus handle remains, and the optional capture. Dispatch means the
+event was delivered; it does not prove the story's business operation
+succeeded.
+
+## Discover and dispatch actions
+
+Call `storybook_list_actions` after each application launch. It lists only
+non-internal GPUI action registrations and returns each action's name,
+documentation, and JSON argument schema. Validate the desired action against
+that runtime result before placing its name and arguments in a
+`dispatch_action` step.
+
+Action dispatch is deferred by GPUI and has no generic handler result. Its
+observation is therefore `dispatched`, not `handled` or `succeeded`. The
+interaction tool is marked destructive, non-idempotent, and open-world because
+an application can bind a click or action to filesystem, network, process,
+hardware, or other external effects.
+
+Direct MCP embedders can enable the same capability without modifying process
+environment:
+
+```rust
+let options = gpui_storybook::mcp::StorybookMcpServerOptions::default()
+    .with_interaction(true);
+let server = gpui_storybook::mcp::server_with_options(automation, options)?;
+```
 
 ## Reproduce a controlled story
 
@@ -143,7 +255,11 @@ Named viewports are `responsive`, `mobile` (390×844), `tablet` (768×1024),
 and `desktop` (1440×900). Explicit paired dimensions take precedence over a
 named viewport.
 
-Only one screenshot request can be pending at a time. A successful result
+Only one Storybook automation mutation can be active at a time. Route opening,
+control setters and resets, live or startup capture, and interaction batches
+share the same operation guard and return `automation_busy` instead of queuing.
+Catalog, current-story, control, and action reads remain available during a
+batch and can observe intermediate rendered state. A successful capture result
 contains the request ID, actual path, rendered pixel dimensions, and story
 metadata.
 
@@ -162,6 +278,12 @@ Width and height request a live window resize. Display scaling or compositor
 behavior can change the rendered result, so treat the returned `pixel_width`
 and `pixel_height` as authoritative.
 
+An interaction capture is part of the same exclusive UI-thread operation. It
+captures the first requested rendered frame after the final step; explicit
+`wait_frames` steps delay that frame. If capture fails after input was
+dispatched, the structured error includes the partial dispatched-step count.
+Do not retry an interaction batch automatically.
+
 ## Troubleshoot automation
 
 | Symptom | Action |
@@ -170,6 +292,10 @@ and `pixel_height` as authoritative.
 | No live host is attached | Await initialization and construct a standard `Gallery` or `StoryWorkspace` view |
 | Width or height is rejected | Set both dimensions to positive integers |
 | A control is rejected | Read the current control specs and use the advertised type, bounds, and options |
-| Capture is already pending | Wait for the active request to complete |
+| Automation is busy | Wait for the active capture or mutation to complete; requests are not queued |
+| Interaction tools are missing | Set `GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1` before server construction and rediscover tools |
+| Action is unknown or arguments are invalid | Call `storybook_list_actions` for this launch and follow its argument schema |
+| Pointer point is rejected | Use finite normalized coordinates in `0.0..=1.0` or route-relative logical pixels inside the rendered bounds |
+| Interaction reports partial execution | Inspect `steps_dispatched`; establish postconditions with a capture or read and do not retry automatically |
 | Stdio messages cannot be decoded | Route tracing and diagnostics to standard error |
 | Startup capture times out | Confirm registrations are linked and test the same route interactively |

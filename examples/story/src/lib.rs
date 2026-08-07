@@ -18,6 +18,7 @@ pub enum StorySection {
     Tables = 7,
     Buttons = 6,
     Grouped = 5,
+    Automation = 4,
 }
 
 const CONSUMER_ID: &str = "gpui-storybook-example-story";
@@ -151,6 +152,7 @@ mod tests {
                 "gpui-storybook-example-story-GroupedDetailsStory",
                 "gpui-storybook-example-story-GroupedSummaryStory",
                 "gpui-storybook-example-story-HelloWorld",
+                "gpui-storybook-example-story-InteractionStory",
                 "gpui-storybook-example-story-TableStory",
             ]
         );

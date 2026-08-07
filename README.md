@@ -8,7 +8,8 @@
 GPUI Storybook is a searchable component preview shell for GPUI applications. It
 supports stateful stories, component-derived stories, persistent appearance and
 language preferences, a live controls/theme/inspection workbench, an optional
-dock workspace, and optional MCP automation and PNG capture.
+dock workspace, and optional MCP automation for typed controls, in-process
+interaction, and PNG capture.
 
 ## Try the examples
 
@@ -42,6 +43,22 @@ struct ButtonStory {
 The Theme tab edits every serialized theme color in memory. Native debug builds
 can watch a consumer theme directory by setting `STORYBOOK_THEME_DIR` before
 launch; Wasm supports in-app editing without filesystem watching.
+
+Enable the `mcp` feature to discover routes, drive controls, and capture the
+story region. Generic focus, keyboard, action, pointer, scroll, and frame-wait
+steps require an explicit capability gate because they can activate arbitrary
+application behavior:
+
+```bash
+GPUI_STORYBOOK_MCP_STDIO=1 \
+GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1 \
+cargo run -p my-app-storybook --features mcp
+```
+
+Interaction runs inside the live GPUI window; it does not require compositor
+or operating-system input injection. See [Automation and
+capture](book/src/automation.md) for the closed step schema, safety limits, and
+capture ordering.
 
 ## Start using Storybook
 

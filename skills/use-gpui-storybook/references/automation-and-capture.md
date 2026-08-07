@@ -15,6 +15,11 @@ mcp = ["gpui-storybook/mcp"]
 Set `GPUI_STORYBOOK_MCP_STDIO=1` to serve MCP over stdio. Route tracing and
 diagnostic logs to standard error.
 
+Set `GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1` only when the client should receive
+generic in-process interaction tools. The value must be exactly `1`; otherwise
+the tools are omitted. This capability can trigger any effect reachable from a
+story action or input handler, so use an inert fixture or a safe backend.
+
 The standard `Gallery::view` and `StoryWorkspace::view` constructors attach
 the controller installed by `gpui_storybook::init`.
 
@@ -29,6 +34,8 @@ the controller installed by `gpui_storybook::init`.
 - `storybook_reset_control`
 - `storybook_capture_current_story`
 - `storybook_capture_launch_env`
+- `storybook_list_actions` (interaction capability)
+- `storybook_run_steps` (interaction capability)
 
 Use advertised typed fields. Width and height are optional only as a pair.
 Control operations use tagged `ControlValue` objects shared with the UI:
@@ -47,6 +54,38 @@ so it applies serialized values immediately before rendering.
 Capture requests also accept `responsive`, `mobile`, `tablet`, or `desktop` as
 a `viewport`. Explicit paired width and height take precedence. The launch-env
 tool accepts the same named presets when dimensions are omitted.
+
+## Interaction batches
+
+Prefer controls, then registered actions, then keystrokes, and finally
+story-relative pointer coordinates. Discover non-internal runtime actions and
+their JSON argument schemas with `storybook_list_actions` after every launch.
+
+`storybook_run_steps` accepts an optional route, controls, paired rendered-pixel
+dimensions or viewport, a required non-empty step list, and an optional final
+capture. Step types are `focus_next`, `focus_previous`, `blur`, `keystrokes`,
+`text`, `dispatch_action`, `pointer_move`, `pointer_click`, `scroll`, and
+`wait_frames`.
+
+Pointer points default to normalized `x`/`y` values in `0.0..=1.0`. The
+`logical_pixels` space is relative to fresh active-route bounds. Points cannot
+reach Storybook chrome or the global screen. A click dispatches move, down, and
+up.
+
+Limits are 64 steps, 64 binding strings per `keystrokes` step, 4 KiB across
+UTF-8 text values and keystroke syntax, 120 waited frames, and one final
+capture. Complete validation happens before input dispatch. The capture is the
+first requested frame after the final step or explicit waits. Runtime failures
+report `steps_dispatched`; do not retry automatically.
+
+Capture, navigation, control mutations, and interaction share one exclusive
+operation. Reads remain available while it runs and may observe intermediate
+state. The interaction tool is destructive, non-idempotent, and open-world;
+dispatch does not authorize or prove semantic success.
+
+Direct integrations enable the capability with
+`StorybookMcpServerOptions::default().with_interaction(true)` and
+`server_with_options` or `register_tools_with_options`.
 
 ## Routes
 
@@ -84,7 +123,12 @@ source of truth.
 
 - Route missing: inspect active filters and discover the base key again.
 - No live host: await initialization and construct a standard view.
-- Capture pending: wait before submitting another screenshot.
+- Automation busy: wait before submitting another capture or mutation; work is
+  not queued.
+- Interaction tools missing: set the explicit capability before server
+  construction and rediscover tools.
+- Invalid action: rediscover actions for this launch and use its JSON schema.
+- Partial interaction failure: inspect the dispatched count and do not retry.
 - Invalid dimensions: provide positive width and height together.
 - Corrupt stdio: move application logs to standard error.
 - Startup timeout: confirm story registration linkage and open the route

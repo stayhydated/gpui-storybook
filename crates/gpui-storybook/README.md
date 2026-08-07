@@ -14,7 +14,7 @@ crates.
 |---|---:|---|
 | `macros` | Yes | Re-export `#[story]`, `#[story_init]`, `StoryControls`, `ComponentStory`, and `Substory` |
 | `dock` | No | Add the panel-based `StoryWorkspace` |
-| `mcp` | No | Add MCP tools and PNG capture support |
+| `mcp` | No | Add MCP tools, opt-in in-process interaction, and PNG capture support |
 
 Initialization is asynchronous: call `gpui_storybook::init`, await the returned
 readiness task, and only then create the first story window.
@@ -35,6 +35,14 @@ The Theme tab edits every serialized theme color in memory. Native debug builds
 can watch a consumer theme directory by setting `STORYBOOK_THEME_DIR` before
 launch; Wasm supports in-app editing without filesystem watching.
 
+With `mcp` enabled, set both `GPUI_STORYBOOK_MCP_STDIO=1` and
+`GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1` to advertise generic focus, keyboard,
+registered-action, story-relative pointer, scroll, frame-wait, and atomic
+post-interaction capture tools. The interaction gate is separate because a
+story action can have arbitrary application effects. Typed controls remain the
+preferred reproducible input contract.
+
 See the [getting-started guide](../../book/src/getting_started.md), [story
 guide](../../book/src/stories.md), [workbench guide](../../book/src/workbench.md),
-and [API documentation](https://docs.rs/gpui-storybook/).
+the [automation guide](../../book/src/automation.md), and [API
+documentation](https://docs.rs/gpui-storybook/).

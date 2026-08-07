@@ -264,7 +264,7 @@ impl Gallery {
         cx: &mut Context<Self>,
     ) {
         match command {
-            StorybookAutomationCommand::OpenStory { key, response } => {
+            StorybookAutomationCommand::OpenStory { key, response, .. } => {
                 let result = self.set_active_story_by_key(&key, cx);
                 cx.notify();
                 let _ = response.send(result);
@@ -273,6 +273,7 @@ impl Gallery {
                 request_id,
                 request,
                 response,
+                operation,
             } => {
                 let quit_after_capture = request.quit_after_capture;
                 match self.prepare_capture_current_story(&request, window, cx) {
@@ -282,6 +283,7 @@ impl Gallery {
                             request,
                             story,
                             response,
+                            operation,
                             quit_after_capture,
                             window,
                         );
@@ -303,6 +305,7 @@ impl Gallery {
                 key,
                 value,
                 response,
+                ..
             } => {
                 let result = self
                     .workbench_state
@@ -310,12 +313,75 @@ impl Gallery {
                 cx.notify();
                 let _ = response.send(result);
             },
-            StorybookAutomationCommand::ResetControl { key, response } => {
+            StorybookAutomationCommand::ResetControl { key, response, .. } => {
                 let result = self
                     .workbench_state
                     .update(cx, |state, cx| state.reset_control(key.as_deref(), cx));
                 cx.notify();
                 let _ = response.send(result);
+            },
+            StorybookAutomationCommand::ListActions { response } => {
+                let _ = response.send(Ok(crate::automation::interaction::list_registered_actions(
+                    cx,
+                )));
+            },
+            StorybookAutomationCommand::RunSteps {
+                request_id,
+                request,
+                response,
+                progress,
+                operation,
+            } => {
+                if response.is_closed() {
+                    return;
+                }
+                let prepared = (|| {
+                    crate::automation::interaction::validate_interaction_request(&request)?;
+                    let steps = crate::automation::interaction::prepare_interaction_steps(
+                        &request.steps,
+                        cx,
+                    )?;
+                    if let Some(route) = &request.route {
+                        self.set_active_story_by_key(route, cx)?;
+                    }
+                    self.workbench_state
+                        .update(cx, |state, cx| state.apply_controls(&request.controls, cx))?;
+                    let story = self
+                        .automation
+                        .as_ref()
+                        .and_then(|automation| automation.current_story().story)
+                        .or_else(|| self.active_story_snapshot(cx))
+                        .ok_or(StorybookAutomationError::NoActiveStory)?;
+                    crate::automation::interaction::apply_interaction_target_size(
+                        &request, window,
+                    )?;
+                    cx.notify();
+                    window.refresh();
+                    Ok((story, steps, request.capture))
+                })();
+
+                match prepared {
+                    Ok((story, steps, capture)) => {
+                        if response.is_closed() {
+                            return;
+                        }
+                        crate::automation::interaction::schedule_story_interaction(
+                            crate::automation::interaction::PreparedStoryInteraction {
+                                request_id,
+                                story,
+                                steps,
+                                capture,
+                                response,
+                                progress,
+                                operation,
+                            },
+                            window,
+                        );
+                    },
+                    Err(error) => {
+                        let _ = response.send(Err(error));
+                    },
+                }
             },
         }
     }
@@ -760,6 +826,9 @@ mod tests {
                     StorybookAutomationCommand::OpenStory {
                         key: "crate-TableStory".to_string(),
                         response,
+                        _operation: automation
+                            .begin_operation()
+                            .expect("open operation should start"),
                     },
                     window,
                     cx,
@@ -773,6 +842,78 @@ mod tests {
                         .expect("table snapshot should exist")
                         .key,
                     "crate-TableStory"
+                );
+
+                let (response, mut result) = oneshot::channel();
+                gallery.handle_automation_command(
+                    StorybookAutomationCommand::RunSteps {
+                        request_id: 8,
+                        request: crate::automation::StoryInteractionRequest {
+                            route: Some("crate-ButtonStory".to_owned()),
+                            controls: BTreeMap::new(),
+                            width: None,
+                            height: None,
+                            viewport: None,
+                            steps: vec![crate::automation::StoryInteractionStep::DispatchAction {
+                                name: "storybook_test::MissingAction".to_owned(),
+                                args: None,
+                            }],
+                            capture: None,
+                        },
+                        response,
+                        progress: std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+                        operation: automation
+                            .begin_operation()
+                            .expect("interaction operation should start"),
+                    },
+                    window,
+                    cx,
+                );
+                assert!(matches!(
+                    result.try_recv().expect("interaction error should be sent"),
+                    Err(StorybookAutomationError::InvalidInteractionStep { step_index: 0, .. })
+                ));
+                assert_eq!(
+                    gallery
+                        .active_story_snapshot(cx)
+                        .expect("invalid batch must not change routes")
+                        .key,
+                    "crate-TableStory"
+                );
+
+                let (response, cancelled) = oneshot::channel();
+                drop(cancelled);
+                gallery.handle_automation_command(
+                    StorybookAutomationCommand::RunSteps {
+                        request_id: 9,
+                        request: crate::automation::StoryInteractionRequest {
+                            route: Some("crate-ButtonStory".to_owned()),
+                            controls: BTreeMap::new(),
+                            width: None,
+                            height: None,
+                            viewport: None,
+                            steps: vec![crate::automation::StoryInteractionStep::FocusNext],
+                            capture: None,
+                        },
+                        response,
+                        progress: std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+                        operation: automation
+                            .begin_operation()
+                            .expect("cancelled interaction operation should start"),
+                    },
+                    window,
+                    cx,
+                );
+                assert_eq!(
+                    gallery
+                        .active_story_snapshot(cx)
+                        .expect("cancelled batch must not change routes")
+                        .key,
+                    "crate-TableStory"
+                );
+                assert!(
+                    automation.begin_operation().is_ok(),
+                    "cancelled batch should release its guard"
                 );
 
                 gallery.stories.clear();
@@ -796,6 +937,9 @@ mod tests {
                         request_id: 7,
                         request: StoryScreenshotRequest::default(),
                         response,
+                        operation: automation
+                            .begin_operation()
+                            .expect("capture operation should start"),
                     },
                     window,
                     cx,
@@ -869,6 +1013,9 @@ mod tests {
                         key: "enabled".to_owned(),
                         value: ControlValue::Boolean(true),
                         response,
+                        _operation: automation
+                            .begin_operation()
+                            .expect("control operation should start"),
                     },
                     window,
                     cx,
@@ -884,6 +1031,9 @@ mod tests {
                     StorybookAutomationCommand::ResetControl {
                         key: None,
                         response,
+                        _operation: automation
+                            .begin_operation()
+                            .expect("reset operation should start"),
                     },
                     window,
                     cx,

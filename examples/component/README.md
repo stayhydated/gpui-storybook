@@ -21,3 +21,11 @@ how `#[storybook(control)]` stores defaults from `example = ...` and overlays
 live values on each render. See [Write stories](../../book/src/stories.md) for
 the derive contract, [Use the workbench](../../book/src/workbench.md) for live
 editing, and [Getting started](../../book/src/getting_started.md) for setup.
+
+The standard gallery and dock constructors attach the same optional automation
+host for component-derived stories. Launch with `--features mcp` for typed
+route, control, and capture tools; also set
+`GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1` when generic in-process keyboard,
+action, pointer, scroll, and frame-wait tools are intentionally allowed. Use
+the explicit story example's inert `InteractionStory` when testing the complete
+interaction surface.

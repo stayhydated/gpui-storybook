@@ -21,3 +21,18 @@ presentation, and stable `Substory` capture routes. See [Write
 stories](../../book/src/stories.md) for the registration contract and
 [Use the workbench](../../book/src/workbench.md) for controls and theme editing,
 and [Automation and capture](../../book/src/automation.md) for MCP usage.
+
+`InteractionStory` is the inert automation fixture. It provides a text input,
+keyboard-operated select, hover/click target, schema-backed
+`interaction_story::SetAutomationStatus` action, viewport readout, typed
+`prefix` control, and a one-frame `pressed` state. Exercise the same route in
+gallery or dock mode:
+
+```bash
+GPUI_STORYBOOK_MCP_STDIO=1 \
+GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1 \
+cargo run -p gpui-storybook-example-story --features mcp
+```
+
+Add `dock` to the feature list to run the identical executor through the dock
+host. Rediscover registered actions after each launch before dispatching one.
