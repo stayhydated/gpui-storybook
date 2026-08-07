@@ -21,7 +21,8 @@ readiness task, and only then create the first story window.
 
 Both the gallery and dock workspace include a right-side workbench. Derive
 `StoryControls` on explicit story structs, or mark fields on a
-`ComponentStory`, to get live field editors and reset behavior:
+`ComponentStory`, to get live field editors and reset behavior. Only fields
+marked with `#[storybook(control...)]` are registered:
 
 ```rust
 #[derive(gpui_storybook::StoryControls)]

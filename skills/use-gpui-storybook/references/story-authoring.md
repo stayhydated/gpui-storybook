@@ -41,7 +41,6 @@ struct ButtonStory {
     disabled: bool,
     #[storybook(control(min = 0.0, max = 32.0, step = 1.0))]
     padding: f32,
-    #[storybook(control(skip))]
     focus_handle: gpui::FocusHandle,
 }
 ```
@@ -53,8 +52,9 @@ example during rendering, and overlays current values.
 Supported inferred types are `bool`, `i8` through `i64`, `isize`, `u8` through
 `u32`, `usize`, `f32`, `f64`, `String`, `SharedString`, and `Hsla`. Enum-like
 types use string `options` and implement `Display` plus `FromStr`. Leave
-collections and application-specific types unmarked or use `control(skip)`;
-an explicitly controlled unsupported field is a compile error.
+collections and application-specific types unmarked; only fields with
+`#[storybook(control...)]` are registered. An explicitly controlled unsupported
+field is a compile error.
 
 ## Organize stories
 

@@ -107,12 +107,12 @@ struct ButtonStory {
     disabled: bool,
     #[storybook(control(min = 0.0, max = 32.0, step = 1.0))]
     padding: f32,
-    #[storybook(control(skip))]
     focus_handle: gpui::FocusHandle,
 }
 ```
 
 For a `ComponentStory`, put `#[storybook(control...)]` on component fields.
+Fields without the attribute are not registered as controls.
 The generated wrapper captures their defaults from `example = ...` and
 overlays live values whenever it renders. See [Use the workbench](workbench.md)
 for supported field types, reset behavior, theme editing, and preview tools.

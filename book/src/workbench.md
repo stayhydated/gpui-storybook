@@ -36,9 +36,8 @@ Keep implementing `Story`, `Render`, and `Focusable` as described in
 [Write stories](stories.md). `Story::new_view` returns `Entity<Self>`, which
 lets the generated control adapter update that exact GPUI entity.
 
-Fields without `#[storybook(control...)]` remain private to the story. Use
-`#[storybook(control(skip))]` when a field should be explicitly documented as
-non-editable.
+Fields without `#[storybook(control...)]` remain private to the story. Control
+registration is explicit, so only marked fields appear in the workbench.
 
 ## Add controls to a component story
 
@@ -86,9 +85,9 @@ An enum-like control supplies the visible serialized choices and implements
 intent: ButtonIntent,
 ```
 
-Collections and application-specific types should remain unmarked or use
-`control(skip)`. Marking an unsupported type as a control produces a compile
-diagnostic instead of silently omitting it.
+Leave collections and application-specific types unmarked. Marking an
+unsupported type as a control produces a compile diagnostic instead of silently
+omitting it.
 
 ## Work with the preview
 
@@ -154,7 +153,7 @@ component source still require recompilation.
 | Symptom | Likely cause | Action |
 |---|---|---|
 | The Controls tab is empty | No fields on the active variant are marked | Add `#[storybook(control)]` to supported fields and rebuild |
-| A control derive fails | The marked field type is unsupported or attributes conflict | Use a supported type, enum `options`, or `control(skip)` |
+| A control derive fails | The marked field type is unsupported or attributes conflict | Use a supported type, enum `options`, or leave the field unmarked |
 | Reset uses an unexpected value | The configured story constructor produced that default | Check `Story::new_view` or `ComponentStory`'s `example = ...` expression |
 | External themes do not reload | The process is not a native debug build or the directory is wrong | Set `STORYBOOK_THEME_DIR` before launch and confirm the directory exists |
 | Inspector opens without Storybook metadata | A nested element is selected | Select the `storybook-inspectable-*` story root |

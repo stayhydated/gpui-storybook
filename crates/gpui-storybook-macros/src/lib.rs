@@ -68,7 +68,6 @@ struct SubstoryVariantArgs {
 
 #[derive(Default)]
 struct ControlFieldArgs {
-    skip: bool,
     label: Option<LitStr>,
     description: Option<LitStr>,
     category: Option<LitStr>,
@@ -409,10 +408,6 @@ fn parse_control_field_args(field: &Field) -> syn::Result<Option<ControlFieldArg
             let mut args = ControlFieldArgs::default();
             if !meta.input.is_empty() {
                 meta.parse_nested_meta(|nested| {
-                    if nested.path.is_ident("skip") {
-                        args.skip = true;
-                        return Ok(());
-                    }
                     if nested.path.is_ident("label") {
                         let value: LitStr = nested.value()?.parse()?;
                         if args.label.replace(value).is_some() {
@@ -480,7 +475,7 @@ fn parse_control_field_args(field: &Field) -> syn::Result<Option<ControlFieldArg
                     }
 
                     Err(nested.error(
-                        "unsupported control argument; expected `skip`, `label`, `description`, `category`, `min`, `max`, `step`, or `options`",
+                        "unsupported control argument; expected `label`, `description`, `category`, `min`, `max`, `step`, or `options`",
                     ))
                 })?;
             }
@@ -532,23 +527,6 @@ fn generated_control_fields(input: &DeriveInput) -> syn::Result<Vec<GeneratedCon
         let Some(args) = parse_control_field_args(field)? else {
             continue;
         };
-        if args.skip {
-            if args.label.is_some()
-                || args.description.is_some()
-                || args.category.is_some()
-                || args.min.is_some()
-                || args.max.is_some()
-                || args.step.is_some()
-                || !args.options.is_empty()
-            {
-                return Err(syn::Error::new_spanned(
-                    field,
-                    "`skip` cannot be combined with other control arguments",
-                ));
-            }
-            continue;
-        }
-
         let ident = field
             .ident
             .clone()
@@ -594,7 +572,7 @@ fn generated_control_fields(input: &DeriveInput) -> syn::Result<Vec<GeneratedCon
         if !supported && !choice {
             return Err(syn::Error::new_spanned(
                 &field.ty,
-                "unsupported story control type; use `control(skip)` or provide string `options` for an enum implementing Display and FromStr",
+                "unsupported story control type; leave the field unmarked or provide string `options` for an enum implementing Display and FromStr",
             ));
         }
         if !numeric && (args.min.is_some() || args.max.is_some() || args.step.is_some()) {
@@ -1180,7 +1158,7 @@ mod tests {
     }
 
     #[test]
-    fn story_controls_derive_generates_typed_metadata_and_setters() {
+    fn story_controls_derive_registers_only_marked_fields() {
         let input = quote! {
             pub struct ButtonStory {
                 #[storybook(control(label = "Disabled", category = "State"))]
@@ -1189,7 +1167,6 @@ mod tests {
                 padding: f32,
                 #[storybook(control(options = ["Primary", "Danger"]))]
                 intent: ButtonIntent,
-                #[storybook(control(skip))]
                 focus_handle: FocusHandle,
             }
         };
@@ -1209,7 +1186,6 @@ mod tests {
                 headline: gpui::SharedString,
                 #[storybook(control)]
                 selected: bool,
-                #[storybook(control(skip))]
                 items: Vec<String>,
             }
         };
@@ -1221,7 +1197,7 @@ mod tests {
     }
 
     #[test]
-    fn explicitly_requested_unsupported_controls_report_compile_errors() {
+    fn unsupported_control_types_and_bounds_report_compile_errors() {
         assert_compile_error(
             story_controls_derive_impl(quote! {
                 pub struct UnsupportedStory {
@@ -1239,15 +1215,6 @@ mod tests {
                 }
             }),
             "only supported by numeric controls",
-        );
-        assert_compile_error(
-            story_controls_derive_impl(quote! {
-                pub struct InvalidSkipStory {
-                    #[storybook(control(skip, label = "Hidden"))]
-                    label: String,
-                }
-            }),
-            "`skip` cannot be combined",
         );
     }
 

@@ -13,7 +13,6 @@ use gpui_component::{ActiveTheme as _, Sizable as _, tag::Tag, v_flex};
 pub struct FieldNotes {
     #[storybook(control)]
     heading: SharedString,
-    #[storybook(control(skip))]
     notes: Vec<NoteCard>,
 }
 

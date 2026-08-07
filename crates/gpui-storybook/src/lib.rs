@@ -16,8 +16,9 @@
 //!
 //! `#[derive(StoryControls)]` and field-level `#[storybook(control...)]`
 //! metadata connect an exact `Entity<S>` to the Controls tab and MCP
-//! automation. `#[derive(ComponentStory)]` accepts the same field metadata and
-//! derives reset defaults from its configured example.
+//! automation. Only marked fields are registered. `#[derive(ComponentStory)]`
+//! accepts the same field metadata and derives reset defaults from its
+//! configured example.
 //!
 //! [`init`] and `generate_stories` load crate-local `storybook.toml` files for
 //! discovered story crates and select a runtime config by matching the running

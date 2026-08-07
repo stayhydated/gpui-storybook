@@ -25,14 +25,13 @@ struct ButtonStory {
     disabled: bool,
     #[storybook(control(min = 0.0, max = 32.0, step = 1.0))]
     padding: f32,
-    #[storybook(control(skip))]
     focus_handle: gpui::FocusHandle,
 }
 ```
 
 The same field attributes work directly on a `ComponentStory`. An explicitly
-controlled unsupported type produces a compile error; leave it unmarked or use
-`control(skip)`.
+controlled unsupported type produces a compile error. Only marked fields are
+registered, so leave other fields unmarked.
 
 See [Write stories](../../book/src/stories.md) for supported patterns and
 [Use the workbench](../../book/src/workbench.md) for runtime behavior, and

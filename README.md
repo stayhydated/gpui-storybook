@@ -27,8 +27,9 @@ cargo run -p gpui-storybook-example-component
 
 Add `--features dock` to either command to open the dock workspace.
 
-Both modes include a right-side workbench. Mark fields with
-`#[storybook(control)]` to edit the selected story instance without rebuilding:
+Both modes include a right-side workbench. Control registration is explicit:
+mark fields with `#[storybook(control)]` to edit the selected story instance
+without rebuilding, and leave all other fields unmarked:
 
 ```rust
 #[derive(gpui_storybook::StoryControls)]
