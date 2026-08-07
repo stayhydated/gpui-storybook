@@ -45,7 +45,8 @@ preferred reproducible input contract. Capture dimensions size the story region
 without replacing the surrounding gallery or dock layout. On Linux,
 `storybook_capture_launch_env` generates a Sway-wrapped launch command so the
 normal Wayland application can run without a physical display. The wrapper
-waits for the compositor socket before starting Cargo.
+waits for the compositor socket before starting Cargo. The returned PNG is
+cropped to the story region and excludes the mounted Storybook chrome.
 
 See the [getting-started guide](../../book/src/getting_started.md), [story
 guide](../../book/src/stories.md), [workbench guide](../../book/src/workbench.md),

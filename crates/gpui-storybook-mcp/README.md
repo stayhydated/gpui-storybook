@@ -16,8 +16,10 @@ sudo apt-get install --no-install-recommends \
   libgl1-mesa-dri mesa-vulkan-drivers sway
 ```
 
-Commands returned by `storybook_capture_launch_env` include the complete
-Linux wrapper; macOS and Windows commands continue to launch Cargo directly.
+The `command` returned by `storybook_capture_launch_env` includes the complete
+Linux wrapper; its separate `env` map must be merged into the child process
+environment before executing that command. macOS and Windows commands continue
+to launch Cargo directly.
 
 ```toml
 [dependencies]
@@ -52,6 +54,12 @@ GPUI_STORYBOOK_MCP_STDIO=1 \
 GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1 \
 cargo run -p my-app-storybook --features mcp
 ```
+
+For a repository-local smoke test, use
+`gpui-storybook-example-story` and the inert
+`gpui-storybook-example-story-InteractionStory` route. The
+[automation guide](../../book/src/automation.md#verify-raw-stdio-with-the-example)
+shows the raw MCP initialization, discovery, and tool-call sequence.
 
 On Linux, apply the complete [headless Sway
 wrapper](../../book/src/automation.md#enable-mcp-support) to the same session.

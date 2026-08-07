@@ -159,7 +159,7 @@ pub struct StoryScreenshotRequest {
 }
 
 /// Current values and metadata for the controls on the selected story instance.
-#[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[schemars(deny_unknown_fields)]
 pub struct StoryControlsSnapshot {
     pub story: StorySnapshot,

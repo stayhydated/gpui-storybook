@@ -7,7 +7,7 @@ use std::{rc::Rc, str::FromStr};
 use thiserror::Error;
 
 /// A serializable color used by story controls and automation.
-#[derive(Clone, Copy, Debug, JsonSchema, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[schemars(deny_unknown_fields)]
 pub struct ControlColor {
     pub h: f32,
@@ -39,7 +39,7 @@ impl From<ControlColor> for Hsla {
 }
 
 /// A value that can be edited by the Storybook workbench.
-#[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 #[schemars(deny_unknown_fields)]
 pub enum ControlValue {
@@ -75,7 +75,7 @@ impl ControlValue {
 }
 
 /// The editor presented for a control.
-#[derive(Clone, Debug, Eq, JsonSchema, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ControlKind {
     Checkbox,
@@ -88,7 +88,7 @@ pub enum ControlKind {
 }
 
 /// Numeric limits applied before a value reaches a story instance.
-#[derive(Clone, Copy, Debug, Default, JsonSchema, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[schemars(deny_unknown_fields)]
 pub struct ControlBounds {
     pub min: Option<f64>,
@@ -97,7 +97,7 @@ pub struct ControlBounds {
 }
 
 /// Metadata and default value for one story control.
-#[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[schemars(deny_unknown_fields)]
 pub struct ControlSpec {
     pub key: String,
@@ -111,7 +111,7 @@ pub struct ControlSpec {
 }
 
 /// A current control value paired with its metadata.
-#[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[schemars(deny_unknown_fields)]
 pub struct ControlSnapshot {
     pub spec: ControlSpec,

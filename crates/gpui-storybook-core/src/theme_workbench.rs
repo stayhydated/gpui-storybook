@@ -7,7 +7,7 @@ use std::{collections::BTreeMap, hash::Hasher as _};
 use thiserror::Error;
 
 /// One deterministic editable row from [`ThemeColor`].
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ThemeColorRow {
     pub name: String,
     pub color: Hsla,

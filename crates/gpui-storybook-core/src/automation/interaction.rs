@@ -958,7 +958,7 @@ mod tests {
     use std::sync::atomic::AtomicBool;
 
     /// Sets the harness counter to a caller-provided value.
-    #[derive(Clone, Debug, gpui::Action, Deserialize, Eq, PartialEq, schemars::JsonSchema)]
+    #[derive(gpui::Action, Clone, Debug, Deserialize, Eq, schemars::JsonSchema, PartialEq)]
     #[action(namespace = storybook_interaction_test)]
     struct SetCounter {
         value: usize,

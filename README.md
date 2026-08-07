@@ -64,9 +64,10 @@ commands.
 
 Interaction runs inside the live GPUI window; it does not require compositor
 or operating-system input injection. Named and paired capture dimensions target
-the story region while the gallery or dock chrome stays mounted. See [Automation and
-capture](book/src/automation.md) for the closed step schema, safety limits, and
-capture ordering.
+the story region while the gallery or dock chrome stays mounted for layout; the
+returned PNG is cropped to the story region and excludes that chrome. See
+[Automation and capture](book/src/automation.md) for the closed step schema,
+safety limits, and capture ordering.
 
 ## Start using Storybook
 

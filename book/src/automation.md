@@ -105,6 +105,53 @@ A stdio launch uses temporary preference storage and a deterministic light
 presentation with the `Default Light` theme and the application's fallback
 language. It does not overwrite interactive preferences.
 
+### Verify raw stdio with the example
+
+Inside this repository, use the explicit story example as a safe end-to-end
+target. Replace the final Cargo command in the Sway wrapper with:
+
+```bash
+GPUI_STORYBOOK_MCP_STDIO=1 \
+GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1 \
+cargo run -p gpui-storybook-example-story --features mcp
+```
+
+The stable route
+`gpui-storybook-example-story-InteractionStory` is an inert fixture with a
+typed `prefix` control and the schema-backed
+`interaction_story::SetAutomationStatus` action.
+
+An MCP client performs the initialization sequence automatically. For a raw
+JSON Lines smoke test, keep the process's standard input open and exchange one
+JSON object per line in this order:
+
+1. Send `initialize`:
+
+   ```json
+   {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2026-07-28","capabilities":{},"clientInfo":{"name":"storybook-smoke","version":"1.0"}}}
+   ```
+
+2. Read the response with `id: 1`, then send the initialized notification:
+
+   ```json
+   {"jsonrpc":"2.0","method":"notifications/initialized"}
+   ```
+
+3. Discover the live tool schemas:
+
+   ```json
+   {"jsonrpc":"2.0","id":2,"method":"tools/list"}
+   ```
+
+4. Invoke a tool with `tools/call`:
+
+   ```json
+   {"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"storybook_list_stories","arguments":{}}}
+   ```
+
+Read the matching response ID before closing standard input. Use each entry's
+advertised `inputSchema` when constructing later calls.
+
 ## Use the MCP tools
 
 | Tool | Purpose |
@@ -301,10 +348,11 @@ headless Sway as shown above.
 
 Set width and height together, and make both values greater than zero.
 `WGPU_CAPTURE_FRAME`, when present, must also be greater than zero.
-On Linux, the `command` returned by `storybook_capture_launch_env` creates a
-private Wayland runtime, starts headless Sway with a software GLES renderer,
-waits for its socket, and then runs Cargo. Its `env` object still holds the
-capture and stdio variables that must be supplied to that command.
+On Linux, `storybook_capture_launch_env` returns an `env` map and a `command`
+array. Merge every `env` entry into the child process environment before
+executing `command`. The command creates a private Wayland runtime, starts
+headless Sway with a software GLES renderer, waits for its socket, and then
+runs Cargo, but it does not inline the capture or MCP variables.
 
 ## Capture a live session
 
@@ -349,9 +397,11 @@ region.
 
 Width and height target the captured story region. Storybook adjusts the host
 window around the existing gallery or dock chrome so sidebars, headers, and the
-workbench remain mounted. Display scaling or compositor behavior can change the
-rendered result, so treat the returned `pixel_width` and `pixel_height` as
-authoritative.
+workbench remain mounted, then crops that chrome from the returned PNG. Display
+scaling or compositor behavior can change the rendered result, so treat the
+returned `pixel_width` and `pixel_height` as authoritative. Viewport text
+rendered by a story can describe its logical live-window bounds instead of the
+PNG size.
 
 An interaction capture is part of the same exclusive UI-thread operation. It
 captures the first requested rendered frame after the final step; explicit

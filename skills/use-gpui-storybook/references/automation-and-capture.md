@@ -71,6 +71,53 @@ direct Cargo command elsewhere.
 The `--unsupported-gpu` flag only bypasses Sway's host-driver check; the
 headless backend and software GLES renderer remain explicitly selected.
 
+### Verify raw stdio in this repository
+
+Use the explicit story example for a safe end-to-end check. Replace the final
+Cargo command in the Sway wrapper with:
+
+```bash
+GPUI_STORYBOOK_MCP_STDIO=1 \
+GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1 \
+cargo run -p gpui-storybook-example-story --features mcp
+```
+
+The stable route
+`gpui-storybook-example-story-InteractionStory` is an inert fixture with a
+typed `prefix` control and the schema-backed
+`interaction_story::SetAutomationStatus` action.
+
+An MCP client performs the initialization sequence automatically. For a raw
+JSON Lines smoke test, keep the process's standard input open and exchange one
+JSON object per line in this order:
+
+1. Send `initialize`:
+
+   ```json
+   {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2026-07-28","capabilities":{},"clientInfo":{"name":"storybook-smoke","version":"1.0"}}}
+   ```
+
+2. Read the response with `id: 1`, then send the initialized notification:
+
+   ```json
+   {"jsonrpc":"2.0","method":"notifications/initialized"}
+   ```
+
+3. Discover the live tool schemas:
+
+   ```json
+   {"jsonrpc":"2.0","id":2,"method":"tools/list"}
+   ```
+
+4. Invoke a tool with `tools/call`:
+
+   ```json
+   {"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"storybook_list_stories","arguments":{}}}
+   ```
+
+Read the matching response ID before closing standard input. Use each entry's
+advertised `inputSchema` when constructing later calls.
+
 Set `GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1` only when the client should receive
 generic in-process interaction tools. The value must be exactly `1`; otherwise
 the tools are omitted. This capability can trigger any effect reachable from a
@@ -108,10 +155,12 @@ or omit the key for all values. A capture request can include a `controls` map
 so it applies serialized values immediately before rendering.
 
 Capture requests also accept `responsive`, `mobile`, `tablet`, or `desktop` as
-a `viewport`. Explicit paired width and height take precedence. Both forms size
-the captured story region while retaining the surrounding gallery or dock
-chrome. The launch-env tool accepts the same named presets when dimensions are
-omitted.
+a `viewport`. Explicit paired width and height take precedence. The live
+gallery or dock chrome remains mounted for layout, while the returned PNG is
+cropped to the story region and excludes that chrome. The launch-env tool
+accepts the same named presets when dimensions are omitted. Treat the returned
+`pixel_width` and `pixel_height` as authoritative; viewport text rendered by a
+story can describe its logical live-window bounds instead of the PNG size.
 
 ## Interaction batches
 
@@ -176,9 +225,11 @@ Optional variables:
 
 Capture startup disables persistence and forces light appearance, the
 `Default Light` theme, and the typed fallback language. Stdio-only startup
-uses the same presentation with temporary storage. On Linux, commands from
-`storybook_capture_launch_env` create a private Wayland runtime, wait for
-headless Sway, and then run Cargo.
+uses the same presentation with temporary storage. On Linux,
+`storybook_capture_launch_env` returns an `env` map and a `command` array. Merge
+every `env` entry into the child process environment before executing
+`command`; the command creates a private Wayland runtime, waits for headless
+Sway, and then runs Cargo, but it does not inline the capture or MCP variables.
 
 Captures exclude gallery or dock chrome. A substory route crops to its section.
 Paired dimensions target the story region rather than collapsing the complete
