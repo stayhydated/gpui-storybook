@@ -49,6 +49,19 @@ Both modes include the right workbench. Gallery uses a third resizable region.
 Dock mode persists the right dock's width, visibility, and selected tab; use
 **Reset layout** in the title bar to restore the current default layout.
 
+The workbench edits controls on the active concrete variant. Viewport,
+background, grid, selection, and action-log state belong to that Storybook
+window. Theme edits are session overrides on the process-global GPUI Component
+theme: they rebuild derived tokens and refresh open windows without changing
+saved preference intent. **Copy export** and **Import clipboard** exchange a
+complete `ThemeColor` JSON object. Selecting a different base theme clears the
+draft, while reloading the same named theme reapplies its session overrides.
+
+The **Inspect** tab dispatches GPUI Component's Inspector toggle and publishes
+the story key, title, source location, and control keys on the inspectable story
+root. Live control and theme edits change serialized runtime values; changed
+Rust types or component source require recompilation.
+
 For consumer theme development in a native debug build, set
 `STORYBOOK_THEME_DIR` before launch. The path becomes the process's complete
 custom-theme directory and is watched for external changes. Wasm keeps in-app

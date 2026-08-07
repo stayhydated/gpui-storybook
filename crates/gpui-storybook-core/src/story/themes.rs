@@ -8,7 +8,8 @@ use gpui_component::ThemeRegistry;
 #[cfg(all(debug_assertions, not(target_family = "wasm")))]
 const THEMES_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/themes");
 
-/// Native debug environment variable for an additional consumer theme directory.
+/// Native debug environment variable selecting the complete consumer theme
+/// directory.
 pub const STORYBOOK_THEME_DIR_ENV: &str = "STORYBOOK_THEME_DIR";
 
 pub fn init(cx: &mut App) {

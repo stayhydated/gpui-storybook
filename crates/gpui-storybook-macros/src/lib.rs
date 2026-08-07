@@ -21,8 +21,9 @@
 //! that makes duplicate generated keys in the same package fail to build.
 //!
 //! `#[derive(StoryControls)]` generates typed metadata, reads, and setters for
-//! explicitly marked fields. Boolean, numeric, text, `SharedString`, and
-//! `Hsla` fields are inferred; enum-like fields provide string `options`.
+//! explicitly marked fields. It infers `bool`, `i8` through `i64`, `isize`,
+//! `u8` through `u32`, `usize`, `f32`, `f64`, `String`, `SharedString`, and
+//! `Hsla`; enum-like fields provide string `options`.
 //!
 //! `#[derive(Substory)]` supports fieldless enums used with
 //! `gpui_storybook::section(...)` or `gpui_storybook::StorySectionBase::new(...)`.
@@ -957,9 +958,10 @@ pub fn story(args: TokenStream, input: TokenStream) -> TokenStream {
 
 /// Derives typed access to fields marked with `#[storybook(control...)]`.
 ///
-/// Supported fields are `bool`, integer and floating-point primitives,
-/// `String`, `SharedString`, and `Hsla`. Enum-like fields can provide
-/// `options = ["..."]` when they implement `Display` and `FromStr`.
+/// Supported fields are `bool`, `i8` through `i64`, `isize`, `u8` through
+/// `u32`, `usize`, `f32`, `f64`, `String`, `SharedString`, and `Hsla`.
+/// Enum-like fields can provide `options = ["..."]` when they implement
+/// `Display` and `FromStr`.
 ///
 /// ```ignore
 /// #[derive(gpui_storybook::StoryControls)]

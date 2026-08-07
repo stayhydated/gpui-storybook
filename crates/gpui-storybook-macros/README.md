@@ -13,9 +13,10 @@ Most applications should enable the default `macros` feature on
 crate directly. Macro expansions reference the facade as `gpui_storybook`, so
 direct macro users still need that dependency name available.
 
-Controls are opt-in. Supported fields include booleans, integer and floating
-point primitives, `String`, `SharedString`, and `Hsla`. Enum-like fields use
-explicit string options and implement `Display` plus `FromStr`:
+Controls are opt-in. Supported fields include `bool`, `i8` through `i64`,
+`isize`, `u8` through `u32`, `usize`, `f32`, `f64`, `String`, `SharedString`,
+and `Hsla`. Enum-like fields use explicit string options and implement
+`Display` plus `FromStr`:
 
 ```rust
 #[derive(gpui_storybook::StoryControls)]

@@ -111,10 +111,11 @@ with a color picker. Each edit replaces the active color set, rebuilds derived
 theme tokens, and refreshes open windows. Use the row-level reset or **Reset
 all** to return to the selected base theme.
 
-**Export** copies the current color set as deterministic JSON. Put compatible
-`ThemeColor` JSON on the clipboard and choose **Import** to apply it as a
-session draft. Selecting a different base theme clears the draft. Reloading the
-same base theme from disk rebases and reapplies current session overrides.
+**Copy export** copies the current color set as deterministic JSON. Put
+compatible `ThemeColor` JSON on the clipboard and choose **Import clipboard**
+to apply it as a session draft. Selecting a different base theme clears the
+draft. Reloading the same base theme from disk rebases and reapplies current
+session overrides.
 
 For native debug builds, set `STORYBOOK_THEME_DIR` before launch to use a
 consumer-owned directory as the custom-theme source:

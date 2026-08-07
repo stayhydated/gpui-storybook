@@ -50,11 +50,11 @@ On a `ComponentStory`, place the same attributes on component fields. The
 generated wrapper obtains reset defaults from `example = ...`, reconstructs the
 example during rendering, and overlays current values.
 
-Supported inferred types are `bool`, signed integers through `i64`, unsigned
-integers through `u32`, `usize`, `f32`, `f64`, `String`, `SharedString`, and
-`Hsla`. Enum-like types use string `options` and implement `Display` plus
-`FromStr`. Leave collections and application-specific types unmarked or use
-`control(skip)`; an explicitly controlled unsupported field is a compile error.
+Supported inferred types are `bool`, `i8` through `i64`, `isize`, `u8` through
+`u32`, `usize`, `f32`, `f64`, `String`, `SharedString`, and `Hsla`. Enum-like
+types use string `options` and implement `Display` plus `FromStr`. Leave
+collections and application-specific types unmarked or use `control(skip)`;
+an explicitly controlled unsupported field is a compile error.
 
 ## Organize stories
 
