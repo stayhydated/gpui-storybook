@@ -34,13 +34,14 @@
 //! `#[story_init]` registers a one-time setup function that the facade executes
 //! during `gpui_storybook::init(...)`.
 
+use darling::{FromAttributes as _, util::PreservedStrExpr};
 use heck::{ToKebabCase as _, ToTitleCase as _};
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{format_ident, quote};
 use syn::{
-    Data, DeriveInput, Expr, ExprArray, ExprLit, ExprPath, Field, Fields, ItemFn, ItemStruct, Lit,
-    LitStr, Token, Type, meta::ParseNestedMeta, parse::Parse, parse::ParseStream,
+    Data, DeriveInput, Expr, ExprLit, ExprPath, Field, Fields, ItemFn, ItemStruct, Lit, LitStr,
+    Token, Type, parse::Parse, parse::ParseStream,
 };
 
 enum SectionArg {
@@ -60,7 +61,17 @@ struct ComponentStoryArgs {
     example: Option<Expr>,
 }
 
-#[derive(Default)]
+#[derive(Default, darling::FromAttributes)]
+#[darling(attributes(storybook))]
+struct ParsedComponentStoryArgs {
+    title: Option<PreservedStrExpr>,
+    description: Option<PreservedStrExpr>,
+    section: Option<SectionArg>,
+    example: Option<PreservedStrExpr>,
+}
+
+#[derive(Default, darling::FromAttributes)]
+#[darling(attributes(substory))]
 struct SubstoryVariantArgs {
     title: Option<LitStr>,
     key: Option<LitStr>,
@@ -75,6 +86,24 @@ struct ControlFieldArgs {
     max: Option<Expr>,
     step: Option<Expr>,
     options: Vec<LitStr>,
+}
+
+#[derive(Default, darling::FromMeta)]
+#[darling(default, from_word = || Ok(Self::default()))]
+struct ParsedControlFieldArgs {
+    label: Option<LitStr>,
+    description: Option<LitStr>,
+    category: Option<LitStr>,
+    min: Option<PreservedStrExpr>,
+    max: Option<PreservedStrExpr>,
+    step: Option<PreservedStrExpr>,
+    options: Option<Vec<LitStr>>,
+}
+
+#[derive(Default, darling::FromAttributes)]
+#[darling(attributes(storybook))]
+struct StorybookFieldArgs {
+    control: Option<ParsedControlFieldArgs>,
 }
 
 struct GeneratedControlField {
@@ -115,10 +144,6 @@ impl Parse for StoryArgs {
     }
 }
 
-fn duplicate_attr_error(meta: &ParseNestedMeta<'_>, name: &str) -> syn::Error {
-    meta.error(format!("duplicate `{name}` argument"))
-}
-
 fn parse_section_expr(expr: Expr) -> syn::Result<SectionArg> {
     match expr {
         Expr::Lit(ExprLit {
@@ -130,6 +155,12 @@ fn parse_section_expr(expr: Expr) -> syn::Result<SectionArg> {
             expr,
             "`section` must be a string literal or enum variant path",
         )),
+    }
+}
+
+impl darling::FromMeta for SectionArg {
+    fn from_expr(expr: &Expr) -> darling::Result<Self> {
+        parse_section_expr(expr.clone()).map_err(darling::Error::from)
     }
 }
 
@@ -215,54 +246,14 @@ fn story_impl(args: TokenStream2, input: TokenStream2) -> TokenStream2 {
 }
 
 fn parse_component_story_args(input: &DeriveInput) -> syn::Result<ComponentStoryArgs> {
-    let mut args = ComponentStoryArgs::default();
-
-    for attr in &input.attrs {
-        if !attr.path().is_ident("storybook") {
-            continue;
-        }
-
-        attr.parse_nested_meta(|meta| {
-            if meta.path.is_ident("title") {
-                let title: Expr = meta.value()?.parse()?;
-                if args.title.replace(title).is_some() {
-                    return Err(duplicate_attr_error(&meta, "title"));
-                }
-                return Ok(());
-            }
-
-            if meta.path.is_ident("description") {
-                let description: Expr = meta.value()?.parse()?;
-                if args.description.replace(description).is_some() {
-                    return Err(duplicate_attr_error(&meta, "description"));
-                }
-                return Ok(());
-            }
-
-            if meta.path.is_ident("section") {
-                let expr: Expr = meta.value()?.parse()?;
-                let section = parse_section_expr(expr)?;
-                if args.section.replace(section).is_some() {
-                    return Err(duplicate_attr_error(&meta, "section"));
-                }
-                return Ok(());
-            }
-
-            if meta.path.is_ident("example") {
-                let expr: Expr = meta.value()?.parse()?;
-                if args.example.replace(expr).is_some() {
-                    return Err(duplicate_attr_error(&meta, "example"));
-                }
-                return Ok(());
-            }
-
-            Err(meta.error(
-                "unsupported #[storybook(...)] argument; expected `title`, `description`, `section`, or `example`",
-            ))
-        })?;
-    }
-
-    Ok(args)
+    let parsed =
+        ParsedComponentStoryArgs::from_attributes(&input.attrs).map_err(syn::Error::from)?;
+    Ok(ComponentStoryArgs {
+        title: parsed.title.map(Into::into),
+        description: parsed.description.map(Into::into),
+        section: parsed.section,
+        example: parsed.example.map(Into::into),
+    })
 }
 
 fn default_component_title(struct_name: &str) -> String {
@@ -287,35 +278,10 @@ fn validate_substory_key(key: &LitStr) -> syn::Result<()> {
 }
 
 fn parse_substory_variant_args(attrs: &[syn::Attribute]) -> syn::Result<SubstoryVariantArgs> {
-    let mut args = SubstoryVariantArgs::default();
-
-    for attr in attrs {
-        if !attr.path().is_ident("substory") {
-            continue;
-        }
-
-        attr.parse_nested_meta(|meta| {
-            if meta.path.is_ident("title") {
-                let title: LitStr = meta.value()?.parse()?;
-                if args.title.replace(title).is_some() {
-                    return Err(duplicate_attr_error(&meta, "title"));
-                }
-                return Ok(());
-            }
-
-            if meta.path.is_ident("key") {
-                let key: LitStr = meta.value()?.parse()?;
-                validate_substory_key(&key)?;
-                if args.key.replace(key).is_some() {
-                    return Err(duplicate_attr_error(&meta, "key"));
-                }
-                return Ok(());
-            }
-
-            Err(meta.error("unsupported #[substory(...)] argument; expected `title` or `key`"))
-        })?;
+    let args = SubstoryVariantArgs::from_attributes(attrs).map_err(syn::Error::from)?;
+    if let Some(key) = &args.key {
+        validate_substory_key(key)?;
     }
-
     Ok(args)
 }
 
@@ -388,104 +354,26 @@ fn substory_impl(input: TokenStream2) -> TokenStream2 {
 }
 
 fn parse_control_field_args(field: &Field) -> syn::Result<Option<ControlFieldArgs>> {
-    let mut control = None;
-
-    for attr in &field.attrs {
-        if !attr.path().is_ident("storybook") {
-            continue;
-        }
-
-        attr.parse_nested_meta(|meta| {
-            if !meta.path.is_ident("control") {
-                return Err(meta.error(
-                    "unsupported field #[storybook(...)] argument; expected `control`",
-                ));
-            }
-            if control.is_some() {
-                return Err(duplicate_attr_error(&meta, "control"));
-            }
-
-            let mut args = ControlFieldArgs::default();
-            if !meta.input.is_empty() {
-                meta.parse_nested_meta(|nested| {
-                    if nested.path.is_ident("label") {
-                        let value: LitStr = nested.value()?.parse()?;
-                        if args.label.replace(value).is_some() {
-                            return Err(duplicate_attr_error(&nested, "label"));
-                        }
-                        return Ok(());
-                    }
-                    if nested.path.is_ident("description") {
-                        let value: LitStr = nested.value()?.parse()?;
-                        if args.description.replace(value).is_some() {
-                            return Err(duplicate_attr_error(&nested, "description"));
-                        }
-                        return Ok(());
-                    }
-                    if nested.path.is_ident("category") {
-                        let value: LitStr = nested.value()?.parse()?;
-                        if args.category.replace(value).is_some() {
-                            return Err(duplicate_attr_error(&nested, "category"));
-                        }
-                        return Ok(());
-                    }
-                    if nested.path.is_ident("min") {
-                        let value: Expr = nested.value()?.parse()?;
-                        if args.min.replace(value).is_some() {
-                            return Err(duplicate_attr_error(&nested, "min"));
-                        }
-                        return Ok(());
-                    }
-                    if nested.path.is_ident("max") {
-                        let value: Expr = nested.value()?.parse()?;
-                        if args.max.replace(value).is_some() {
-                            return Err(duplicate_attr_error(&nested, "max"));
-                        }
-                        return Ok(());
-                    }
-                    if nested.path.is_ident("step") {
-                        let value: Expr = nested.value()?.parse()?;
-                        if args.step.replace(value).is_some() {
-                            return Err(duplicate_attr_error(&nested, "step"));
-                        }
-                        return Ok(());
-                    }
-                    if nested.path.is_ident("options") {
-                        if !args.options.is_empty() {
-                            return Err(duplicate_attr_error(&nested, "options"));
-                        }
-                        let values: ExprArray = nested.value()?.parse()?;
-                        for value in values.elems {
-                            let Expr::Lit(ExprLit {
-                                lit: Lit::Str(value),
-                                ..
-                            }) = value
-                            else {
-                                return Err(syn::Error::new_spanned(
-                                    value,
-                                    "control options must be string literals",
-                                ));
-                            };
-                            args.options.push(value);
-                        }
-                        if args.options.is_empty() {
-                            return Err(nested.error("control options cannot be empty"));
-                        }
-                        return Ok(());
-                    }
-
-                    Err(nested.error(
-                        "unsupported control argument; expected `label`, `description`, `category`, `min`, `max`, `step`, or `options`",
-                    ))
-                })?;
-            }
-
-            control = Some(args);
-            Ok(())
-        })?;
+    let parsed = StorybookFieldArgs::from_attributes(&field.attrs).map_err(syn::Error::from)?;
+    let Some(parsed) = parsed.control else {
+        return Ok(None);
+    };
+    if parsed.options.as_ref().is_some_and(Vec::is_empty) {
+        return Err(syn::Error::new_spanned(
+            field,
+            "control options cannot be empty",
+        ));
     }
 
-    Ok(control)
+    Ok(Some(ControlFieldArgs {
+        label: parsed.label,
+        description: parsed.description,
+        category: parsed.category,
+        min: parsed.min.map(Into::into),
+        max: parsed.max.map(Into::into),
+        step: parsed.step.map(Into::into),
+        options: parsed.options.unwrap_or_default(),
+    }))
 }
 
 fn control_type_name(ty: &Type) -> Option<String> {
@@ -1219,6 +1107,37 @@ mod tests {
     }
 
     #[test]
+    fn control_metadata_reports_parser_errors() {
+        assert_compile_error(
+            story_controls_derive_impl(quote! {
+                pub struct UnknownControlArgumentStory {
+                    #[storybook(control(unknown = "value"))]
+                    disabled: bool,
+                }
+            }),
+            "Unknown field: `unknown`",
+        );
+        assert_compile_error(
+            story_controls_derive_impl(quote! {
+                pub struct DuplicateControlArgumentStory {
+                    #[storybook(control(label = "One", label = "Two"))]
+                    disabled: bool,
+                }
+            }),
+            "Duplicate field `label`",
+        );
+        assert_compile_error(
+            story_controls_derive_impl(quote! {
+                pub struct EmptyControlOptionsStory {
+                    #[storybook(control(options = []))]
+                    intent: ButtonIntent,
+                }
+            }),
+            "control options cannot be empty",
+        );
+    }
+
+    #[test]
     fn substory_derive_generates_stable_keys_and_titles() {
         let input = quote! {
             pub enum ButtonSubstory {
@@ -1268,7 +1187,7 @@ mod tests {
         };
 
         let expanded = component_story_impl(input);
-        assert_compile_error(expanded, "duplicate `title` argument");
+        assert_compile_error(expanded, "Duplicate field `title`");
     }
 
     #[test]
@@ -1293,7 +1212,7 @@ mod tests {
                 #[storybook(unknown = "value")]
                 pub struct ButtonChip;
             }),
-            "unsupported #[storybook(...)] argument",
+            "Unknown field: `unknown`",
         );
     }
 
@@ -1324,7 +1243,7 @@ mod tests {
         ] {
             assert_compile_error(
                 component_story_impl(input),
-                &format!("duplicate `{name}` argument"),
+                &format!("Duplicate field `{name}`"),
             );
         }
     }
@@ -1363,7 +1282,7 @@ mod tests {
                         Default,
                     }
                 },
-                "unsupported #[substory(...)] argument",
+                "Unknown field: `unknown`",
             ),
             (
                 quote! {
@@ -1410,10 +1329,7 @@ mod tests {
                 "key",
             ),
         ] {
-            assert_compile_error(
-                substory_impl(input),
-                &format!("duplicate `{name}` argument"),
-            );
+            assert_compile_error(substory_impl(input), &format!("Duplicate field `{name}`"));
         }
     }
 

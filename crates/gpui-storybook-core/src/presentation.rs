@@ -1,9 +1,10 @@
 //! Window-local preview presentation settings and action records.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Named viewport sizes available in the workbench and capture automation.
-#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum StoryViewportPreset {
     /// Fill the available story canvas.

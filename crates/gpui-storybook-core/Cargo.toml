@@ -38,6 +38,7 @@ rust-embed = { features = [ "include-exclude", "interpolate-folder-path" ], work
 schemars = { workspace = true }
 serde = { features = [ "derive" ], workspace = true }
 serde_json = { workspace = true }
+thiserror = { workspace = true }
 tokio = { features = [ "sync" ], workspace = true }
 tracing = { workspace = true }
 unic-langid = { features = [ "serde" ], workspace = true }

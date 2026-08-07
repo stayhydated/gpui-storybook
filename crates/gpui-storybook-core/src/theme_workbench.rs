@@ -3,7 +3,8 @@
 use gpui::{App, Hsla};
 use gpui_component::{Theme, ThemeColor, ThemeTokens};
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, fmt, hash::Hasher as _};
+use std::{collections::BTreeMap, hash::Hasher as _};
+use thiserror::Error;
 
 /// One deterministic editable row from [`ThemeColor`].
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -13,16 +14,9 @@ pub struct ThemeColorRow {
 }
 
 /// Theme draft serialization or field update failure.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
+#[error("{0}")]
 pub struct ThemeDraftError(String);
-
-impl fmt::Display for ThemeDraftError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(&self.0)
-    }
-}
-
-impl std::error::Error for ThemeDraftError {}
 
 /// A session draft layered over the selected base theme.
 pub struct ThemeDraft {

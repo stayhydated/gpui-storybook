@@ -20,9 +20,9 @@
 //! so GPUI receives compositor-driven frame callbacks without a physical display.
 
 use component_shape_mcp::{
-    McpAny, McpSchema, McpSchemaProperties, McpServer, McpToolError, McpToolInput, McpToolMetadata,
-    McpTypedTool, ServeStdioResult, nullable_schema, tool_definition_for_input_with_metadata,
-    tool_error_result_for, tool_structured_result,
+    McpJsonSchema, McpSchema, McpSchemaProperties, McpServer, McpToolError, McpToolInput,
+    McpToolMetadata, McpTypedTool, ServeStdioResult, nullable_schema,
+    tool_definition_for_input_with_metadata, tool_error_result_for, tool_structured_result,
 };
 use frame_capture::{
     CaptureConfig, CaptureEnv, CaptureEnvError, CaptureLaunchEnv as FrameCaptureLaunchEnv,
@@ -43,6 +43,7 @@ pub use gpui_storybook_core::controls::{
 };
 pub use gpui_storybook_core::presentation::StoryViewportPreset;
 use rmcp::model::CallToolResult as ToolCallResult;
+use schemars::{JsonSchema, generate::SchemaSettings};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{collections::BTreeMap, path::PathBuf, thread, time::Duration};
@@ -108,11 +109,46 @@ pub struct StorybookCaptureSession {
     pub capture: Option<StorybookCaptureConfig>,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[schemars(deny_unknown_fields)]
 pub struct CaptureLaunchEnv {
     pub env: BTreeMap<String, String>,
     pub cargo_args: Vec<String>,
     pub command: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(transparent)]
+struct SchemarsValue<T>(T);
+
+impl<T> SchemarsValue<T> {
+    fn into_inner(self) -> T {
+        self.0
+    }
+}
+
+impl<T: JsonSchema> McpJsonSchema for SchemarsValue<T> {
+    fn json_schema() -> McpSchema {
+        deserialize_schema::<T>()
+    }
+}
+
+#[derive(JsonSchema, Serialize)]
+#[schemars(deny_unknown_fields)]
+struct ListStoriesOutput {
+    stories: Vec<StorySnapshot>,
+}
+
+#[derive(JsonSchema, Serialize)]
+#[schemars(deny_unknown_fields)]
+struct StoryOutput {
+    story: StorySnapshot,
+}
+
+#[derive(JsonSchema, Serialize)]
+#[schemars(deny_unknown_fields)]
+struct ListActionsOutput {
+    actions: Vec<StoryActionSnapshot>,
 }
 
 /// No arguments.
@@ -147,9 +183,9 @@ struct CaptureCurrentStoryInput {
     /// Requested captured story-region height in pixels. Set together with `width`.
     height: Option<u32>,
     /// Named viewport (`responsive`, `mobile`, `tablet`, or `desktop`).
-    viewport: Option<String>,
+    viewport: Option<SchemarsValue<StoryViewportPreset>>,
     /// Tagged `ControlValue` objects keyed by control name, applied before capture.
-    controls: Option<BTreeMap<String, McpAny>>,
+    controls: Option<BTreeMap<String, SchemarsValue<ControlValue>>>,
 }
 
 /// Run an ordered in-process interaction batch.
@@ -158,17 +194,17 @@ struct RunStepsInput {
     /// Stable story or substory route to open before interaction.
     route: Option<String>,
     /// Tagged `ControlValue` objects applied before interaction.
-    controls: Option<BTreeMap<String, McpAny>>,
+    controls: Option<BTreeMap<String, SchemarsValue<ControlValue>>>,
     /// Requested story-region width in physical pixels. Set together with `height`.
     width: Option<u32>,
     /// Requested story-region height in physical pixels. Set together with `width`.
     height: Option<u32>,
     /// Named viewport used when explicit dimensions are omitted.
-    viewport: Option<String>,
+    viewport: Option<SchemarsValue<StoryViewportPreset>>,
     /// Ordered, closed, tagged interaction step objects.
-    steps: Vec<McpAny>,
+    steps: Vec<SchemarsValue<StoryInteractionStep>>,
     /// Optional `{ "output_path": "..." }` next-frame PNG capture request.
-    capture: Option<McpAny>,
+    capture: Option<SchemarsValue<StoryInteractionCaptureRequest>>,
 }
 
 /// Set one control on the active concrete story instance.
@@ -177,7 +213,7 @@ struct SetControlInput {
     /// Control key from `storybook_read_controls`.
     key: String,
     /// Tagged `ControlValue`, for example `{ "type": "boolean", "value": true }`.
-    value: McpAny,
+    value: SchemarsValue<ControlValue>,
 }
 
 /// Reset one active-story control, or all controls when `key` is omitted.
@@ -201,7 +237,7 @@ struct CaptureLaunchEnvInput {
     /// Requested captured story-region height in pixels. Set together with `width`.
     height: Option<u32>,
     /// Named viewport used when explicit width and height are omitted.
-    viewport: Option<String>,
+    viewport: Option<SchemarsValue<StoryViewportPreset>>,
     /// Optional Cargo package passed with `-p`.
     package: Option<String>,
     /// Optional Cargo binary passed with `--bin`.
@@ -230,8 +266,6 @@ pub enum StorybookMcpError {
     NoStoriesRegistered,
     #[error("capture session timed out after {seconds} seconds")]
     CaptureSessionTimedOut { seconds: u64 },
-    #[error("unknown viewport preset `{value}`")]
-    InvalidViewport { value: String },
 }
 
 pub fn stdio_requested() -> bool {
@@ -419,7 +453,11 @@ pub fn register_tools_with_options(
         )?,
         {
             let automation = automation.clone();
-            move |_input| tool_structured_result(json!({ "stories": automation.stories() }))
+            move |_input| {
+                tool_structured_result(json!(ListStoriesOutput {
+                    stories: automation.stories(),
+                }))
+            }
         },
     )?;
 
@@ -434,7 +472,7 @@ pub fn register_tools_with_options(
         {
             let automation = automation.clone();
             move |input| match automation.get_story(&input.key) {
-                Ok(story) => tool_structured_result(json!({ "story": story })),
+                Ok(story) => tool_structured_result(json!(StoryOutput { story })),
                 Err(error) => automation_tool_error(error),
             }
         },
@@ -491,7 +529,9 @@ pub fn register_tools_with_options(
                     let automation = automation.clone();
                     async move {
                         match automation.list_actions().await {
-                            Ok(actions) => tool_structured_result(json!({ "actions": actions })),
+                            Ok(actions) => {
+                                tool_structured_result(json!(ListActionsOutput { actions }))
+                            },
                             Err(error) => automation_tool_error(error),
                         }
                     }
@@ -504,10 +544,7 @@ pub fn register_tools_with_options(
             move |input| {
                 let automation = automation.clone();
                 async move {
-                    let request = match decode_interaction_request(input) {
-                        Ok(request) => request,
-                        Err(error) => return tool_error_result_for(error),
-                    };
+                    let request = decode_interaction_request(input);
                     match automation.run_steps(request).await {
                         Ok(snapshot) => tool_structured_result(json!(snapshot)),
                         Err(error) => interaction_automation_tool_error(error),
@@ -552,17 +589,10 @@ pub fn register_tools_with_options(
             move |input| {
                 let automation = automation.clone();
                 async move {
-                    let value =
-                        match serde_json::from_value::<ControlValue>(input.value.into_value()) {
-                            Ok(value) => value,
-                            Err(error) => {
-                                return tool_error_result_for(McpToolError::invalid_field_value(
-                                    "value",
-                                    error.to_string(),
-                                ));
-                            },
-                        };
-                    match automation.set_control(input.key, value).await {
+                    match automation
+                        .set_control(input.key, input.value.into_inner())
+                        .await
+                    {
                         Ok(snapshot) => tool_structured_result(json!(snapshot)),
                         Err(error) => automation_tool_error(error),
                     }
@@ -605,25 +635,12 @@ pub fn register_tools_with_options(
         move |input| {
             let automation = automation.clone();
             async move {
-                let controls = match decode_control_map(input.controls) {
-                    Ok(controls) => controls,
-                    Err(error) => return tool_error_result_for(error),
-                };
-                let viewport = match parse_viewport(input.viewport) {
-                    Ok(viewport) => viewport,
-                    Err(error) => {
-                        return tool_error_result_for(McpToolError::invalid_field_value(
-                            "viewport",
-                            error.to_string(),
-                        ));
-                    },
-                };
                 let request = StoryScreenshotRequest {
                     output_path: input.output_path,
                     width: input.width,
                     height: input.height,
-                    viewport,
-                    controls,
+                    viewport: input.viewport.map(SchemarsValue::into_inner),
+                    controls: decode_control_map(input.controls),
                     quit_after_capture: false,
                 };
 
@@ -774,7 +791,6 @@ where
     {
         set_optional_positive_integer(properties, "width");
         set_optional_positive_integer(properties, "height");
-        set_optional_viewport_enum(properties);
         if has_frame {
             set_optional_positive_integer(properties, "frame");
         }
@@ -814,29 +830,8 @@ fn interaction_tool() -> Result<McpTypedTool<RunStepsInput>, McpToolError> {
         );
         set_optional_positive_integer(properties, "width");
         set_optional_positive_integer(properties, "height");
-        set_optional_viewport_enum(properties);
     }
     Ok(tool)
-}
-
-fn set_optional_viewport_enum(properties: &mut serde_json::Map<String, Value>) {
-    let Some(branches) = properties
-        .get_mut("viewport")
-        .and_then(Value::as_object_mut)
-        .and_then(|schema| schema.get_mut("anyOf"))
-        .and_then(Value::as_array_mut)
-    else {
-        return;
-    };
-    if let Some(string) = branches.iter_mut().find_map(|branch| {
-        let object = branch.as_object_mut()?;
-        (object.get("type").and_then(Value::as_str) == Some("string")).then_some(object)
-    }) {
-        string.insert(
-            "enum".to_string(),
-            json!(["responsive", "mobile", "tablet", "desktop"]),
-        );
-    }
 }
 
 fn set_optional_positive_integer(properties: &mut serde_json::Map<String, Value>, field: &str) {
@@ -926,71 +921,48 @@ fn structured_automation_error(error: StorybookAutomationError) -> McpToolError 
 }
 
 fn decode_control_map(
-    controls: Option<BTreeMap<String, McpAny>>,
-) -> Result<BTreeMap<String, ControlValue>, McpToolError> {
+    controls: Option<BTreeMap<String, SchemarsValue<ControlValue>>>,
+) -> BTreeMap<String, ControlValue> {
     controls
         .unwrap_or_default()
         .into_iter()
-        .map(|(key, value)| {
-            serde_json::from_value(value.into_value())
-                .map(|value| (key.clone(), value))
-                .map_err(|error| {
-                    McpToolError::invalid_field_value(format!("controls.{key}"), error.to_string())
-                })
-        })
+        .map(|(key, value)| (key, value.into_inner()))
         .collect()
 }
 
-fn decode_interaction_request(
-    input: RunStepsInput,
-) -> Result<StoryInteractionRequest, McpToolError> {
-    let controls = decode_control_map(input.controls)?;
-    let viewport = parse_viewport(input.viewport)
-        .map_err(|error| McpToolError::invalid_field_value("viewport", error.to_string()))?;
-    let steps = input
-        .steps
-        .into_iter()
-        .enumerate()
-        .map(|(index, step)| {
-            serde_json::from_value(step.into_value()).map_err(|error| {
-                McpToolError::invalid_field_value(format!("steps.{index}"), error.to_string())
-            })
-        })
-        .collect::<Result<Vec<_>, _>>()?;
-    let capture = input
-        .capture
-        .map(|capture| {
-            serde_json::from_value(capture.into_value())
-                .map_err(|error| McpToolError::invalid_field_value("capture", error.to_string()))
-        })
-        .transpose()?;
-
-    Ok(StoryInteractionRequest {
+fn decode_interaction_request(input: RunStepsInput) -> StoryInteractionRequest {
+    StoryInteractionRequest {
         route: input.route,
-        controls,
+        controls: decode_control_map(input.controls),
         width: input.width,
         height: input.height,
-        viewport,
-        steps,
-        capture,
-    })
+        viewport: input.viewport.map(SchemarsValue::into_inner),
+        steps: input
+            .steps
+            .into_iter()
+            .map(SchemarsValue::into_inner)
+            .collect(),
+        capture: input.capture.map(SchemarsValue::into_inner),
+    }
 }
 
-fn parse_viewport(
-    viewport: Option<String>,
-) -> Result<Option<StoryViewportPreset>, StorybookMcpError> {
-    viewport
-        .map(|value| {
-            let viewport = match value.as_str() {
-                "responsive" => StoryViewportPreset::Responsive,
-                "mobile" => StoryViewportPreset::Mobile,
-                "tablet" => StoryViewportPreset::Tablet,
-                "desktop" => StoryViewportPreset::Desktop,
-                _ => return Err(StorybookMcpError::InvalidViewport { value }),
-            };
-            Ok(viewport)
+fn schema_with_settings<T: JsonSchema>(settings: SchemaSettings) -> McpSchema {
+    let schema = settings
+        .with(|settings| {
+            settings.meta_schema = None;
+            settings.inline_subschemas = true;
         })
-        .transpose()
+        .into_generator()
+        .into_root_schema_for::<T>();
+    McpSchema::new(schema.to_value())
+}
+
+fn deserialize_schema<T: JsonSchema>() -> McpSchema {
+    schema_with_settings::<T>(SchemaSettings::draft2020_12().for_deserialize())
+}
+
+fn serialize_schema<T: JsonSchema>() -> McpSchema {
+    schema_with_settings::<T>(SchemaSettings::draft2020_12().for_serialize())
 }
 
 fn object_schema<const N: usize>(
@@ -1003,48 +975,8 @@ fn object_schema<const N: usize>(
         .with_additional_properties(false)
 }
 
-fn story_size_schema() -> McpSchema {
-    object_schema(
-        [
-            ("width".to_string(), McpSchema::integer()),
-            ("height".to_string(), McpSchema::integer()),
-        ],
-        ["width", "height"],
-    )
-}
-
-fn control_color_schema() -> McpSchema {
-    object_schema(
-        [
-            ("h".to_string(), McpSchema::number()),
-            ("s".to_string(), McpSchema::number()),
-            ("l".to_string(), McpSchema::number()),
-            ("a".to_string(), McpSchema::number()),
-        ],
-        ["h", "s", "l", "a"],
-    )
-}
-
-fn tagged_control_value_schema(kind: &'static str, value: McpSchema) -> McpSchema {
-    object_schema(
-        [
-            ("type".to_string(), McpSchema::string().with_const(kind)),
-            ("value".to_string(), value),
-        ],
-        ["type", "value"],
-    )
-}
-
 fn control_value_schema() -> McpSchema {
-    McpSchema::one_of([
-        tagged_control_value_schema("boolean", McpSchema::boolean()),
-        tagged_control_value_schema("integer", McpSchema::integer()),
-        tagged_control_value_schema("float", McpSchema::number()),
-        tagged_control_value_schema("text", McpSchema::string()),
-        tagged_control_value_schema("color", control_color_schema()),
-        tagged_control_value_schema("choice", McpSchema::string()),
-        tagged_control_value_schema("json", McpSchema::any()),
-    ])
+    deserialize_schema::<ControlValue>()
 }
 
 fn story_point_schema() -> McpSchema {
@@ -1204,252 +1136,45 @@ fn interaction_steps_schema() -> McpSchema {
 }
 
 fn interaction_capture_request_schema() -> McpSchema {
-    object_schema(
-        [(
-            "output_path".to_owned(),
-            nullable_schema(McpSchema::string()),
-        )],
-        [],
-    )
-}
-
-fn control_bounds_schema() -> McpSchema {
-    object_schema(
-        [
-            ("min".to_string(), nullable_schema(McpSchema::number())),
-            ("max".to_string(), nullable_schema(McpSchema::number())),
-            ("step".to_string(), nullable_schema(McpSchema::number())),
-        ],
-        ["min", "max", "step"],
-    )
-}
-
-fn control_kind_schema() -> McpSchema {
-    McpSchema::any_of([
-        McpSchema::string().with_enum_values([
-            "checkbox",
-            "number",
-            "range",
-            "text",
-            "color_picker",
-            "select",
-        ]),
-        object_schema([("custom".to_string(), McpSchema::string())], ["custom"]),
-    ])
-}
-
-fn control_spec_schema() -> McpSchema {
-    object_schema(
-        [
-            ("key".to_string(), McpSchema::string()),
-            ("label".to_string(), McpSchema::string()),
-            ("description".to_string(), McpSchema::string()),
-            ("category".to_string(), McpSchema::string()),
-            ("kind".to_string(), control_kind_schema()),
-            ("default".to_string(), control_value_schema()),
-            ("bounds".to_string(), control_bounds_schema()),
-            ("options".to_string(), McpSchema::array(McpSchema::string())),
-        ],
-        [
-            "key",
-            "label",
-            "description",
-            "category",
-            "kind",
-            "default",
-            "bounds",
-            "options",
-        ],
-    )
-}
-
-fn control_snapshot_schema() -> McpSchema {
-    object_schema(
-        [
-            ("spec".to_string(), control_spec_schema()),
-            ("value".to_string(), control_value_schema()),
-        ],
-        ["spec", "value"],
-    )
+    deserialize_schema::<StoryInteractionCaptureRequest>()
 }
 
 fn story_controls_output_schema() -> McpSchema {
-    object_schema(
-        [
-            ("story".to_string(), story_schema()),
-            (
-                "controls".to_string(),
-                McpSchema::array(control_snapshot_schema()),
-            ),
-        ],
-        ["story", "controls"],
-    )
-}
-
-fn story_schema() -> McpSchema {
-    object_schema(
-        [
-            ("key".to_string(), McpSchema::string()),
-            ("crate_name".to_string(), McpSchema::string()),
-            ("story_name".to_string(), McpSchema::string()),
-            ("title".to_string(), McpSchema::string()),
-            ("description".to_string(), McpSchema::string()),
-            ("group".to_string(), nullable_schema(McpSchema::string())),
-            ("section".to_string(), nullable_schema(McpSchema::string())),
-            ("source_file".to_string(), McpSchema::string()),
-            ("source_line".to_string(), McpSchema::integer()),
-            ("capture_route_id".to_string(), McpSchema::string()),
-            ("default_size".to_string(), story_size_schema()),
-        ],
-        [
-            "key",
-            "crate_name",
-            "story_name",
-            "title",
-            "description",
-            "group",
-            "section",
-            "source_file",
-            "source_line",
-            "capture_route_id",
-            "default_size",
-        ],
-    )
+    serialize_schema::<StoryControlsSnapshot>()
 }
 
 fn list_stories_output_schema() -> McpSchema {
-    object_schema(
-        [("stories".to_string(), McpSchema::array(story_schema()))],
-        ["stories"],
-    )
+    serialize_schema::<ListStoriesOutput>()
 }
 
 fn get_story_output_schema() -> McpSchema {
-    object_schema([("story".to_string(), story_schema())], ["story"])
+    serialize_schema::<StoryOutput>()
 }
 
 fn current_story_output_schema() -> McpSchema {
-    object_schema(
-        [
-            ("story".to_string(), nullable_schema(story_schema())),
-            ("revision".to_string(), McpSchema::integer()),
-        ],
-        ["story", "revision"],
-    )
+    serialize_schema::<StoryCurrentSnapshot>()
 }
 
 fn capture_story_output_schema() -> McpSchema {
-    object_schema(
-        [
-            ("request_id".to_string(), McpSchema::integer()),
-            ("path".to_string(), McpSchema::string()),
-            ("pixel_width".to_string(), McpSchema::integer()),
-            ("pixel_height".to_string(), McpSchema::integer()),
-            ("story".to_string(), story_schema()),
-        ],
-        ["request_id", "path", "pixel_width", "pixel_height", "story"],
-    )
-}
-
-fn action_schema() -> McpSchema {
-    object_schema(
-        [
-            ("name".to_owned(), McpSchema::string()),
-            (
-                "documentation".to_owned(),
-                nullable_schema(McpSchema::string()),
-            ),
-            ("argument_schema".to_owned(), McpSchema::any()),
-        ],
-        ["name", "documentation", "argument_schema"],
-    )
+    serialize_schema::<StoryCaptureSnapshot>()
 }
 
 fn list_actions_output_schema() -> McpSchema {
-    object_schema(
-        [("actions".to_owned(), McpSchema::array(action_schema()))],
-        ["actions"],
-    )
-}
-
-fn interaction_dispatch_schema() -> McpSchema {
-    McpSchema::one_of([
-        tagged_interaction_step_schema("dispatched", [], []),
-        tagged_interaction_step_schema(
-            "input",
-            [("handled".to_owned(), McpSchema::boolean())],
-            ["handled"],
-        ),
-        tagged_interaction_step_schema(
-            "platform_event",
-            [
-                ("propagated".to_owned(), McpSchema::boolean()),
-                ("default_prevented".to_owned(), McpSchema::boolean()),
-            ],
-            ["propagated", "default_prevented"],
-        ),
-    ])
-}
-
-fn interaction_observation_schema() -> McpSchema {
-    object_schema(
-        [
-            ("step_index".to_owned(), McpSchema::integer()),
-            (
-                "dispatches".to_owned(),
-                McpSchema::array(interaction_dispatch_schema()),
-            ),
-        ],
-        ["step_index", "dispatches"],
-    )
+    serialize_schema::<ListActionsOutput>()
 }
 
 fn interaction_output_schema() -> McpSchema {
-    object_schema(
-        [
-            ("request_id".to_owned(), McpSchema::integer()),
-            ("story".to_owned(), story_schema()),
-            ("steps_dispatched".to_owned(), McpSchema::integer()),
-            (
-                "observations".to_owned(),
-                McpSchema::array(interaction_observation_schema()),
-            ),
-            ("focused".to_owned(), McpSchema::boolean()),
-            (
-                "capture".to_owned(),
-                nullable_schema(capture_story_output_schema()),
-            ),
-        ],
-        [
-            "request_id",
-            "story",
-            "steps_dispatched",
-            "observations",
-            "focused",
-            "capture",
-        ],
-    )
+    serialize_schema::<StoryInteractionSnapshot>()
 }
 
 fn capture_launch_env_output_schema() -> McpSchema {
-    let string_array = || McpSchema::array(McpSchema::string());
-    object_schema(
-        [
-            (
-                "env".to_string(),
-                McpSchema::object().with_additional_properties(McpSchema::string()),
-            ),
-            ("cargo_args".to_string(), string_array()),
-            ("command".to_string(), string_array()),
-        ],
-        ["env", "cargo_args", "command"],
-    )
+    serialize_schema::<CaptureLaunchEnv>()
 }
 
 fn build_capture_launch_env(
     input: CaptureLaunchEnvInput,
 ) -> Result<CaptureLaunchEnv, StorybookMcpError> {
-    let viewport = parse_viewport(input.viewport)?;
+    let viewport = input.viewport.map(SchemarsValue::into_inner);
     let (width, height) = match (input.width, input.height) {
         (None, None) => viewport
             .and_then(StoryViewportPreset::dimensions)
@@ -1780,8 +1505,8 @@ mod tests {
         );
         assert_eq!(capture["annotations"]["destructiveHint"], true);
         assert_eq!(
-            capture["inputSchema"]["properties"]["viewport"]["anyOf"][0]["enum"],
-            json!(["responsive", "mobile", "tablet", "desktop"])
+            capture["inputSchema"]["properties"]["viewport"]["anyOf"][0],
+            deserialize_schema::<StoryViewportPreset>().into_value()
         );
 
         let launch = find(TOOL_CAPTURE_LAUNCH_ENV);
@@ -2297,7 +2022,7 @@ mod tests {
             frame: None,
             width: None,
             height: None,
-            viewport: Some("mobile".to_owned()),
+            viewport: Some(SchemarsValue(StoryViewportPreset::Mobile)),
             package: None,
             bin: None,
             features: None,
@@ -2364,7 +2089,7 @@ mod tests {
         assert_eq!(invalid["isError"], true);
         assert_eq!(
             invalid["structuredContent"]["error"]["kind"],
-            "invalid_field_value"
+            "decode_field"
         );
     }
 

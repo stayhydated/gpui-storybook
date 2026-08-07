@@ -4334,6 +4334,7 @@ dependencies = [
  "serde",
  "serde_json",
  "strum 0.28.0",
+ "thiserror 2.0.19",
  "tokio",
  "tracing",
  "unic-langid",
@@ -4386,6 +4387,7 @@ dependencies = [
 name = "gpui-storybook-macros"
 version = "0.5.0"
 dependencies = [
+ "darling 0.24.0",
  "heck 0.5.0",
  "insta",
  "prettyplease 0.3.0",
@@ -4402,6 +4404,7 @@ dependencies = [
  "frame-capture",
  "gpui-storybook-core",
  "rmcp",
+ "schemars",
  "serde",
  "serde_json",
  "thiserror 2.0.19",

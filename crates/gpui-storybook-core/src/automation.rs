@@ -40,17 +40,18 @@ pub use interaction::{
     StoryInteractionStep, StoryModifier, StoryModifiers, StoryMouseButton, StoryPoint,
     StoryPointSpace,
 };
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::{
     borrow::Borrow,
     collections::BTreeMap,
-    fmt,
     path::PathBuf,
     sync::{
         Arc, Mutex,
         atomic::{AtomicBool, AtomicU64, Ordering},
     },
 };
+use thiserror::Error;
 use tokio::sync::{mpsc, oneshot};
 
 pub const DEFAULT_STORY_CAPTURE_WIDTH: u32 = 1280;
@@ -99,7 +100,8 @@ pub fn default_storybook_automation(cx: &App) -> Option<SharedStorybookAutomatio
         .map(DefaultStorybookAutomation::automation)
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[schemars(deny_unknown_fields)]
 pub struct StoryDefaultSize {
     pub width: u32,
     pub height: u32,
@@ -115,7 +117,8 @@ impl Default for StoryDefaultSize {
 }
 
 /// Machine-readable story metadata used by automation and capture tools.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[schemars(deny_unknown_fields)]
 pub struct StorySnapshot {
     pub key: String,
     pub crate_name: String,
@@ -130,13 +133,15 @@ pub struct StorySnapshot {
     pub default_size: StoryDefaultSize,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[schemars(deny_unknown_fields)]
 pub struct StoryCurrentSnapshot {
     pub story: Option<StorySnapshot>,
     pub revision: u64,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
+#[schemars(deny_unknown_fields)]
 pub struct StoryScreenshotRequest {
     /// PNG destination, or the route-derived default when omitted.
     pub output_path: Option<PathBuf>,
@@ -154,13 +159,15 @@ pub struct StoryScreenshotRequest {
 }
 
 /// Current values and metadata for the controls on the selected story instance.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize)]
+#[schemars(deny_unknown_fields)]
 pub struct StoryControlsSnapshot {
     pub story: StorySnapshot,
     pub controls: Vec<ControlSnapshot>,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[schemars(deny_unknown_fields)]
 pub struct StoryCaptureSnapshot {
     pub request_id: u64,
     pub path: PathBuf,
@@ -170,11 +177,15 @@ pub struct StoryCaptureSnapshot {
 }
 
 /// Structured live-host, validation, control, interaction, and capture errors.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
 pub enum StorybookAutomationError {
     /// No gallery or dock window has attached the automation command receiver.
+    #[error("no live GPUI storybook host is attached")]
     NoLiveHost,
     /// The live host disappeared while a request was awaiting completion.
+    #[error(
+        "live GPUI storybook host disconnected after {steps_dispatched} dispatched step(s): {message}"
+    )]
     HostDisconnected {
         /// Oneshot or host failure detail.
         message: String,
@@ -182,28 +193,34 @@ pub enum StorybookAutomationError {
         steps_dispatched: usize,
     },
     /// A requested stable story or substory route is unknown.
+    #[error("story route `{key}` was not found")]
     StoryNotFound {
         /// Requested route.
         key: String,
     },
     /// Another navigation, control mutation, capture, or batch owns the guard.
+    #[error("another storybook automation mutation is already active")]
     AutomationBusy,
     /// The active route could not be rendered or captured.
+    #[error("{message}")]
     CaptureUnavailable {
         /// Capture failure detail.
         message: String,
     },
     /// Capture dimensions or viewport input is invalid.
+    #[error("{message}")]
     InvalidCaptureRequest {
         /// Validation detail.
         message: String,
     },
     /// Batch-level interaction input is invalid.
+    #[error("{message}")]
     InvalidInteractionRequest {
         /// Validation detail.
         message: String,
     },
     /// One indexed interaction step is invalid.
+    #[error("interaction step {step_index} is invalid: {message}")]
     InvalidInteractionStep {
         /// Zero-based request step index.
         step_index: usize,
@@ -211,6 +228,9 @@ pub enum StorybookAutomationError {
         message: String,
     },
     /// A runtime failure occurred after the batch runner started.
+    #[error(
+        "interaction request {request_id} failed after {steps_dispatched} dispatched step(s): {message}"
+    )]
     InteractionFailed {
         /// Controller-assigned interaction request ID.
         request_id: u64,
@@ -220,13 +240,16 @@ pub enum StorybookAutomationError {
         message: String,
     },
     /// The live host has no selected story instance.
+    #[error("no story is selected in the live host")]
     NoActiveStory,
     /// The selected story instance has no typed control target.
+    #[error("story `{key}` does not expose controls")]
     ControlsUnavailable {
         /// Active story route.
         key: String,
     },
     /// A typed control target rejected a read or mutation.
+    #[error("{message}")]
     ControlOperationFailed {
         /// Control failure detail.
         message: String,
@@ -296,55 +319,6 @@ pub struct StorybookAutomation {
     operation_pending: Arc<AtomicBool>,
     next_request_id: AtomicU64,
 }
-
-impl fmt::Display for StorybookAutomationError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::NoLiveHost => write!(formatter, "no live GPUI storybook host is attached"),
-            Self::HostDisconnected {
-                message,
-                steps_dispatched,
-            } => {
-                write!(
-                    formatter,
-                    "live GPUI storybook host disconnected after {steps_dispatched} dispatched step(s): {message}"
-                )
-            },
-            Self::StoryNotFound { key } => write!(formatter, "story route `{key}` was not found"),
-            Self::AutomationBusy => {
-                write!(
-                    formatter,
-                    "another storybook automation mutation is already active"
-                )
-            },
-            Self::CaptureUnavailable { message } => write!(formatter, "{message}"),
-            Self::InvalidCaptureRequest { message } => write!(formatter, "{message}"),
-            Self::InvalidInteractionRequest { message } => write!(formatter, "{message}"),
-            Self::InvalidInteractionStep {
-                step_index,
-                message,
-            } => write!(
-                formatter,
-                "interaction step {step_index} is invalid: {message}"
-            ),
-            Self::InteractionFailed {
-                request_id,
-                steps_dispatched,
-                message,
-            } => write!(
-                formatter,
-                "interaction request {request_id} failed after {steps_dispatched} dispatched step(s): {message}"
-            ),
-            Self::NoActiveStory => write!(formatter, "no story is selected in the live host"),
-            Self::ControlsUnavailable { key } => {
-                write!(formatter, "story `{key}` does not expose controls")
-            },
-            Self::ControlOperationFailed { message } => write!(formatter, "{message}"),
-        }
-    }
-}
-
-impl std::error::Error for StorybookAutomationError {}
 
 impl StorySnapshot {
     pub fn from_container(story: &StoryContainer, cx: &impl Borrow<App>) -> Option<Self> {

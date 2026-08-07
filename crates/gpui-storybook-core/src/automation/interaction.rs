@@ -12,6 +12,7 @@ use gpui::{
     Action, App, Keystroke, Modifiers, MouseDownEvent, MouseMoveEvent, MouseUpEvent, PlatformInput,
     ScrollDelta, ScrollWheelEvent, TouchPhase, Window, point, px,
 };
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{
@@ -32,7 +33,7 @@ pub const MAX_INTERACTION_TEXT_BYTES: usize = 4 * 1024;
 pub const MAX_INTERACTION_WAITED_FRAMES: u16 = 120;
 
 /// Runtime-visible GPUI action metadata.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct StoryActionSnapshot {
     /// Runtime action name accepted by a `dispatch_action` step.
@@ -44,7 +45,7 @@ pub struct StoryActionSnapshot {
 }
 
 /// Coordinate space for a point inside the active story route.
-#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum StoryPointSpace {
     /// Fractions across the active route bounds in the inclusive range
@@ -56,7 +57,7 @@ pub enum StoryPointSpace {
 }
 
 /// A point relative to the active story or substory capture region.
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct StoryPoint {
     /// Coordinate space. Omission defaults to [`StoryPointSpace::Normalized`].
@@ -69,7 +70,7 @@ pub struct StoryPoint {
 }
 
 /// Mouse buttons supported by in-process story interaction.
-#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum StoryMouseButton {
     /// Primary mouse button.
@@ -82,7 +83,9 @@ pub enum StoryMouseButton {
 }
 
 /// Keyboard modifiers supported by pointer interaction.
-#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
+#[derive(
+    Clone, Copy, Debug, Deserialize, Eq, JsonSchema, Ord, PartialEq, PartialOrd, Serialize,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum StoryModifier {
     /// Control modifier.
@@ -98,12 +101,12 @@ pub enum StoryModifier {
 }
 
 /// Modifier keys held while dispatching a pointer step.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(transparent)]
 pub struct StoryModifiers(pub Vec<StoryModifier>);
 
 /// One ordered interaction operation.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum StoryInteractionStep {
     /// Move focus to the next focusable element.
@@ -169,7 +172,7 @@ const fn default_click_count() -> u8 {
 }
 
 /// Optional PNG capture performed after the final interaction step.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct StoryInteractionCaptureRequest {
     /// PNG destination. The normal capture default is used when omitted.
@@ -177,7 +180,7 @@ pub struct StoryInteractionCaptureRequest {
 }
 
 /// One exclusive interaction batch.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct StoryInteractionRequest {
     /// Stable story or substory route opened before controls and input.
@@ -198,7 +201,7 @@ pub struct StoryInteractionRequest {
 }
 
 /// Dispatch information reported directly by GPUI.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum StoryInteractionDispatch {
     /// The API reports dispatch but no handler outcome.
@@ -218,7 +221,7 @@ pub enum StoryInteractionDispatch {
 }
 
 /// Dispatch observations for one completed interaction step.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct StoryInteractionObservation {
     /// Zero-based request step index.
@@ -228,7 +231,7 @@ pub struct StoryInteractionObservation {
 }
 
 /// Result of an interaction batch executed by the live GPUI host.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct StoryInteractionSnapshot {
     /// Monotonic request ID assigned by this automation controller.

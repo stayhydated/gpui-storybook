@@ -1,11 +1,14 @@
 //! Typed story controls shared by the workbench and automation surfaces.
 
 use gpui::{App, Entity, Hsla, SharedString};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::{fmt, rc::Rc, str::FromStr};
+use std::{rc::Rc, str::FromStr};
+use thiserror::Error;
 
 /// A serializable color used by story controls and automation.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, JsonSchema, PartialEq, Serialize, Deserialize)]
+#[schemars(deny_unknown_fields)]
 pub struct ControlColor {
     pub h: f32,
     pub s: f32,
@@ -36,8 +39,9 @@ impl From<ControlColor> for Hsla {
 }
 
 /// A value that can be edited by the Storybook workbench.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
+#[schemars(deny_unknown_fields)]
 pub enum ControlValue {
     Boolean(bool),
     Integer(i64),
@@ -71,7 +75,7 @@ impl ControlValue {
 }
 
 /// The editor presented for a control.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, JsonSchema, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ControlKind {
     Checkbox,
@@ -84,7 +88,8 @@ pub enum ControlKind {
 }
 
 /// Numeric limits applied before a value reaches a story instance.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, JsonSchema, PartialEq, Serialize, Deserialize)]
+#[schemars(deny_unknown_fields)]
 pub struct ControlBounds {
     pub min: Option<f64>,
     pub max: Option<f64>,
@@ -92,7 +97,8 @@ pub struct ControlBounds {
 }
 
 /// Metadata and default value for one story control.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize)]
+#[schemars(deny_unknown_fields)]
 pub struct ControlSpec {
     pub key: String,
     pub label: String,
@@ -105,28 +111,34 @@ pub struct ControlSpec {
 }
 
 /// A current control value paired with its metadata.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize)]
+#[schemars(deny_unknown_fields)]
 pub struct ControlSnapshot {
     pub spec: ControlSpec,
     pub value: ControlValue,
 }
 
 /// Structured failures produced while reading or editing story controls.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Error, PartialEq)]
 pub enum ControlError {
-    UnknownControl {
-        key: String,
-    },
+    #[error("unknown story control `{key}`")]
+    UnknownControl { key: String },
+    #[error("story control `{key}` expected {expected}, received {actual}")]
     InvalidValue {
         key: String,
         expected: &'static str,
         actual: &'static str,
     },
+    #[error(
+        "story control `{key}` rejected choice `{value}`; expected one of {}",
+        .options.join(", ")
+    )]
     InvalidChoice {
         key: String,
         value: String,
         options: Vec<String>,
     },
+    #[error("story control `{key}` value {value} is outside bounds {min:?}..={max:?}")]
     RangeViolation {
         key: String,
         value: f64,
@@ -134,42 +146,6 @@ pub enum ControlError {
         max: Option<f64>,
     },
 }
-
-impl fmt::Display for ControlError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::UnknownControl { key } => write!(formatter, "unknown story control `{key}`"),
-            Self::InvalidValue {
-                key,
-                expected,
-                actual,
-            } => write!(
-                formatter,
-                "story control `{key}` expected {expected}, received {actual}"
-            ),
-            Self::InvalidChoice {
-                key,
-                value,
-                options,
-            } => write!(
-                formatter,
-                "story control `{key}` rejected choice `{value}`; expected one of {}",
-                options.join(", ")
-            ),
-            Self::RangeViolation {
-                key,
-                value,
-                min,
-                max,
-            } => write!(
-                formatter,
-                "story control `{key}` value {value} is outside bounds {min:?}..={max:?}"
-            ),
-        }
-    }
-}
-
-impl std::error::Error for ControlError {}
 
 /// Typed access generated for a story's controllable fields.
 ///

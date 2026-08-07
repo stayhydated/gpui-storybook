@@ -2500,6 +2500,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+ "thiserror 2.0.19",
  "tokio",
  "tracing",
  "unic-langid",
@@ -2517,6 +2518,7 @@ dependencies = [
 name = "gpui-storybook-macros"
 version = "0.5.0"
 dependencies = [
+ "darling 0.24.0",
  "heck 0.5.0",
  "proc-macro2",
  "quote",
