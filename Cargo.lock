@@ -4334,10 +4334,12 @@ dependencies = [
  "serde",
  "serde_json",
  "strum 0.28.0",
+ "tempfile",
  "thiserror 2.0.19",
  "tokio",
  "tracing",
  "unic-langid",
+ "url",
 ]
 
 [[package]]

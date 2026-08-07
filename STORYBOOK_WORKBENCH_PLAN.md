@@ -229,7 +229,8 @@ Do not copy or instantiate GPUI's private Inspector implementation.
 Instead:
 
 1. Dispatch the existing inspector toggle action from the Inspect tab.
-2. Display the active story key, source location, and available controls.
+2. Display the active story key with a copy action and link the source location
+   to the system's configured application.
 3. Wrap the story root in a custom inspectable element.
 4. Register a `StoryInspectorState` renderer so selecting the story root in
    GPUI Inspector exposes Storybook-specific metadata.
@@ -249,7 +250,6 @@ After the controls model is stable:
 - Allow serialized args in capture requests or route state.
 - Add viewport sizing and presets.
 - Add background and grid selection.
-- Add an event/action log.
 - Consider URL or state serialization for shareable story configurations.
 
 These features should reuse `ControlSpec` and `ControlValue` rather than

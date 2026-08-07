@@ -777,6 +777,7 @@ mod tests {
                 StoryName::new(name),
                 None,
                 "crate",
+                "/tmp/crate",
                 "src/stories.rs",
                 1,
             ));
@@ -999,6 +1000,7 @@ mod tests {
                         StoryName::new("ControlledStory"),
                         None,
                         "crate",
+                        "/tmp/crate",
                         "src/controlled.rs",
                         1,
                     ));

@@ -1,4 +1,4 @@
-//! Window-local preview presentation settings and action records.
+//! Window-local preview presentation settings.
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -68,14 +68,6 @@ pub struct StoryPresentation {
     pub viewport: StoryViewportPreset,
     pub background: StoryCanvasBackground,
     pub grid: bool,
-}
-
-/// One deterministic entry in the window-local workbench action log.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct StoryActionEntry {
-    pub sequence: u64,
-    pub name: String,
-    pub detail: String,
 }
 
 #[cfg(test)]

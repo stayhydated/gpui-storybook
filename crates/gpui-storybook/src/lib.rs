@@ -102,9 +102,7 @@ pub use gpui_storybook_core::{
     },
     gallery::Gallery,
     language::{CurrentLanguage, Language},
-    presentation::{
-        StoryActionEntry, StoryCanvasBackground, StoryPresentation, StoryViewportPreset,
-    },
+    presentation::{StoryCanvasBackground, StoryPresentation, StoryViewportPreset},
     story::themes::STORYBOOK_THEME_DIR_ENV,
     story::{
         Story, StoryContainer, StorySection, StorySectionBase, StorySectionTitle, Substory,

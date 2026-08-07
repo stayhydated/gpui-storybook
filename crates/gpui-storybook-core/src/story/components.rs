@@ -1095,6 +1095,7 @@ mod tests {
                     StoryName::new("ButtonStory"),
                     Some(StorySectionName::new("Components")),
                     "crate",
+                    "/tmp/crate",
                     "src/button.rs",
                     42,
                 );

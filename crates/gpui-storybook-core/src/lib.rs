@@ -17,7 +17,7 @@
 //! - `gallery`: searchable sidebar plus active-story display
 //! - `controls`, `workbench`, and `presentation`: typed live field editing,
 //!   per-window selection and preview state, theme/Inspector tabs, viewport
-//!   presets, canvas settings, and the action log
+//!   presets, and canvas settings
 //! - `theme_workbench`: deterministic session drafts layered over the selected
 //!   base theme, including token rebuilding and external-reload rebasing
 //! - `dock_gallery`: feature-gated dock workspace, sidebar panel, story panel

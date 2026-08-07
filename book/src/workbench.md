@@ -99,9 +99,10 @@ window:
 - an optional alignment grid;
 - explicit variant buttons for grouped stories.
 
-The **Inspect** tab includes a bounded action log for story selection, control
-edits, resets, and preview-setting changes. Each Storybook window owns its own
-selection, preview settings, controls, and log.
+The **Inspect** tab shows the active story key with a copy button. Select the
+source location to open the story file with the system's configured application,
+or choose **Open GPUI Inspector** to inspect the rendered element tree. Each
+Storybook window owns its own selection, preview settings, and controls.
 
 ## Edit the active theme
 

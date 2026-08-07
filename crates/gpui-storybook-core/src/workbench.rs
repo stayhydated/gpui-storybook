@@ -3,9 +3,7 @@
 use crate::{
     automation::{StoryControlsSnapshot, StorySnapshot, StorybookAutomationError},
     controls::{ControlKind, ControlSpec, ControlTarget, ControlValue},
-    presentation::{
-        StoryActionEntry, StoryCanvasBackground, StoryPresentation, StoryViewportPreset,
-    },
+    presentation::{StoryCanvasBackground, StoryPresentation, StoryViewportPreset},
     story::StoryContainer,
     theme_workbench::ThemeDraft,
 };
@@ -18,10 +16,12 @@ use gpui_component::{
     ActiveTheme as _, Selectable as _, Sizable as _,
     button::{Button, ButtonVariants as _},
     checkbox::Checkbox,
+    clipboard::Clipboard,
     color_picker::{ColorPicker, ColorPickerEvent, ColorPickerState},
     dock::{Panel, PanelControl, PanelEvent, PanelInfo, PanelState},
     h_flex,
     input::{Input, InputEvent, InputState, NumberInput},
+    link::Link,
     menu::DropdownMenu as _,
     scroll::ScrollableElement as _,
     slider::{Slider, SliderEvent, SliderState},
@@ -29,7 +29,7 @@ use gpui_component::{
     v_flex,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, rc::Rc};
+use std::{collections::BTreeMap, path::Path, rc::Rc};
 
 /// Tabs available in the Storybook workbench.
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
@@ -64,8 +64,6 @@ pub struct WorkbenchState {
     active_group: Option<Entity<StoryContainer>>,
     active_story: Option<Entity<StoryContainer>>,
     presentation: StoryPresentation,
-    actions: Vec<StoryActionEntry>,
-    next_action_sequence: u64,
 }
 
 impl WorkbenchState {
@@ -74,8 +72,6 @@ impl WorkbenchState {
             active_group: None,
             active_story: None,
             presentation: StoryPresentation::default(),
-            actions: Vec::new(),
-            next_action_sequence: 1,
         };
         if let Some(story) = initial_story {
             state.active_group = Some(story.clone());
@@ -90,14 +86,10 @@ impl WorkbenchState {
         story: Option<Entity<StoryContainer>>,
         cx: &mut Context<Self>,
     ) {
-        let previous = self.active_story.as_ref().map(Entity::entity_id);
         self.active_group = story.clone();
         self.active_story =
             story.and_then(|story| story.read(cx).list_members.first().cloned().or(Some(story)));
         self.apply_presentation(cx);
-        if self.active_story.as_ref().map(Entity::entity_id) != previous {
-            self.record_action("story.select", self.active_story_key(cx), cx);
-        }
         cx.notify();
     }
 
@@ -132,7 +124,6 @@ impl WorkbenchState {
         self.active_story = find(&story, key, cx)
             .or_else(|| story.read(cx).list_members.first().cloned().or(Some(story)));
         self.apply_presentation(cx);
-        self.record_action("story.select", key, cx);
         cx.notify();
     }
 
@@ -148,7 +139,6 @@ impl WorkbenchState {
         if belongs_to_group || self.active_group.as_ref() == Some(&story) {
             self.active_story = Some(story);
             self.apply_presentation(cx);
-            self.record_action("story.variant", self.active_story_key(cx), cx);
             cx.notify();
         }
     }
@@ -175,56 +165,19 @@ impl WorkbenchState {
     pub fn set_viewport(&mut self, viewport: StoryViewportPreset, cx: &mut Context<Self>) {
         self.presentation.viewport = viewport;
         self.apply_presentation(cx);
-        self.record_action("preview.viewport", viewport.label(), cx);
         cx.notify();
     }
 
     pub fn set_background(&mut self, background: StoryCanvasBackground, cx: &mut Context<Self>) {
         self.presentation.background = background;
         self.apply_presentation(cx);
-        self.record_action("preview.background", background.label(), cx);
         cx.notify();
     }
 
     pub fn set_grid(&mut self, grid: bool, cx: &mut Context<Self>) {
         self.presentation.grid = grid;
         self.apply_presentation(cx);
-        self.record_action("preview.grid", grid.to_string(), cx);
         cx.notify();
-    }
-
-    pub fn actions(&self) -> &[StoryActionEntry] {
-        &self.actions
-    }
-
-    pub fn clear_actions(&mut self, cx: &mut Context<Self>) {
-        self.actions.clear();
-        cx.notify();
-    }
-
-    pub fn record_action(
-        &mut self,
-        name: impl Into<String>,
-        detail: impl Into<String>,
-        cx: &mut Context<Self>,
-    ) {
-        self.actions.push(StoryActionEntry {
-            sequence: self.next_action_sequence,
-            name: name.into(),
-            detail: detail.into(),
-        });
-        self.next_action_sequence = self.next_action_sequence.saturating_add(1);
-        if self.actions.len() > 100 {
-            self.actions.remove(0);
-        }
-        cx.notify();
-    }
-
-    fn active_story_key(&self, cx: &App) -> String {
-        self.active_story
-            .as_ref()
-            .and_then(|story| story.read(cx).story_key_label().map(str::to_owned))
-            .unwrap_or_else(|| "unregistered".to_owned())
     }
 
     fn apply_presentation(&self, cx: &mut App) {
@@ -284,7 +237,7 @@ impl WorkbenchState {
                 message: error.to_string(),
             }
         })?;
-        self.record_action("control.set", key, cx);
+        cx.notify();
         self.controls_snapshot(cx)
     }
 
@@ -313,7 +266,7 @@ impl WorkbenchState {
         result.map_err(|error| StorybookAutomationError::ControlOperationFailed {
             message: error.to_string(),
         })?;
-        self.record_action("control.reset", key.unwrap_or("all"), cx);
+        cx.notify();
         self.controls_snapshot(cx)
     }
 
@@ -359,6 +312,20 @@ enum ControlEditor {
         integer: bool,
     },
     Color(Entity<ColorPickerState>),
+}
+
+fn story_source_url(crate_dir: &str, source_file: &str) -> Option<String> {
+    let source_file = Path::new(source_file);
+    let source_path = if source_file.is_absolute() {
+        source_file.is_file().then(|| source_file.to_path_buf())
+    } else {
+        Path::new(crate_dir)
+            .ancestors()
+            .map(|directory| directory.join(source_file))
+            .find(|candidate| candidate.is_file())
+    }?;
+
+    url::Url::from_file_path(source_path).ok().map(Into::into)
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -473,7 +440,6 @@ impl StoryWorkbench {
                     });
                     let target = target.clone();
                     let control_key = key.clone();
-                    let action_state = self.state.clone();
                     let json = matches!(value, ControlValue::Json(_));
                     self.editor_subscriptions.push(cx.subscribe_in(
                         &state,
@@ -495,11 +461,6 @@ impl StoryWorkbench {
                                     .set(&control_key, value, cx)
                                     .map_err(|error| error.to_string())
                             });
-                            if result.is_ok() {
-                                action_state.update(cx, |state, cx| {
-                                    state.record_action("control.set", &control_key, cx);
-                                });
-                            }
                             this.last_error = result.err().map(Into::into);
                             cx.notify();
                         },
@@ -525,7 +486,6 @@ impl StoryWorkbench {
                     });
                     let target = target.clone();
                     let control_key = key.clone();
-                    let action_state = self.state.clone();
                     self.editor_subscriptions.push(cx.subscribe_in(
                         &state,
                         window,
@@ -552,11 +512,6 @@ impl StoryWorkbench {
                                         .set(&control_key, value, cx)
                                         .map_err(|error| error.to_string())
                                 });
-                            if result.is_ok() {
-                                action_state.update(cx, |state, cx| {
-                                    state.record_action("control.set", &control_key, cx);
-                                });
-                            }
                             this.last_error = result.err().map(Into::into);
                             cx.notify();
                         },
@@ -579,7 +534,6 @@ impl StoryWorkbench {
                     });
                     let target = target.clone();
                     let control_key = key.clone();
-                    let action_state = self.state.clone();
                     self.editor_subscriptions.push(cx.subscribe_in(
                         &state,
                         window,
@@ -593,11 +547,6 @@ impl StoryWorkbench {
                                 ControlValue::Float(value.start() as f64)
                             };
                             let result = target.set(&control_key, value, cx);
-                            if result.is_ok() {
-                                action_state.update(cx, |state, cx| {
-                                    state.record_action("control.set", &control_key, cx);
-                                });
-                            }
                             this.last_error = result.err().map(|error| error.to_string().into());
                             cx.notify();
                         },
@@ -613,7 +562,6 @@ impl StoryWorkbench {
                     });
                     let target = target.clone();
                     let control_key = key.clone();
-                    let action_state = self.state.clone();
                     self.editor_subscriptions.push(cx.subscribe_in(
                         &state,
                         window,
@@ -623,11 +571,6 @@ impl StoryWorkbench {
                             };
                             let result =
                                 target.set(&control_key, ControlValue::Color((*color).into()), cx);
-                            if result.is_ok() {
-                                action_state.update(cx, |state, cx| {
-                                    state.record_action("control.set", &control_key, cx);
-                                });
-                            }
                             this.last_error = result.err().map(|error| error.to_string().into());
                             cx.notify();
                         },
@@ -761,11 +704,6 @@ impl StoryWorkbench {
                     .set(&action.key, ControlValue::Choice(action.value.clone()), cx)
                     .map_err(|error| error.to_string())
             });
-        if result.is_ok() {
-            self.state.update(cx, |state, cx| {
-                state.record_action("control.set", &action.key, cx);
-            });
-        }
         self.last_error = result.err().map(Into::into);
         cx.notify();
     }
@@ -803,18 +741,10 @@ impl StoryWorkbench {
                 let checked = matches!(value, ControlValue::Boolean(true));
                 let target = target.clone();
                 let control_key = key.clone();
-                let action_state = self.state.clone();
                 Checkbox::new(format!("workbench-control-{key}"))
                     .checked(checked)
                     .on_click(move |checked, _, cx| {
-                        if target
-                            .set(&control_key, ControlValue::Boolean(*checked), cx)
-                            .is_ok()
-                        {
-                            action_state.update(cx, |state, cx| {
-                                state.record_action("control.set", &control_key, cx);
-                            });
-                        }
+                        let _ = target.set(&control_key, ControlValue::Boolean(*checked), cx);
                     })
                     .into_any_element()
             },
@@ -894,7 +824,6 @@ impl StoryWorkbench {
 
         let target_for_reset = target;
         let key_for_reset = key.clone();
-        let state_for_reset = self.state.clone();
         v_flex()
             .id(format!("workbench-control-row-{key}"))
             .gap_2()
@@ -925,11 +854,6 @@ impl StoryWorkbench {
                             .ghost()
                             .on_click(cx.listener(move |this, _, _, cx| {
                                 let result = target_for_reset.reset(&key_for_reset, cx);
-                                if result.is_ok() {
-                                    state_for_reset.update(cx, |state, cx| {
-                                        state.record_action("control.reset", &key_for_reset, cx);
-                                    });
-                                }
                                 this.last_error =
                                     result.err().map(|error| error.to_string().into());
                                 cx.notify();
@@ -950,7 +874,6 @@ impl StoryWorkbench {
         };
         let specs = target.specs().to_vec();
         let target_for_reset = target.clone();
-        let state_for_reset = self.state.clone();
 
         v_flex()
             .id("workbench-controls")
@@ -963,11 +886,6 @@ impl StoryWorkbench {
                         .xsmall()
                         .on_click(cx.listener(move |this, _, _, cx| {
                             let result = target_for_reset.reset_all(cx);
-                            if result.is_ok() {
-                                state_for_reset.update(cx, |state, cx| {
-                                    state.record_action("control.reset", "all", cx);
-                                });
-                            }
                             this.last_error = result.err().map(|error| error.to_string().into());
                             cx.notify();
                         })),
@@ -1091,26 +1009,32 @@ impl StoryWorkbench {
 
     fn render_inspect(&self, cx: &mut Context<Self>) -> AnyElement {
         let story = self.active_story(cx);
-        let (key, source, controls) = story
+        let (key, source, source_url) = story
             .as_ref()
             .map(|story| {
                 let story = story.read(cx);
                 let key = story.story_key_label().unwrap_or("unregistered").to_owned();
+                let source_file = story.source_file_label().unwrap_or("unknown source");
                 let source = format!(
                     "{}:{}",
-                    story.source_file_label().unwrap_or("unknown source"),
+                    source_file,
                     story.source_line().unwrap_or_default()
                 );
-                let controls = story
-                    .control_target()
-                    .map(|target| target.specs().len())
-                    .unwrap_or_default();
-                (key, source, controls)
+                let source_url = story
+                    .registration_metadata()
+                    .and_then(|metadata| story_source_url(metadata.crate_dir(), source_file));
+                (key, source, source_url)
             })
-            .unwrap_or_else(|| ("No active story".to_owned(), String::new(), 0));
+            .unwrap_or_else(|| ("No active story".to_owned(), String::new(), None));
 
-        let actions = self.state.read(cx).actions().to_vec();
-        let state = self.state.clone();
+        let source = source_url
+            .map(|url| {
+                Link::new("open-story-source")
+                    .href(url)
+                    .child(source.clone())
+                    .into_any_element()
+            })
+            .unwrap_or_else(|| div().child(source).into_any_element());
 
         v_flex()
             .p_4()
@@ -1120,47 +1044,16 @@ impl StoryWorkbench {
                     .label("Open GPUI Inspector")
                     .on_click(|_, window, cx| window.toggle_inspector(cx)),
             )
-            .child(v_flex().gap_1().child("Story key").child(key))
+            .child(
+                v_flex().gap_1().child("Story key").child(
+                    h_flex().justify_between().gap_2().child(key.clone()).child(
+                        Clipboard::new("copy-story-key")
+                            .value(key)
+                            .tooltip("Copy story key"),
+                    ),
+                ),
+            )
             .child(v_flex().gap_1().child("Source").child(source))
-            .child(
-                v_flex()
-                    .gap_1()
-                    .child("Available controls")
-                    .child(controls.to_string()),
-            )
-            .child(
-                v_flex()
-                    .gap_2()
-                    .child(
-                        h_flex().justify_between().child("Action log").child(
-                            Button::new("clear-story-action-log")
-                                .label("Clear")
-                                .xsmall()
-                                .ghost()
-                                .on_click(move |_, _, cx| {
-                                    state.update(cx, |state, cx| state.clear_actions(cx));
-                                }),
-                        ),
-                    )
-                    .children(actions.into_iter().rev().map(|action| {
-                        v_flex()
-                            .gap_0p5()
-                            .py_1()
-                            .border_b_1()
-                            .border_color(cx.theme().border)
-                            .child(
-                                div()
-                                    .text_xs()
-                                    .child(format!("#{} {}", action.sequence, action.name)),
-                            )
-                            .child(
-                                div()
-                                    .text_xs()
-                                    .text_color(cx.theme().muted_foreground)
-                                    .child(action.detail),
-                            )
-                    })),
-            )
             .into_any_element()
     }
 }
@@ -1394,7 +1287,7 @@ mod tests {
     }
 
     #[gpui::test]
-    fn window_scoped_states_keep_preview_and_actions_independent(cx: &mut App) {
+    fn window_scoped_states_keep_preview_independent(cx: &mut App) {
         let first = cx.new(|_| WorkbenchState::new(None));
         let second = cx.new(|_| WorkbenchState::new(None));
 
@@ -1413,7 +1306,27 @@ mod tests {
             }
         );
         assert_eq!(second.read(cx).presentation(), StoryPresentation::default());
-        assert_eq!(first.read(cx).actions().len(), 3);
-        assert!(second.read(cx).actions().is_empty());
+    }
+
+    #[test]
+    fn story_source_url_resolves_workspace_relative_files_from_the_crate_directory() {
+        let workspace = tempfile::tempdir().expect("temporary workspace");
+        let crate_dir = workspace.path().join("examples/story");
+        let source_file = workspace.path().join("examples/story/src/lib.rs");
+        std::fs::create_dir_all(source_file.parent().expect("source parent"))
+            .expect("create source directory");
+        std::fs::File::create(&source_file).expect("create source file");
+
+        assert_eq!(
+            story_source_url(
+                crate_dir.to_str().expect("UTF-8 crate directory"),
+                "examples/story/src/lib.rs",
+            ),
+            Some(
+                url::Url::from_file_path(source_file)
+                    .expect("source file URL")
+                    .into(),
+            )
+        );
     }
 }

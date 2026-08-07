@@ -129,6 +129,7 @@ pub struct RegisteredStoryMetadata {
     name: StoryName,
     section: Option<StorySectionName>,
     crate_name: &'static str,
+    crate_dir: &'static str,
     source_file: &'static str,
     source_line: u32,
 }
@@ -140,6 +141,7 @@ impl RegisteredStoryMetadata {
         name: StoryName,
         section: Option<StorySectionName>,
         crate_name: &'static str,
+        crate_dir: &'static str,
         source_file: &'static str,
         source_line: u32,
     ) -> Self {
@@ -148,6 +150,7 @@ impl RegisteredStoryMetadata {
             name,
             section,
             crate_name,
+            crate_dir,
             source_file,
             source_line,
         }
@@ -171,6 +174,11 @@ impl RegisteredStoryMetadata {
     /// Returns the crate package name that registered the story.
     pub const fn crate_name(self) -> &'static str {
         self.crate_name
+    }
+
+    /// Returns the manifest directory of the crate that registered the story.
+    pub const fn crate_dir(self) -> &'static str {
+        self.crate_dir
     }
 
     /// Returns the source file recorded by the registration macro.
@@ -267,6 +275,7 @@ impl StoryEntry {
             self.name,
             self.section,
             self.crate_name,
+            self.crate_dir,
             self.file,
             self.line,
         )
@@ -381,6 +390,7 @@ mod tests {
             Some(StorySectionName::new("Components"))
         );
         assert_eq!(metadata.crate_name(), "storybook");
+        assert_eq!(metadata.crate_dir(), "/tmp/storybook");
         assert_eq!(metadata.source_file(), "src/lib.rs");
         assert_eq!(metadata.source_line(), 42);
     }
