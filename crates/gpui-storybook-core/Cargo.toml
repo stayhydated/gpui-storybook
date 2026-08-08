@@ -49,6 +49,9 @@ url = { workspace = true }
 [target.'cfg(target_os = "linux")'.dependencies]
 gtk = { version = "0.18" }
 
+[target.'cfg(unix)'.dependencies]
+libc = { workspace = true }
+
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 gpui_tokio = { workspace = true }
 

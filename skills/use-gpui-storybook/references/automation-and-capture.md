@@ -40,7 +40,7 @@ run stdio and startup-capture sessions through a headless Wayland compositor:
   WLR_BACKENDS=headless \
   WLR_HEADLESS_OUTPUTS=1 \
   WLR_LIBINPUT_NO_DEVICES=1 \
-  WLR_RENDERER=gles2 \
+  WLR_RENDERER=pixman \
   WLR_RENDERER_ALLOW_SOFTWARE=1 \
   LIBGL_ALWAYS_SOFTWARE=1 \
   sway --unsupported-gpu --config "$runtime_dir/sway.conf" \
@@ -69,7 +69,7 @@ while retaining GPUI's normal Wayland backend. The launch-env tool emits a
 bounded-readiness version of this wrapper on Linux and continues to emit a
 direct Cargo command elsewhere.
 The `--unsupported-gpu` flag only bypasses Sway's host-driver check; the
-headless backend and software GLES renderer remain explicitly selected.
+headless backend and software Pixman renderer remain explicitly selected.
 
 ### Verify raw stdio in this repository
 

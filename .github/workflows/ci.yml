@@ -40,6 +40,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Setup sccache
+        if: runner.os != 'Windows'
         uses: mozilla-actions/sccache-action@v0.0.11
 
       - name: Install Linux dependencies
@@ -49,12 +50,20 @@ jobs:
           sway: true
 
       - name: Run tests
+        if: runner.os != 'Windows'
+        run: cargo test --workspace --all-features --locked
+
+      - name: Run tests
+        if: runner.os == 'Windows'
+        env:
+          RUSTC_WRAPPER: ""
         run: cargo test --workspace --all-features --locked
 
       - name: Smoke test Storybook capture through headless Sway
         if: runner.os == 'Linux'
         shell: bash
         run: |
+          cargo build -p gpui-storybook-example-story --features mcp --locked
           env -u DISPLAY -u WAYLAND_DISPLAY -u WAYLAND_SOCKET -u ZED_HEADLESS \
             RUST_LOG=warn \
             WGPU_CAPTURE_ROUTE=gpui-storybook-example-story-ButtonStory \
@@ -76,7 +85,7 @@ jobs:
               WLR_BACKENDS=headless \
               WLR_HEADLESS_OUTPUTS=1 \
               WLR_LIBINPUT_NO_DEVICES=1 \
-              WLR_RENDERER=gles2 \
+              WLR_RENDERER=pixman \
               WLR_RENDERER_ALLOW_SOFTWARE=1 \
               LIBGL_ALWAYS_SOFTWARE=1 \
               sway --unsupported-gpu --config "$storybook_sway_config" \
@@ -118,7 +127,7 @@ jobs:
               export LIBGL_ALWAYS_SOFTWARE=1
               "$@"
             ' sh \
-              cargo run -p gpui-storybook-example-story --features mcp --locked
+              target/debug/gpui-storybook-example-story
           test -s target/storybook-captures/ci-sway-button.png
 
   fmt:

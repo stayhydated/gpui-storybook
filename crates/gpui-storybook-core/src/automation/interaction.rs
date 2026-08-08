@@ -951,10 +951,9 @@ mod tests {
     use super::*;
     use crate::capture_region::capture_story_view_with_scroll;
     use gpui::{
-        AppContext as _, Context, Entity, Focusable, InteractiveElement as _, IntoElement,
-        ParentElement as _, Render, StatefulInteractiveElement as _, Styled as _, div,
+        AppContext as _, Context, Focusable, InteractiveElement as _, IntoElement, KeyDownEvent,
+        Render, StatefulInteractiveElement as _, Styled as _, div,
     };
-    use gpui_component::input::{Input, InputState};
     use std::sync::atomic::AtomicBool;
 
     /// Sets the harness counter to a caller-provided value.
@@ -966,7 +965,7 @@ mod tests {
 
     struct InteractionHarness {
         focus_handle: gpui::FocusHandle,
-        input: Entity<InputState>,
+        text: String,
         clicks: usize,
         hovered: bool,
         action_value: usize,
@@ -993,6 +992,13 @@ mod tests {
                         this.events.push("action");
                         cx.notify();
                     }))
+                    .on_key_down(cx.listener(|this, event: &KeyDownEvent, _, cx| {
+                        if let Some(text) = event.keystroke.key_char.as_deref() {
+                            this.text.push_str(text);
+                            cx.stop_propagation();
+                            cx.notify();
+                        }
+                    }))
                     .on_hover(cx.listener(|this, hovered, _, cx| {
                         this.hovered = *hovered;
                         cx.notify();
@@ -1001,8 +1007,7 @@ mod tests {
                         this.clicks += 1;
                         this.events.push("click");
                         cx.notify();
-                    }))
-                    .child(Input::new(&self.input)),
+                    })),
             )
         }
     }
@@ -1234,21 +1239,19 @@ mod tests {
         cx: &mut gpui::TestAppContext,
     ) {
         let (window, harness, receiver, pending) = cx.update(|cx| {
-            gpui_component::init(cx);
             let mut harness = None;
             let window = cx
-                .open_window(Default::default(), |window, cx| {
-                    let input = cx.new(|cx| InputState::new(window, cx));
+                .open_window(Default::default(), |_, cx| {
                     let entity = cx.new(|cx| InteractionHarness {
-                        focus_handle: cx.focus_handle(),
-                        input,
+                        focus_handle: cx.focus_handle().tab_stop(true),
+                        text: String::new(),
                         clicks: 0,
                         hovered: false,
                         action_value: 0,
                         events: Vec::new(),
                     });
                     harness = Some(entity.clone());
-                    cx.new(|cx| gpui_component::Root::new(entity, window, cx))
+                    entity
                 })
                 .expect("interaction test window should open");
             let harness = harness.expect("harness should be created");
@@ -1342,26 +1345,24 @@ mod tests {
             assert_eq!(harness.clicks, 1);
             assert_eq!(harness.events, ["action", "click"]);
             assert!(harness.hovered);
-            assert_eq!(harness.input.read(cx).value(), "héllo 世界");
+            assert_eq!(harness.text, "héllo 世界");
         });
     }
 
     #[gpui::test]
     async fn executor_rejects_an_unrendered_route_without_dispatch(cx: &mut gpui::TestAppContext) {
         let (window, receiver, progress, pending) = cx.update(|cx| {
-            gpui_component::init(cx);
             let window = cx
-                .open_window(Default::default(), |window, cx| {
-                    let input = cx.new(|cx| InputState::new(window, cx));
+                .open_window(Default::default(), |_, cx| {
                     let entity = cx.new(|cx| InteractionHarness {
-                        focus_handle: cx.focus_handle(),
-                        input,
+                        focus_handle: cx.focus_handle().tab_stop(true),
+                        text: String::new(),
                         clicks: 0,
                         hovered: false,
                         action_value: 0,
                         events: Vec::new(),
                     });
-                    cx.new(|cx| gpui_component::Root::new(entity, window, cx))
+                    entity
                 })
                 .expect("interaction test window should open");
             let (response, receiver) = oneshot::channel();
@@ -1420,21 +1421,19 @@ mod tests {
     #[gpui::test]
     async fn capture_failure_reports_partial_dispatch_without_retry(cx: &mut gpui::TestAppContext) {
         let (window, harness, receiver, progress, pending) = cx.update(|cx| {
-            gpui_component::init(cx);
             let mut harness = None;
             let window = cx
-                .open_window(Default::default(), |window, cx| {
-                    let input = cx.new(|cx| InputState::new(window, cx));
+                .open_window(Default::default(), |_, cx| {
                     let entity = cx.new(|cx| InteractionHarness {
-                        focus_handle: cx.focus_handle(),
-                        input,
+                        focus_handle: cx.focus_handle().tab_stop(true),
+                        text: String::new(),
                         clicks: 0,
                         hovered: false,
                         action_value: 0,
                         events: Vec::new(),
                     });
                     harness = Some(entity.clone());
-                    cx.new(|cx| gpui_component::Root::new(entity, window, cx))
+                    entity
                 })
                 .expect("interaction test window should open");
             let harness = harness.expect("harness should be created");

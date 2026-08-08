@@ -52,7 +52,7 @@ Then run MCP sessions through a headless Wayland compositor:
   WLR_BACKENDS=headless \
   WLR_HEADLESS_OUTPUTS=1 \
   WLR_LIBINPUT_NO_DEVICES=1 \
-  WLR_RENDERER=gles2 \
+  WLR_RENDERER=pixman \
   WLR_RENDERER_ALLOW_SOFTWARE=1 \
   LIBGL_ALWAYS_SOFTWARE=1 \
   sway --unsupported-gpu --config "$runtime_dir/sway.conf" \
@@ -79,7 +79,8 @@ Then run MCP sessions through a headless Wayland compositor:
 This uses the normal Wayland-backed GPUI application. The private
 `XDG_RUNTIME_DIR` and discovered `WAYLAND_DISPLAY` select Sway's in-memory
 wlroots compositor, which provides a compatibility seat, window management,
-and frame callbacks. Mesa renders both compositor and application in software.
+and frame callbacks. Pixman renders the compositor, and Mesa renders the
+application in software.
 macOS and Windows continue to use their native launch paths.
 `--unsupported-gpu` bypasses Sway's host-driver startup check; the explicit
 headless backend and software renderer keep this wrapper off the physical GPU.
@@ -351,7 +352,7 @@ Set width and height together, and make both values greater than zero.
 On Linux, `storybook_capture_launch_env` returns an `env` map and a `command`
 array. Merge every `env` entry into the child process environment before
 executing `command`. The command creates a private Wayland runtime, starts
-headless Sway with a software GLES renderer, waits for its socket, and then
+headless Sway with the software Pixman renderer, waits for its socket, and then
 runs Cargo, but it does not inline the capture or MCP variables.
 
 ## Capture a live session

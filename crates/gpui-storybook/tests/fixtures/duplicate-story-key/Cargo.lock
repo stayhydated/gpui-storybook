@@ -2507,6 +2507,7 @@ dependencies = [
  "gtk",
  "inventory",
  "koruma",
+ "libc",
  "rust-embed",
  "schemars",
  "serde",

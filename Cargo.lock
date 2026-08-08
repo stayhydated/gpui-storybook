@@ -4340,6 +4340,7 @@ dependencies = [
  "image",
  "inventory",
  "koruma 0.11.0",
+ "libc",
  "rust-embed",
  "schemars",
  "serde",

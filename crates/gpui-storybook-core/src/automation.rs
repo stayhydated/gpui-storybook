@@ -774,6 +774,14 @@ fn prepare_story_capture(
     });
 }
 
+#[cfg(unix)]
+fn exit_after_capture(exit_code: i32, _cx: &mut App) -> ! {
+    // SAFETY: startup capture owns the process and has completed its output
+    // write. `_exit` avoids native platform teardown callbacks after that point.
+    unsafe { libc::_exit(exit_code) }
+}
+
+#[cfg(not(unix))]
 fn exit_after_capture(exit_code: i32, cx: &mut App) {
     if exit_code == 0 {
         cx.quit();
