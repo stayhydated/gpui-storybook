@@ -27,21 +27,21 @@ version = "0.5.0"
 [workspace.dependencies]
 anyhow = "1.0"
 clap = "4.6"
-component-shape-mcp = { git = "https://github.com/stayhydated/component-shape", rev = "09ebec5af9fc3522e96b272d79036501b9116d60", version = "0.2.0" }
+component-shape-mcp = { git = "https://github.com/stayhydated/component-shape", rev = "acd8f941ae78f69ffc08408bf484ee94e51e7eb4", version = "0.2.0" }
 darling = "0.24"
 derive_more = "2.1"
 dioxus = { default-features = false, version = "0.7" }
-es-fluent = { git = "https://github.com/stayhydated/es-fluent", rev = "be9ccf8d9fc5e417e2605af3b648a6199cb39f8d", version = "0.18.1" }
-es-fluent-build = { git = "https://github.com/stayhydated/es-fluent", rev = "be9ccf8d9fc5e417e2605af3b648a6199cb39f8d", version = "0.18.1" }
-es-fluent-lang = { git = "https://github.com/stayhydated/es-fluent", rev = "be9ccf8d9fc5e417e2605af3b648a6199cb39f8d", version = "0.18.1" }
-es-fluent-manager-core = { git = "https://github.com/stayhydated/es-fluent", rev = "be9ccf8d9fc5e417e2605af3b648a6199cb39f8d", version = "0.18.1" }
-es-fluent-manager-embedded = { git = "https://github.com/stayhydated/es-fluent", rev = "be9ccf8d9fc5e417e2605af3b648a6199cb39f8d", version = "0.18.1" }
+es-fluent = { git = "https://github.com/stayhydated/es-fluent", rev = "8ff586b958c3e17bfc530b2ddf7b7a5c87b716b9", version = "0.18.1" }
+es-fluent-build = { git = "https://github.com/stayhydated/es-fluent", rev = "8ff586b958c3e17bfc530b2ddf7b7a5c87b716b9", version = "0.18.1" }
+es-fluent-lang = { git = "https://github.com/stayhydated/es-fluent", rev = "8ff586b958c3e17bfc530b2ddf7b7a5c87b716b9", version = "0.18.1" }
+es-fluent-manager-core = { git = "https://github.com/stayhydated/es-fluent", rev = "8ff586b958c3e17bfc530b2ddf7b7a5c87b716b9", version = "0.18.1" }
+es-fluent-manager-embedded = { git = "https://github.com/stayhydated/es-fluent", rev = "8ff586b958c3e17bfc530b2ddf7b7a5c87b716b9", version = "0.18.1" }
 fluent-langneg = "=0.13.1"
-frame-capture = { git = "https://github.com/stayhydated/frame-capture", rev = "656510bb36873fff1a32dcea3510159108bf5ea8", version = "0.1.0" }
+frame-capture = { git = "https://github.com/stayhydated/frame-capture", rev = "a9027c70f830aceaae3b4df44b7f044d286f9ce6", version = "0.1.0" }
 gpui = { branch = "linux-headless-renderer", git = "https://github.com/stayhydated/zed", version = "0.2.2" }
 gpui-component = { git = "https://github.com/longbridge/gpui-component" }
 gpui-component-assets = { git = "https://github.com/longbridge/gpui-component" }
-gpui-es-fluent = { git = "https://github.com/stayhydated/gpui-es-fluent", rev = "b104b172c0e365d03a2e6c0d79fbcc78b171306f", version = "0.1.0" }
+gpui-es-fluent = { git = "https://github.com/stayhydated/gpui-es-fluent", rev = "71ae96cdf29d53b5434eb7aadd4036d3a25f9f70", version = "0.1.0" }
 gpui-storybook = { path = "crates/gpui-storybook", version = "0.5.0" }
 gpui-storybook-components = { path = "crates/gpui-storybook-components", version = "0.5.0" }
 gpui-storybook-core = { path = "crates/gpui-storybook-core", version = "0.5.0" }
@@ -61,7 +61,7 @@ image = { default-features = false, features = [ "png" ], version = "0.25" }
 insta = "1.48"
 inventory = "0.3"
 itertools = "0.15"
-koruma = { git = "https://github.com/stayhydated/koruma", rev = "0e92fde0b37f7caff376b8d95ed7fae1b18d3ed8", version = "0.11.0" }
+koruma = { git = "https://github.com/stayhydated/koruma", rev = "efbac2d9bddeade53c61f85f5a5ddaa689a01970", version = "0.11.0" }
 libc = "0.2"
 prettyplease = "0.3"
 proc-macro2 = "1.0"
