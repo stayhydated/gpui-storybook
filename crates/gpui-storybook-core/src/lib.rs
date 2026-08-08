@@ -15,11 +15,20 @@
 //!   section helpers with stable sub-story capture metadata, runtime startup,
 //!   and standard window helpers
 //! - `gallery`: searchable sidebar plus active-story display
+//! - `controls`, `workbench`, and `presentation`: typed live field editing,
+//!   per-window selection and preview state, theme editing, story source
+//!   details, optional GPUI Inspector integration, viewport presets, and canvas
+//!   settings
+//! - `theme_workbench`: deterministic session drafts layered over the selected
+//!   base theme, including token rebuilding and external-reload rebasing
 //! - `dock_gallery`: feature-gated dock workspace, sidebar panel, story panel
 //!   registry, and layout persistence
 //! - `automation`: shared controller and command types for live story
-//!   listing, story opening, screenshot capture, and the optional default
-//!   automation global consumed by the base gallery and dock constructors
+//!   listing, story opening, control reads/edits/resets, serialized capture
+//!   controls, screenshot capture, runtime action discovery, closed in-process
+//!   interaction batches, and the optional default automation global consumed
+//!   by the base gallery and dock constructors. Gallery and dock use one
+//!   frame-aware executor and one exclusive mutation/capture guard.
 //! - `capture_region`: story-view and sub-story capture bounds used by MCP
 //!   screenshot capture
 //! - `storybook_window_ui`: customization hooks for application menu and
@@ -34,10 +43,11 @@
 //!
 //! The preference runtime treats saved intent and resolved presentation as
 //! separate state. Standard windows feed appearance and activation events into
-//! resolution, independent light/dark theme slots follow the effective scheme,
-//! and locale changes fan out to Storybook, the consumer adapter,
-//! `CurrentLanguage`, and GPUI Component. `PersistenceStatus` reports storage
-//! activity only; locale failures remain retryable diagnostics.
+//! resolution, selecting a named theme activates its matching appearance while
+//! preserving the opposite light/dark slot, and locale changes fan out to
+//! Storybook, the consumer adapter, `CurrentLanguage`, and GPUI Component.
+//! `PersistenceStatus` reports storage activity only; locale failures remain
+//! retryable diagnostics.
 
 pub mod actions;
 pub mod app_menus;
@@ -46,6 +56,7 @@ pub mod automation;
 #[cfg(feature = "capture")]
 mod capture_output;
 pub mod capture_region;
+pub mod controls;
 #[cfg(feature = "dock")]
 pub mod dock_gallery;
 #[cfg(feature = "dock")]
@@ -57,10 +68,15 @@ pub mod i18n;
 pub mod language;
 mod messages;
 pub mod preferences;
+pub mod presentation;
 pub mod registry;
 pub mod story;
+#[cfg(feature = "inspector")]
+pub mod story_inspector;
 pub mod storybook_window_ui;
+pub mod theme_workbench;
 pub mod title_bar;
 mod web_fonts;
 mod window_options;
 pub mod window_view;
+pub mod workbench;

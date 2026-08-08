@@ -2,8 +2,12 @@
 //!
 //! Most applications should depend on this crate rather than the lower-level
 //! runtime, macro, or TOML crates. It re-exports the standard runtime shell,
-//! story traits, locale helpers, window helpers, and, with the default
-//! `macros` feature, the story registration macros.
+//! typed controls and workbench state, story traits, locale helpers, window
+//! helpers, and, with the default `macros` feature, the story registration
+//! macros.
+//! The Inspect workbench tab always shows the active story key and source.
+//! Enable the opt-in `inspector` feature for its GPUI Component Inspector
+//! button and `StoryInspectorState` story-root metadata.
 //!
 //! Story registration flows through `inventory`: `#[story]` and
 //! `#[derive(ComponentStory)]` submit story entries, `#[derive(Substory)]`
@@ -12,6 +16,12 @@
 //! `#[story_init]` submits one-time setup hooks. The hidden `__registry` and
 //! `__inventory` re-exports are the stable expansion path used by those
 //! macros.
+//!
+//! `#[derive(StoryControls)]` and field-level `#[storybook(control...)]`
+//! metadata connect an exact `Entity<S>` to the Controls tab and MCP
+//! automation. Only marked fields are registered. `#[derive(ComponentStory)]`
+//! accepts the same field metadata and derives reset defaults from its
+//! configured example.
 //!
 //! [`init`] and `generate_stories` load crate-local `storybook.toml` files for
 //! discovered story crates and select a runtime config by matching the running
@@ -30,8 +40,13 @@
 //!
 //! - `macros`: re-exports proc macros from `gpui-storybook-macros`
 //! - `dock`: re-exports the dock workspace helpers from `gpui-storybook-core`
+//! - `inspector`: adds GPUI Inspector activation and story-root metadata; the
+//!   Inspect tab's story key and source remain part of the base workbench
 //! - `mcp`: installs a default automation controller during [`init`] and
-//!   re-exports MCP automation and capture helpers
+//!   re-exports MCP automation and capture helpers. Generic in-process input
+//!   tools are advertised only when
+//!   `GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1`; typed controls remain available
+//!   without that capability.
 //!
 //! Applications with embedded locale assets should call
 //! `es_fluent_build::track_i18n_assets()` from `build.rs`. Define the embedded
@@ -40,11 +55,13 @@
 //! story window.
 //!
 //! [`PreferenceState::saved`] retains durable user intent, including `System`
-//! choices and independent light/dark theme slots. [`PreferenceState::resolved`]
-//! reports effective values and their sources after live system detection,
-//! registry fallback, and deterministic overrides. [`PersistenceStatus`] is
-//! storage-only; locale-adapter failures are reported as diagnostics and are
-//! retried on later window activation without falsifying storage state.
+//! choices and independent light/dark theme slots. Choosing a named theme also
+//! activates its matching appearance while preserving the opposite slot.
+//! [`PreferenceState::resolved`] reports effective values and their sources
+//! after live system detection, registry fallback, and deterministic overrides.
+//! [`PersistenceStatus`] is storage-only; locale-adapter failures are reported
+//! as diagnostics and are retried on later window activation without falsifying
+//! storage state.
 
 #[cfg(feature = "macros")]
 pub use gpui_storybook_macros::*;
@@ -77,6 +94,8 @@ pub use gpui_storybook_core::dock_gallery::{
 pub use gpui_storybook_core::registry::{
     RegisteredStoryMetadata, StoryKey, StoryName, StorySectionName,
 };
+#[cfg(feature = "inspector")]
+pub use gpui_storybook_core::story_inspector::StoryInspectorState;
 #[cfg(feature = "dock")]
 pub use gpui_storybook_core::window_view::DockWindowView;
 pub use gpui_storybook_core::{
@@ -85,14 +104,23 @@ pub use gpui_storybook_core::{
         capture_route_slug, capture_substory, capture_substory_route_id,
         capture_substory_route_id_with_key, capture_substory_with_key,
     },
+    controls::{
+        ControlBounds, ControlColor, ControlError, ControlKind, ControlSnapshot, ControlSpec,
+        ControlTarget, ControlValue, ControlValueField, StoryControls, choice_control_value,
+        parse_choice_control_value,
+    },
     gallery::Gallery,
     language::{CurrentLanguage, Language},
+    presentation::{StoryCanvasBackground, StoryPresentation, StoryViewportPreset},
+    story::themes::STORYBOOK_THEME_DIR_ENV,
     story::{
         Story, StoryContainer, StorySection, StorySectionBase, StorySectionTitle, Substory,
         create_new_window, create_new_window_with_ui, section,
     },
     storybook_window_ui::{StorybookWindow, StorybookWindowUi},
+    theme_workbench::{ThemeColorRow, ThemeDraft, ThemeDraftError, theme_color_rows},
     window_view::SimpleWindowView,
+    workbench::{StoryWorkbench, WorkbenchState, WorkbenchTab},
 };
 
 #[doc(hidden)]

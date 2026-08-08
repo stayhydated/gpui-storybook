@@ -12,8 +12,11 @@ use gpui_component::ActiveTheme as _;
     example = WelcomeCard::example(),
 )]
 pub struct WelcomeCard {
+    #[storybook(control(category = "Content"))]
     eyebrow: SharedString,
+    #[storybook(control(category = "Content"))]
     title: SharedString,
+    #[storybook(control(category = "Content"))]
     message: SharedString,
 }
 

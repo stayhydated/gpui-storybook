@@ -67,6 +67,7 @@ impl Render for FontSizeSelector {
 
         div()
             .id("font-size-selector")
+            .debug_selector(|| "storybook-settings".to_owned())
             .track_focus(&focus_handle)
             .on_action(cx.listener(Self::on_select_font))
             .on_action(cx.listener(Self::on_select_radius))

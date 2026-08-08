@@ -6,15 +6,32 @@ use gpui::{
     AnyElement, App, AppContext as _, Context, Entity, InteractiveElement as _, IntoElement,
     MouseButton, ParentElement as _, Render, SharedString, Styled as _, Window, div,
 };
-use gpui_component::{TitleBar, menu::AppMenuBar};
+use gpui_component::{
+    IconName, Side, Sizable as _, TitleBar,
+    button::{Button, ButtonVariants as _},
+    menu::AppMenuBar,
+};
 use std::rc::Rc;
 
 use crate::storybook_window_ui::StorybookWindowUi;
 
+pub(crate) fn sidebar_toggle_button(id: &'static str, side: Side, collapsed: bool) -> Button {
+    let icon = match (side, collapsed) {
+        (Side::Left, true) => IconName::PanelLeftOpen,
+        (Side::Left, false) => IconName::PanelLeftClose,
+        (_, true) => IconName::PanelRightOpen,
+        (_, false) => IconName::PanelRightClose,
+    };
+
+    Button::new(id).small().ghost().icon(icon)
+}
+
 pub struct AppTitleBar {
     app_menu_bar: Entity<AppMenuBar>,
     font_size_selector: Entity<FontSizeSelector>,
+    system_child: Rc<dyn Fn(&mut Window, &mut App) -> AnyElement>,
     child: Rc<dyn Fn(&mut Window, &mut App) -> AnyElement>,
+    sidebar_child: Rc<dyn Fn(&mut Window, &mut App) -> AnyElement>,
 }
 
 impl AppTitleBar {
@@ -30,10 +47,22 @@ impl AppTitleBar {
         Self {
             app_menu_bar,
             font_size_selector,
+            system_child: Rc::new(|_, _| div().into_any_element()),
             child: ui
                 .title_bar_items
                 .unwrap_or_else(|| Rc::new(|_, _| div().into_any_element())),
+            sidebar_child: Rc::new(|_, _| div().into_any_element()),
         }
+    }
+
+    #[cfg(feature = "dock")]
+    pub(crate) fn system_child<F, E>(mut self, f: F) -> Self
+    where
+        E: IntoElement,
+        F: Fn(&mut Window, &mut App) -> E + 'static,
+    {
+        self.system_child = Rc::new(move |window, cx| f(window, cx).into_any_element());
+        self
     }
 
     pub fn child<F, E>(mut self, f: F) -> Self
@@ -42,6 +71,15 @@ impl AppTitleBar {
         F: Fn(&mut Window, &mut App) -> E + 'static,
     {
         self.child = Rc::new(move |window, cx| f(window, cx).into_any_element());
+        self
+    }
+
+    pub(crate) fn sidebar_child<F, E>(mut self, f: F) -> Self
+    where
+        E: IntoElement,
+        F: Fn(&mut Window, &mut App) -> E + 'static,
+    {
+        self.sidebar_child = Rc::new(move |window, cx| f(window, cx).into_any_element());
         self
     }
 }
@@ -58,7 +96,9 @@ impl Render for AppTitleBar {
                     .px_2()
                     .gap_2()
                     .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    .child((self.system_child.clone())(window, cx))
                     .child((self.child.clone())(window, cx))
+                    .child((self.sidebar_child.clone())(window, cx))
                     .child(self.font_size_selector.clone()),
             )
     }

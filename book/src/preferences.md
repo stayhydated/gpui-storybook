@@ -2,7 +2,8 @@
 
 Storybook stores appearance and language intent per Storybook binary. Give each
 binary a distinct stable `ConsumerId`, await initialization readiness, and let
-the Preferences menu update the same typed state used by application code.
+the appearance, theme, and language menu controls update the same typed state
+used by application code.
 
 ## Scope preference storage
 
@@ -57,9 +58,17 @@ language after system detection, registered-theme availability, and launch
 overrides. Each resolved value includes its source, and fallback decisions add
 structured diagnostics.
 
-Changing the inactive light or dark theme slot saves that slot without changing
-the current appearance. The saved theme becomes effective when its color scheme
-becomes active.
+Selecting a named light or dark theme saves that theme in its matching slot and
+activates the same appearance, so the selected theme is visible immediately.
+Storybook keeps the theme in the opposite slot for later appearance changes.
+Select `System` from **Appearance** to resume following device appearance; each
+system transition uses the saved theme for that light or dark slot. A
+launch-only `color_scheme` override remains higher priority than menu changes.
+
+Color edits in the workbench's **Theme** tab are session overrides layered over
+the selected base theme; they do not rewrite saved preference intent. Selecting
+a different base theme clears the draft. Reloading the same named theme from a
+native watched directory rebases and reapplies the session overrides.
 
 ## Follow system changes
 
@@ -107,8 +116,8 @@ Repository open or load failures instead complete readiness with fallbacks,
 `PersistenceStatus::Error`, and diagnostics so the window can still open.
 
 A failed save leaves the optimistic session value active. Open windows expose a
-**Retry Save** notification action and a **Retry Preferences** menu action.
-Locale adapter failures are retried when a Storybook window becomes active.
+**Retry Save** notification action. Locale adapter failures are retried when a
+Storybook window becomes active.
 
 Inspect `StorybookReady::diagnostics` immediately after readiness and
 `PreferenceState::diagnostics` when diagnosing later changes.

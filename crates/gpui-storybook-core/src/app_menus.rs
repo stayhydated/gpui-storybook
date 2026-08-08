@@ -9,7 +9,7 @@ use crate::{
         Quit, RetryPreferences, SelectColorScheme, SelectLocale, SelectTheme, UseSystemLocale,
     },
     messages::{StorybookMessage, text},
-    preferences::{self, PersistenceStatus, StorybookPreferencesGlobal},
+    preferences::{self, StorybookPreferencesGlobal},
     storybook_window_ui::AppMenuItemsBuilder,
 };
 
@@ -116,7 +116,6 @@ fn build_menus(
         theme_menu(SystemColorScheme::Light, cx),
         theme_menu(SystemColorScheme::Dark, cx),
         language_menu(cx),
-        persistence_menu(cx),
     ];
 
     if let Some(extra_items) = extra_items
@@ -234,83 +233,20 @@ fn language_menu(cx: &App) -> MenuItem {
     })
 }
 
-fn persistence_menu(cx: &App) -> MenuItem {
-    let status = preferences::try_state(cx).map(|state| state.persistence_status);
-    persistence_menu_for_status(status, cx)
-}
-
-fn persistence_menu_for_status(status: Option<PersistenceStatus>, cx: &App) -> MenuItem {
-    let status_label = match status.unwrap_or(PersistenceStatus::Loading) {
-        PersistenceStatus::Loading => StorybookMessage::PersistenceLoading,
-        PersistenceStatus::Ready => StorybookMessage::PersistenceReady,
-        PersistenceStatus::Saving => StorybookMessage::PersistenceSaving,
-        PersistenceStatus::Error => StorybookMessage::PersistenceError,
-    };
-    let mut items = vec![MenuItem::action(text(cx, status_label), RetryPreferences).disabled(true)];
-    if status == Some(PersistenceStatus::Error) {
-        items.push(MenuItem::action(
-            text(cx, StorybookMessage::RetryPreferences),
-            RetryPreferences,
-        ));
-    }
-
-    MenuItem::Submenu(Menu {
-        name: text(cx, StorybookMessage::Preferences).into(),
-        items,
-        disabled: false,
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use std::{cell::Cell, rc::Rc};
 
     use super::*;
 
-    fn first_item_name(item: MenuItem) -> SharedString {
-        let MenuItem::Submenu(menu) = item else {
-            panic!("persistence menu should be a submenu");
-        };
-        let Some(MenuItem::Action { name, .. }) = menu.items.into_iter().next() else {
-            panic!("persistence menu should contain a status action");
-        };
-        name
-    }
-
-    #[gpui::test]
-    fn menu_status_tracks_saving_ready_and_error_transitions(cx: &mut App) {
-        crate::i18n::init(cx).expect("Storybook test localization initializes");
-
-        assert_eq!(
-            first_item_name(persistence_menu_for_status(
-                Some(PersistenceStatus::Saving),
-                cx,
-            )),
-            text(cx, StorybookMessage::PersistenceSaving)
-        );
-        assert_eq!(
-            first_item_name(persistence_menu_for_status(
-                Some(PersistenceStatus::Ready),
-                cx,
-            )),
-            text(cx, StorybookMessage::PersistenceReady)
-        );
-        let MenuItem::Submenu(error_menu) =
-            persistence_menu_for_status(Some(PersistenceStatus::Error), cx)
-        else {
-            panic!("error status should be a submenu");
-        };
-        assert_eq!(error_menu.items.len(), 2);
-        let MenuItem::Action { name, .. } = &error_menu.items[0] else {
-            panic!("first error item should report status");
-        };
-        assert_eq!(name.as_ref(), text(cx, StorybookMessage::PersistenceError));
-    }
-
     #[gpui::test]
     fn appearance_and_language_menus_expose_system_intent(cx: &mut App) {
         gpui_component::init(cx);
         crate::i18n::init(cx).expect("Storybook test localization initializes");
+
+        let menus = build_menus("Storybook", None, cx);
+        assert_eq!(menus.len(), 1);
+        assert_eq!(menus[0].items.len(), 6);
 
         let MenuItem::Submenu(appearance) = appearance_menu(cx) else {
             panic!("appearance should be a submenu");

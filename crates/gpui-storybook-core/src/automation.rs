@@ -1,24 +1,57 @@
+//! Live-window automation shared by gallery, dock, and MCP integrations.
+//!
+//! [`StorybookAutomation`] serializes navigation, control mutation, capture,
+//! and [`StoryInteractionRequest`] batches through one exclusive operation
+//! guard. Story and current-route reads, control reads, and action discovery do
+//! not acquire the guard; callers may use them while a mutation is active, but
+//! they can observe an intermediate rendered state.
+//!
+//! Interaction requests are completely validated and their keystrokes and
+//! registered actions are constructed before input dispatch. The shared
+//! frame-aware executor resolves fresh story or substory capture bounds after
+//! route preparation and story-region sizing, constrains pointer input to those bounds,
+//! honors explicit rendered-frame waits, and performs an optional capture in
+//! the same operation. Runtime failures after dispatch report partial progress
+//! and must not be retried automatically.
+//!
+//! This controller uses the application's normal platform window. Linux
+//! automation runners can provide a Wayland compositor with Sway's wlroots
+//! headless backend; the MCP launch helper generates that platform wrapper.
+
 #[cfg(feature = "capture")]
 use crate::capture_output::CaptureOutputStore;
-#[cfg(feature = "capture")]
-use crate::capture_region::capture_region_bounds;
+pub(crate) mod interaction;
+
 use crate::{
-    capture_region::{capture_route_story_key, scroll_capture_region_into_view},
+    capture_region::{
+        capture_region_bounds, capture_route_story_key, scroll_capture_region_into_view,
+    },
+    controls::{ControlSnapshot, ControlValue},
+    presentation::StoryViewportPreset,
     story::StoryContainer,
 };
-use gpui::{App, Global, Window, px};
+use gpui::{App, Entity, Global, Window, px};
 #[cfg(feature = "capture")]
 use gpui::{Bounds, Pixels, point};
+pub use interaction::{
+    MAX_INTERACTION_STEPS, MAX_INTERACTION_TEXT_BYTES, MAX_INTERACTION_WAITED_FRAMES,
+    StoryActionSnapshot, StoryInteractionCaptureRequest, StoryInteractionDispatch,
+    StoryInteractionObservation, StoryInteractionRequest, StoryInteractionSnapshot,
+    StoryInteractionStep, StoryModifier, StoryModifiers, StoryMouseButton, StoryPoint,
+    StoryPointSpace,
+};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::{
     borrow::Borrow,
-    fmt,
+    collections::BTreeMap,
     path::PathBuf,
     sync::{
         Arc, Mutex,
         atomic::{AtomicBool, AtomicU64, Ordering},
     },
 };
+use thiserror::Error;
 use tokio::sync::{mpsc, oneshot};
 
 pub const DEFAULT_STORY_CAPTURE_WIDTH: u32 = 1280;
@@ -67,7 +100,8 @@ pub fn default_storybook_automation(cx: &App) -> Option<SharedStorybookAutomatio
         .map(DefaultStorybookAutomation::automation)
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[schemars(deny_unknown_fields)]
 pub struct StoryDefaultSize {
     pub width: u32,
     pub height: u32,
@@ -83,7 +117,8 @@ impl Default for StoryDefaultSize {
 }
 
 /// Machine-readable story metadata used by automation and capture tools.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[schemars(deny_unknown_fields)]
 pub struct StorySnapshot {
     pub key: String,
     pub crate_name: String,
@@ -98,22 +133,41 @@ pub struct StorySnapshot {
     pub default_size: StoryDefaultSize,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[schemars(deny_unknown_fields)]
 pub struct StoryCurrentSnapshot {
     pub story: Option<StorySnapshot>,
     pub revision: u64,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
+#[schemars(deny_unknown_fields)]
 pub struct StoryScreenshotRequest {
+    /// PNG destination, or the route-derived default when omitted.
     pub output_path: Option<PathBuf>,
+    /// Requested captured story-region width in physical pixels.
     pub width: Option<u32>,
+    /// Requested captured story-region height in physical pixels.
     pub height: Option<u32>,
+    /// Named viewport used when explicit dimensions are omitted.
+    pub viewport: Option<StoryViewportPreset>,
+    /// Serialized controls to apply to the current story before capture.
+    #[serde(default)]
+    pub controls: BTreeMap<String, ControlValue>,
     #[serde(default)]
     pub quit_after_capture: bool,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Current values and metadata for the controls on the selected story instance.
+#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
+#[schemars(deny_unknown_fields)]
+pub struct StoryControlsSnapshot {
+    pub story: StorySnapshot,
+    pub controls: Vec<ControlSnapshot>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[schemars(deny_unknown_fields)]
 pub struct StoryCaptureSnapshot {
     pub request_id: u64,
     pub path: PathBuf,
@@ -122,26 +176,132 @@ pub struct StoryCaptureSnapshot {
     pub story: StorySnapshot,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+/// Structured live-host, validation, control, interaction, and capture errors.
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
 pub enum StorybookAutomationError {
+    /// No gallery or dock window has attached the automation command receiver.
+    #[error("no live GPUI storybook host is attached")]
     NoLiveHost,
-    HostDisconnected { message: String },
-    StoryNotFound { key: String },
-    CaptureAlreadyPending,
-    CaptureUnavailable { message: String },
-    InvalidCaptureRequest { message: String },
+    /// The live host disappeared while a request was awaiting completion.
+    #[error(
+        "live GPUI storybook host disconnected after {steps_dispatched} dispatched step(s): {message}"
+    )]
+    HostDisconnected {
+        /// Oneshot or host failure detail.
+        message: String,
+        /// Interaction steps completed before disconnection.
+        steps_dispatched: usize,
+    },
+    /// A requested stable story or substory route is unknown.
+    #[error("story route `{key}` was not found")]
+    StoryNotFound {
+        /// Requested route.
+        key: String,
+    },
+    /// Another navigation, control mutation, capture, or batch owns the guard.
+    #[error("another storybook automation mutation is already active")]
+    AutomationBusy,
+    /// The active route could not be rendered or captured.
+    #[error("{message}")]
+    CaptureUnavailable {
+        /// Capture failure detail.
+        message: String,
+    },
+    /// Capture dimensions or viewport input is invalid.
+    #[error("{message}")]
+    InvalidCaptureRequest {
+        /// Validation detail.
+        message: String,
+    },
+    /// Batch-level interaction input is invalid.
+    #[error("{message}")]
+    InvalidInteractionRequest {
+        /// Validation detail.
+        message: String,
+    },
+    /// One indexed interaction step is invalid.
+    #[error("interaction step {step_index} is invalid: {message}")]
+    InvalidInteractionStep {
+        /// Zero-based request step index.
+        step_index: usize,
+        /// Validation detail.
+        message: String,
+    },
+    /// A runtime failure occurred after the batch runner started.
+    #[error(
+        "interaction request {request_id} failed after {steps_dispatched} dispatched step(s): {message}"
+    )]
+    InteractionFailed {
+        /// Controller-assigned interaction request ID.
+        request_id: u64,
+        /// Steps completed before the runtime failure.
+        steps_dispatched: usize,
+        /// Runtime failure detail.
+        message: String,
+    },
+    /// The live host has no selected story instance.
+    #[error("no story is selected in the live host")]
+    NoActiveStory,
+    /// The selected story instance has no typed control target.
+    #[error("story `{key}` does not expose controls")]
+    ControlsUnavailable {
+        /// Active story route.
+        key: String,
+    },
+    /// A typed control target rejected a read or mutation.
+    #[error("{message}")]
+    ControlOperationFailed {
+        /// Control failure detail.
+        message: String,
+    },
 }
 
 pub(crate) enum StorybookAutomationCommand {
     OpenStory {
         key: String,
         response: oneshot::Sender<Result<StoryCurrentSnapshot, StorybookAutomationError>>,
+        _operation: AutomationOperationGuard,
     },
     CaptureCurrentStory {
         request_id: u64,
         request: StoryScreenshotRequest,
         response: oneshot::Sender<Result<StoryCaptureSnapshot, StorybookAutomationError>>,
+        operation: AutomationOperationGuard,
     },
+    ReadControls {
+        response: oneshot::Sender<Result<StoryControlsSnapshot, StorybookAutomationError>>,
+    },
+    SetControl {
+        key: String,
+        value: ControlValue,
+        response: oneshot::Sender<Result<StoryControlsSnapshot, StorybookAutomationError>>,
+        _operation: AutomationOperationGuard,
+    },
+    ResetControl {
+        key: Option<String>,
+        response: oneshot::Sender<Result<StoryControlsSnapshot, StorybookAutomationError>>,
+        _operation: AutomationOperationGuard,
+    },
+    ListActions {
+        response: oneshot::Sender<Result<Vec<StoryActionSnapshot>, StorybookAutomationError>>,
+    },
+    RunSteps {
+        request_id: u64,
+        request: StoryInteractionRequest,
+        response: oneshot::Sender<Result<StoryInteractionSnapshot, StorybookAutomationError>>,
+        progress: Arc<std::sync::atomic::AtomicUsize>,
+        operation: AutomationOperationGuard,
+    },
+}
+
+pub(crate) struct AutomationOperationGuard {
+    pending: Arc<AtomicBool>,
+}
+
+impl Drop for AutomationOperationGuard {
+    fn drop(&mut self) {
+        self.pending.store(false, Ordering::SeqCst);
+    }
 }
 
 #[derive(Debug, Default)]
@@ -156,31 +316,9 @@ pub struct StorybookAutomation {
     command_tx: mpsc::UnboundedSender<StorybookAutomationCommand>,
     command_rx: Mutex<Option<mpsc::UnboundedReceiver<StorybookAutomationCommand>>>,
     live_host_attached: AtomicBool,
-    capture_pending: AtomicBool,
+    operation_pending: Arc<AtomicBool>,
     next_request_id: AtomicU64,
 }
-
-impl fmt::Display for StorybookAutomationError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::NoLiveHost => write!(formatter, "no live GPUI storybook host is attached"),
-            Self::HostDisconnected { message } => {
-                write!(
-                    formatter,
-                    "live GPUI storybook host disconnected: {message}"
-                )
-            },
-            Self::StoryNotFound { key } => write!(formatter, "story route `{key}` was not found"),
-            Self::CaptureAlreadyPending => {
-                write!(formatter, "a story screenshot request is already pending")
-            },
-            Self::CaptureUnavailable { message } => write!(formatter, "{message}"),
-            Self::InvalidCaptureRequest { message } => write!(formatter, "{message}"),
-        }
-    }
-}
-
-impl std::error::Error for StorybookAutomationError {}
 
 impl StorySnapshot {
     pub fn from_container(story: &StoryContainer, cx: &impl Borrow<App>) -> Option<Self> {
@@ -229,7 +367,7 @@ impl StorybookAutomation {
             command_tx,
             command_rx: Mutex::new(Some(command_rx)),
             live_host_attached: AtomicBool::new(false),
-            capture_pending: AtomicBool::new(false),
+            operation_pending: Arc::new(AtomicBool::new(false)),
             next_request_id: AtomicU64::new(1),
         })
     }
@@ -291,15 +429,21 @@ impl StorybookAutomation {
             return Err(StorybookAutomationError::NoLiveHost);
         }
 
+        let operation = self.begin_operation()?;
         let (response, receiver) = oneshot::channel();
         self.command_tx
-            .send(StorybookAutomationCommand::OpenStory { key, response })
+            .send(StorybookAutomationCommand::OpenStory {
+                key,
+                response,
+                _operation: operation,
+            })
             .map_err(|_| StorybookAutomationError::NoLiveHost)?;
 
         receiver
             .await
             .map_err(|error| StorybookAutomationError::HostDisconnected {
                 message: error.to_string(),
+                steps_dispatched: 0,
             })?
     }
 
@@ -311,33 +455,140 @@ impl StorybookAutomation {
             return Err(StorybookAutomationError::NoLiveHost);
         }
 
-        self.capture_pending
-            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
-            .map_err(|_| StorybookAutomationError::CaptureAlreadyPending)?;
+        let operation = self.begin_operation()?;
 
         let request_id = self.next_request_id.fetch_add(1, Ordering::SeqCst);
         let (response, receiver) = oneshot::channel();
-        let send_result = self
-            .command_tx
+        self.command_tx
             .send(StorybookAutomationCommand::CaptureCurrentStory {
                 request_id,
                 request,
                 response,
+                operation,
             })
-            .map_err(|_| StorybookAutomationError::NoLiveHost);
+            .map_err(|_| StorybookAutomationError::NoLiveHost)?;
 
-        if let Err(error) = send_result {
-            self.capture_pending.store(false, Ordering::SeqCst);
-            return Err(error);
-        }
-
-        let result = receiver
+        receiver
             .await
             .map_err(|error| StorybookAutomationError::HostDisconnected {
                 message: error.to_string(),
-            });
-        self.capture_pending.store(false, Ordering::SeqCst);
-        result?
+                steps_dispatched: 0,
+            })?
+    }
+
+    /// Reads controls from the concrete story entity displayed by the live host.
+    pub async fn read_controls(&self) -> Result<StoryControlsSnapshot, StorybookAutomationError> {
+        let (response, receiver) = self.live_command_channel()?;
+        self.command_tx
+            .send(StorybookAutomationCommand::ReadControls { response })
+            .map_err(|_| StorybookAutomationError::NoLiveHost)?;
+        receive_host_response(receiver).await
+    }
+
+    /// Updates one control on the concrete story entity displayed by the live host.
+    pub async fn set_control(
+        &self,
+        key: impl Into<String>,
+        value: ControlValue,
+    ) -> Result<StoryControlsSnapshot, StorybookAutomationError> {
+        let (response, receiver) = self.live_command_channel()?;
+        let operation = self.begin_operation()?;
+        self.command_tx
+            .send(StorybookAutomationCommand::SetControl {
+                key: key.into(),
+                value,
+                response,
+                _operation: operation,
+            })
+            .map_err(|_| StorybookAutomationError::NoLiveHost)?;
+        receive_host_response(receiver).await
+    }
+
+    /// Resets one control, or every control when `key` is `None`.
+    pub async fn reset_control(
+        &self,
+        key: Option<String>,
+    ) -> Result<StoryControlsSnapshot, StorybookAutomationError> {
+        let (response, receiver) = self.live_command_channel()?;
+        let operation = self.begin_operation()?;
+        self.command_tx
+            .send(StorybookAutomationCommand::ResetControl {
+                key,
+                response,
+                _operation: operation,
+            })
+            .map_err(|_| StorybookAutomationError::NoLiveHost)?;
+        receive_host_response(receiver).await
+    }
+
+    /// Lists the non-internal GPUI actions registered in the live application.
+    ///
+    /// Action registrations are runtime state. Clients should rediscover them
+    /// for each application launch before constructing an interaction batch.
+    pub async fn list_actions(&self) -> Result<Vec<StoryActionSnapshot>, StorybookAutomationError> {
+        let (response, receiver) = self.live_command_channel()?;
+        self.command_tx
+            .send(StorybookAutomationCommand::ListActions { response })
+            .map_err(|_| StorybookAutomationError::NoLiveHost)?;
+        receive_host_response(receiver).await
+    }
+
+    /// Runs one validated interaction batch on the live GPUI window thread.
+    ///
+    /// The batch owns the shared operation guard through every frame wait and
+    /// optional capture. Canceling the receiver is observed at executor safety
+    /// boundaries; already dispatched clicks and actions are never retried.
+    pub async fn run_steps(
+        &self,
+        request: StoryInteractionRequest,
+    ) -> Result<StoryInteractionSnapshot, StorybookAutomationError> {
+        interaction::validate_interaction_request(&request)?;
+        let (response, receiver) = self.live_command_channel()?;
+        let operation = self.begin_operation()?;
+        let request_id = self.next_request_id.fetch_add(1, Ordering::SeqCst);
+        let progress = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        self.command_tx
+            .send(StorybookAutomationCommand::RunSteps {
+                request_id,
+                request,
+                response,
+                progress: progress.clone(),
+                operation,
+            })
+            .map_err(|_| StorybookAutomationError::NoLiveHost)?;
+
+        receiver
+            .await
+            .map_err(|error| StorybookAutomationError::HostDisconnected {
+                message: error.to_string(),
+                steps_dispatched: progress.load(Ordering::SeqCst),
+            })?
+    }
+
+    pub(crate) fn begin_operation(
+        &self,
+    ) -> Result<AutomationOperationGuard, StorybookAutomationError> {
+        self.operation_pending
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .map_err(|_| StorybookAutomationError::AutomationBusy)?;
+        Ok(AutomationOperationGuard {
+            pending: self.operation_pending.clone(),
+        })
+    }
+
+    fn live_command_channel<T>(
+        &self,
+    ) -> Result<
+        (
+            oneshot::Sender<Result<T, StorybookAutomationError>>,
+            oneshot::Receiver<Result<T, StorybookAutomationError>>,
+        ),
+        StorybookAutomationError,
+    > {
+        if !self.live_host_attached.load(Ordering::SeqCst) {
+            return Err(StorybookAutomationError::NoLiveHost);
+        }
+        Ok(oneshot::channel())
     }
 
     pub(crate) fn take_command_receiver(
@@ -377,6 +628,17 @@ impl StorybookAutomation {
             revision: state.revision,
         })
     }
+}
+
+async fn receive_host_response<T>(
+    receiver: oneshot::Receiver<Result<T, StorybookAutomationError>>,
+) -> Result<T, StorybookAutomationError> {
+    receiver
+        .await
+        .map_err(|error| StorybookAutomationError::HostDisconnected {
+            message: error.to_string(),
+            steps_dispatched: 0,
+        })?
 }
 
 fn resolve_story_route(stories: &[StorySnapshot], route_id: &str) -> Option<StorySnapshot> {
@@ -423,35 +685,101 @@ pub(crate) fn schedule_story_capture(
     request: StoryScreenshotRequest,
     story: StorySnapshot,
     response: oneshot::Sender<Result<StoryCaptureSnapshot, StorybookAutomationError>>,
+    operation: AutomationOperationGuard,
     quit_after_capture: bool,
     window: &mut Window,
 ) {
-    window.on_next_frame(move |window, _cx| {
-        if !scroll_capture_region_into_view(&story.capture_route_id) {
-            let result = Err(StorybookAutomationError::CaptureUnavailable {
-                message: format!(
-                    "capture route `{}` was not rendered by the current story view",
-                    story.capture_route_id
-                ),
-            });
-            let exit_code = capture_exit_code(&result);
-            let _ = response.send(result);
-            if quit_after_capture {
-                std::process::exit(exit_code);
-            }
+    if response.is_closed() {
+        return;
+    }
+    window.on_next_frame(move |window, cx| {
+        if response.is_closed() {
             return;
         }
-
-        window.refresh();
-        window.on_next_frame(move |window, _cx| {
-            let result = render_story_capture(request_id, request, story, window);
-            let exit_code = capture_exit_code(&result);
-            let _ = response.send(result);
-            if quit_after_capture {
-                std::process::exit(exit_code);
-            }
-        });
+        let resized = match ensure_capture_target_visible(&story.capture_route_id, window) {
+            Ok(resized) => resized,
+            Err(error) => {
+                let result = Err(error);
+                let exit_code = capture_exit_code(&result);
+                let _ = response.send(result);
+                if quit_after_capture {
+                    exit_after_capture(exit_code, cx);
+                }
+                return;
+            },
+        };
+        if resized {
+            window.refresh();
+            window.on_next_frame(move |window, _cx| {
+                prepare_story_capture(
+                    request_id,
+                    request,
+                    story,
+                    response,
+                    operation,
+                    quit_after_capture,
+                    window,
+                )
+            });
+        } else {
+            prepare_story_capture(
+                request_id,
+                request,
+                story,
+                response,
+                operation,
+                quit_after_capture,
+                window,
+            );
+        }
     });
+}
+
+fn prepare_story_capture(
+    request_id: u64,
+    request: StoryScreenshotRequest,
+    story: StorySnapshot,
+    response: oneshot::Sender<Result<StoryCaptureSnapshot, StorybookAutomationError>>,
+    operation: AutomationOperationGuard,
+    quit_after_capture: bool,
+    window: &mut Window,
+) {
+    if response.is_closed() {
+        return;
+    }
+    if !scroll_capture_region_into_view(&story.capture_route_id) {
+        let result = Err(StorybookAutomationError::CaptureUnavailable {
+            message: format!(
+                "capture route `{}` was not rendered by the current story view",
+                story.capture_route_id
+            ),
+        });
+        let exit_code = capture_exit_code(&result);
+        let _ = response.send(result);
+        if quit_after_capture {
+            std::process::exit(exit_code);
+        }
+        return;
+    }
+
+    window.refresh();
+    window.on_next_frame(move |window, cx| {
+        let _operation = operation;
+        let result = render_story_capture(request_id, request, story, window);
+        let exit_code = capture_exit_code(&result);
+        let _ = response.send(result);
+        if quit_after_capture {
+            exit_after_capture(exit_code, cx);
+        }
+    });
+}
+
+fn exit_after_capture(exit_code: i32, cx: &mut App) {
+    if exit_code == 0 {
+        cx.quit();
+    } else {
+        std::process::exit(exit_code);
+    }
 }
 
 pub fn story_snapshots_from_containers(
@@ -501,20 +829,65 @@ pub(crate) fn validate_capture_target_size(
         (Some(_), Some(_)) => Err(StorybookAutomationError::InvalidCaptureRequest {
             message: "capture width and height must be greater than zero".to_string(),
         }),
-        (None, None) => Ok(None),
+        (None, None) => Ok(request.viewport.and_then(StoryViewportPreset::dimensions)),
         _ => Err(StorybookAutomationError::InvalidCaptureRequest {
             message: "capture width and height must be provided together".to_string(),
         }),
     }
 }
 
-pub(crate) fn apply_capture_target_size(window: &mut Window, target_size: Option<(u32, u32)>) {
-    if let Some((width, height)) = target_size {
-        let scale_factor = window.scale_factor().max(f32::EPSILON);
-        window.resize(gpui::size(
+pub(crate) fn set_capture_target_size(
+    story: &Entity<StoryContainer>,
+    window: &Window,
+    target_size: Option<(u32, u32)>,
+    cx: &mut App,
+) {
+    let scale_factor = window.scale_factor().max(f32::EPSILON);
+    let size = target_size.map(|(width, height)| {
+        gpui::size(
             px(width as f32 / scale_factor),
             px(height as f32 / scale_factor),
-        ));
+        )
+    });
+    story.update(cx, |story, cx| {
+        story.set_automation_size(size);
+        cx.notify();
+    });
+}
+
+pub(crate) fn ensure_capture_target_visible(
+    route_id: &str,
+    window: &mut Window,
+) -> Result<bool, StorybookAutomationError> {
+    let story_key = capture_route_story_key(route_id);
+    let region = capture_region_bounds(story_key).ok_or_else(|| {
+        StorybookAutomationError::CaptureUnavailable {
+            message: format!(
+                "capture route `{story_key}` was not rendered before validating its target size"
+            ),
+        }
+    })?;
+    let Some(target_window_size) = expanded_window_size(window.bounds().size, region.bounds) else {
+        return Ok(false);
+    };
+    window.resize(target_window_size);
+    Ok(true)
+}
+
+fn expanded_window_size(
+    window_size: gpui::Size<gpui::Pixels>,
+    story_region: gpui::Bounds<gpui::Pixels>,
+) -> Option<gpui::Size<gpui::Pixels>> {
+    let required_width =
+        (f32::from(story_region.origin.x) + f32::from(story_region.size.width)).max(0.0);
+    let required_height =
+        (f32::from(story_region.origin.y) + f32::from(story_region.size.height)).max(0.0);
+    let width = f32::from(window_size.width).max(required_width);
+    let height = f32::from(window_size.height).max(required_height);
+    if width == f32::from(window_size.width) && height == f32::from(window_size.height) {
+        None
+    } else {
+        Some(gpui::size(px(width), px(height)))
     }
 }
 
@@ -770,6 +1143,24 @@ mod tests {
         assert!(automation.take_command_receiver().is_none());
     }
 
+    #[test]
+    fn operation_guard_rejects_mutations_until_its_owner_drops() {
+        let automation =
+            StorybookAutomation::with_stories(vec![sample_story("crate-ButtonStory", "Button")]);
+        let operation = automation
+            .begin_operation()
+            .expect("first mutation should acquire the operation guard");
+
+        assert!(matches!(
+            automation.begin_operation(),
+            Err(StorybookAutomationError::AutomationBusy)
+        ));
+        assert_eq!(automation.stories().len(), 1, "reads remain available");
+
+        drop(operation);
+        assert!(automation.begin_operation().is_ok());
+    }
+
     #[gpui::test]
     fn default_automation_round_trips_through_app_global(cx: &mut App) {
         assert!(default_storybook_automation(cx).is_none());
@@ -810,6 +1201,13 @@ mod tests {
             }),
             Ok(Some((800, 600)))
         );
+        assert_eq!(
+            validate_capture_target_size(&StoryScreenshotRequest {
+                viewport: Some(StoryViewportPreset::Mobile),
+                ..StoryScreenshotRequest::default()
+            }),
+            Ok(Some((390, 844)))
+        );
         assert!(matches!(
             validate_capture_target_size(&StoryScreenshotRequest {
                 width: Some(0),
@@ -830,6 +1228,31 @@ mod tests {
     }
 
     #[test]
+    fn capture_target_size_only_expands_a_clipped_story_region() {
+        let window = gpui::size(px(800.), px(600.));
+        assert_eq!(
+            expanded_window_size(
+                window,
+                gpui::Bounds {
+                    origin: gpui::point(px(200.), px(100.)),
+                    size: gpui::size(px(400.), px(300.)),
+                },
+            ),
+            None
+        );
+        assert_eq!(
+            expanded_window_size(
+                window,
+                gpui::Bounds {
+                    origin: gpui::point(px(300.), px(150.)),
+                    size: gpui::size(px(600.), px(500.)),
+                },
+            ),
+            Some(gpui::size(px(900.), px(650.)))
+        );
+    }
+
+    #[test]
     fn automation_errors_have_actionable_messages_and_exit_codes() {
         let errors = [
             (
@@ -839,8 +1262,9 @@ mod tests {
             (
                 StorybookAutomationError::HostDisconnected {
                     message: "closed".to_string(),
+                    steps_dispatched: 2,
                 },
-                "live GPUI storybook host disconnected: closed",
+                "live GPUI storybook host disconnected after 2 dispatched step(s): closed",
             ),
             (
                 StorybookAutomationError::StoryNotFound {
@@ -849,8 +1273,8 @@ mod tests {
                 "story route `missing` was not found",
             ),
             (
-                StorybookAutomationError::CaptureAlreadyPending,
-                "a story screenshot request is already pending",
+                StorybookAutomationError::AutomationBusy,
+                "another storybook automation mutation is already active",
             ),
             (
                 StorybookAutomationError::CaptureUnavailable {

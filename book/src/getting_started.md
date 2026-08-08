@@ -2,7 +2,7 @@
 
 This guide adds a gallery-style Storybook binary to an existing GPUI workspace.
 When setup is complete, running the package opens a window containing every
-linked and enabled story.
+linked and enabled story plus the right-side workbench.
 
 ## Prerequisites
 
@@ -42,6 +42,18 @@ es-fluent-build.workspace = true
 Use explicit versions or Git revisions instead when the application does not
 inherit workspace dependencies. Keep all GPUI-related crates on compatible
 revisions.
+
+Forward the opt-in Inspector feature from the Storybook binary when that
+development surface is useful:
+
+```toml
+[features]
+inspector = ["gpui-storybook/inspector"]
+```
+
+Launch that package with `--features inspector` to add the GPUI Inspector button
+and Storybook story-root metadata to GPUI Component's Inspector. The Inspect
+workbench tab remains available without this feature.
 
 ## Wire the locale adapter
 
@@ -147,9 +159,13 @@ Run the package that owns the entry point:
 cargo run -p my-app-storybook
 ```
 
+Linux MCP and startup-capture sessions use the same application under Sway's
+wlroots headless backend. The [automation guide](automation.md) covers the
+required packages and launch command.
+
 The window should list every linked story allowed by the active
 `storybook.toml`. Continue with [Write stories](stories.md) if the gallery is
-empty.
+empty, then [Use the workbench](workbench.md) to add live controls.
 
 ## Troubleshooting startup
 

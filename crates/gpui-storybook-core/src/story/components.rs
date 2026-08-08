@@ -1,21 +1,22 @@
 use gpui::{
-    Action, AnyElement, AnyView, App, AppContext as _, ClickEvent, Div, Entity, EventEmitter,
-    Focusable, Hsla, InteractiveElement as _, IntoElement, ParentElement, Render, RenderOnce,
-    ScrollHandle, SharedString, StatefulInteractiveElement as _, StyleRefinement, Styled, Window,
-    div, prelude::FluentBuilder as _, rems,
+    Action, AnyElement, AnyView, App, AppContext as _, Axis, Bounds, ClickEvent, Div,
+    DragMoveEvent, Empty, Entity, EntityId, EventEmitter, Focusable, Hsla, InteractiveElement as _,
+    IntoElement, ParentElement, Pixels, Point, Render, RenderOnce, ScrollHandle, SharedString,
+    Size, StatefulInteractiveElement as _, StyleRefinement, Styled, Window, div, hsla,
+    prelude::FluentBuilder as _, px, rems, size,
 };
 
 use serde::{Deserialize, Serialize};
-use std::{borrow::Borrow, sync::Arc};
+use std::{borrow::Borrow, rc::Rc, sync::Arc};
 
 use gpui_component::{
-    ActiveTheme as _, IconName, Sizable as _,
+    ActiveTheme as _, ElementExt as _, IconName, Sizable as _,
     button::{Button, ButtonVariants as _},
     dock::{Panel, PanelControl, PanelEvent, PanelInfo, PanelState, PanelView, TitleStyle},
     group_box::{GroupBox, GroupBoxVariants as _},
     h_flex,
     menu::PopupMenu,
-    scroll::ScrollableElement as _,
+    scroll::{ScrollableElement as _, ScrollableMask, ScrollbarAxis},
     v_flex,
 };
 
@@ -25,10 +26,41 @@ use crate::{
         capture_scroll_scope, capture_story_view, capture_story_view_with_scroll, capture_substory,
         capture_substory_with_key, current_capture_scroll_handle,
     },
+    controls::{ControlTarget, EntityControlTarget, StoryControls},
+    presentation::{StoryCanvasBackground, StoryPresentation},
     registry::{RegisteredStoryMetadata, StoryKey, StoryName},
 };
 
 pub const STORY_LIST_KLASS_PREFIX: &str = "__gpui_storybook_list__:";
+const STORY_CANVAS_MIN_SIZE: Size<Pixels> = size(px(240.), px(160.));
+const STORY_CANVAS_RESIZE_GUTTER: Pixels = px(32.);
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum StoryCanvasResizeAxis {
+    Horizontal,
+    Vertical,
+    Both,
+}
+
+#[derive(Clone, Copy)]
+struct DragStoryCanvasResize {
+    entity_id: EntityId,
+    axis: StoryCanvasResizeAxis,
+}
+
+impl Render for DragStoryCanvasResize {
+    fn render(&mut self, _: &mut Window, _: &mut gpui::Context<Self>) -> impl IntoElement {
+        Empty
+    }
+}
+
+#[derive(Clone, Copy)]
+struct StoryCanvasResizeDrag {
+    start_position: Point<Pixels>,
+    start_size: Size<Pixels>,
+    horizontal_scale: f32,
+    vertical_scale: f32,
+}
 
 #[derive(Action, Clone, Debug, Default, Eq, PartialEq)]
 #[action(namespace = story)]
@@ -249,10 +281,19 @@ pub struct StoryContainer {
     pub description: SharedString,
     pub(crate) list_members: Vec<Entity<StoryContainer>>,
     scroll_handle: ScrollHandle,
+    story_scroll_handle: ScrollHandle,
     width: Option<gpui::Pixels>,
     height: Option<gpui::Pixels>,
     tab_panel: Option<gpui::WeakEntity<gpui_component::dock::TabPanel>>,
     story: Option<AnyView>,
+    control_target: Option<Rc<dyn ControlTarget>>,
+    presentation: StoryPresentation,
+    responsive_size: Option<Size<Pixels>>,
+    canvas_bounds: Option<Bounds<Pixels>>,
+    canvas_stage_bounds: Option<Bounds<Pixels>>,
+    canvas_resize_drag: Option<StoryCanvasResizeDrag>,
+    automation_size: Option<gpui::Size<gpui::Pixels>>,
+    workbench_state: Option<gpui::WeakEntity<crate::workbench::WorkbenchState>>,
     pub story_klass: Option<SharedString>,
     registration_metadata: Option<RegisteredStoryMetadata>,
     pub story_key: Option<SharedString>,
@@ -402,7 +443,7 @@ pub enum ContainerEvent {
     Close,
 }
 
-pub trait Story: Focusable + Render + Sized {
+pub trait Story: Focusable + Render + StoryControls + Sized {
     fn klass() -> &'static str {
         let type_name = std::any::type_name::<Self>();
         type_name.rsplit("::").next().unwrap_or(type_name)
@@ -422,7 +463,7 @@ pub trait Story: Focusable + Render + Sized {
     fn title_bg() -> Option<Hsla> {
         None
     }
-    fn new_view(window: &mut Window, cx: &mut App) -> Entity<impl Render + Focusable>;
+    fn new_view(window: &mut Window, cx: &mut App) -> Entity<Self>;
 
     fn on_active(&mut self, active: bool, window: &mut Window, cx: &mut App) {
         let _ = active;
@@ -456,10 +497,19 @@ impl StoryContainer {
             description: "".into(),
             list_members: Vec::new(),
             scroll_handle: ScrollHandle::new(),
+            story_scroll_handle: ScrollHandle::new(),
             width: None,
             height: None,
             tab_panel: None,
             story: None,
+            control_target: None,
+            presentation: StoryPresentation::default(),
+            responsive_size: None,
+            canvas_bounds: None,
+            canvas_stage_bounds: None,
+            canvas_resize_drag: None,
+            automation_size: None,
+            workbench_state: None,
             story_klass: None,
             registration_metadata: None,
             story_key: None,
@@ -501,6 +551,7 @@ impl StoryContainer {
         let name = S::title(cx);
         let description = S::description(cx);
         let story = S::new_view(window, cx);
+        let control_target = EntityControlTarget::optional(story.clone(), cx);
         let story_klass = S::klass();
         let focus_handle = story.focus_handle(cx);
 
@@ -508,6 +559,7 @@ impl StoryContainer {
             let mut story = Self::new(window, cx)
                 .story(story.into(), story_klass)
                 .on_active(S::on_active_any);
+            story.control_target = control_target;
             story.focus_handle = focus_handle;
             story.closable = S::closable();
             story.zoomable = S::zoomable();
@@ -564,6 +616,175 @@ impl StoryContainer {
     pub fn on_active(mut self, on_active: fn(AnyView, bool, &mut Window, &mut App)) -> Self {
         self.on_active = Some(on_active);
         self
+    }
+
+    /// Returns the controls for this concrete story instance.
+    pub fn control_target(&self) -> Option<Rc<dyn ControlTarget>> {
+        self.control_target.clone()
+    }
+
+    pub(crate) fn set_presentation(&mut self, presentation: StoryPresentation) {
+        self.presentation = presentation;
+    }
+
+    pub(crate) fn set_responsive_size(&mut self, responsive_size: Option<Size<Pixels>>) {
+        self.responsive_size = responsive_size;
+    }
+
+    pub(crate) fn set_automation_size(&mut self, size: Option<gpui::Size<gpui::Pixels>>) {
+        self.automation_size = size;
+    }
+
+    pub fn presentation(&self) -> StoryPresentation {
+        self.presentation
+    }
+
+    pub(crate) fn set_workbench_state(
+        &mut self,
+        state: gpui::WeakEntity<crate::workbench::WorkbenchState>,
+    ) {
+        self.workbench_state = Some(state);
+    }
+
+    fn viewport_size(&self) -> Option<Size<Pixels>> {
+        self.presentation
+            .viewport
+            .dimensions()
+            .map(|(width, height)| size(px(width as f32), px(height as f32)))
+            .or(self.responsive_size)
+    }
+
+    fn begin_canvas_resize(&mut self, start_position: Point<Pixels>) {
+        let (Some(canvas_bounds), Some(stage_bounds)) =
+            (self.canvas_bounds, self.canvas_stage_bounds)
+        else {
+            return;
+        };
+        let gutter = STORY_CANVAS_RESIZE_GUTTER * 2.;
+        let available_stage_size = size(
+            (stage_bounds.size.width - gutter).max(px(0.)),
+            (stage_bounds.size.height - gutter).max(px(0.)),
+        );
+        self.canvas_resize_drag = Some(StoryCanvasResizeDrag {
+            start_position,
+            start_size: canvas_bounds.size,
+            horizontal_scale: if canvas_bounds.size.width < available_stage_size.width {
+                2.
+            } else {
+                1.
+            },
+            vertical_scale: if canvas_bounds.size.height < available_stage_size.height {
+                2.
+            } else {
+                1.
+            },
+        });
+    }
+
+    fn resize_canvas(
+        &mut self,
+        axis: StoryCanvasResizeAxis,
+        position: Point<Pixels>,
+        cx: &mut gpui::Context<Self>,
+    ) {
+        if self.presentation.viewport != crate::presentation::StoryViewportPreset::Responsive {
+            return;
+        }
+        let Some(drag) = self.canvas_resize_drag else {
+            return;
+        };
+        let delta = position - drag.start_position;
+        let width = match axis {
+            StoryCanvasResizeAxis::Horizontal | StoryCanvasResizeAxis::Both => {
+                (drag.start_size.width + delta.x * drag.horizontal_scale)
+                    .max(STORY_CANVAS_MIN_SIZE.width)
+            },
+            StoryCanvasResizeAxis::Vertical => drag.start_size.width,
+        };
+        let height = match axis {
+            StoryCanvasResizeAxis::Vertical | StoryCanvasResizeAxis::Both => {
+                (drag.start_size.height + delta.y * drag.vertical_scale)
+                    .max(STORY_CANVAS_MIN_SIZE.height)
+            },
+            StoryCanvasResizeAxis::Horizontal => drag.start_size.height,
+        };
+        let responsive_size = size(width, height);
+        self.responsive_size = Some(responsive_size);
+        if let Some(workbench_state) = self
+            .workbench_state
+            .as_ref()
+            .and_then(gpui::WeakEntity::upgrade)
+        {
+            workbench_state.update(cx, |state, cx| {
+                state.set_responsive_size(responsive_size, cx);
+            });
+        }
+        cx.notify();
+    }
+
+    fn render_canvas_resize_handle(
+        &self,
+        axis: StoryCanvasResizeAxis,
+        cx: &mut gpui::Context<Self>,
+    ) -> impl IntoElement {
+        let entity_id = cx.entity_id();
+        let story_for_mouse_down = cx.entity();
+        let (id, selector) = match axis {
+            StoryCanvasResizeAxis::Horizontal => {
+                ("story-canvas-resize-width", "story-canvas-resize-width")
+            },
+            StoryCanvasResizeAxis::Vertical => {
+                ("story-canvas-resize-height", "story-canvas-resize-height")
+            },
+            StoryCanvasResizeAxis::Both => {
+                ("story-canvas-resize-corner", "story-canvas-resize-corner")
+            },
+        };
+
+        div()
+            .id(id)
+            .absolute()
+            .debug_selector(move || selector.to_owned())
+            .map(|this| match axis {
+                StoryCanvasResizeAxis::Horizontal => this
+                    .top_0()
+                    .right(px(-4.))
+                    .h_full()
+                    .w(px(9.))
+                    .cursor_ew_resize(),
+                StoryCanvasResizeAxis::Vertical => this
+                    .left_0()
+                    .bottom(px(-4.))
+                    .w_full()
+                    .h(px(9.))
+                    .cursor_ns_resize(),
+                StoryCanvasResizeAxis::Both => this
+                    .right(px(-5.))
+                    .bottom(px(-5.))
+                    .size(px(12.))
+                    .cursor_nwse_resize(),
+            })
+            .on_mouse_down(gpui::MouseButton::Left, move |event, _, cx| {
+                cx.stop_propagation();
+                story_for_mouse_down.update(cx, |story, _| {
+                    story.begin_canvas_resize(event.position);
+                });
+            })
+            .on_drag(
+                DragStoryCanvasResize { entity_id, axis },
+                move |drag, _, _, cx| {
+                    cx.stop_propagation();
+                    cx.new(|_| *drag)
+                },
+            )
+            .on_drag_move(cx.listener(
+                move |this, event: &DragMoveEvent<DragStoryCanvasResize>, _, cx| {
+                    let drag = event.drag(cx);
+                    if drag.entity_id == entity_id && drag.axis == axis {
+                        this.resize_canvas(axis, event.event.position, cx);
+                    }
+                },
+            ))
     }
 
     /// Store typed registry metadata on this runtime container.
@@ -742,13 +963,27 @@ impl Panel for StoryContainer {
         tracing::debug!(panel = %self.name, zoomed, "Storybook panel zoom changed");
     }
 
-    fn set_active(&mut self, active: bool, _window: &mut Window, cx: &mut gpui::Context<Self>) {
+    fn set_active(&mut self, active: bool, window: &mut Window, cx: &mut gpui::Context<Self>) {
         tracing::debug!(panel = %self.name, active, "Storybook panel activation changed");
         self.is_active = active;
+        if active
+            && let Some(state) = self
+                .workbench_state
+                .as_ref()
+                .and_then(gpui::WeakEntity::upgrade)
+        {
+            let story = cx.entity();
+            // `PanelView::set_active` updates this entity while GPUI's tab panel is
+            // synchronizing its selection. Defer the workbench update so it can
+            // inspect the story after the current entity lease has been released.
+            window.defer(cx, move |_, cx| {
+                state.update(cx, |state, cx| state.set_active_story(Some(story), cx));
+            });
+        }
         if let Some(on_active) = self.on_active
             && let Some(story) = self.story.clone()
         {
-            on_active(story, active, _window, cx);
+            on_active(story, active, window, cx);
         }
     }
 
@@ -819,23 +1054,142 @@ impl Focusable for StoryContainer {
     }
 }
 impl Render for StoryContainer {
-    fn render(&mut self, _: &mut Window, _cx: &mut gpui::Context<Self>) -> impl IntoElement {
-        let scroll_handle = self.scroll_handle.clone();
+    fn render(&mut self, _: &mut Window, cx: &mut gpui::Context<Self>) -> impl IntoElement {
+        let canvas_scroll_handle = self.scroll_handle.clone();
+        let story_scroll_handle = self.story_scroll_handle.clone();
         let story_key = self.story_key_label().map(str::to_owned);
-        let content = div()
-            .id("story-container")
-            .size_full()
-            .track_scroll(&scroll_handle)
-            .overflow_y_scrollbar()
-            .track_focus(&self.focus_handle)
+        let presentation = self.presentation;
+        let is_responsive =
+            presentation.viewport == crate::presentation::StoryViewportPreset::Responsive;
+        let viewport_size = self.viewport_size();
+        let automation_size = self.automation_size;
+        let background = match presentation.background {
+            StoryCanvasBackground::Theme => cx.theme().background,
+            StoryCanvasBackground::Light => hsla(0.0, 0.0, 0.98, 1.0),
+            StoryCanvasBackground::Dark => hsla(0.0, 0.0, 0.08, 1.0),
+            StoryCanvasBackground::Transparent => hsla(0.0, 0.0, 0.0, 0.0),
+        };
+        let border_color = cx.theme().border;
+        let frame = || {
+            div()
+                .absolute()
+                .top_0()
+                .left_0()
+                .size_full()
+                .border_1()
+                .border_color(border_color)
+                .debug_selector(|| "story-canvas-border".to_owned())
+        };
+        let resize_handles = if is_responsive {
+            vec![
+                self.render_canvas_resize_handle(StoryCanvasResizeAxis::Horizontal, cx)
+                    .into_any_element(),
+                self.render_canvas_resize_handle(StoryCanvasResizeAxis::Vertical, cx)
+                    .into_any_element(),
+                self.render_canvas_resize_handle(StoryCanvasResizeAxis::Both, cx)
+                    .into_any_element(),
+            ]
+        } else {
+            Vec::new()
+        };
+        let story_for_canvas_bounds = cx.entity();
+        let canvas = div()
+            .relative()
+            .flex_none()
+            .bg(background)
+            .debug_selector(|| "story-canvas".to_owned())
+            .map(|this| match viewport_size {
+                Some(size) => this.w(size.width).h(size.height),
+                None => this.size_full(),
+            })
             .when_some(self.story.clone(), |this, story| {
-                this.child(div().size_full().p_4().child(story))
+                this.child(
+                    div()
+                        .relative()
+                        .size_full()
+                        .child(
+                            div()
+                                .id("story-content-scroll-region")
+                                .debug_selector(|| "story-content-scroll-region".to_owned())
+                                .size_full()
+                                .overflow_hidden()
+                                .track_scroll(&story_scroll_handle)
+                                .child(
+                                    div()
+                                        .flex_none()
+                                        .w_auto()
+                                        .h_auto()
+                                        .min_w_full()
+                                        .min_h_full()
+                                        .p_4()
+                                        .child(story),
+                                ),
+                        )
+                        .child(
+                            ScrollableMask::new(Axis::Vertical, &story_scroll_handle)
+                                .id("story-content-scroll-region"),
+                        )
+                        .child(
+                            ScrollableMask::new(Axis::Horizontal, &story_scroll_handle)
+                                .id("story-content-scroll-region"),
+                        )
+                        .scrollbar(&story_scroll_handle, ScrollbarAxis::Both),
+                )
+            })
+            .child(frame())
+            .children(resize_handles)
+            .on_prepaint(move |bounds, _, cx| {
+                story_for_canvas_bounds.update(cx, |story, _| {
+                    story.canvas_bounds = Some(bounds);
+                });
             });
+        let story_for_stage_bounds = cx.entity();
+        let canvas_stage = div()
+            .relative()
+            .flex()
+            .flex_none()
+            .items_center()
+            .justify_center()
+            .debug_selector(|| "story-canvas-stage".to_owned())
+            .when(is_responsive, |this| this.p(STORY_CANVAS_RESIZE_GUTTER))
+            .map(|this| match viewport_size {
+                Some(size) if is_responsive => this
+                    .min_w_full()
+                    .min_h_full()
+                    .w(size.width + STORY_CANVAS_RESIZE_GUTTER * 2.)
+                    .h(size.height + STORY_CANVAS_RESIZE_GUTTER * 2.),
+                Some(size) => this.min_w_full().min_h_full().w(size.width).h(size.height),
+                None => this.size_full(),
+            })
+            .child(canvas)
+            .on_prepaint(move |bounds, _, cx| {
+                story_for_stage_bounds.update(cx, |story, _| {
+                    story.canvas_stage_bounds = Some(bounds);
+                });
+            });
+        let content = v_flex()
+            .id("story-container")
+            .debug_selector(|| "story-container-scroll-region".to_owned())
+            .when(automation_size.is_none(), |this| this.size_full())
+            .when_some(automation_size, |this, size| {
+                this.flex_none().w(size.width).h(size.height)
+            })
+            .track_scroll(&canvas_scroll_handle)
+            .overflow_scroll()
+            .restrict_scroll_to_axis()
+            .track_focus(&self.focus_handle)
+            .child(canvas_stage)
+            .scrollbar(&canvas_scroll_handle, ScrollbarAxis::Both);
+        #[cfg(feature = "inspector")]
+        let content = crate::story_inspector::inspectable_story(
+            crate::story_inspector::StoryInspectorState::from_container(self, cx),
+            content,
+        );
 
         if let Some(story_key) = story_key {
-            capture_story_view(story_key, scroll_handle, content).into_any_element()
+            capture_story_view(story_key, story_scroll_handle, content).into_any_element()
         } else {
-            capture_scroll_scope(scroll_handle, content).into_any_element()
+            capture_scroll_scope(story_scroll_handle, content).into_any_element()
         }
     }
 }
@@ -844,7 +1198,11 @@ impl Render for StoryContainer {
 mod tests {
     use super::*;
     use crate::registry::{StoryKey, StoryName, StorySectionName};
-    use gpui::{div, px};
+    use crate::workbench::WorkbenchState;
+    use gpui::{
+        Modifiers, MouseButton, ScrollDelta, ScrollWheelEvent, TestAppContext, VisualTestContext,
+        div, point, px,
+    };
 
     enum DemoSubstory {
         WithIcon,
@@ -861,6 +1219,10 @@ mod tests {
     }
 
     struct DefaultStoryContract;
+
+    struct TallStoryContent;
+
+    impl StoryControls for DefaultStoryContract {}
 
     impl Focusable for DefaultStoryContract {
         fn focus_handle(&self, _: &App) -> gpui::FocusHandle {
@@ -879,8 +1241,18 @@ mod tests {
             "Default Story".to_string()
         }
 
-        fn new_view(_: &mut Window, cx: &mut App) -> Entity<impl Render + Focusable> {
+        fn new_view(_: &mut Window, cx: &mut App) -> Entity<Self> {
             cx.new(|_| DefaultStoryContract)
+        }
+    }
+
+    impl Render for TallStoryContent {
+        fn render(&mut self, _: &mut Window, _: &mut gpui::Context<Self>) -> impl IntoElement {
+            v_flex().w_full().child(div().h(px(1200.))).child(
+                div()
+                    .debug_selector(|| "tall-story-bottom".to_owned())
+                    .h(px(32.)),
+            )
         }
     }
 
@@ -989,6 +1361,7 @@ mod tests {
                     StoryName::new("ButtonStory"),
                     Some(StorySectionName::new("Components")),
                     "crate",
+                    "/tmp/crate",
                     "src/button.rs",
                     42,
                 );
@@ -1011,6 +1384,326 @@ mod tests {
                 assert_eq!(container.display_description(cx), "Localized description");
             })
             .expect("container should update");
+    }
+
+    #[test]
+    fn tall_stories_scroll_inside_canvas_without_panning_viewport_frame() {
+        let mut app = TestAppContext::single();
+        app.update(gpui_component::init);
+        let (container, cx) = app.add_window_view(|window, cx| -> StoryContainer {
+            let story = cx.new(|_| TallStoryContent);
+            let mut container =
+                StoryContainer::new(window, cx).story(story.into(), "TallStoryContent");
+            container.set_presentation(StoryPresentation {
+                viewport: crate::presentation::StoryViewportPreset::Responsive,
+                background: StoryCanvasBackground::Theme,
+            });
+            container
+        });
+
+        let draw = |cx: &mut VisualTestContext| {
+            cx.run_until_parked();
+            cx.update(|window, cx| {
+                _ = window.draw(cx);
+            });
+        };
+
+        draw(cx);
+        let story_viewport = cx
+            .debug_bounds("story-content-scroll-region")
+            .expect("story content viewport should render");
+        let bottom_before = cx
+            .debug_bounds("tall-story-bottom")
+            .expect("tall story content should render beyond the viewport");
+        cx.read(|cx| {
+            let container = container.read(cx);
+            assert!(container.story_scroll_handle.max_offset().y > px(0.));
+            assert_eq!(container.scroll_handle.max_offset(), point(px(0.), px(0.)));
+        });
+
+        cx.simulate_event(ScrollWheelEvent {
+            position: story_viewport.center(),
+            delta: ScrollDelta::Pixels(point(px(0.), px(-120.))),
+            ..Default::default()
+        });
+        draw(cx);
+
+        let bottom_after = cx
+            .debug_bounds("tall-story-bottom")
+            .expect("tall story content should remain rendered after scrolling");
+        assert_eq!(bottom_after.origin.y, bottom_before.origin.y - px(120.));
+        cx.read(|cx| {
+            let container = container.read(cx);
+            assert_eq!(
+                container.story_scroll_handle.offset(),
+                point(px(0.), px(-120.))
+            );
+            assert_eq!(container.scroll_handle.offset(), point(px(0.), px(0.)));
+        });
+    }
+
+    #[test]
+    fn viewport_presets_size_and_center_the_canvas() {
+        let mut app = TestAppContext::single();
+        app.update(gpui_component::init);
+        let (container, cx) = app.add_window_view(|window, cx| -> StoryContainer {
+            let mut container = StoryContainer::new(window, cx);
+            container.set_presentation(StoryPresentation {
+                viewport: crate::presentation::StoryViewportPreset::Responsive,
+                background: StoryCanvasBackground::Theme,
+            });
+            container
+        });
+
+        let draw = |cx: &mut VisualTestContext| {
+            cx.run_until_parked();
+            cx.update(|window, cx| {
+                _ = window.draw(cx);
+            });
+        };
+
+        draw(cx);
+        let initial_canvas_bounds = cx
+            .debug_bounds("story-canvas")
+            .expect("responsive canvas should render");
+        let initial_stage_bounds = cx
+            .debug_bounds("story-canvas-stage")
+            .expect("responsive canvas stage should render");
+        let scroll_region_bounds = cx
+            .debug_bounds("story-container-scroll-region")
+            .expect("story scroll region should render");
+        assert_eq!(initial_stage_bounds, scroll_region_bounds);
+        assert_eq!(
+            initial_canvas_bounds.size,
+            gpui::size(
+                initial_stage_bounds.size.width - STORY_CANVAS_RESIZE_GUTTER * 2.,
+                initial_stage_bounds.size.height - STORY_CANVAS_RESIZE_GUTTER * 2.
+            )
+        );
+        assert_eq!(
+            initial_canvas_bounds.center(),
+            initial_stage_bounds.center()
+        );
+        assert_eq!(
+            cx.debug_bounds("story-canvas-border"),
+            cx.debug_bounds("story-canvas")
+        );
+        assert!(cx.debug_bounds("story-canvas-resize-width").is_some());
+        assert!(cx.debug_bounds("story-canvas-resize-height").is_some());
+        assert!(cx.debug_bounds("story-canvas-resize-corner").is_some());
+
+        for (viewport, expected_size) in [
+            (
+                crate::presentation::StoryViewportPreset::Mobile,
+                gpui::size(px(390.), px(844.)),
+            ),
+            (
+                crate::presentation::StoryViewportPreset::Tablet,
+                gpui::size(px(768.), px(1024.)),
+            ),
+            (
+                crate::presentation::StoryViewportPreset::Desktop,
+                gpui::size(px(1440.), px(900.)),
+            ),
+        ] {
+            container.update(cx, |container, cx| {
+                container.set_presentation(StoryPresentation {
+                    viewport,
+                    background: StoryCanvasBackground::Theme,
+                });
+                cx.notify();
+            });
+            draw(cx);
+
+            let canvas_bounds = cx
+                .debug_bounds("story-canvas")
+                .expect("fixed canvas should render");
+            let stage_bounds = cx
+                .debug_bounds("story-canvas-stage")
+                .expect("centered canvas stage should render");
+            assert_eq!(canvas_bounds.size, expected_size);
+            assert_eq!(canvas_bounds.center(), stage_bounds.center());
+            assert_eq!(
+                cx.debug_bounds("story-canvas-border")
+                    .expect("canvas border should render"),
+                canvas_bounds
+            );
+            assert_eq!(cx.debug_bounds("story-canvas-resize-corner"), None);
+        }
+
+        let workbench = cx.new(|_| WorkbenchState::new(Some(container.clone())));
+        workbench.update(cx, |state, cx| {
+            state.set_viewport(crate::presentation::StoryViewportPreset::Mobile, cx);
+            state.set_viewport(crate::presentation::StoryViewportPreset::Responsive, cx);
+        });
+        draw(cx);
+
+        let canvas_bounds = cx
+            .debug_bounds("story-canvas")
+            .expect("inherited responsive canvas should render");
+        let stage_bounds = cx
+            .debug_bounds("story-canvas-stage")
+            .expect("responsive canvas stage should render");
+        assert_eq!(canvas_bounds.size, gpui::size(px(390.), px(844.)));
+        assert_eq!(canvas_bounds.center(), stage_bounds.center());
+        assert!(cx.debug_bounds("story-canvas-resize-corner").is_some());
+
+        let resize_start = cx
+            .debug_bounds("story-canvas-resize-corner")
+            .expect("responsive corner resize handle should render")
+            .center();
+        cx.simulate_mouse_move(resize_start, None, Modifiers::none());
+        cx.simulate_mouse_down(resize_start, MouseButton::Left, Modifiers::none());
+        cx.simulate_mouse_move(
+            point(resize_start.x + px(5.), resize_start.y + px(5.)),
+            MouseButton::Left,
+            Modifiers::none(),
+        );
+        cx.simulate_mouse_move(
+            point(resize_start.x + px(30.), resize_start.y + px(25.)),
+            MouseButton::Left,
+            Modifiers::none(),
+        );
+        draw(cx);
+        let first_resized_canvas = cx
+            .debug_bounds("story-canvas")
+            .expect("responsive canvas should resize during the drag");
+        assert_eq!(
+            first_resized_canvas.size,
+            gpui::size(
+                canvas_bounds.size.width + px(60.),
+                canvas_bounds.size.height + px(50.)
+            )
+        );
+
+        cx.simulate_mouse_move(
+            point(resize_start.x + px(50.), resize_start.y + px(40.)),
+            MouseButton::Left,
+            Modifiers::none(),
+        );
+        draw(cx);
+        let second_resized_canvas = cx
+            .debug_bounds("story-canvas")
+            .expect("responsive canvas should keep resizing during the drag");
+        assert_eq!(
+            second_resized_canvas.size,
+            gpui::size(
+                canvas_bounds.size.width + px(100.),
+                canvas_bounds.size.height + px(80.)
+            )
+        );
+
+        cx.simulate_mouse_up(
+            point(resize_start.x + px(50.), resize_start.y + px(40.)),
+            MouseButton::Left,
+            Modifiers::none(),
+        );
+        draw(cx);
+        let resized_canvas = cx
+            .debug_bounds("story-canvas")
+            .expect("resized responsive canvas should render");
+        assert_eq!(resized_canvas.size, second_resized_canvas.size);
+        assert_eq!(
+            cx.read(|cx| workbench.read(cx).responsive_size()),
+            Some(resized_canvas.size)
+        );
+
+        container.update(cx, |container, cx| {
+            container.set_responsive_size(Some(gpui::size(px(2000.), px(1500.))));
+            cx.notify();
+        });
+        draw(cx);
+        let oversized_canvas = cx
+            .debug_bounds("story-canvas")
+            .expect("oversized responsive canvas should render");
+        let oversized_stage = cx
+            .debug_bounds("story-canvas-stage")
+            .expect("oversized responsive canvas stage should render");
+        assert_eq!(
+            oversized_canvas.origin.x - oversized_stage.origin.x,
+            STORY_CANVAS_RESIZE_GUTTER
+        );
+        assert_eq!(
+            oversized_canvas.origin.y - oversized_stage.origin.y,
+            STORY_CANVAS_RESIZE_GUTTER
+        );
+        assert_eq!(
+            oversized_stage.right() - oversized_canvas.right(),
+            STORY_CANVAS_RESIZE_GUTTER
+        );
+        assert_eq!(
+            oversized_stage.bottom() - oversized_canvas.bottom(),
+            STORY_CANVAS_RESIZE_GUTTER
+        );
+        for selector in [
+            "story-canvas-resize-width",
+            "story-canvas-resize-height",
+            "story-canvas-resize-corner",
+        ] {
+            let handle = cx
+                .debug_bounds(selector)
+                .unwrap_or_else(|| panic!("{selector} should render"));
+            assert!(
+                handle.left() >= oversized_stage.left()
+                    && handle.top() >= oversized_stage.top()
+                    && handle.right() <= oversized_stage.right()
+                    && handle.bottom() <= oversized_stage.bottom(),
+                "resize handle {handle:?} must remain inside stage {oversized_stage:?}"
+            );
+        }
+
+        let scroll_region =
+            cx.update(|window, _| gpui::Bounds::new(point(px(0.), px(0.)), window.viewport_size()));
+        cx.simulate_event(ScrollWheelEvent {
+            position: scroll_region.center(),
+            delta: ScrollDelta::Pixels(point(px(-5000.), px(0.))),
+            ..Default::default()
+        });
+        cx.simulate_event(ScrollWheelEvent {
+            position: scroll_region.center(),
+            delta: ScrollDelta::Pixels(point(px(0.), px(-5000.))),
+            ..Default::default()
+        });
+        draw(cx);
+        let scrolled_canvas = cx
+            .debug_bounds("story-canvas")
+            .expect("scrolled responsive canvas should render");
+        let scrolled_stage = cx
+            .debug_bounds("story-canvas-stage")
+            .expect("scrolled responsive stage should render");
+        assert_eq!(
+            scroll_region.right() - scrolled_canvas.right(),
+            STORY_CANVAS_RESIZE_GUTTER,
+            "scroll region {scroll_region:?}, canvas {scrolled_canvas:?}, stage {scrolled_stage:?}"
+        );
+        assert_eq!(
+            scroll_region.bottom() - scrolled_canvas.bottom(),
+            STORY_CANVAS_RESIZE_GUTTER,
+            "scroll viewport {scroll_region:?}, canvas {scrolled_canvas:?}, stage {scrolled_stage:?}"
+        );
+    }
+
+    #[gpui::test]
+    fn panel_activation_defers_workbench_story_reads(cx: &mut App) {
+        gpui_component::init(cx);
+        let state = cx.new(|_| WorkbenchState::new(None));
+        let state_for_window = state.clone();
+        let window: gpui::WindowHandle<StoryContainer> = cx
+            .open_window(Default::default(), move |window, cx| {
+                cx.new(|cx| {
+                    let mut story = StoryContainer::new(window, cx);
+                    story.set_workbench_state(state_for_window.downgrade());
+                    story
+                })
+            })
+            .expect("test window should open");
+
+        window
+            .update(cx, |story, window, cx| {
+                Panel::set_active(story, true, window, cx);
+                assert!(state.read(cx).active_story().is_none());
+            })
+            .expect("panel activation should not reenter the story entity");
     }
 
     #[gpui::test]

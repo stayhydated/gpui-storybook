@@ -7,7 +7,8 @@ preferences, window mode, or `storybook.toml`.
 
 Use the facade's startup order:
 
-1. Build the GPUI application with `gpui_storybook::Assets`.
+1. Build the native GPUI application with
+   `gpui_platform::application().with_assets(gpui_storybook::Assets)`.
 2. Construct a stable `ConsumerId` unique to the Storybook binary.
 3. Construct typed `StorybookOptions` with the fallback language and locale
    adapter.
@@ -18,6 +19,11 @@ Use the facade's startup order:
 
 Opening the window before step 5 can render a first frame with default
 preferences.
+
+On Linux, run MCP and startup-capture sessions through Sway's wlroots headless
+backend. This preserves the normal Wayland-backed application path while
+providing an in-memory compositor; see the automation reference for the command
+and runtime packages.
 
 ## Locale contract
 
@@ -44,6 +50,37 @@ For the dock workspace, forward the feature and use `create_dock_window` plus
 [features]
 dock = ["gpui-storybook/dock"]
 ```
+
+Both modes include the right workbench. Gallery uses a third resizable region.
+Dock mode persists the right dock's width, visibility, and selected tab; use
+**Reset layout** in the title bar to restore the current default layout.
+
+Forward the Inspector feature when the Storybook package should expose the GPUI
+Inspector button and story-root metadata:
+
+```toml
+[features]
+inspector = ["gpui-storybook/inspector"]
+```
+
+The workbench edits controls on the active concrete variant. Viewport,
+selection, and action-log state belong to that Storybook window.
+Theme edits are session overrides on the process-global GPUI Component
+theme: they rebuild derived tokens and refresh open windows without changing
+saved preference intent. **Copy export** and **Import clipboard** exchange a
+complete `ThemeColor` JSON object. Selecting a different base theme clears the
+draft, while reloading the same named theme reapplies its session overrides.
+
+The **Inspect** tab always shows the story key and source location. With
+`inspector` enabled, its button dispatches GPUI Component's Inspector toggle and
+the inspectable story root publishes its key, title, source location, and
+control keys. Live control and theme edits change serialized runtime values;
+changed Rust types or component source require recompilation.
+
+For consumer theme development in a native debug build, set
+`STORYBOOK_THEME_DIR` before launch. The path becomes the process's complete
+custom-theme directory and is watched for external changes. Wasm keeps in-app
+theme edits but needs a separate development bridge for filesystem changes.
 
 ## Configuration rules
 
@@ -85,4 +122,8 @@ or standalone package root. `Temporary` uses isolated temporary files.
 mode.
 
 Treat `PreferenceState::saved` as user intent and `resolved` as effective
-presentation. Use `try_preference_state` for a read-only snapshot.
+presentation. Selecting a named light or dark theme saves it in the matching
+slot and activates that appearance immediately; selecting `System` afterward
+resumes device appearance changes with both saved theme slots. Launch-only
+appearance overrides remain higher priority. Use `try_preference_state` for a
+read-only snapshot.
