@@ -16,6 +16,7 @@ use gpui::{
     ParentElement as _, Render, Window, div,
 };
 
+#[derive(gpui_storybook::StoryControls)]
 #[gpui_storybook::story("Components")]
 pub struct ButtonStory {
     focus_handle: FocusHandle,
@@ -46,7 +47,7 @@ impl gpui_storybook::Story for ButtonStory {
         "Button".into()
     }
 
-    fn new_view(window: &mut Window, cx: &mut App) -> Entity<impl Render + Focusable> {
+    fn new_view(window: &mut Window, cx: &mut App) -> Entity<Self> {
         Self::view(window, cx)
     }
 }
@@ -95,6 +96,27 @@ the generated wrapper constructs the component with `Default::default()`.
 `cx: &gpui::App` in scope, so metadata can call
 `gpui_storybook::localize_message(cx, ...)`.
 
+## Expose live controls
+
+For an explicit story, derive `StoryControls` and mark individual fields:
+
+```rust
+#[derive(gpui_storybook::StoryControls)]
+struct ButtonStory {
+    #[storybook(control)]
+    disabled: bool,
+    #[storybook(control(min = 0.0, max = 32.0, step = 1.0))]
+    padding: f32,
+    focus_handle: gpui::FocusHandle,
+}
+```
+
+For a `ComponentStory`, put `#[storybook(control...)]` on component fields.
+Fields without the attribute are not registered as controls.
+The generated wrapper captures their defaults from `example = ...` and
+overlays live values whenever it renders. See [Use the workbench](workbench.md)
+for supported field types, reset behavior, theme editing, and preview tools.
+
 ## Order stories with sections
 
 Both registration styles accept a string or enum-variant section. String
@@ -109,6 +131,7 @@ pub enum StorySection {
     Patterns = 3,
 }
 
+#[derive(gpui_storybook::StoryControls)]
 #[gpui_storybook::story(crate::StorySection::Components)]
 pub struct ButtonStory;
 ```

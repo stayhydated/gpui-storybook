@@ -1,9 +1,9 @@
 use gpui::{
-    App, AppContext as _, Context, Entity, FocusHandle, Focusable, IntoElement, ParentElement,
-    Render, Styled, Window, prelude::FluentBuilder as _, px,
+    App, AppContext as _, Context, Entity, FocusHandle, Focusable, IntoElement, ParentElement as _,
+    Render, Styled as _, Window, prelude::FluentBuilder as _, px,
 };
 use gpui_component::{
-    ActiveTheme, Selectable as _, Sizable, Size,
+    ActiveTheme as _, Selectable as _, Sizable as _, Size,
     button::{Button, ButtonGroup},
     h_flex,
     table::{
@@ -15,6 +15,7 @@ use gpui_component::{
 
 use gpui_storybook::section;
 
+#[derive(gpui_storybook::StoryControls)]
 #[gpui_storybook::story(crate::StorySection::Tables)]
 pub struct TableStory {
     focus_handle: FocusHandle,
@@ -44,7 +45,7 @@ impl gpui_storybook::Story for TableStory {
         "Table".into()
     }
 
-    fn new_view(window: &mut Window, cx: &mut App) -> Entity<impl Render + Focusable> {
+    fn new_view(window: &mut Window, cx: &mut App) -> Entity<Self> {
         Self::view(window, cx)
     }
 }

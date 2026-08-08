@@ -19,6 +19,7 @@ fn metric(label: &'static str, value: &'static str) -> impl IntoElement {
         .child(div().text_lg().child(value))
 }
 
+#[derive(gpui_storybook::StoryControls)]
 #[gpui_storybook::story(crate::StorySection::Grouped)]
 pub struct GroupedSummaryStory {
     focus_handle: FocusHandle,
@@ -41,7 +42,7 @@ impl gpui_storybook::Story for GroupedSummaryStory {
         "Summary variant".into()
     }
 
-    fn new_view(window: &mut Window, cx: &mut App) -> Entity<impl Render + Focusable> {
+    fn new_view(window: &mut Window, cx: &mut App) -> Entity<Self> {
         Self::view(window, cx)
     }
 }
@@ -58,6 +59,7 @@ impl Render for GroupedSummaryStory {
     }
 }
 
+#[derive(gpui_storybook::StoryControls)]
 #[gpui_storybook::story(crate::StorySection::Grouped)]
 pub struct GroupedDetailsStory {
     focus_handle: FocusHandle,
@@ -80,7 +82,7 @@ impl gpui_storybook::Story for GroupedDetailsStory {
         "Details variant".into()
     }
 
-    fn new_view(window: &mut Window, cx: &mut App) -> Entity<impl Render + Focusable> {
+    fn new_view(window: &mut Window, cx: &mut App) -> Entity<Self> {
         Self::view(window, cx)
     }
 }

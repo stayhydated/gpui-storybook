@@ -383,6 +383,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 
 [[package]]
+name = "attribute-dsl"
+version = "0.2.0"
+source = "git+https://github.com/stayhydated/attribute-dsl?rev=bb69a6ee0a6772895d180113515fbb6cb46acc9d#bb69a6ee0a6772895d180113515fbb6cb46acc9d"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 3.0.3",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2496,12 +2506,17 @@ dependencies = [
  "gpui_tokio",
  "gtk",
  "inventory",
+ "koruma",
+ "libc",
  "rust-embed",
+ "schemars",
  "serde",
  "serde_json",
+ "thiserror 2.0.19",
  "tokio",
  "tracing",
  "unic-langid",
+ "url",
 ]
 
 [[package]]
@@ -2516,6 +2531,7 @@ dependencies = [
 name = "gpui-storybook-macros"
 version = "0.5.0"
 dependencies = [
+ "darling 0.24.0",
  "heck 0.5.0",
  "proc-macro2",
  "quote",
@@ -3261,6 +3277,45 @@ dependencies = [
  "cfg-if",
  "futures-util",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "koruma"
+version = "0.11.0"
+source = "git+https://github.com/stayhydated/koruma?rev=0e92fde0b37f7caff376b8d95ed7fae1b18d3ed8#0e92fde0b37f7caff376b8d95ed7fae1b18d3ed8"
+dependencies = [
+ "koruma-core",
+ "koruma-derive",
+]
+
+[[package]]
+name = "koruma-core"
+version = "0.11.0"
+source = "git+https://github.com/stayhydated/koruma?rev=0e92fde0b37f7caff376b8d95ed7fae1b18d3ed8#0e92fde0b37f7caff376b8d95ed7fae1b18d3ed8"
+
+[[package]]
+name = "koruma-derive"
+version = "0.11.0"
+source = "git+https://github.com/stayhydated/koruma?rev=0e92fde0b37f7caff376b8d95ed7fae1b18d3ed8#0e92fde0b37f7caff376b8d95ed7fae1b18d3ed8"
+dependencies = [
+ "heck 0.5.0",
+ "koruma-derive-core",
+ "proc-macro-crate 3.5.0",
+ "proc-macro2",
+ "quote",
+ "syn 3.0.3",
+]
+
+[[package]]
+name = "koruma-derive-core"
+version = "0.11.0"
+source = "git+https://github.com/stayhydated/koruma?rev=0e92fde0b37f7caff376b8d95ed7fae1b18d3ed8#0e92fde0b37f7caff376b8d95ed7fae1b18d3ed8"
+dependencies = [
+ "attribute-dsl",
+ "heck 0.5.0",
+ "proc-macro2",
+ "quote",
+ "syn 3.0.3",
 ]
 
 [[package]]

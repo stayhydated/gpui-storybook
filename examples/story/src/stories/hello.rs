@@ -8,6 +8,7 @@ enum StoryItems {
     Title,
 }
 
+#[derive(gpui_storybook::StoryControls)]
 #[gpui_storybook::story("Basics")]
 pub struct HelloWorld {
     focus_handle: FocusHandle,
@@ -24,7 +25,7 @@ impl gpui_storybook::Story for HelloWorld {
         gpui_storybook::localize_message(cx, &StoryItems::Title).unwrap_or_else(|| "Title".into())
     }
 
-    fn new_view(window: &mut Window, cx: &mut App) -> Entity<impl Render + Focusable> {
+    fn new_view(window: &mut Window, cx: &mut App) -> Entity<Self> {
         Self::view(window, cx)
     }
 }

@@ -1,4 +1,5 @@
 use crate::{
+    gallery::Gallery,
     storybook_window_ui::{StorybookWindow, StorybookWindowUi},
     title_bar::AppTitleBar,
     window_options::default_storybook_window_options,
@@ -62,7 +63,7 @@ where
     .detach();
 }
 
-struct StoryRoot {
+pub(crate) struct StoryRoot {
     focus_handle: FocusHandle,
     title_bar: Entity<AppTitleBar>,
     view: AnyView,
@@ -77,7 +78,18 @@ impl StoryRoot {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
-        let title_bar = cx.new(|cx| AppTitleBar::new(title, ui, window, cx));
+        let view = view.into();
+        let gallery = view.clone().downcast::<Gallery>().ok();
+        let title_bar = cx.new(|cx| {
+            let title_bar = AppTitleBar::new(title, ui, window, cx);
+            if let Some(gallery) = gallery {
+                title_bar.sidebar_child(move |_, cx| {
+                    Gallery::title_bar_sidebar_controls(gallery.clone(), cx)
+                })
+            } else {
+                title_bar
+            }
+        });
         let preference_subscriptions = vec![
             cx.observe_window_appearance(window, |_, window, cx| {
                 crate::preferences::window_appearance_changed(window, cx);
@@ -90,7 +102,7 @@ impl StoryRoot {
         Self {
             focus_handle: cx.focus_handle(),
             title_bar,
-            view: view.into(),
+            view,
             _preference_subscriptions: preference_subscriptions,
         }
     }

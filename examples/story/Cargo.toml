@@ -21,6 +21,7 @@ path = "examples/demo.rs"
 [features]
 default = [  ]
 dock = [ "gpui-storybook/dock" ]
+inspector = [ "gpui-storybook/inspector" ]
 mcp = [ "gpui-storybook/mcp" ]
 
 [dependencies]
@@ -33,6 +34,7 @@ gpui-es-fluent = { workspace = true }
 gpui_platform = { workspace = true }
 gpui-storybook = { workspace = true }
 rust-embed = { workspace = true }
+schemars = { workspace = true }
 serde = { workspace = true }
 strum = { workspace = true }
 tracing = { workspace = true }

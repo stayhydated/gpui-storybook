@@ -1,0 +1,92 @@
+---
+source: crates/gpui-storybook-macros/src/lib.rs
+expression: snapshot_tokens(story_controls_derive_impl(input))
+---
+impl ::gpui_storybook::StoryControls for ButtonStory {
+    fn control_specs(&self) -> ::std::vec::Vec<::gpui_storybook::ControlSpec> {
+        vec![
+            ::gpui_storybook::ControlSpec { key : "disabled".to_owned(), label :
+            "Disabled".to_owned(), description : "".to_owned(), category : "State"
+            .to_owned(), kind : < bool as ::gpui_storybook::ControlValueField >
+            ::control_kind(), default : < bool as ::gpui_storybook::ControlValueField >
+            ::to_control_value(& self.disabled), bounds : ::gpui_storybook::ControlBounds
+            { min : None, max : None, step : None, }, options : vec![], },
+            ::gpui_storybook::ControlSpec { key : "padding".to_owned(), label : "Padding"
+            .to_owned(), description : "".to_owned(), category : "Properties".to_owned(),
+            kind : ::gpui_storybook::ControlKind::Range, default : < f32 as
+            ::gpui_storybook::ControlValueField > ::to_control_value(& self.padding),
+            bounds : ::gpui_storybook::ControlBounds { min : Some((0.0) as f64), max :
+            Some((32.0) as f64), step : Some((1.0) as f64), }, options : vec![], },
+            ::gpui_storybook::ControlSpec { key : "intent".to_owned(), label : "Intent"
+            .to_owned(), description : "".to_owned(), category : "Properties".to_owned(),
+            kind : ::gpui_storybook::ControlKind::Select, default :
+            ::gpui_storybook::choice_control_value(& self.intent), bounds :
+            ::gpui_storybook::ControlBounds { min : None, max : None, step : None, },
+            options : vec!["Primary".to_owned(), "Danger".to_owned()], }
+        ]
+    }
+    fn control_value(
+        &self,
+        key: &str,
+    ) -> ::std::result::Result<
+        ::gpui_storybook::ControlValue,
+        ::gpui_storybook::ControlError,
+    > {
+        match key {
+            "disabled" => {
+                Ok(
+                    <bool as ::gpui_storybook::ControlValueField>::to_control_value(
+                        &self.disabled,
+                    ),
+                )
+            }
+            "padding" => {
+                Ok(
+                    <f32 as ::gpui_storybook::ControlValueField>::to_control_value(
+                        &self.padding,
+                    ),
+                )
+            }
+            "intent" => Ok(::gpui_storybook::choice_control_value(&self.intent)),
+            _ => {
+                Err(::gpui_storybook::ControlError::UnknownControl {
+                    key: key.to_owned(),
+                })
+            }
+        }
+    }
+    fn set_control_value(
+        &mut self,
+        key: &str,
+        value: ::gpui_storybook::ControlValue,
+    ) -> ::std::result::Result<(), ::gpui_storybook::ControlError> {
+        match key {
+            "disabled" => {
+                self.disabled = <bool as ::gpui_storybook::ControlValueField>::from_control_value(
+                    "disabled",
+                    value,
+                )?;
+                Ok(())
+            }
+            "padding" => {
+                self.padding = <f32 as ::gpui_storybook::ControlValueField>::from_control_value(
+                    "padding",
+                    value,
+                )?;
+                Ok(())
+            }
+            "intent" => {
+                let options = vec!["Primary".to_owned(), "Danger".to_owned()];
+                self.intent = ::gpui_storybook::parse_choice_control_value::<
+                    ButtonIntent,
+                >("intent", value, &options)?;
+                Ok(())
+            }
+            _ => {
+                Err(::gpui_storybook::ControlError::UnknownControl {
+                    key: key.to_owned(),
+                })
+            }
+        }
+    }
+}

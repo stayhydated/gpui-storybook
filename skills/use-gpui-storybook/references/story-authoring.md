@@ -7,7 +7,7 @@ or one-time setup.
 
 Use `#[gpui_storybook::story(...)]` when the preview owns GPUI state, a focus
 handle, actions, lifecycle, or wrapper UI. Implement `Story`, `Render`, and
-`Focusable`.
+`Focusable`, and derive or implement `StoryControls`.
 
 Use `#[derive(gpui_storybook::ComponentStory)]` when the component implements
 `IntoElement` and Storybook can generate its wrapper. The derive supports
@@ -28,6 +28,33 @@ pub struct WelcomeCard {
 The derive accepts non-generic structs. Without `example`, the wrapper uses
 `Default::default()`. Title and description expressions have
 `cx: &gpui::App` in scope and may call `localize_message`.
+
+## Add live controls
+
+Derive `StoryControls` on an explicit story and keep `Story::new_view` typed as
+`Entity<Self>`:
+
+```rust
+#[derive(gpui_storybook::StoryControls)]
+struct ButtonStory {
+    #[storybook(control(category = "State"))]
+    disabled: bool,
+    #[storybook(control(min = 0.0, max = 32.0, step = 1.0))]
+    padding: f32,
+    focus_handle: gpui::FocusHandle,
+}
+```
+
+On a `ComponentStory`, place the same attributes on component fields. The
+generated wrapper obtains reset defaults from `example = ...`, reconstructs the
+example during rendering, and overlays current values.
+
+Supported inferred types are `bool`, `i8` through `i64`, `isize`, `u8` through
+`u32`, `usize`, `f32`, `f64`, `String`, `SharedString`, and `Hsla`. Enum-like
+types use string `options` and implement `Display` plus `FromStr`. Leave
+collections and application-specific types unmarked; only fields with
+`#[storybook(control...)]` are registered. An explicitly controlled unsupported
+field is a compile error.
 
 ## Organize stories
 

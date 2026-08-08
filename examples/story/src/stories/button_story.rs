@@ -1,10 +1,11 @@
 use gpui::{
-    Action, App, AppContext as _, Axis, ClickEvent, Context, Entity, Focusable, InteractiveElement,
-    IntoElement, ParentElement as _, Render, Styled as _, Window, prelude::FluentBuilder, px,
+    Action, App, AppContext as _, Axis, ClickEvent, Context, Entity, Focusable,
+    InteractiveElement as _, IntoElement, ParentElement as _, Render, Styled as _, Window,
+    prelude::FluentBuilder as _, px,
 };
 
 use gpui_component::{
-    ActiveTheme, Disableable as _, Icon, IconName, Selectable as _, Sizable as _, Theme,
+    ActiveTheme as _, Disableable as _, Icon, IconName, Selectable as _, Sizable as _, Theme,
     button::{Button, ButtonCustomVariant, ButtonGroup, ButtonVariants as _},
     checkbox::Checkbox,
     h_flex,
@@ -13,6 +14,7 @@ use gpui_component::{
 };
 use gpui_storybook::section;
 use serde::Deserialize;
+use std::{fmt, str::FromStr};
 
 #[derive(Action, Clone, Deserialize, Eq, PartialEq)]
 #[action(namespace = button_story, no_json)]
@@ -21,6 +23,32 @@ enum ButtonAction {
     Loading,
     Selected,
     Compact,
+}
+
+enum ButtonDensity {
+    Comfortable,
+    Compact,
+}
+
+impl fmt::Display for ButtonDensity {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::Comfortable => "Comfortable",
+            Self::Compact => "Compact",
+        })
+    }
+}
+
+impl FromStr for ButtonDensity {
+    type Err = ();
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "Comfortable" => Ok(Self::Comfortable),
+            "Compact" => Ok(Self::Compact),
+            _ => Err(()),
+        }
+    }
 }
 
 #[derive(gpui_storybook::Substory)]
@@ -32,14 +60,29 @@ enum ButtonSubstory {
     WithProgress,
 }
 
+#[derive(gpui_storybook::StoryControls)]
 #[gpui_storybook::story(crate::StorySection::Buttons)]
 pub struct ButtonStory {
     focus_handle: gpui::FocusHandle,
+    #[storybook(control(category = "State", description = "Disable every button example"))]
     disabled: bool,
+    #[storybook(control(category = "State"))]
     loading: bool,
+    #[storybook(control(category = "State"))]
     selected: bool,
+    #[storybook(control(category = "Layout"))]
     compact: bool,
+    #[storybook(control(category = "Layout", options = ["Comfortable", "Compact"]))]
+    density: ButtonDensity,
     toggle_multiple: bool,
+    #[storybook(control(
+        min = 0.0,
+        max = 32.0,
+        step = 1.0,
+        category = "Layout",
+        description = "Outer padding around the story examples"
+    ))]
+    padding: f32,
 }
 
 impl ButtonStory {
@@ -50,7 +93,9 @@ impl ButtonStory {
             loading: false,
             selected: false,
             compact: false,
+            density: ButtonDensity::Comfortable,
             toggle_multiple: false,
+            padding: 0.0,
         })
     }
 
@@ -68,7 +113,7 @@ impl gpui_storybook::Story for ButtonStory {
         "Button".into()
     }
 
-    fn new_view(window: &mut Window, cx: &mut App) -> Entity<impl Render + Focusable> {
+    fn new_view(window: &mut Window, cx: &mut App) -> Entity<Self> {
         Self::view(window, cx)
     }
 }
@@ -84,8 +129,9 @@ impl Render for ButtonStory {
         let disabled = self.disabled;
         let loading = self.loading;
         let selected = self.selected;
-        let compact = self.compact;
+        let compact = self.compact || matches!(self.density, ButtonDensity::Compact);
         let toggle_multiple = self.toggle_multiple;
+        let padding = self.padding;
 
         let custom_variant = ButtonCustomVariant::new(cx)
             .color(cx.theme().magenta)
@@ -94,6 +140,7 @@ impl Render for ButtonStory {
             .active(cx.theme().magenta);
 
         v_flex()
+            .p(px(padding))
             .on_action(
                 cx.listener(|this, action: &ButtonAction, _, _| match action {
                     ButtonAction::Disabled => this.disabled = !this.disabled,

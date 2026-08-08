@@ -15,6 +15,114 @@ mcp = ["gpui-storybook/mcp"]
 Set `GPUI_STORYBOOK_MCP_STDIO=1` to serve MCP over stdio. Route tracing and
 diagnostic logs to standard error.
 
+On Linux, install Sway plus `libgl1-mesa-dri` and `mesa-vulkan-drivers`, then
+run stdio and startup-capture sessions through a headless Wayland compositor:
+
+```bash
+(
+  runtime_dir="$(mktemp -d)"
+  chmod 700 "$runtime_dir"
+  printf '%s\n' \
+    'output * mode 1920x1200' \
+    'seat seat0 fallback true' \
+    'for_window [app_id=".*"] floating enable' \
+    > "$runtime_dir/sway.conf"
+
+  cleanup() {
+    kill "$sway_pid" 2>/dev/null || true
+    wait "$sway_pid" 2>/dev/null || true
+    rm -rf "$runtime_dir"
+  }
+  trap cleanup EXIT
+
+  export XDG_RUNTIME_DIR="$runtime_dir"
+  unset DISPLAY I3SOCK SWAYSOCK WAYLAND_DISPLAY WAYLAND_SOCKET ZED_HEADLESS
+  WLR_BACKENDS=headless \
+  WLR_HEADLESS_OUTPUTS=1 \
+  WLR_LIBINPUT_NO_DEVICES=1 \
+  WLR_RENDERER=pixman \
+  WLR_RENDERER_ALLOW_SOFTWARE=1 \
+  LIBGL_ALWAYS_SOFTWARE=1 \
+  sway --unsupported-gpu --config "$runtime_dir/sway.conf" \
+    > "$runtime_dir/sway.log" 2>&1 &
+  sway_pid=$!
+
+  until wayland_socket="$(find "$runtime_dir" -maxdepth 1 \
+    -type s -name 'wayland-*' -print -quit)" && \
+    [ -n "$wayland_socket" ]; do
+    if ! kill -0 "$sway_pid" 2>/dev/null; then
+      cat "$runtime_dir/sway.log" >&2
+      exit 1
+    fi
+    sleep 0.05
+  done
+
+  export WAYLAND_DISPLAY="${wayland_socket##*/}"
+  export LIBGL_ALWAYS_SOFTWARE=1
+  GPUI_STORYBOOK_MCP_STDIO=1 \
+  cargo run -p my-app-storybook --features mcp
+)
+```
+
+Sway provides a compatibility seat, window management, and frame callbacks
+while retaining GPUI's normal Wayland backend. The launch-env tool emits a
+bounded-readiness version of this wrapper on Linux and continues to emit a
+direct Cargo command elsewhere.
+The `--unsupported-gpu` flag only bypasses Sway's host-driver check; the
+headless backend and software Pixman renderer remain explicitly selected.
+
+### Verify raw stdio in this repository
+
+Use the explicit story example for a safe end-to-end check. Replace the final
+Cargo command in the Sway wrapper with:
+
+```bash
+GPUI_STORYBOOK_MCP_STDIO=1 \
+GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1 \
+cargo run -p gpui-storybook-example-story --features mcp
+```
+
+The stable route
+`gpui-storybook-example-story-InteractionStory` is an inert fixture with a
+typed `prefix` control and the schema-backed
+`interaction_story::SetAutomationStatus` action.
+
+An MCP client performs the initialization sequence automatically. For a raw
+JSON Lines smoke test, keep the process's standard input open and exchange one
+JSON object per line in this order:
+
+1. Send `initialize`:
+
+   ```json
+   {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2026-07-28","capabilities":{},"clientInfo":{"name":"storybook-smoke","version":"1.0"}}}
+   ```
+
+2. Read the response with `id: 1`, then send the initialized notification:
+
+   ```json
+   {"jsonrpc":"2.0","method":"notifications/initialized"}
+   ```
+
+3. Discover the live tool schemas:
+
+   ```json
+   {"jsonrpc":"2.0","id":2,"method":"tools/list"}
+   ```
+
+4. Invoke a tool with `tools/call`:
+
+   ```json
+   {"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"storybook_list_stories","arguments":{}}}
+   ```
+
+Read the matching response ID before closing standard input. Use each entry's
+advertised `inputSchema` when constructing later calls.
+
+Set `GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1` only when the client should receive
+generic in-process interaction tools. The value must be exactly `1`; otherwise
+the tools are omitted. This capability can trigger any effect reachable from a
+story action or input handler, so use an inert fixture or a safe backend.
+
 The standard `Gallery::view` and `StoryWorkspace::view` constructors attach
 the controller installed by `gpui_storybook::init`.
 
@@ -24,10 +132,72 @@ the controller installed by `gpui_storybook::init`.
 - `storybook_get_story`
 - `storybook_current_story`
 - `storybook_open_story`
+- `storybook_read_controls`
+- `storybook_set_control`
+- `storybook_reset_control`
 - `storybook_capture_current_story`
 - `storybook_capture_launch_env`
+- `storybook_list_actions` (interaction capability)
+- `storybook_run_steps` (interaction capability)
 
 Use advertised typed fields. Width and height are optional only as a pair.
+Control operations use tagged `ControlValue` objects shared with the UI:
+
+```json
+{
+  "key": "disabled",
+  "value": { "type": "boolean", "value": true }
+}
+```
+
+Read controls after opening the intended route. Reset with a key for one value
+or omit the key for all values. A capture request can include a `controls` map
+so it applies serialized values immediately before rendering.
+
+Capture requests also accept `responsive`, `mobile`, `tablet`, or `desktop` as
+a `viewport`. Explicit paired width and height take precedence. The live
+gallery or dock chrome remains mounted for layout, while the returned PNG is
+cropped to the story region and excludes that chrome. The launch-env tool
+accepts the same named presets when dimensions are omitted. Treat the returned
+`pixel_width` and `pixel_height` as authoritative; viewport text rendered by a
+story can describe its logical live-window bounds instead of the PNG size.
+
+## Interaction batches
+
+Prefer controls, then registered actions, then keystrokes, and finally
+story-relative pointer coordinates. Discover non-internal runtime actions and
+their JSON argument schemas with `storybook_list_actions` after every launch.
+
+`storybook_run_steps` accepts an optional route, controls, paired rendered-pixel
+dimensions or viewport, a required non-empty step list, and an optional final
+capture. Step types are `focus_next`, `focus_previous`, `blur`, `keystrokes`,
+`text`, `dispatch_action`, `pointer_move`, `pointer_click`, `scroll`, and
+`wait_frames`. Supplying a route focuses the selected story's focus handle
+before the first step.
+
+GPUI defers registered-action dispatch; the executor resumes with the next step
+after that dispatch is delivered. Use `wait_frames` before a later action when
+earlier widget input schedules its own next-frame state change.
+
+Pointer points default to normalized `x`/`y` values in `0.0..=1.0`. The
+`logical_pixels` space is relative to fresh active-route bounds. Points cannot
+reach Storybook chrome or the global screen. A click dispatches move, down, and
+up.
+
+Limits are 64 steps, 64 binding strings per `keystrokes` step, 4 KiB across
+UTF-8 text values and keystroke syntax, 120 waited frames, and one final
+capture. Complete validation happens before input dispatch. The capture is the
+first requested frame after the final step or explicit waits. Runtime failures
+report `steps_dispatched`; do not retry automatically.
+
+Capture, navigation, control mutations, and interaction share one exclusive
+operation. Reads remain available while it runs and may observe intermediate
+state. The interaction tool is destructive, non-idempotent, and open-world;
+dispatch does not authorize or prove semantic success.
+
+Direct integrations enable the capability with
+`StorybookMcpServerOptions::default().with_interaction(true)` and
+`server_with_options` or `register_tools_with_options`.
 
 ## Routes
 
@@ -55,17 +225,26 @@ Optional variables:
 
 Capture startup disables persistence and forces light appearance, the
 `Default Light` theme, and the typed fallback language. Stdio-only startup
-uses the same presentation with temporary storage.
+uses the same presentation with temporary storage. On Linux,
+`storybook_capture_launch_env` returns an `env` map and a `command` array. Merge
+every `env` entry into the child process environment before executing
+`command`; the command creates a private Wayland runtime, waits for headless
+Sway, and then runs Cargo, but it does not inline the capture or MCP variables.
 
 Captures exclude gallery or dock chrome. A substory route crops to its section.
-Use returned pixel dimensions rather than requested dimensions as the rendered
-source of truth.
+Paired dimensions target the story region rather than collapsing the complete
+window. Use returned pixel dimensions as the rendered source of truth.
 
 ## Failure checks
 
 - Route missing: inspect active filters and discover the base key again.
 - No live host: await initialization and construct a standard view.
-- Capture pending: wait before submitting another screenshot.
+- Automation busy: wait before submitting another capture or mutation; work is
+  not queued.
+- Interaction tools missing: set the explicit capability before server
+  construction and rediscover tools.
+- Invalid action: rediscover actions for this launch and use its JSON schema.
+- Partial interaction failure: inspect the dispatched count and do not retry.
 - Invalid dimensions: provide positive width and height together.
 - Corrupt stdio: move application logs to standard error.
 - Startup timeout: confirm story registration linkage and open the route

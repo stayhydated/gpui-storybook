@@ -109,6 +109,7 @@ fn metric_tile(
         .into_any_element()
 }
 
+#[derive(gpui_storybook::StoryControls)]
 #[gpui_storybook::story(crate::StorySection::CustomSections)]
 pub struct CustomSectionStory {
     focus_handle: FocusHandle,
@@ -131,7 +132,7 @@ impl gpui_storybook::Story for CustomSectionStory {
         "Custom section component using StorySectionBase".into()
     }
 
-    fn new_view(window: &mut Window, cx: &mut App) -> Entity<impl Render + Focusable> {
+    fn new_view(window: &mut Window, cx: &mut App) -> Entity<Self> {
         Self::view(window, cx)
     }
 }

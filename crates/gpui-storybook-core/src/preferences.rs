@@ -493,8 +493,18 @@ where
     }
 
     fn optimistic_change(&mut self, edit: PreferenceEdit, cx: &mut App) {
-        edit.apply_to(&mut self.state.saved);
-        self.pending_edits.record(edit);
+        self.optimistic_changes([edit], cx);
+    }
+
+    fn optimistic_changes(
+        &mut self,
+        edits: impl IntoIterator<Item = PreferenceEdit>,
+        cx: &mut App,
+    ) {
+        for edit in edits {
+            edit.apply_to(&mut self.state.saved);
+            self.pending_edits.record(edit);
+        }
         if let Err(error) = self.resolve_current(cx) {
             tracing::error!(error = %error, "failed to resolve changed Storybook preferences");
             return;
@@ -680,11 +690,18 @@ where
     }
 
     fn select_theme(&mut self, scheme: SystemColorScheme, theme: ThemeId, cx: &mut App) {
-        self.optimistic_change(
-            PreferenceEdit::Theme {
-                scheme,
-                theme: Some(theme),
-            },
+        let color_scheme = match scheme {
+            SystemColorScheme::Light => PreferredColorScheme::Light,
+            SystemColorScheme::Dark => PreferredColorScheme::Dark,
+        };
+        self.optimistic_changes(
+            [
+                PreferenceEdit::ColorScheme(color_scheme),
+                PreferenceEdit::Theme {
+                    scheme,
+                    theme: Some(theme),
+                },
+            ],
             cx,
         );
     }
@@ -932,7 +949,9 @@ pub fn select_color_scheme(value: PreferredColorScheme, cx: &mut App) {
     }
 }
 
-/// Applies a named theme to its independent light or dark slot.
+/// Applies a named theme and activates its matching light or dark appearance.
+///
+/// The opposite theme slot remains saved for the next appearance transition.
 pub fn select_theme(scheme: SystemColorScheme, theme: ThemeId, cx: &mut App) {
     if cx.try_global::<StorybookPreferencesGlobal>().is_some() {
         cx.update_global::<StorybookPreferencesGlobal, _>(|runtime, cx| {
@@ -1241,11 +1260,11 @@ mod tests {
     }
 
     #[gpui::test]
-    fn selecting_non_current_theme_slot_waits_for_scheme_transition(cx: &mut App) {
+    fn selecting_theme_activates_its_matching_appearance(cx: &mut App) {
         init_test_runtime(cx);
         let mut runtime = Runtime::new(
             test_options(
-                SystemColorScheme::Light,
+                SystemColorScheme::Dark,
                 ResolutionOverrides::default(),
                 successful_callback(),
             ),
@@ -1253,23 +1272,48 @@ mod tests {
         )
         .expect("runtime resolves");
         runtime.apply_resolved(cx);
-        let initial_theme = cx.theme().theme_name().clone();
+        assert!(cx.theme().mode.is_dark());
 
         runtime.save_in_flight = true;
         runtime.select_theme(
-            SystemColorScheme::Dark,
-            ThemeId::new("Solarized Dark").expect("valid theme"),
+            SystemColorScheme::Light,
+            ThemeId::new("Solarized Light").expect("valid light theme"),
             cx,
         );
-        assert_eq!(cx.theme().theme_name(), &initial_theme);
+        assert_eq!(
+            runtime.state.saved.color_scheme,
+            PreferredColorScheme::Light
+        );
+        assert_eq!(
+            runtime
+                .state
+                .saved
+                .light_theme
+                .as_ref()
+                .map(ThemeId::as_str),
+            Some("Solarized Light")
+        );
+        assert_eq!(
+            runtime.state.resolved.color_scheme.scheme,
+            SystemColorScheme::Light
+        );
+        assert!(!cx.theme().mode.is_dark());
+        assert_eq!(cx.theme().theme_name().as_ref(), "Solarized Light");
+
+        runtime.select_theme(
+            SystemColorScheme::Dark,
+            ThemeId::new("Solarized Dark").expect("valid dark theme"),
+            cx,
+        );
+        assert_eq!(runtime.state.saved.color_scheme, PreferredColorScheme::Dark);
         assert_eq!(
             runtime.state.saved.dark_theme.as_ref().map(ThemeId::as_str),
             Some("Solarized Dark")
         );
-
-        runtime.detected_scheme = SystemColorScheme::Dark;
-        runtime.resolve_current(cx).expect("dark slot resolves");
-        runtime.apply_resolved(cx);
+        assert_eq!(
+            runtime.state.resolved.color_scheme.scheme,
+            SystemColorScheme::Dark
+        );
         assert!(cx.theme().mode.is_dark());
         assert_eq!(cx.theme().theme_name().as_ref(), "Solarized Dark");
     }

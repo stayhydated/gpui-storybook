@@ -1,0 +1,155 @@
+---
+source: crates/gpui-storybook-macros/src/lib.rs
+expression: snapshot_tokens(component_story_impl(input))
+---
+struct __WelcomeCardComponentStoryView {
+    focus_handle: ::gpui::FocusHandle,
+    headline: gpui::SharedString,
+    selected: bool,
+}
+impl __WelcomeCardComponentStoryView {
+    fn view(_window: &mut ::gpui::Window, cx: &mut ::gpui::App) -> ::gpui::Entity<Self> {
+        let example = WelcomeCard::example();
+        ::gpui::AppContext::new(
+            cx,
+            |cx| Self {
+                focus_handle: cx.focus_handle(),
+                headline: example.headline.clone(),
+                selected: example.selected.clone(),
+            },
+        )
+    }
+}
+impl ::gpui::Focusable for __WelcomeCardComponentStoryView {
+    fn focus_handle(&self, _cx: &::gpui::App) -> ::gpui::FocusHandle {
+        self.focus_handle.clone()
+    }
+}
+impl ::gpui::Render for __WelcomeCardComponentStoryView {
+    fn render(
+        &mut self,
+        window: &mut ::gpui::Window,
+        cx: &mut ::gpui::Context<Self>,
+    ) -> impl ::gpui::IntoElement {
+        let _ = &self.focus_handle;
+        let _ = window;
+        let _ = cx;
+        let mut example = WelcomeCard::example();
+        example.headline = self.headline.clone();
+        example.selected = self.selected.clone();
+        example
+    }
+}
+impl ::gpui_storybook::StoryControls for __WelcomeCardComponentStoryView {
+    fn control_specs(&self) -> ::std::vec::Vec<::gpui_storybook::ControlSpec> {
+        vec![
+            ::gpui_storybook::ControlSpec { key : "headline".to_owned(), label :
+            "Headline".to_owned(), description : "".to_owned(), category : "Content"
+            .to_owned(), kind : < gpui::SharedString as
+            ::gpui_storybook::ControlValueField > ::control_kind(), default : <
+            gpui::SharedString as ::gpui_storybook::ControlValueField >
+            ::to_control_value(& self.headline), bounds : ::gpui_storybook::ControlBounds
+            { min : None, max : None, step : None, }, options : vec![], },
+            ::gpui_storybook::ControlSpec { key : "selected".to_owned(), label :
+            "Selected".to_owned(), description : "".to_owned(), category : "Properties"
+            .to_owned(), kind : < bool as ::gpui_storybook::ControlValueField >
+            ::control_kind(), default : < bool as ::gpui_storybook::ControlValueField >
+            ::to_control_value(& self.selected), bounds : ::gpui_storybook::ControlBounds
+            { min : None, max : None, step : None, }, options : vec![], }
+        ]
+    }
+    fn control_value(
+        &self,
+        key: &str,
+    ) -> ::std::result::Result<
+        ::gpui_storybook::ControlValue,
+        ::gpui_storybook::ControlError,
+    > {
+        match key {
+            "headline" => {
+                Ok(
+                    <gpui::SharedString as ::gpui_storybook::ControlValueField>::to_control_value(
+                        &self.headline,
+                    ),
+                )
+            }
+            "selected" => {
+                Ok(
+                    <bool as ::gpui_storybook::ControlValueField>::to_control_value(
+                        &self.selected,
+                    ),
+                )
+            }
+            _ => {
+                Err(::gpui_storybook::ControlError::UnknownControl {
+                    key: key.to_owned(),
+                })
+            }
+        }
+    }
+    fn set_control_value(
+        &mut self,
+        key: &str,
+        value: ::gpui_storybook::ControlValue,
+    ) -> ::std::result::Result<(), ::gpui_storybook::ControlError> {
+        match key {
+            "headline" => {
+                self.headline = <gpui::SharedString as ::gpui_storybook::ControlValueField>::from_control_value(
+                    "headline",
+                    value,
+                )?;
+                Ok(())
+            }
+            "selected" => {
+                self.selected = <bool as ::gpui_storybook::ControlValueField>::from_control_value(
+                    "selected",
+                    value,
+                )?;
+                Ok(())
+            }
+            _ => {
+                Err(::gpui_storybook::ControlError::UnknownControl {
+                    key: key.to_owned(),
+                })
+            }
+        }
+    }
+}
+impl ::gpui_storybook::Story for __WelcomeCardComponentStoryView {
+    fn klass() -> &'static str {
+        "WelcomeCard"
+    }
+    fn title(cx: &::gpui::App) -> ::std::string::String {
+        let _ = cx;
+        ("Welcome Card").into()
+    }
+    fn description(cx: &::gpui::App) -> ::std::string::String {
+        let _ = cx;
+        ("").into()
+    }
+    fn new_view(
+        window: &mut ::gpui::Window,
+        cx: &mut ::gpui::App,
+    ) -> ::gpui::Entity<Self> {
+        Self::view(window, cx)
+    }
+}
+#[doc(hidden)]
+#[used]
+#[unsafe(
+    export_name = concat!(
+        "__gpui_storybook_story_key__",
+        env!("CARGO_PKG_NAME"),
+        "__",
+        "WelcomeCard",
+    )
+)]
+static __gpui_storybook_story_key_marker_WelcomeCard: u8 = 0;
+gpui_storybook::__inventory::submit! {
+    ::gpui_storybook::__registry::StoryEntry::new(concat!(::std::env!("CARGO_PKG_NAME"),
+    "-", "WelcomeCard"), "WelcomeCard", None, None, | window, cx | {
+    ::gpui_storybook::StoryContainer::panel:: < __WelcomeCardComponentStoryView >
+    (window, cx) },
+    ::gpui_storybook::__registry::StoryRegistrationSource::new(::std::env!("CARGO_PKG_NAME"),
+    ::std::env!("CARGO_MANIFEST_DIR"), ::std::file!(), ::std::line!(),),)
+}

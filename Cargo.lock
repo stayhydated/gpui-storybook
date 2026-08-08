@@ -632,6 +632,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "attribute-dsl"
+version = "0.2.0"
+source = "git+https://github.com/stayhydated/attribute-dsl?rev=bb69a6ee0a6772895d180113515fbb6cb46acc9d#bb69a6ee0a6772895d180113515fbb6cb46acc9d"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 3.0.3",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3524,7 +3534,7 @@ dependencies = [
  "derive_more",
  "frame-capture-macros",
  "frame-capture-toml",
- "koruma",
+ "koruma 0.10.0",
  "serde",
  "serde_with",
  "thiserror 2.0.19",
@@ -4329,13 +4339,19 @@ dependencies = [
  "gtk",
  "image",
  "inventory",
+ "koruma 0.11.0",
+ "libc",
  "rust-embed",
+ "schemars",
  "serde",
  "serde_json",
  "strum 0.28.0",
+ "tempfile",
+ "thiserror 2.0.19",
  "tokio",
  "tracing",
  "unic-langid",
+ "url",
 ]
 
 [[package]]
@@ -4373,6 +4389,7 @@ dependencies = [
  "gpui_platform",
  "reqwest_client",
  "rust-embed",
+ "schemars",
  "serde",
  "strum 0.28.0",
  "tracing",
@@ -4384,6 +4401,7 @@ dependencies = [
 name = "gpui-storybook-macros"
 version = "0.5.0"
 dependencies = [
+ "darling 0.24.0",
  "heck 0.5.0",
  "insta",
  "prettyplease 0.3.0",
@@ -4400,6 +4418,7 @@ dependencies = [
  "frame-capture",
  "gpui-storybook-core",
  "rmcp",
+ "schemars",
  "serde",
  "serde_json",
  "thiserror 2.0.19",
@@ -5769,7 +5788,16 @@ version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "795782a96e661e711b4f5a3d5bcf8068a68bd2ce65582a44ec9dd3d647aab658"
 dependencies = [
- "koruma-core",
+ "koruma-core 0.10.0",
+]
+
+[[package]]
+name = "koruma"
+version = "0.11.0"
+source = "git+https://github.com/stayhydated/koruma?rev=0e92fde0b37f7caff376b8d95ed7fae1b18d3ed8#0e92fde0b37f7caff376b8d95ed7fae1b18d3ed8"
+dependencies = [
+ "koruma-core 0.11.0",
+ "koruma-derive",
 ]
 
 [[package]]
@@ -5777,6 +5805,36 @@ name = "koruma-core"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "268f7d209f7793d0b6c0a15942a8bc82db1097f1a4d8a6a76855b9dc2d2314bd"
+
+[[package]]
+name = "koruma-core"
+version = "0.11.0"
+source = "git+https://github.com/stayhydated/koruma?rev=0e92fde0b37f7caff376b8d95ed7fae1b18d3ed8#0e92fde0b37f7caff376b8d95ed7fae1b18d3ed8"
+
+[[package]]
+name = "koruma-derive"
+version = "0.11.0"
+source = "git+https://github.com/stayhydated/koruma?rev=0e92fde0b37f7caff376b8d95ed7fae1b18d3ed8#0e92fde0b37f7caff376b8d95ed7fae1b18d3ed8"
+dependencies = [
+ "heck 0.5.0",
+ "koruma-derive-core",
+ "proc-macro-crate 3.5.0",
+ "proc-macro2",
+ "quote",
+ "syn 3.0.3",
+]
+
+[[package]]
+name = "koruma-derive-core"
+version = "0.11.0"
+source = "git+https://github.com/stayhydated/koruma?rev=0e92fde0b37f7caff376b8d95ed7fae1b18d3ed8#0e92fde0b37f7caff376b8d95ed7fae1b18d3ed8"
+dependencies = [
+ "attribute-dsl",
+ "heck 0.5.0",
+ "proc-macro2",
+ "quote",
+ "syn 3.0.3",
+]
 
 [[package]]
 name = "kqueue"
