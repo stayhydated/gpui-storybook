@@ -11,24 +11,25 @@ use crate::{
     registry::StoryEntry,
     story::{StoryContainer, StoryState, parse_story_list_klass, reveal_story_panel},
     storybook_window_ui::StorybookWindowUi,
-    title_bar::AppTitleBar,
+    title_bar::{AppTitleBar, sidebar_toggle_button},
     window_options::default_storybook_window_options,
     window_view::DockWindowView,
     workbench::{StoryWorkbench, WorkbenchState, WorkbenchTab},
 };
 use anyhow::{Context as _, Result};
 use gpui::{
-    Action, App, AppContext as _, ClickEvent, Context, Edges, Entity, EntityId, EventEmitter,
-    FocusHandle, Focusable, InteractiveElement as _, IntoElement, ParentElement as _, Render,
-    SharedString, Styled as _, Subscription, Window, div, px, relative,
+    Action, AnyElement, App, AppContext as _, ClickEvent, Context, Edges, Entity, EntityId,
+    EventEmitter, FocusHandle, Focusable, InteractiveElement as _, IntoElement, ParentElement as _,
+    Render, SharedString, Styled as _, Subscription, Window, div, px, relative,
 };
 use gpui_component::{
-    ActiveTheme as _, Root, Sizable as _,
+    ActiveTheme as _, Root, Side, Sizable as _,
     button::{Button, ButtonVariants as _},
     dock::{
         ClosePanel, DockArea, DockAreaState, DockEvent, DockItem, DockPlacement, Panel,
         PanelControl, PanelEvent, PanelInfo, PanelView, ToggleZoom, register_panel,
     },
+    h_flex,
     input::{Input, InputEvent, InputState},
     sidebar::{Sidebar, SidebarGroup},
     v_flex,
@@ -587,6 +588,8 @@ impl Render for StorySidebar {
     }
 }
 
+/// Dock workspace whose collapsible side docks leave the story canvas centered
+/// within the available center pane.
 pub struct StoryWorkspace {
     title_bar: Entity<AppTitleBar>,
     dock_area: Entity<DockArea>,
@@ -635,6 +638,9 @@ impl StoryWorkspace {
                 );
             },
         };
+        dock_area.update(cx, |dock_area, cx| {
+            dock_area.set_toggle_button_visible(false, cx);
+        });
 
         cx.subscribe_in(
             &dock_area,
@@ -660,16 +666,21 @@ impl StoryWorkspace {
         })
         .detach();
 
+        let dock_area_for_title_bar = dock_area.clone();
         let title_bar = cx.new(|cx| {
-            AppTitleBar::new("Storybook", ui, window, cx).system_child(|_, _| {
-                Button::new("reset-storybook-layout")
-                    .label("Reset layout")
-                    .xsmall()
-                    .ghost()
-                    .on_click(|_, window, cx| {
-                        window.dispatch_action(Box::new(ResetLayout), cx);
-                    })
-            })
+            AppTitleBar::new("Storybook", ui, window, cx)
+                .system_child(|_, _| {
+                    Button::new("reset-storybook-layout")
+                        .label("Reset layout")
+                        .xsmall()
+                        .ghost()
+                        .on_click(|_, window, cx| {
+                            window.dispatch_action(Box::new(ResetLayout), cx);
+                        })
+                })
+                .sidebar_child(move |_, cx| {
+                    Self::title_bar_sidebar_controls(dock_area_for_title_bar.clone(), cx)
+                })
         });
 
         let mut preference_subscriptions = vec![
@@ -699,15 +710,78 @@ impl StoryWorkspace {
             title_bar,
             automation,
             last_layout_state: None,
-            toggle_button_visible: true,
+            toggle_button_visible: false,
             _preference_subscriptions: preference_subscriptions,
         };
-
         if let Some(automation) = this.automation.clone() {
             this.attach_automation_host(automation, window, cx);
         }
 
         this
+    }
+
+    fn title_bar_sidebar_controls(dock_area: Entity<DockArea>, cx: &App) -> AnyElement {
+        let (left_collapsed, right_collapsed) = {
+            let dock_area = dock_area.read(cx);
+            (
+                dock_area
+                    .left_dock()
+                    .is_none_or(|dock| !dock.read(cx).is_open()),
+                dock_area
+                    .right_dock()
+                    .is_none_or(|dock| !dock.read(cx).is_open()),
+            )
+        };
+        let dock_area_for_left = dock_area.clone();
+        let dock_area_for_right = dock_area;
+
+        h_flex()
+            .gap_1()
+            .child(
+                div()
+                    .debug_selector(|| "dock-toggle-left-sidebar".to_owned())
+                    .child(
+                        sidebar_toggle_button(
+                            "dock-toggle-left-sidebar-button",
+                            Side::Left,
+                            left_collapsed,
+                        )
+                        .tooltip(if left_collapsed {
+                            "Show story navigation"
+                        } else {
+                            "Hide story navigation"
+                        })
+                        .on_click(move |_, window, cx| {
+                            dock_area_for_left.update(cx, |dock_area, cx| {
+                                dock_area.toggle_dock(DockPlacement::Left, window, cx);
+                            });
+                            window.refresh();
+                        }),
+                    ),
+            )
+            .child(
+                div()
+                    .debug_selector(|| "dock-toggle-right-sidebar".to_owned())
+                    .child(
+                        sidebar_toggle_button(
+                            "dock-toggle-right-sidebar-button",
+                            Side::Right,
+                            right_collapsed,
+                        )
+                        .tooltip(if right_collapsed {
+                            "Show story workbench"
+                        } else {
+                            "Hide story workbench"
+                        })
+                        .on_click(move |_, window, cx| {
+                            dock_area_for_right.update(cx, |dock_area, cx| {
+                                dock_area.toggle_dock(DockPlacement::Right, window, cx);
+                            });
+                            window.refresh();
+                        }),
+                    ),
+            )
+            .into_any_element()
     }
 
     fn save_layout(
@@ -1117,7 +1191,6 @@ impl StoryWorkspace {
             window,
             cx,
         );
-
         // Delete saved state file
         let _ = std::fs::remove_file(STATE_FILE);
 

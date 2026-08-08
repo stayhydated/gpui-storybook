@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum StoryViewportPreset {
-    /// Fill the available story canvas.
+    /// Fill the available canvas or use the workbench's retained resizable size.
     #[default]
     Responsive,
     Mobile,

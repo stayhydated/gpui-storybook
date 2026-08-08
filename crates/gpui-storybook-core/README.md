@@ -11,6 +11,15 @@ configuration discovery, story generation, and optional macro and MCP
 re-exports. Depend on this crate directly only when building a custom Storybook
 runtime integration.
 
+The runtime centers every preview canvas inside a visible frame. Fixed viewport
+presets lock that frame to their named dimensions. Responsive mode alone exposes
+edge and corner resize handles, and it inherits the dimensions of the fixed
+preset that was selected immediately before it. The canvas stays centered within
+the visible center pane as sidebar visibility and width change. Left and right
+panel icons in the top bar, immediately before appearance settings, toggle story
+navigation and the workbench in gallery and dock layouts. The initial Responsive
+frame fills the center pane without an artificial inset.
+
 Its public integration APIs include `ControlValue`, `ControlSpec`,
 `ControlTarget`, `WorkbenchState`, `ThemeDraft`, `StoryInspectorState`, and the
 shared automation controller. The facade re-exports the application-facing

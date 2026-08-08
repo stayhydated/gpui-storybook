@@ -32,6 +32,14 @@ struct ButtonStory {
 }
 ```
 
+The preview canvas stays centered inside a visible frame. **Mobile**, **Tablet**,
+and **Desktop** use locked preset dimensions; **Responsive** exposes resize
+handles and starts from the dimensions of the fixed preset selected immediately
+before it. The canvas remains centered within the visible main pane as the
+sidebars change width or visibility; dedicated left and right panel icons sit in
+the top bar immediately before the appearance settings button. Responsive frames
+fill that pane without an artificial inset and remain visibly contained within it.
+
 The Theme tab edits every serialized theme color in memory. Native debug builds
 can watch a consumer theme directory by setting `STORYBOOK_THEME_DIR` before
 launch; Wasm supports in-app editing without filesystem watching.

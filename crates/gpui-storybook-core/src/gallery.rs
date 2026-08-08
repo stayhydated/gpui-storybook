@@ -7,17 +7,19 @@ use crate::{
     },
     capture_region::capture_route_story_key,
     story::StoryContainer,
+    title_bar::sidebar_toggle_button,
     workbench::{StoryWorkbench, WorkbenchState, WorkbenchTab},
 };
 use gpui::prelude::{
     Context, FluentBuilder as _, InteractiveElement as _, IntoElement, ParentElement as _, Render,
-    StatefulInteractiveElement as _, Styled as _,
+    Styled as _,
 };
 use gpui::{
-    App, AppContext as _, ClickEvent, Entity, SharedString, Subscription, Window, div, px, relative,
+    AnyElement, App, AppContext as _, ClickEvent, Entity, Pixels, SharedString, Subscription,
+    Window, div, px, relative,
 };
 use gpui_component::{
-    ActiveTheme as _, h_flex,
+    ActiveTheme as _, ElementExt as _, Side, h_flex,
     input::{Input, InputEvent, InputState},
     resizable::{h_resizable, resizable_panel},
     sidebar::{Sidebar, SidebarGroup, SidebarMenu, SidebarMenuItem},
@@ -25,10 +27,15 @@ use gpui_component::{
 };
 use std::{borrow::Borrow, collections::BTreeMap};
 
+/// Searchable gallery host with independently toggled navigation and workbench
+/// sidebars around a story canvas centered within the available main pane.
 pub struct Gallery {
     stories: Vec<Entity<StoryContainer>>,
     active_index: Option<usize>,
-    collapsed: bool,
+    left_sidebar_visible: bool,
+    right_sidebar_visible: bool,
+    left_sidebar_width: Pixels,
+    right_sidebar_width: Pixels,
     search_input: Entity<InputState>,
     automation: Option<SharedStorybookAutomation>,
     workbench_state: Entity<WorkbenchState>,
@@ -36,6 +43,9 @@ pub struct Gallery {
 
     _subscriptions: Vec<Subscription>,
 }
+
+const DEFAULT_LEFT_SIDEBAR_WIDTH: Pixels = px(255.);
+const DEFAULT_RIGHT_SIDEBAR_WIDTH: Pixels = px(320.);
 
 impl Gallery {
     pub fn new(
@@ -51,7 +61,6 @@ impl Gallery {
         let workbench = cx.new(|cx| {
             StoryWorkbench::new(workbench_state.clone(), WorkbenchTab::Controls, window, cx)
         });
-
         let subscriptions = vec![
             #[allow(clippy::single_match)]
             cx.subscribe(&search_input, |this, _, event, cx_window| match event {
@@ -122,7 +131,10 @@ impl Gallery {
             } else {
                 Some(0)
             },
-            collapsed: false,
+            left_sidebar_visible: true,
+            right_sidebar_visible: true,
+            left_sidebar_width: DEFAULT_LEFT_SIDEBAR_WIDTH,
+            right_sidebar_width: DEFAULT_RIGHT_SIDEBAR_WIDTH,
             automation,
             workbench_state,
             workbench,
@@ -141,6 +153,173 @@ impl Gallery {
         }
 
         this
+    }
+
+    fn set_left_sidebar_width(&mut self, width: Pixels) {
+        if self.left_sidebar_width == width {
+            return;
+        }
+        self.left_sidebar_width = width;
+    }
+
+    fn set_right_sidebar_width(&mut self, width: Pixels) {
+        if self.right_sidebar_width == width {
+            return;
+        }
+        self.right_sidebar_width = width;
+    }
+
+    fn toggle_left_sidebar(&mut self, cx: &mut Context<Self>) {
+        self.left_sidebar_visible = !self.left_sidebar_visible;
+        cx.notify();
+    }
+
+    fn toggle_right_sidebar(&mut self, cx: &mut Context<Self>) {
+        self.right_sidebar_visible = !self.right_sidebar_visible;
+        cx.notify();
+    }
+
+    pub(crate) fn title_bar_sidebar_controls(gallery: Entity<Self>, cx: &App) -> AnyElement {
+        let (left_collapsed, right_collapsed) = {
+            let gallery = gallery.read(cx);
+            (
+                !gallery.left_sidebar_visible,
+                !gallery.right_sidebar_visible,
+            )
+        };
+        let gallery_for_left = gallery.clone();
+        let gallery_for_right = gallery;
+
+        h_flex()
+            .gap_1()
+            .child(
+                div()
+                    .debug_selector(|| "gallery-toggle-left-sidebar".to_owned())
+                    .child(
+                        sidebar_toggle_button(
+                            "gallery-toggle-left-sidebar-button",
+                            Side::Left,
+                            left_collapsed,
+                        )
+                        .tooltip(if left_collapsed {
+                            "Show story navigation"
+                        } else {
+                            "Hide story navigation"
+                        })
+                        .on_click(move |_, window, cx| {
+                            gallery_for_left.update(cx, |gallery, cx| {
+                                gallery.toggle_left_sidebar(cx);
+                            });
+                            window.refresh();
+                        }),
+                    ),
+            )
+            .child(
+                div()
+                    .debug_selector(|| "gallery-toggle-right-sidebar".to_owned())
+                    .child(
+                        sidebar_toggle_button(
+                            "gallery-toggle-right-sidebar-button",
+                            Side::Right,
+                            right_collapsed,
+                        )
+                        .tooltip(if right_collapsed {
+                            "Show story workbench"
+                        } else {
+                            "Hide story workbench"
+                        })
+                        .on_click(move |_, window, cx| {
+                            gallery_for_right.update(cx, |gallery, cx| {
+                                gallery.toggle_right_sidebar(cx);
+                            });
+                            window.refresh();
+                        }),
+                    ),
+            )
+            .into_any_element()
+    }
+
+    fn render_story_sidebar(
+        &self,
+        filtered_stories: &[Entity<StoryContainer>],
+        active_filtered_index: Option<usize>,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
+        let mut groups: BTreeMap<
+            Option<SharedString>,
+            BTreeMap<Option<SharedString>, Vec<(usize, Entity<StoryContainer>)>>,
+        > = BTreeMap::new();
+        for (filtered_index, story) in filtered_stories.iter().enumerate() {
+            let story_data = story.read(cx);
+            groups
+                .entry(story_data.sidebar_group())
+                .or_default()
+                .entry(story_data.sidebar_section())
+                .or_default()
+                .push((filtered_index, story.clone()));
+        }
+
+        let groups = groups.into_iter().map(|(group, sections)| {
+            let menu_items = sections.into_iter().flat_map(|(section, stories)| {
+                let story_items = stories
+                    .into_iter()
+                    .map(|(filtered_index, story)| {
+                        let story_data = story.read(cx);
+                        let name: SharedString = story_data.display_title(cx).into();
+                        let is_active = active_filtered_index == Some(filtered_index);
+
+                        SidebarMenuItem::new(name)
+                            .active(is_active)
+                            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                if let Some(original_index) = this
+                                    .stories
+                                    .iter()
+                                    .position(|candidate| candidate == &story)
+                                {
+                                    this.active_index = Some(original_index);
+                                }
+                                this.sync_workbench_active(cx);
+                                cx.notify();
+                            }))
+                    })
+                    .collect::<Vec<_>>();
+
+                if let Some(section) = section {
+                    vec![
+                        SidebarMenuItem::new(section)
+                            .default_open(true)
+                            .children(story_items),
+                    ]
+                } else {
+                    story_items
+                }
+            });
+
+            SidebarGroup::new(group.unwrap_or_default())
+                .child(SidebarMenu::new().children(menu_items))
+        });
+
+        Sidebar::new("sidebar-gallery")
+            .side(gpui_component::Side::Left)
+            .w(relative(1.))
+            .border_0()
+            .header(
+                v_flex().w_full().child(
+                    div()
+                        .bg(cx.theme().sidebar_border)
+                        .px_1()
+                        .rounded_full()
+                        .flex_1()
+                        .mx_1()
+                        .gap_4()
+                        .child(
+                            Input::new(&self.search_input)
+                                .appearance(false)
+                                .cleanable(true),
+                        ),
+                ),
+            )
+            .children(groups)
     }
 
     fn set_active_story(&mut self, name: &str, app_cx: &mut App) {
@@ -513,171 +692,99 @@ impl Render for Gallery {
                 ("".to_owned(), "".to_owned())
             };
 
-        h_resizable("gallery-container")
-            .child(
+        let left_sidebar_visible = self.left_sidebar_visible;
+        let right_sidebar_visible = self.right_sidebar_visible;
+        let left_sidebar_width = self.left_sidebar_width;
+        let right_sidebar_width = self.right_sidebar_width;
+        let gallery_for_left_bounds = cx.entity();
+        let gallery_for_right_bounds = cx.entity();
+        let story_sidebar =
+            self.render_story_sidebar(&filtered_stories, ui_active_index_in_filtered_list, cx);
+
+        h_resizable(format!(
+            "gallery-container-{left_sidebar_visible}-{right_sidebar_visible}"
+        ))
+        .when(left_sidebar_visible, |this| {
+            this.child(
                 resizable_panel()
-                    .size(px(255.))
+                    .size(left_sidebar_width)
                     .size_range(px(200.)..px(320.))
+                    .flex_none()
                     .child(
-                        Sidebar::new("sidebar-gallery")
-                            .side(gpui_component::Side::Left)
-                            .w(relative(1.))
-                            .border_0()
-                            .collapsed(self.collapsed)
-                            .header(
-                                v_flex().w_full().child(
-                                    div()
-                                        .bg(cx.theme().sidebar_border)
-                                        .px_1()
-                                        .rounded_full()
-                                        .flex_1()
-                                        .mx_1()
-                                        .gap_4()
-                                        .child(
-                                            Input::new(&self.search_input)
-                                                .appearance(false)
-                                                .cleanable(true),
-                                        ),
-                                ),
-                            )
-                            .children({
-                                // Group stories by crate group, then optional section.
-                                let mut groups: BTreeMap<
-                                    Option<SharedString>,
-                                    BTreeMap<
-                                        Option<SharedString>,
-                                        Vec<(usize, Entity<StoryContainer>)>,
-                                    >,
-                                > = BTreeMap::new();
-
-                                for (idx_in_filtered, story_entity) in
-                                    filtered_stories.iter().enumerate()
-                                {
-                                    let (group, section) = {
-                                        let story_data = story_entity.read(cx);
-                                        (story_data.sidebar_group(), story_data.sidebar_section())
-                                    };
-
-                                    groups
-                                        .entry(group)
-                                        .or_default()
-                                        .entry(section)
-                                        .or_default()
-                                        .push((idx_in_filtered, story_entity.clone()));
-                                }
-
-                                // Build sidebar groups with menus.
-                                groups
-                                    .into_iter()
-                                    .map(|(group, sections_in_group)| {
-                                        let menu_items: Vec<_> = sections_in_group
-                                            .into_iter()
-                                            .flat_map(|(section, stories_in_section)| {
-                                                let story_items: Vec<_> = stories_in_section
-                                                    .into_iter()
-                                                    .map(
-                                                        |(
-                                                            idx_in_filtered,
-                                                            story_entity_in_filtered,
-                                                        )| {
-                                                            let story_data =
-                                                                story_entity_in_filtered.read(cx);
-                                                            let name: SharedString = story_data
-                                                                .display_title(cx)
-                                                                .into();
-                                                            let is_active =
-                                                                ui_active_index_in_filtered_list
-                                                                    == Some(idx_in_filtered);
-
-                                                            let story_entity_for_click =
-                                                                story_entity_in_filtered.clone();
-
-                                                            SidebarMenuItem::new(name)
-                                                                .active(is_active)
-                                                                .on_click(cx.listener(
-                                                                    move |this,
-                                                                          _: &ClickEvent,
-                                                                          _,
-                                                                          cx_listener| {
-                                                                        if let Some(original_idx) =
-                                                                            this.stories.iter().position(|s| {
-                                                                                s == &story_entity_for_click
-                                                                            })
-                                                                        {
-                                                                            this.active_index = Some(original_idx);
-                                                                        }
-                                                                        this.sync_workbench_active(cx_listener);
-                                                                        cx_listener.notify();
-                                                                    },
-                                                                ))
-                                                        },
-                                                    )
-                                                    .collect();
-
-                                                if let Some(section) = section {
-                                                    vec![
-                                                        SidebarMenuItem::new(section)
-                                                            .default_open(true)
-                                                            .children(story_items),
-                                                    ]
-                                                } else {
-                                                    story_items
-                                                }
-                                            })
-                                            .collect();
-
-                                        let menu = SidebarMenu::new().children(menu_items);
-
-                                        SidebarGroup::new(group.unwrap_or_default()).child(menu)
-                                    })
-                                    .collect::<Vec<_>>()
-                            }),
+                        div()
+                            .size_full()
+                            .debug_selector(|| "gallery-left-sidebar".to_owned())
+                            .on_prepaint(move |bounds, _, cx| {
+                                gallery_for_left_bounds.update(cx, |gallery, _| {
+                                    gallery.set_left_sidebar_width(bounds.size.width);
+                                });
+                            })
+                            .child(story_sidebar),
                     ),
             )
-            .child(
-                resizable_panel().child(
-                    v_flex()
+        })
+        .child(
+            resizable_panel().child(
+                v_flex()
                     .flex_1()
                     .h_full()
-                    .overflow_x_hidden()
+                    .min_w_0()
+                    .min_h_0()
+                    .overflow_hidden()
+                    .debug_selector(|| "gallery-main-content".to_owned())
                     .child(
                         h_flex()
                             .id("header")
                             .p_4()
                             .border_b_1()
                             .border_color(cx.theme().border)
-                            .justify_between()
                             .items_start()
                             .child(
-                                v_flex()
-                                    .gap_1()
-                                    .child(div().text_xl().child(story_name))
-                                    .child(
-                                        div()
-                                            .text_color(cx.theme().muted_foreground)
-                                            .child(description),
-                                    ),
+                                h_flex().items_start().gap_3().child(
+                                    v_flex()
+                                        .gap_1()
+                                        .child(div().text_xl().child(story_name))
+                                        .child(
+                                            div()
+                                                .text_color(cx.theme().muted_foreground)
+                                                .child(description),
+                                        ),
+                                ),
                             ),
                     )
                     .child(
                         div()
                             .id("story")
                             .flex_1()
-                            .overflow_y_scroll()
+                            .min_w_0()
+                            .min_h_0()
+                            .overflow_hidden()
                             .when_some(active_story_to_render, |this, active_story_ref| {
                                 this.child(active_story_ref)
                             }),
                     )
                     .into_any_element(),
-                ),
-            )
-            .child(
+            ),
+        )
+        .when(right_sidebar_visible, |this| {
+            this.child(
                 resizable_panel()
-                    .size(px(320.))
+                    .size(right_sidebar_width)
                     .size_range(px(280.)..px(520.))
                     .flex_none()
-                    .child(self.workbench.clone()),
+                    .child(
+                        div()
+                            .size_full()
+                            .debug_selector(|| "gallery-right-sidebar".to_owned())
+                            .on_prepaint(move |bounds, _, cx| {
+                                gallery_for_right_bounds.update(cx, |gallery, _| {
+                                    gallery.set_right_sidebar_width(bounds.size.width);
+                                });
+                            })
+                            .child(self.workbench.clone()),
+                    ),
             )
+        })
     }
 }
 
@@ -689,7 +796,8 @@ mod tests {
     };
     use crate::registry::{RegisteredStoryMetadata, StoryKey, StoryName};
     use crate::story::Story;
-    use gpui::Focusable;
+    use crate::storybook_window_ui::StorybookWindowUi;
+    use gpui::{Focusable, Modifiers, MouseButton, TestAppContext, VisualTestContext, point};
     use tokio::sync::oneshot;
 
     struct ControlledStory {
@@ -807,7 +915,8 @@ mod tests {
         window
             .update(cx, |gallery, window, cx| {
                 assert_eq!(gallery.active_index, Some(1));
-                assert!(!gallery.collapsed);
+                assert!(gallery.left_sidebar_visible);
+                assert!(gallery.right_sidebar_visible);
                 assert_eq!(
                     gallery
                         .active_story_snapshot(cx)
@@ -967,6 +1076,188 @@ mod tests {
             .expect("gallery should update");
     }
 
+    #[test]
+    fn sidebar_toggles_keep_responsive_canvas_flush_with_the_main_pane() {
+        let mut app = TestAppContext::single();
+        app.update(gpui_component::init);
+        let (_, cx) = app.add_window_view(move |window, cx| {
+            let gallery = cx.new(|gallery_cx| {
+                let story = story(
+                    "crate-ButtonStory",
+                    "ButtonStory",
+                    "Button",
+                    window,
+                    gallery_cx,
+                );
+                Gallery::new(vec![story], None, None, window, gallery_cx)
+            });
+            crate::story::StoryRoot::new(
+                "Storybook",
+                gallery,
+                StorybookWindowUi::default(),
+                window,
+                cx,
+            )
+        });
+        let draw = |cx: &mut VisualTestContext| {
+            cx.run_until_parked();
+            cx.update(|window, cx| {
+                _ = window.draw(cx);
+            });
+            cx.run_until_parked();
+            cx.update(|window, cx| {
+                _ = window.draw(cx);
+            });
+        };
+        let assert_canvas_flush_with_main_pane = |cx: &mut VisualTestContext| {
+            let canvas = cx
+                .debug_bounds("story-canvas")
+                .expect("story canvas should render");
+            let main_content = cx
+                .debug_bounds("gallery-main-content")
+                .expect("main content pane should render");
+            assert_eq!(
+                canvas.left(),
+                main_content.left(),
+                "responsive canvas {canvas:?} must not have a left inset in {main_content:?}"
+            );
+            assert_eq!(
+                canvas.right(),
+                main_content.right(),
+                "responsive canvas {canvas:?} must not have a right inset in {main_content:?}"
+            );
+            assert_eq!(
+                canvas.center().x,
+                main_content.center().x,
+                "responsive canvas {canvas:?} must be centered in {main_content:?}"
+            );
+            if let Some(left_sidebar) = cx.debug_bounds("gallery-left-sidebar") {
+                assert!(
+                    canvas.left() >= left_sidebar.right(),
+                    "canvas {canvas:?} must stay to the right of {left_sidebar:?}"
+                );
+            }
+            if let Some(right_sidebar) = cx.debug_bounds("gallery-right-sidebar") {
+                assert!(
+                    canvas.right() <= right_sidebar.left(),
+                    "canvas {canvas:?} must stay to the left of {right_sidebar:?}"
+                );
+            }
+        };
+        let click_toggle = |selector, cx: &mut VisualTestContext| {
+            let bounds = cx
+                .debug_bounds(selector)
+                .expect("sidebar toggle should render");
+            cx.simulate_click(bounds.center(), Modifiers::none());
+            draw(cx);
+        };
+
+        draw(cx);
+        let left_toggle_bounds = cx
+            .debug_bounds("gallery-toggle-left-sidebar")
+            .expect("left sidebar toggle should render in the title bar");
+        let right_toggle_bounds = cx
+            .debug_bounds("gallery-toggle-right-sidebar")
+            .expect("right sidebar toggle should render in the title bar");
+        let settings_bounds = cx
+            .debug_bounds("storybook-settings")
+            .expect("settings should render in the title bar");
+        assert!(left_toggle_bounds.right() <= right_toggle_bounds.left());
+        assert!(right_toggle_bounds.right() <= settings_bounds.left());
+
+        let left_width = cx
+            .debug_bounds("gallery-left-sidebar")
+            .expect("left sidebar should render")
+            .size
+            .width;
+        let right_width = cx
+            .debug_bounds("gallery-right-sidebar")
+            .expect("right sidebar should render")
+            .size
+            .width;
+        assert_canvas_flush_with_main_pane(cx);
+
+        click_toggle("gallery-toggle-left-sidebar", cx);
+        assert_eq!(cx.debug_bounds("gallery-left-sidebar"), None);
+        assert!(cx.debug_bounds("gallery-right-sidebar").is_some());
+        assert_canvas_flush_with_main_pane(cx);
+
+        click_toggle("gallery-toggle-right-sidebar", cx);
+        assert_eq!(cx.debug_bounds("gallery-left-sidebar"), None);
+        assert_eq!(cx.debug_bounds("gallery-right-sidebar"), None);
+        assert_canvas_flush_with_main_pane(cx);
+
+        click_toggle("gallery-toggle-left-sidebar", cx);
+        assert!(cx.debug_bounds("gallery-left-sidebar").is_some());
+        assert_eq!(cx.debug_bounds("gallery-right-sidebar"), None);
+        assert_canvas_flush_with_main_pane(cx);
+
+        click_toggle("gallery-toggle-right-sidebar", cx);
+        assert!(cx.debug_bounds("gallery-left-sidebar").is_some());
+        assert!(cx.debug_bounds("gallery-right-sidebar").is_some());
+        assert_canvas_flush_with_main_pane(cx);
+
+        let left_bounds = cx
+            .debug_bounds("gallery-left-sidebar")
+            .expect("left sidebar should render before resizing");
+        let resize_start = point(left_bounds.right(), left_bounds.center().y);
+        cx.simulate_mouse_move(resize_start, None, Modifiers::none());
+        cx.simulate_mouse_down(resize_start, MouseButton::Left, Modifiers::none());
+        cx.simulate_mouse_move(
+            point(resize_start.x + px(5.), resize_start.y),
+            MouseButton::Left,
+            Modifiers::none(),
+        );
+        cx.simulate_mouse_move(
+            point(resize_start.x + px(30.), resize_start.y),
+            MouseButton::Left,
+            Modifiers::none(),
+        );
+        cx.simulate_mouse_up(
+            point(resize_start.x + px(30.), resize_start.y),
+            MouseButton::Left,
+            Modifiers::none(),
+        );
+        draw(cx);
+        let resized_left_width = cx
+            .debug_bounds("gallery-left-sidebar")
+            .expect("left sidebar should render after resizing")
+            .size
+            .width;
+        assert!(resized_left_width > left_width);
+        assert_canvas_flush_with_main_pane(cx);
+
+        let right_bounds = cx
+            .debug_bounds("gallery-right-sidebar")
+            .expect("right sidebar should render before resizing");
+        let resize_start = point(right_bounds.left(), right_bounds.center().y);
+        cx.simulate_mouse_move(resize_start, None, Modifiers::none());
+        cx.simulate_mouse_down(resize_start, MouseButton::Left, Modifiers::none());
+        cx.simulate_mouse_move(
+            point(resize_start.x - px(5.), resize_start.y),
+            MouseButton::Left,
+            Modifiers::none(),
+        );
+        cx.simulate_mouse_move(
+            point(resize_start.x - px(30.), resize_start.y),
+            MouseButton::Left,
+            Modifiers::none(),
+        );
+        cx.simulate_mouse_up(
+            point(resize_start.x - px(30.), resize_start.y),
+            MouseButton::Left,
+            Modifiers::none(),
+        );
+        draw(cx);
+        let resized_right_width = cx
+            .debug_bounds("gallery-right-sidebar")
+            .expect("right sidebar should render after resizing")
+            .size
+            .width;
+        assert!(resized_right_width > right_width);
+        assert_canvas_flush_with_main_pane(cx);
+    }
+
     #[gpui::test]
     fn empty_gallery_has_no_active_story(cx: &mut App) {
         gpui_component::init(cx);
@@ -1067,7 +1358,6 @@ mod tests {
     fn grouped_route_selects_the_exact_workbench_variant(cx: &mut App) {
         gpui_component::init(cx);
         let automation = crate::automation::StorybookAutomation::new();
-        let automation_for_view = automation.clone();
         let window: gpui::WindowHandle<Gallery> = cx
             .open_window(Default::default(), move |window, cx| {
                 let primary = story(
@@ -1086,7 +1376,7 @@ mod tests {
                 );
                 let grouped =
                     StoryContainer::list_panel("Button", vec![primary, danger], window, cx);
-                Gallery::view_with_automation(vec![grouped], None, automation_for_view, window, cx)
+                Gallery::view_with_automation(vec![grouped], None, automation, window, cx)
             })
             .expect("grouped gallery window should open");
 

@@ -1,15 +1,16 @@
 use gpui::{
-    Action, AnyElement, AnyView, App, AppContext as _, ClickEvent, Div, Entity, EventEmitter,
-    Focusable, Hsla, InteractiveElement as _, IntoElement, ParentElement, Render, RenderOnce,
-    ScrollHandle, SharedString, StatefulInteractiveElement as _, StyleRefinement, Styled, Window,
-    div, hsla, prelude::FluentBuilder as _, px, relative, rems,
+    Action, AnyElement, AnyView, App, AppContext as _, Bounds, ClickEvent, Div, DragMoveEvent,
+    Empty, Entity, EntityId, EventEmitter, Focusable, Hsla, InteractiveElement as _, IntoElement,
+    ParentElement, Pixels, Point, Render, RenderOnce, ScrollHandle, SharedString, Size,
+    StatefulInteractiveElement as _, StyleRefinement, Styled, Window, div, hsla,
+    prelude::FluentBuilder as _, px, relative, rems, size,
 };
 
 use serde::{Deserialize, Serialize};
 use std::{borrow::Borrow, rc::Rc, sync::Arc};
 
 use gpui_component::{
-    ActiveTheme as _, IconName, Sizable as _,
+    ActiveTheme as _, ElementExt as _, IconName, Sizable as _,
     button::{Button, ButtonVariants as _},
     dock::{Panel, PanelControl, PanelEvent, PanelInfo, PanelState, PanelView, TitleStyle},
     group_box::{GroupBox, GroupBoxVariants as _},
@@ -31,6 +32,34 @@ use crate::{
 };
 
 pub const STORY_LIST_KLASS_PREFIX: &str = "__gpui_storybook_list__:";
+const STORY_CANVAS_MIN_SIZE: Size<Pixels> = size(px(240.), px(160.));
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum StoryCanvasResizeAxis {
+    Horizontal,
+    Vertical,
+    Both,
+}
+
+#[derive(Clone, Copy)]
+struct DragStoryCanvasResize {
+    entity_id: EntityId,
+    axis: StoryCanvasResizeAxis,
+}
+
+impl Render for DragStoryCanvasResize {
+    fn render(&mut self, _: &mut Window, _: &mut gpui::Context<Self>) -> impl IntoElement {
+        Empty
+    }
+}
+
+#[derive(Clone, Copy)]
+struct StoryCanvasResizeDrag {
+    start_position: Point<Pixels>,
+    start_size: Size<Pixels>,
+    horizontal_scale: f32,
+    vertical_scale: f32,
+}
 
 #[derive(Action, Clone, Debug, Default, Eq, PartialEq)]
 #[action(namespace = story)]
@@ -257,6 +286,10 @@ pub struct StoryContainer {
     story: Option<AnyView>,
     control_target: Option<Rc<dyn ControlTarget>>,
     presentation: StoryPresentation,
+    responsive_size: Option<Size<Pixels>>,
+    canvas_bounds: Option<Bounds<Pixels>>,
+    canvas_stage_bounds: Option<Bounds<Pixels>>,
+    canvas_resize_drag: Option<StoryCanvasResizeDrag>,
     automation_size: Option<gpui::Size<gpui::Pixels>>,
     workbench_state: Option<gpui::WeakEntity<crate::workbench::WorkbenchState>>,
     pub story_klass: Option<SharedString>,
@@ -468,6 +501,10 @@ impl StoryContainer {
             story: None,
             control_target: None,
             presentation: StoryPresentation::default(),
+            responsive_size: None,
+            canvas_bounds: None,
+            canvas_stage_bounds: None,
+            canvas_resize_drag: None,
             automation_size: None,
             workbench_state: None,
             story_klass: None,
@@ -587,6 +624,10 @@ impl StoryContainer {
         self.presentation = presentation;
     }
 
+    pub(crate) fn set_responsive_size(&mut self, responsive_size: Option<Size<Pixels>>) {
+        self.responsive_size = responsive_size;
+    }
+
     pub(crate) fn set_automation_size(&mut self, size: Option<gpui::Size<gpui::Pixels>>) {
         self.automation_size = size;
     }
@@ -595,12 +636,141 @@ impl StoryContainer {
         self.presentation
     }
 
-    #[cfg(feature = "dock")]
     pub(crate) fn set_workbench_state(
         &mut self,
         state: gpui::WeakEntity<crate::workbench::WorkbenchState>,
     ) {
         self.workbench_state = Some(state);
+    }
+
+    fn viewport_size(&self) -> Option<Size<Pixels>> {
+        self.presentation
+            .viewport
+            .dimensions()
+            .map(|(width, height)| size(px(width as f32), px(height as f32)))
+            .or(self.responsive_size)
+    }
+
+    fn begin_canvas_resize(&mut self, start_position: Point<Pixels>) {
+        let (Some(canvas_bounds), Some(stage_bounds)) =
+            (self.canvas_bounds, self.canvas_stage_bounds)
+        else {
+            return;
+        };
+        self.canvas_resize_drag = Some(StoryCanvasResizeDrag {
+            start_position,
+            start_size: canvas_bounds.size,
+            horizontal_scale: if canvas_bounds.size.width < stage_bounds.size.width {
+                2.
+            } else {
+                1.
+            },
+            vertical_scale: if canvas_bounds.size.height < stage_bounds.size.height {
+                2.
+            } else {
+                1.
+            },
+        });
+    }
+
+    fn resize_canvas(
+        &mut self,
+        axis: StoryCanvasResizeAxis,
+        position: Point<Pixels>,
+        cx: &mut gpui::Context<Self>,
+    ) {
+        if self.presentation.viewport != crate::presentation::StoryViewportPreset::Responsive {
+            return;
+        }
+        let Some(drag) = self.canvas_resize_drag else {
+            return;
+        };
+        let delta = position - drag.start_position;
+        let width = match axis {
+            StoryCanvasResizeAxis::Horizontal | StoryCanvasResizeAxis::Both => {
+                (drag.start_size.width + delta.x * drag.horizontal_scale)
+                    .max(STORY_CANVAS_MIN_SIZE.width)
+            },
+            StoryCanvasResizeAxis::Vertical => drag.start_size.width,
+        };
+        let height = match axis {
+            StoryCanvasResizeAxis::Vertical | StoryCanvasResizeAxis::Both => {
+                (drag.start_size.height + delta.y * drag.vertical_scale)
+                    .max(STORY_CANVAS_MIN_SIZE.height)
+            },
+            StoryCanvasResizeAxis::Horizontal => drag.start_size.height,
+        };
+        let responsive_size = size(width, height);
+        self.responsive_size = Some(responsive_size);
+        if let Some(workbench_state) = self
+            .workbench_state
+            .as_ref()
+            .and_then(gpui::WeakEntity::upgrade)
+        {
+            workbench_state.update(cx, |state, cx| {
+                state.set_responsive_size(responsive_size, cx);
+            });
+        }
+        cx.notify();
+    }
+
+    fn render_canvas_resize_handle(
+        &self,
+        axis: StoryCanvasResizeAxis,
+        cx: &mut gpui::Context<Self>,
+    ) -> impl IntoElement {
+        let entity_id = cx.entity_id();
+        let story = cx.entity();
+        let (id, selector) = match axis {
+            StoryCanvasResizeAxis::Horizontal => {
+                ("story-canvas-resize-width", "story-canvas-resize-width")
+            },
+            StoryCanvasResizeAxis::Vertical => {
+                ("story-canvas-resize-height", "story-canvas-resize-height")
+            },
+            StoryCanvasResizeAxis::Both => {
+                ("story-canvas-resize-corner", "story-canvas-resize-corner")
+            },
+        };
+
+        div()
+            .id(id)
+            .absolute()
+            .debug_selector(move || selector.to_owned())
+            .map(|this| match axis {
+                StoryCanvasResizeAxis::Horizontal => this
+                    .top_0()
+                    .right(px(-4.))
+                    .h_full()
+                    .w(px(9.))
+                    .cursor_ew_resize(),
+                StoryCanvasResizeAxis::Vertical => this
+                    .left_0()
+                    .bottom(px(-4.))
+                    .w_full()
+                    .h(px(9.))
+                    .cursor_ns_resize(),
+                StoryCanvasResizeAxis::Both => this
+                    .right(px(-5.))
+                    .bottom(px(-5.))
+                    .size(px(12.))
+                    .cursor_nwse_resize(),
+            })
+            .on_drag(
+                DragStoryCanvasResize { entity_id, axis },
+                move |drag, position, _, cx| {
+                    story.update(cx, |story, _| story.begin_canvas_resize(position));
+                    cx.new(|_| *drag)
+                },
+            )
+            .on_drag_move(cx.listener(
+                move |this, event: &DragMoveEvent<DragStoryCanvasResize>, _, cx| {
+                    let drag = event.drag(cx);
+                    if drag.entity_id == entity_id && drag.axis == axis {
+                        this.resize_canvas(axis, event.event.position, cx);
+                    }
+                },
+            ))
     }
 
     /// Store typed registry metadata on this runtime container.
@@ -874,6 +1044,7 @@ impl Render for StoryContainer {
         let scroll_handle = self.scroll_handle.clone();
         let story_key = self.story_key_label().map(str::to_owned);
         let presentation = self.presentation;
+        let viewport_size = self.viewport_size();
         let automation_size = self.automation_size;
         let background = match presentation.background {
             StoryCanvasBackground::Theme => cx.theme().background,
@@ -885,51 +1056,109 @@ impl Render for StoryContainer {
             StoryCanvasBackground::Dark => hsla(0.0, 0.0, 1.0, 0.10),
             _ => hsla(0.0, 0.0, 0.0, 0.08),
         };
-        let grid = (1..20).flat_map(|index| {
-            let offset = relative(index as f32 / 20.0);
-            [
-                div()
-                    .absolute()
-                    .top_0()
-                    .bottom_0()
-                    .left(offset)
-                    .w(px(1.0))
-                    .bg(grid_color)
-                    .into_any_element(),
-                div()
-                    .absolute()
-                    .left_0()
-                    .right_0()
-                    .top(offset)
-                    .h(px(1.0))
-                    .bg(grid_color)
-                    .into_any_element(),
-            ]
-        });
+        let grid = || {
+            div()
+                .absolute()
+                .top_0()
+                .left_0()
+                .size_full()
+                .debug_selector(|| "story-canvas-grid".to_owned())
+                .children((1..20).flat_map(|index| {
+                    let offset = relative(index as f32 / 20.0);
+                    [
+                        div()
+                            .absolute()
+                            .top_0()
+                            .bottom_0()
+                            .left(offset)
+                            .w(px(1.0))
+                            .bg(grid_color)
+                            .into_any_element(),
+                        div()
+                            .absolute()
+                            .left_0()
+                            .right_0()
+                            .top(offset)
+                            .h(px(1.0))
+                            .bg(grid_color)
+                            .into_any_element(),
+                    ]
+                }))
+        };
+        let border_color = cx.theme().border;
+        let frame = || {
+            div()
+                .absolute()
+                .top_0()
+                .left_0()
+                .size_full()
+                .border_1()
+                .border_color(border_color)
+                .debug_selector(|| "story-canvas-border".to_owned())
+        };
+        let resize_handles =
+            if presentation.viewport == crate::presentation::StoryViewportPreset::Responsive {
+                vec![
+                    self.render_canvas_resize_handle(StoryCanvasResizeAxis::Horizontal, cx)
+                        .into_any_element(),
+                    self.render_canvas_resize_handle(StoryCanvasResizeAxis::Vertical, cx)
+                        .into_any_element(),
+                    self.render_canvas_resize_handle(StoryCanvasResizeAxis::Both, cx)
+                        .into_any_element(),
+                ]
+            } else {
+                Vec::new()
+            };
+        let story_for_canvas_bounds = cx.entity();
         let canvas = div()
             .relative()
             .flex_none()
-            .min_w_full()
-            .min_h_full()
             .bg(background)
-            .when_some(
-                presentation.viewport.dimensions(),
-                |this, (width, height)| this.w(px(width as f32)).h(px(height as f32)),
-            )
-            .when(presentation.grid, |this| this.children(grid))
+            .debug_selector(|| "story-canvas".to_owned())
+            .map(|this| match viewport_size {
+                Some(size) => this.w(size.width).h(size.height),
+                None => this.size_full(),
+            })
             .when_some(self.story.clone(), |this, story| {
                 this.child(div().relative().size_full().p_4().child(story))
+            })
+            .when(presentation.grid, |this| this.child(grid()))
+            .child(frame())
+            .children(resize_handles)
+            .on_prepaint(move |bounds, _, cx| {
+                story_for_canvas_bounds.update(cx, |story, _| {
+                    story.canvas_bounds = Some(bounds);
+                });
+            });
+        let story_for_stage_bounds = cx.entity();
+        let canvas_stage = div()
+            .relative()
+            .flex()
+            .flex_none()
+            .items_center()
+            .justify_center()
+            .debug_selector(|| "story-canvas-stage".to_owned())
+            .map(|this| match viewport_size {
+                Some(size) => this.min_w_full().min_h_full().w(size.width).h(size.height),
+                None => this.size_full(),
+            })
+            .child(canvas)
+            .on_prepaint(move |bounds, _, cx| {
+                story_for_stage_bounds.update(cx, |story, _| {
+                    story.canvas_stage_bounds = Some(bounds);
+                });
             });
         let content = div()
             .id("story-container")
+            .debug_selector(|| "story-container-scroll-region".to_owned())
             .when(automation_size.is_none(), |this| this.size_full())
             .when_some(automation_size, |this, size| {
                 this.flex_none().w(size.width).h(size.height)
             })
             .track_scroll(&scroll_handle)
-            .overflow_y_scrollbar()
+            .overflow_scrollbar()
             .track_focus(&self.focus_handle)
-            .child(canvas);
+            .child(canvas_stage);
         let content = crate::story_inspector::inspectable_story(
             crate::story_inspector::StoryInspectorState::from_container(self, cx),
             content,
@@ -948,7 +1177,7 @@ mod tests {
     use super::*;
     use crate::registry::{StoryKey, StoryName, StorySectionName};
     use crate::workbench::WorkbenchState;
-    use gpui::{div, px};
+    use gpui::{Modifiers, MouseButton, TestAppContext, VisualTestContext, div, point, px};
 
     enum DemoSubstory {
         WithIcon,
@@ -1118,6 +1347,138 @@ mod tests {
                 assert_eq!(container.display_description(cx), "Localized description");
             })
             .expect("container should update");
+    }
+
+    #[test]
+    fn viewport_presets_size_the_canvas_and_grid_overlays_the_preview() {
+        let mut app = TestAppContext::single();
+        app.update(gpui_component::init);
+        let (container, cx) = app.add_window_view(|window, cx| -> StoryContainer {
+            let mut container = StoryContainer::new(window, cx);
+            container.set_presentation(StoryPresentation {
+                viewport: crate::presentation::StoryViewportPreset::Responsive,
+                background: StoryCanvasBackground::Theme,
+                grid: false,
+            });
+            container
+        });
+
+        let draw = |cx: &mut VisualTestContext| {
+            cx.run_until_parked();
+            cx.update(|window, cx| {
+                _ = window.draw(cx);
+            });
+        };
+
+        draw(cx);
+        assert_eq!(
+            cx.debug_bounds("story-canvas")
+                .expect("responsive canvas should render"),
+            cx.debug_bounds("story-container-scroll-region")
+                .expect("story scroll region should render")
+        );
+        assert_eq!(cx.debug_bounds("story-canvas-grid"), None);
+        assert_eq!(
+            cx.debug_bounds("story-canvas-border"),
+            cx.debug_bounds("story-canvas")
+        );
+        assert!(cx.debug_bounds("story-canvas-resize-width").is_some());
+        assert!(cx.debug_bounds("story-canvas-resize-height").is_some());
+        assert!(cx.debug_bounds("story-canvas-resize-corner").is_some());
+
+        for (viewport, expected_size) in [
+            (
+                crate::presentation::StoryViewportPreset::Mobile,
+                gpui::size(px(390.), px(844.)),
+            ),
+            (
+                crate::presentation::StoryViewportPreset::Tablet,
+                gpui::size(px(768.), px(1024.)),
+            ),
+            (
+                crate::presentation::StoryViewportPreset::Desktop,
+                gpui::size(px(1440.), px(900.)),
+            ),
+        ] {
+            container.update(cx, |container, cx| {
+                container.set_presentation(StoryPresentation {
+                    viewport,
+                    background: StoryCanvasBackground::Theme,
+                    grid: true,
+                });
+                cx.notify();
+            });
+            draw(cx);
+
+            let canvas_bounds = cx
+                .debug_bounds("story-canvas")
+                .expect("fixed canvas should render");
+            let stage_bounds = cx
+                .debug_bounds("story-canvas-stage")
+                .expect("centered canvas stage should render");
+            assert_eq!(canvas_bounds.size, expected_size);
+            assert_eq!(canvas_bounds.center(), stage_bounds.center());
+            assert_eq!(
+                cx.debug_bounds("story-canvas-grid")
+                    .expect("enabled grid should render"),
+                canvas_bounds
+            );
+            assert_eq!(
+                cx.debug_bounds("story-canvas-border")
+                    .expect("canvas border should render"),
+                canvas_bounds
+            );
+            assert_eq!(cx.debug_bounds("story-canvas-resize-corner"), None);
+        }
+
+        let workbench = cx.new(|_| WorkbenchState::new(Some(container.clone())));
+        workbench.update(cx, |state, cx| {
+            state.set_viewport(crate::presentation::StoryViewportPreset::Mobile, cx);
+            state.set_viewport(crate::presentation::StoryViewportPreset::Responsive, cx);
+        });
+        draw(cx);
+
+        let canvas_bounds = cx
+            .debug_bounds("story-canvas")
+            .expect("inherited responsive canvas should render");
+        let stage_bounds = cx
+            .debug_bounds("story-canvas-stage")
+            .expect("responsive canvas stage should render");
+        assert_eq!(canvas_bounds.size, gpui::size(px(390.), px(844.)));
+        assert_eq!(canvas_bounds.center(), stage_bounds.center());
+        assert!(cx.debug_bounds("story-canvas-resize-corner").is_some());
+
+        let resize_start = cx
+            .debug_bounds("story-canvas-resize-corner")
+            .expect("responsive corner resize handle should render")
+            .center();
+        cx.simulate_mouse_move(resize_start, None, Modifiers::none());
+        cx.simulate_mouse_down(resize_start, MouseButton::Left, Modifiers::none());
+        cx.simulate_mouse_move(
+            point(resize_start.x + px(5.), resize_start.y + px(5.)),
+            MouseButton::Left,
+            Modifiers::none(),
+        );
+        cx.simulate_mouse_move(
+            point(resize_start.x + px(30.), resize_start.y + px(25.)),
+            MouseButton::Left,
+            Modifiers::none(),
+        );
+        cx.simulate_mouse_up(
+            point(resize_start.x + px(30.), resize_start.y + px(25.)),
+            MouseButton::Left,
+            Modifiers::none(),
+        );
+        draw(cx);
+        let resized_canvas = cx
+            .debug_bounds("story-canvas")
+            .expect("resized responsive canvas should render");
+        assert!(resized_canvas.size.width > canvas_bounds.size.width);
+        assert!(resized_canvas.size.height > canvas_bounds.size.height);
+        assert_eq!(
+            cx.read(|cx| workbench.read(cx).responsive_size()),
+            Some(resized_canvas.size)
+        );
     }
 
     #[gpui::test]

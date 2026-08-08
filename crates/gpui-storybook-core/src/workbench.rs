@@ -10,7 +10,8 @@ use crate::{
 use gpui::{
     Action, AnyElement, App, AppContext as _, ClipboardItem, Context, Entity, EntityId,
     EventEmitter, FocusHandle, Focusable, InteractiveElement as _, IntoElement, ParentElement as _,
-    Render, SharedString, Styled as _, Subscription, Window, div, prelude::FluentBuilder as _,
+    Pixels, Render, SharedString, Size, Styled as _, Subscription, Window, div,
+    prelude::FluentBuilder as _, px, size,
 };
 use gpui_component::{
     ActiveTheme as _, Selectable as _, Sizable as _,
@@ -64,6 +65,7 @@ pub struct WorkbenchState {
     active_group: Option<Entity<StoryContainer>>,
     active_story: Option<Entity<StoryContainer>>,
     presentation: StoryPresentation,
+    responsive_size: Option<Size<Pixels>>,
 }
 
 impl WorkbenchState {
@@ -72,6 +74,7 @@ impl WorkbenchState {
             active_group: None,
             active_story: None,
             presentation: StoryPresentation::default(),
+            responsive_size: None,
         };
         if let Some(story) = initial_story {
             state.active_group = Some(story.clone());
@@ -162,7 +165,21 @@ impl WorkbenchState {
         self.presentation
     }
 
+    #[cfg(test)]
+    pub(crate) fn responsive_size(&self) -> Option<Size<Pixels>> {
+        self.responsive_size
+    }
+
     pub fn set_viewport(&mut self, viewport: StoryViewportPreset, cx: &mut Context<Self>) {
+        if viewport == StoryViewportPreset::Responsive
+            && self.presentation.viewport != StoryViewportPreset::Responsive
+        {
+            self.responsive_size = self
+                .presentation
+                .viewport
+                .dimensions()
+                .map(|(width, height)| size(px(width as f32), px(height as f32)));
+        }
         self.presentation.viewport = viewport;
         self.apply_presentation(cx);
         cx.notify();
@@ -180,10 +197,25 @@ impl WorkbenchState {
         cx.notify();
     }
 
-    fn apply_presentation(&self, cx: &mut App) {
+    pub(crate) fn set_responsive_size(
+        &mut self,
+        responsive_size: Size<Pixels>,
+        cx: &mut Context<Self>,
+    ) {
+        if self.presentation.viewport != StoryViewportPreset::Responsive {
+            return;
+        }
+        self.responsive_size = Some(responsive_size);
+        cx.notify();
+    }
+
+    fn apply_presentation(&self, cx: &mut Context<Self>) {
         if let Some(story) = &self.active_story {
+            let workbench_state = cx.entity().downgrade();
             story.update(cx, |story, cx| {
                 story.set_presentation(self.presentation);
+                story.set_responsive_size(self.responsive_size);
+                story.set_workbench_state(workbench_state);
                 cx.notify();
             });
         }
@@ -1308,7 +1340,31 @@ mod tests {
                 grid: true,
             }
         );
+        assert_eq!(first.read(cx).responsive_size(), None);
         assert_eq!(second.read(cx).presentation(), StoryPresentation::default());
+    }
+
+    #[gpui::test]
+    fn responsive_viewport_inherits_the_previous_fixed_preset(cx: &mut App) {
+        let state = cx.new(|_| WorkbenchState::new(None));
+
+        state.update(cx, |state, cx| {
+            state.set_viewport(StoryViewportPreset::Mobile, cx);
+            state.set_viewport(StoryViewportPreset::Responsive, cx);
+        });
+        assert_eq!(
+            state.read(cx).responsive_size(),
+            Some(size(px(390.), px(844.)))
+        );
+
+        state.update(cx, |state, cx| {
+            state.set_viewport(StoryViewportPreset::Desktop, cx);
+            state.set_viewport(StoryViewportPreset::Responsive, cx);
+        });
+        assert_eq!(
+            state.read(cx).responsive_size(),
+            Some(size(px(1440.), px(900.)))
+        );
     }
 
     #[test]

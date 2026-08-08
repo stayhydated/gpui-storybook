@@ -99,6 +99,16 @@ window:
 - an optional alignment grid;
 - explicit variant buttons for grouped stories.
 
+Every viewport is centered inside a bordered frame. **Mobile**, **Tablet**, and
+**Desktop** lock the frame to their preset dimensions. **Responsive** provides
+width, height, and corner resize handles; when selected after a fixed preset, it
+starts at that preset's size. The initial Responsive view fills the available
+preview area. Resizing or hiding the story navigation and workbench sidebars keeps
+the canvas centered within the visible main pane. Use the left and right panel
+icons immediately before the top-bar appearance settings button to toggle those
+sidebars. The initial Responsive frame fills that pane without an artificial
+inset.
+
 The **Inspect** tab shows the active story key with a copy button. Select the
 source location to open the story file with the system's configured application,
 or choose **Open GPUI Inspector** to inspect the rendered element tree. Each

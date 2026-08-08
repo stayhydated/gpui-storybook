@@ -66,5 +66,11 @@ description: >-
   automatically.
 - Treat paired dimensions and named viewports as story-region capture sizes;
   keep the gallery or dock chrome mounted around that region.
+- Keep fixed viewport frames centered and locked. Responsive mode alone is
+  resizable and inherits the immediately previous fixed preset's dimensions.
+- Keep the canvas centered within the visible main pane as the story-navigation
+  and workbench sidebars change; expose left and right panel icons immediately
+  before the top-bar appearance settings button for toggling those panels. Keep
+  Responsive frames flush with and contained by that pane.
 - Prefer current public APIs and examples; do not add compatibility wrappers for
   older pre-1.0 shapes unless the user requires them.
