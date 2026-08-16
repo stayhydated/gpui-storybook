@@ -39,10 +39,12 @@ Custom integrations should use `StorybookAutomation` instead of dispatching
 window input independently so validation, cancellation boundaries, and capture
 ordering remain consistent. Capture sizing preserves the surrounding shell and
 targets the rendered story region used for pointer bounds and PNG output.
-Application bootstrap remains the embedding application's responsibility.
+Facade-created controllers expose a readiness future that completes after the
+standard gallery or dock publishes its catalog and attaches the live command
+receiver. Application bootstrap remains the embedding application's responsibility.
 `StorybookElementExt` records stable keys and route-relative live bounds during
-prepaint with `storybook_target`, and route-local JSON state during the same
-phase with `storybook_value`. The implicit methods use the GPUI element ID as
+prepaint with `storybook_target`, and route-local Serde-serializable state during
+the same phase with `storybook_value`. The implicit methods use the GPUI element ID as
 the key and derive a readable label; the `_as` methods accept both explicitly.
 Duplicate keys within either registry are rejected.
 On Linux,

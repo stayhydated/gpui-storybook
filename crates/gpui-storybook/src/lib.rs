@@ -702,14 +702,18 @@ fn init_mcp_automation(cx: &mut ::gpui::App) {
         match gpui_storybook_mcp::start_stdio(automation.clone()) {
             Ok(completion) => {
                 cx.spawn(async move |cx| {
-                    if let Err(error) = completion.await {
-                        eprintln!("gpui-storybook MCP stdio server failed: {error}");
-                    }
-                    cx.update(|cx| {
-                        for handle in cx.windows() {
-                            let _ = handle.update(cx, |_, window, _| window.remove_window());
-                        }
-                        cx.quit();
+                    let exit_code = match completion.await {
+                        Ok(()) => 0,
+                        Err(error) => {
+                            eprintln!("gpui-storybook MCP stdio server failed: {error}");
+                            1
+                        },
+                    };
+                    cx.update(move |_cx| {
+                        // A stdio session owns this process. Exit directly after
+                        // transport completion so native window and renderer
+                        // teardown cannot race the headless compositor cleanup.
+                        exit_after_mcp_stdio(exit_code);
                     });
                 })
                 .detach();
@@ -724,6 +728,18 @@ fn init_mcp_automation(cx: &mut ::gpui::App) {
     if let Err(error) = gpui_storybook_mcp::start_capture_session_from_env(automation) {
         eprintln!("failed to start storybook capture session: {error}");
     }
+}
+
+#[cfg(all(feature = "mcp", unix))]
+fn exit_after_mcp_stdio(exit_code: i32) -> ! {
+    // SAFETY: the stdio transport has completed and the automation session owns
+    // this process. `_exit` avoids native platform and thread-local teardown.
+    unsafe { libc::_exit(exit_code) }
+}
+
+#[cfg(all(feature = "mcp", not(unix)))]
+fn exit_after_mcp_stdio(exit_code: i32) -> ! {
+    std::process::exit(exit_code)
 }
 
 /// Discovers registered stories, applies `storybook.toml` filtering, and

@@ -66,10 +66,14 @@ description: >-
   visible controls with `StorybookElementExt::storybook_target()` so stable
   route-local GPUI IDs become semantic keys before falling back to coordinates.
 - Wrap machine-readable rendered state with
-  `StorybookElementExt::storybook_value(...)` and use
-  `storybook_read_semantic_values` for postconditions. Use the `_as` variants
+  `StorybookElementExt::storybook_value(&state)` and use
+  `storybook_read_value` or bounded `storybook_wait_for_value` calls for
+  postconditions. Use the `_as` variants
   when keys or labels must be explicit. Reserve capture for assertions about
   visual presentation.
+- Use `story_key`, `target_key`, `value_key`, and `control_key` in MCP inputs.
+  Let the initial tool call await the standard host instead of polling an empty
+  story catalog.
 - Treat interaction batches as potentially destructive and non-idempotent.
   Rediscover runtime actions after each launch and never retry partial batches
   automatically.

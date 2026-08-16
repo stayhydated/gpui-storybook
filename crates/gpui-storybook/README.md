@@ -61,13 +61,16 @@ post-interaction capture tools. The interaction gate is separate because a
 story action can have arbitrary application effects. Typed controls remain the
 preferred reproducible input contract. Wrap important controls with
 `StorybookElementExt::storybook_target()` so their GPUI IDs become stable keys
-and MCP can list their live bounds and use a `click_target` step without screen
-coordinates. Wrap rendered state with
-`StorybookElementExt::storybook_value(json_value)` so the always-available
-`storybook_read_semantic_values` tool can inspect application postconditions
-without a screenshot. Storybook derives a readable label from the ID; the
+and MCP can list their live bounds and use `storybook_click_target` or a
+`click_target` step without screen coordinates. Wrap Serde-serializable rendered
+state with `StorybookElementExt::storybook_value(&state)` so
+`storybook_read_value` and `storybook_wait_for_value` can inspect application
+postconditions without a screenshot. Storybook derives a readable label from the ID; the
 `_as` variants accept explicit keys and labels for opaque elements or localized
-copy. Capture dimensions size
+copy. MCP route, target, value, and control inputs use the explicit
+`story_key`, `target_key`, `value_key`, and `control_key` field names. Initial
+tool calls wait for the standard live host with a bounded startup deadline.
+Capture dimensions size
 the story region without replacing the surrounding gallery or dock layout. On
 Linux, install `gpui-storybook-launch`; `storybook_capture_launch_env` emits
 that Sway-backed command so the normal Wayland application can run without a

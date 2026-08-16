@@ -91,22 +91,24 @@ The GPUI element ID becomes the stable route-local key, and Storybook derives
 its display label (`execute-request` becomes `Execute request`). Use
 `storybook_target_as(key, label)` when those values need to differ.
 
-Wrap rendered application state with `storybook_value` when automation needs a
-machine-readable postcondition:
+Wrap Serde-serializable rendered application state with `storybook_value` when
+automation needs a machine-readable postcondition:
 
 ```rust
 div()
     .id("response")
     .child(response_panel)
-    .storybook_value(serde_json::json!({
-        "status": "success",
-        "position": 12.5,
-    }))
+    .storybook_value(&response_state)
 ```
 
-`storybook_read_semantic_values` refreshes the active route and returns these
-JSON values without capturing a frame. Use screenshot capture separately when
-the rendered appearance itself is the assertion.
+`storybook_read_value` reads one key and `storybook_wait_for_value` refreshes a
+bounded number of frames until the value or a JSON Pointer matches. The
+interaction-gated `storybook_click_target` performs one semantic click without
+constructing a step batch. MCP uses explicit `story_key`, `target_key`,
+`value_key`, and `control_key` input names, and its initial tool call waits for
+the live Storybook host with a bounded deadline. None of these semantic reads
+capture a frame; use screenshot capture when rendered appearance is the
+assertion.
 
 Linux automation uses the normal Wayland-backed GPUI application under Sway's
 wlroots headless backend. Install Sway and Mesa's software graphics drivers;

@@ -44,4 +44,5 @@ MCP and startup-capture sessions through `gpui-storybook-launch` and Sway's
 wlroots headless backend as described in the automation guide; the normal
 application remains Wayland-backed. Component stories can import
 `StorybookElementExt` and mark important children with `.storybook_target()`
-for stable MCP discovery and clicking.
+for stable MCP discovery and clicking, then attach Serde-serializable state
+with `.storybook_value(&state)` for focused value reads and bounded waits.

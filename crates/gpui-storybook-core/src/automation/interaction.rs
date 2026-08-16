@@ -154,7 +154,7 @@ pub enum StoryInteractionStep {
     /// Click the center of one stable semantic target in the active route.
     ClickTarget {
         /// Target key returned by semantic target discovery.
-        key: String,
+        target_key: String,
         /// Button, defaulting to left.
         #[serde(default)]
         button: StoryMouseButton,
@@ -198,7 +198,7 @@ pub struct StoryInteractionCaptureRequest {
 #[serde(deny_unknown_fields)]
 pub struct StoryInteractionRequest {
     /// Stable story or substory route opened before controls and input.
-    pub route: Option<String>,
+    pub story_key: Option<String>,
     /// Typed control values applied before input.
     #[serde(default)]
     pub controls: BTreeMap<String, ControlValue>,
@@ -313,20 +313,20 @@ pub(crate) fn validate_interaction_request(
                 return invalid_step(step_index, "click_count must be greater than zero");
             },
             StoryInteractionStep::ClickTarget {
-                key,
+                target_key,
                 click_count: 0,
                 ..
             } => {
-                if key.trim().is_empty() {
+                if target_key.trim().is_empty() {
                     return invalid_step(step_index, "target key must not be empty");
                 }
                 return invalid_step(step_index, "click_count must be greater than zero");
             },
-            StoryInteractionStep::ClickTarget { key, .. } => {
-                if key.trim().is_empty() {
+            StoryInteractionStep::ClickTarget { target_key, .. } => {
+                if target_key.trim().is_empty() {
                     return invalid_step(step_index, "target key must not be empty");
                 }
-                text_bytes = text_bytes.saturating_add(key.len());
+                text_bytes = text_bytes.saturating_add(target_key.len());
             },
             StoryInteractionStep::PointerMove { point }
             | StoryInteractionStep::PointerClick { point, .. } => {
@@ -500,12 +500,12 @@ pub(crate) fn prepare_interaction_steps(
                 modifiers: modifiers.clone(),
             }),
             StoryInteractionStep::ClickTarget {
-                key,
+                target_key,
                 button,
                 click_count,
                 modifiers,
             } => Ok(PreparedInteractionStep::ClickTarget {
-                key: key.clone(),
+                key: target_key.clone(),
                 button: *button,
                 click_count: *click_count,
                 modifiers: modifiers.clone(),
@@ -1173,7 +1173,7 @@ mod tests {
 
     fn request(steps: Vec<StoryInteractionStep>) -> StoryInteractionRequest {
         StoryInteractionRequest {
-            route: None,
+            story_key: None,
             controls: BTreeMap::new(),
             width: None,
             height: None,
@@ -1280,7 +1280,7 @@ mod tests {
         ));
         assert!(matches!(
             validate_interaction_request(&request(vec![StoryInteractionStep::ClickTarget {
-                key: " ".to_owned(),
+                target_key: " ".to_owned(),
                 button: StoryMouseButton::Left,
                 click_count: 1,
                 modifiers: StoryModifiers::default(),
@@ -1453,7 +1453,7 @@ mod tests {
                             modifiers: StoryModifiers::default(),
                         },
                         StoryInteractionStep::ClickTarget {
-                            key: "harness".to_owned(),
+                            target_key: "harness".to_owned(),
                             button: StoryMouseButton::Left,
                             click_count: 1,
                             modifiers: StoryModifiers::default(),

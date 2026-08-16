@@ -111,6 +111,9 @@ JSON object per line in this order:
 Read the matching response ID before closing standard input. Use each entry's
 advertised `inputSchema` when constructing later calls. Closing standard input
 terminates the GPUI application; the launcher then stops Sway.
+The first tool call waits up to 30 seconds for the standard gallery or dock to
+publish its story catalog and attach the live automation host, so clients do
+not need a startup polling loop.
 
 ## Use the MCP tools
 
@@ -122,17 +125,20 @@ terminates the GPUI application; the launcher then stops Sway.
 | `storybook_open_story` | Navigate the live window to a route |
 | `storybook_read_controls` | Read control metadata and current values from the active variant |
 | `storybook_read_semantic_values` | Read route-local JSON values refreshed from rendered application state |
+| `storybook_read_value` | Read one route-local JSON value by `value_key` |
+| `storybook_wait_for_value` | Refresh up to a bounded frame count until a value or JSON Pointer equals the expected JSON |
 | `storybook_set_control` | Set one control on the active story instance |
-| `storybook_reset_control` | Reset one control, or all controls when `key` is omitted |
+| `storybook_reset_control` | Reset one control, or all controls when `control_key` is omitted |
 | `storybook_capture_current_story` | Capture the active story region |
 | `storybook_capture_launch_env` | Build environment variables and a platform launch command |
 | `storybook_list_actions` | List runtime GPUI actions, documentation, and argument schemas; interaction gate required |
 | `storybook_list_interaction_targets` | List stable semantic targets and live route-relative bounds; interaction gate required |
+| `storybook_click_target` | Click one semantic target exactly once; interaction gate required |
 | `storybook_run_steps` | Run one ordered in-process interaction batch with optional capture; interaction gate required |
 
-Tool inputs and outputs use closed typed schemas. Use the advertised `key`,
-`output_path`, `width`, `height`, `viewport`, `controls`, and launch properties;
-unknown, missing, or invalid fields return structured errors.
+Tool inputs and outputs use closed typed schemas. Route, target, value, and
+control inputs use `story_key`, `target_key`, `value_key`, and `control_key`
+respectively. Unknown, missing, or invalid fields return structured errors.
 
 ## Run an in-process interaction batch
 
@@ -162,7 +168,7 @@ After opening the route, call `storybook_list_interaction_targets`, then use
 the returned key in a batch:
 
 ```json
-{ "type": "click_target", "key": "execute-request" }
+{ "type": "click_target", "target_key": "execute-request" }
 ```
 
 Target keys must be unique within each story or substory route. Storybook
@@ -181,14 +187,34 @@ div()
     }))
 ```
 
-After input dispatch, call `storybook_read_semantic_values`. Storybook requests
-a fresh frame and returns the active route's values in stable key order. Poll a
-transitional value such as `{ "status": "loading" }` when the application
-finishes work asynchronously. This readback is independent from capture:
-semantic values prove state, while PNG capture proves visual presentation.
+After input dispatch, use `storybook_read_value` for one known key or
+`storybook_read_semantic_values` for the complete route. For asynchronous work,
+`storybook_wait_for_value` refreshes a bounded number of frames and compares
+either the complete value or an RFC 6901 JSON Pointer inside it. This readback
+is independent from capture: semantic values prove state, while PNG capture
+proves visual presentation.
 Value keys, like target keys, must be unique within a story or substory route.
 Call `.storybook_value_as(key, label, value)` when the element does not expose
 an ID or when the label needs explicit wording.
+
+The common click-and-wait flow uses two focused calls. The click is dispatched
+once and is never retried by the wait:
+
+```json
+{
+  "story_key": "gpui-storybook-example-story-InteractionStory",
+  "target_key": "pointer-target"
+}
+```
+
+```json
+{
+  "value_key": "fixture-state",
+  "json_pointer": "/clicks",
+  "expected": 1,
+  "max_frames": 120
+}
+```
 
 `storybook_run_steps` can open a route, apply a `controls` map, size the story
 region for paired rendered-pixel `width` and `height` values or a named
@@ -198,7 +224,7 @@ select navigation, and a typed action:
 
 ```json
 {
-  "route": "gpui-storybook-example-story-InteractionStory",
+  "story_key": "gpui-storybook-example-story-InteractionStory",
   "viewport": "mobile",
   "controls": {
     "prefix": { "type": "text", "value": "mcp" }
@@ -221,7 +247,7 @@ select navigation, and a typed action:
 }
 ```
 
-When `route` is supplied, Storybook focuses that story's focus handle before
+When `story_key` is supplied, Storybook focuses that story's focus handle before
 the first step. The fixture maps its focus handle to the text input, so the
 first `focus_next` moves from that input to the select.
 
@@ -235,7 +261,7 @@ The closed step variants are:
 | `dispatch_action` | Build a registered action by `name` and optional JSON `args`, dispatch it, and resume the batch after GPUI delivers that deferred dispatch |
 | `pointer_move` | Dispatch a move at the story-relative `point` |
 | `pointer_click` | Dispatch move, down, and up at `point`; optional `button`, `click_count`, and `modifiers` default to a single left click with no modifiers |
-| `click_target` | Dispatch move, down, and up at the center of semantic target `key`; accepts the same optional button, count, and modifiers |
+| `click_target` | Dispatch move, down, and up at the center of semantic `target_key`; accepts the same optional button, count, and modifiers |
 | `scroll` | Dispatch pixel `delta_x` and `delta_y` at `point` |
 | `wait_frames` | Refresh and continue after the positive rendered-frame `count` |
 
@@ -292,7 +318,7 @@ Open the route before reading or changing its controls:
 
 ```json
 {
-  "key": "my-app-storybook-ButtonStory"
+  "story_key": "my-app-storybook-ButtonStory"
 }
 ```
 
@@ -301,7 +327,7 @@ Pass a tagged value to `storybook_set_control`:
 
 ```json
 {
-  "key": "disabled",
+  "control_key": "disabled",
   "value": { "type": "boolean", "value": true }
 }
 ```
@@ -310,8 +336,8 @@ Other value tags are `integer`, `float`, `text`, `color`, `choice`, and `json`.
 A color value contains `h`, `s`, `l`, and `a` numbers. The setter enforces the
 advertised bounds and select options before updating the concrete story entity.
 
-Call `storybook_reset_control` with a `key` to reset one value, or with an empty
-object to reset all active-story controls.
+Call `storybook_reset_control` with a `control_key` to reset one value, or with
+an empty object to reset all active-story controls.
 
 ## Address stories by stable route
 
@@ -371,7 +397,7 @@ variables.
 
 ## Capture a live session
 
-Call `storybook_open_story` with a stable route, then call
+Call `storybook_open_story` with a stable `story_key`, then call
 `storybook_capture_current_story`. The capture tool accepts an optional
 `output_path`, optional paired `width` and `height`, a named `viewport`, and a
 `controls` object. The control map is applied immediately before capture:
@@ -400,8 +426,8 @@ contains the request ID, actual path, rendered pixel dimensions, and story
 metadata.
 
 `storybook_capture_launch_env` can construct the environment and platform
-command for an external launcher. It accepts a route plus optional output path,
-frame, paired dimensions, package, binary, feature list, and stdio selection.
+command for an external launcher. It accepts a `story_key` plus optional output
+path, frame, paired dimensions, package, binary, feature list, and stdio selection.
 It also accepts a named viewport when paired dimensions are omitted.
 
 ## Understand capture bounds and size
@@ -429,6 +455,7 @@ Do not retry an interaction batch automatically.
 | Symptom | Action |
 |---|---|
 | Route not found | Discover the base key with `storybook_list_stories`, inspect the substory definition, and check filtering |
+| Automation startup times out | Ensure the initialized application constructs a standard `Gallery` or `StoryWorkspace` within 30 seconds |
 | No live host is attached | Await initialization and construct a standard `Gallery` or `StoryWorkspace` view |
 | Width or height is rejected | Set both dimensions to positive integers |
 | A control is rejected | Read the current control specs and use the advertised type, bounds, and options |
@@ -438,6 +465,6 @@ Do not retry an interaction batch automatically.
 | Semantic target is missing or duplicated | Open the intended route, call `storybook_list_interaction_targets`, and give every `.storybook_target()` element a unique route-local GPUI ID |
 | Semantic value is missing or duplicated | Render the value in the active route and give every `.storybook_value(...)` element a unique route-local GPUI ID |
 | Pointer point is rejected | Use finite normalized coordinates in `0.0..=1.0` or route-relative logical pixels inside the rendered bounds |
-| Interaction reports partial execution | Inspect `steps_dispatched`; establish postconditions with a capture or read and do not retry automatically |
+| Interaction reports partial execution | Inspect `steps_dispatched`; establish postconditions with `storybook_read_value` or `storybook_wait_for_value` and do not retry automatically |
 | Stdio messages cannot be decoded | Route tracing and diagnostics to standard error |
 | Startup capture times out | Confirm registrations are linked and test the same route interactively |

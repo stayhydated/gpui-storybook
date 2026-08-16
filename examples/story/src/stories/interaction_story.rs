@@ -11,7 +11,7 @@ use gpui_component::{
 };
 use gpui_storybook::StorybookElementExt as _;
 use schemars::JsonSchema;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// Sets the inert status text displayed by the interaction automation fixture.
 #[derive(Action, Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq)]
@@ -19,6 +19,15 @@ use serde::Deserialize;
 pub struct SetAutomationStatus {
     /// New local fixture status.
     pub value: String,
+}
+
+#[derive(Serialize)]
+struct AutomationFixtureState<'a> {
+    clicks: usize,
+    hovered: bool,
+    input: &'a str,
+    selected: &'a str,
+    status: &'a str,
 }
 
 /// Deterministic controls for exercising in-process MCP interaction steps.
@@ -150,13 +159,13 @@ impl Render for InteractionStory {
                     .child(format!("{} status:{}", self.prefix, self.status))
                     .child(format!("hovered:{}", self.hovered))
                     .child(format!("clicks:{}", self.clicks))
-                    .storybook_value(serde_json::json!({
-                        "clicks": self.clicks,
-                        "hovered": self.hovered,
-                        "input": input_value.to_string(),
-                        "selected": selected,
-                        "status": self.status.clone(),
-                    })),
+                    .storybook_value(&AutomationFixtureState {
+                        clicks: self.clicks,
+                        hovered: self.hovered,
+                        input: input_value.as_ref(),
+                        selected,
+                        status: &self.status,
+                    }),
             )
             .child(format!("input:{input_value}"))
             .child(format!("selected:{selected}"))

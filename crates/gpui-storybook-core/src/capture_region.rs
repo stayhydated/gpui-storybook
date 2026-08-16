@@ -167,9 +167,11 @@ pub trait StorybookElementExt: IntoElement {
     ///
     /// The element's GPUI ID becomes the route-local key. Values are refreshed
     /// from application state during prepaint and exposed by Storybook
-    /// automation for the active story or substory route.
+    /// automation for the active story or substory route. Any Serde-serializable
+    /// value can be passed directly; serialization failures are authoring errors
+    /// and panic at this call site.
     #[track_caller]
-    fn storybook_value(mut self, value: Value) -> impl IntoElement
+    fn storybook_value(mut self, value: impl Serialize) -> impl IntoElement
     where
         Self: InteractiveElement,
     {
@@ -180,16 +182,18 @@ pub trait StorybookElementExt: IntoElement {
     /// Mark this element as a machine-readable value with an explicit key and label.
     ///
     /// Keys must be unique within a story or substory route.
+    #[track_caller]
     fn storybook_value_as(
         self,
         key: impl Into<String>,
         label: impl Into<String>,
-        value: Value,
+        value: impl Serialize,
     ) -> impl IntoElement {
         SemanticValueElement {
             key: key.into(),
             label: label.into(),
-            value,
+            value: serde_json::to_value(value)
+                .expect("Storybook semantic values must serialize as JSON"),
             child: self.into_any_element(),
         }
     }

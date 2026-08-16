@@ -554,7 +554,7 @@ impl Gallery {
                         &request.steps,
                         cx,
                     )?;
-                    if let Some(route) = &request.route {
+                    if let Some(route) = &request.story_key {
                         self.set_active_story_by_key(route, cx)?;
                     }
                     self.workbench_state
@@ -573,7 +573,7 @@ impl Gallery {
                         .active_story()
                         .ok_or(StorybookAutomationError::NoActiveStory)?;
                     set_capture_target_size(&story_entity, window, target_size, cx);
-                    if request.route.is_some() {
+                    if request.story_key.is_some() {
                         gpui::Focusable::focus_handle(&story_entity, cx).focus(window, cx);
                     }
                     cx.notify();
@@ -1007,7 +1007,7 @@ mod tests {
                     StorybookAutomationCommand::RunSteps {
                         request_id: 8,
                         request: crate::automation::StoryInteractionRequest {
-                            route: Some("crate-ButtonStory".to_owned()),
+                            story_key: Some("crate-ButtonStory".to_owned()),
                             controls: BTreeMap::new(),
                             width: None,
                             height: None,
@@ -1045,7 +1045,7 @@ mod tests {
                     StorybookAutomationCommand::RunSteps {
                         request_id: 9,
                         request: crate::automation::StoryInteractionRequest {
-                            route: Some("crate-ButtonStory".to_owned()),
+                            story_key: Some("crate-ButtonStory".to_owned()),
                             controls: BTreeMap::new(),
                             width: None,
                             height: None,

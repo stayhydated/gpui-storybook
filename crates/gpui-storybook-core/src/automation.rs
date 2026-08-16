@@ -57,7 +57,7 @@ use std::{
     },
 };
 use thiserror::Error;
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::{mpsc, oneshot, watch};
 
 pub const DEFAULT_STORY_CAPTURE_WIDTH: u32 = 1280;
 pub const DEFAULT_STORY_CAPTURE_HEIGHT: u32 = 720;
@@ -204,6 +204,13 @@ pub struct StoryCaptureSnapshot {
 /// Structured live-host, validation, control, interaction, and capture errors.
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
 pub enum StorybookAutomationError {
+    /// The standard gallery or dock did not finish publishing and attaching its
+    /// live automation host within the MCP startup deadline.
+    #[error("GPUI storybook automation did not become ready within {seconds} seconds")]
+    StartupTimedOut {
+        /// Bounded startup wait in seconds.
+        seconds: u64,
+    },
     /// No gallery or dock window has attached the automation command receiver.
     #[error("no live GPUI storybook host is attached")]
     NoLiveHost,
@@ -307,6 +314,25 @@ pub enum StorybookAutomationError {
         /// Active story or substory route.
         route: String,
     },
+    /// A semantic value key is not present in the active route.
+    #[error("semantic value `{key}` was not found in route `{route}`")]
+    SemanticValueNotFound {
+        /// Active story or substory route.
+        route: String,
+        /// Requested stable value key.
+        key: String,
+    },
+    /// A semantic value did not match the requested JSON value within the
+    /// bounded number of refreshed frames.
+    #[error("semantic value `{key}` in route `{route}` did not match within {max_frames} frame(s)")]
+    SemanticValueWaitTimedOut {
+        /// Active story or substory route.
+        route: String,
+        /// Requested stable value key.
+        key: String,
+        /// Maximum refreshed frames requested by the caller.
+        max_frames: u16,
+    },
     /// A story rendered the same semantic value key more than once.
     #[error("semantic value `{key}` is duplicated in route `{route}`")]
     DuplicateSemanticValue {
@@ -379,11 +405,25 @@ struct StorybookAutomationState {
     revision: u64,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+struct StorybookAutomationReadiness {
+    catalog_published: bool,
+    live_host_attached: bool,
+}
+
+impl StorybookAutomationReadiness {
+    const fn ready(self) -> bool {
+        self.catalog_published && self.live_host_attached
+    }
+}
+
 pub struct StorybookAutomation {
     state: Mutex<StorybookAutomationState>,
     command_tx: mpsc::UnboundedSender<StorybookAutomationCommand>,
     command_rx: Mutex<Option<mpsc::UnboundedReceiver<StorybookAutomationCommand>>>,
     live_host_attached: AtomicBool,
+    startup_wait_required: AtomicBool,
+    readiness_tx: watch::Sender<StorybookAutomationReadiness>,
     operation_pending: Arc<AtomicBool>,
     next_request_id: AtomicU64,
 }
@@ -419,12 +459,23 @@ impl StorySnapshot {
 
 impl StorybookAutomation {
     pub fn new() -> SharedStorybookAutomation {
-        Self::with_stories(Vec::new())
+        Self::build(Vec::new(), true)
     }
 
     pub fn with_stories(stories: Vec<StorySnapshot>) -> SharedStorybookAutomation {
+        Self::build(stories, false)
+    }
+
+    fn build(
+        stories: Vec<StorySnapshot>,
+        startup_wait_required: bool,
+    ) -> SharedStorybookAutomation {
         let (command_tx, command_rx) = mpsc::unbounded_channel();
         let current_story_key = stories.first().map(|story| story.key.clone());
+        let (readiness_tx, _) = watch::channel(StorybookAutomationReadiness {
+            catalog_published: !startup_wait_required,
+            live_host_attached: false,
+        });
 
         Arc::new(Self {
             state: Mutex::new(StorybookAutomationState {
@@ -435,6 +486,8 @@ impl StorybookAutomation {
             command_tx,
             command_rx: Mutex::new(Some(command_rx)),
             live_host_attached: AtomicBool::new(false),
+            startup_wait_required: AtomicBool::new(startup_wait_required),
+            readiness_tx,
             operation_pending: Arc::new(AtomicBool::new(false)),
             next_request_id: AtomicU64::new(1),
         })
@@ -453,6 +506,40 @@ impl StorybookAutomation {
         }
 
         state.stories = stories;
+        drop(state);
+        self.update_readiness(|readiness| readiness.catalog_published = true);
+    }
+
+    /// Wait until the standard gallery or dock has published its catalog and
+    /// attached the live automation command receiver.
+    ///
+    /// Controllers built with [`with_stories`](Self::with_stories) are treated
+    /// as explicitly configured low-level integrations and return immediately.
+    /// The MCP layer applies its own bounded timeout around this future.
+    pub async fn wait_until_ready(&self) {
+        if !self.startup_wait_required.load(Ordering::SeqCst) {
+            return;
+        }
+
+        let mut readiness = self.readiness_tx.subscribe();
+        loop {
+            if readiness.borrow_and_update().ready() {
+                self.startup_wait_required.store(false, Ordering::SeqCst);
+                return;
+            }
+            if readiness.changed().await.is_err() {
+                return;
+            }
+        }
+    }
+
+    fn update_readiness(&self, update: impl FnOnce(&mut StorybookAutomationReadiness)) {
+        self.readiness_tx.send_modify(|readiness| {
+            update(readiness);
+            if readiness.ready() {
+                self.startup_wait_required.store(false, Ordering::SeqCst);
+            }
+        });
     }
 
     pub fn stories(&self) -> Vec<StorySnapshot> {
@@ -692,6 +779,7 @@ impl StorybookAutomation {
 
         if receiver.is_some() {
             self.live_host_attached.store(true, Ordering::SeqCst);
+            self.update_readiness(|readiness| readiness.live_host_attached = true);
         }
 
         receiver
@@ -1290,6 +1378,41 @@ mod tests {
 
         assert!(automation.take_command_receiver().is_some());
         assert!(automation.take_command_receiver().is_none());
+    }
+
+    #[test]
+    fn facade_automation_waits_for_catalog_and_live_host() {
+        let automation = StorybookAutomation::new();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .expect("test runtime should build");
+
+        runtime.block_on(async {
+            let waiting = automation.clone();
+            let ready = tokio::spawn(async move { waiting.wait_until_ready().await });
+            tokio::task::yield_now().await;
+            assert!(!ready.is_finished());
+
+            automation.set_stories(vec![sample_story("crate-ButtonStory", "Button")]);
+            tokio::task::yield_now().await;
+            assert!(!ready.is_finished());
+
+            let _receiver = automation
+                .take_command_receiver()
+                .expect("live host should attach once");
+            ready.await.expect("readiness task should complete");
+        });
+    }
+
+    #[test]
+    fn explicitly_seeded_automation_skips_facade_startup_wait() {
+        let automation =
+            StorybookAutomation::with_stories(vec![sample_story("crate-ButtonStory", "Button")]);
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .expect("test runtime should build");
+
+        runtime.block_on(automation.wait_until_ready());
     }
 
     #[test]

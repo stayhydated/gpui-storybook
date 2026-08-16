@@ -1,6 +1,6 @@
 # MCP Semantic Automation Implementation Plan
 
-Status: complete (2026-08-15)
+Status: complete (2026-08-16)
 
 ## Outcome
 
@@ -13,6 +13,23 @@ pin is updated.
 
 ## Public contracts
 
+### Automation DX follow-up
+
+- Facade-created automation controllers wait for both story-catalog publication
+  and live-host attachment. MCP tools apply a 30-second startup deadline, so a
+  client can call `storybook_list_stories` immediately after initialization.
+- MCP inputs name their identity domain explicitly: `story_key`, `target_key`,
+  `value_key`, and `control_key`.
+- `storybook_click_target` dispatches one semantic click without requiring a
+  general step batch and remains interaction-gated, destructive,
+  non-idempotent, and open-world.
+- `storybook_read_value` selects one route-local semantic value.
+  `storybook_wait_for_value` refreshes at most 120 frames and compares either
+  the complete value or an RFC 6901 JSON Pointer. It never retries a preceding
+  interaction.
+- `StorybookElementExt::storybook_value` accepts any Serde-serializable value,
+  allowing application state enums and structs to own their wire shape.
+
 ### Semantic targets
 
 - `gpui-storybook-core` owns an element wrapper that records a stable target
@@ -24,8 +41,9 @@ pin is updated.
 - Target keys are unique within one story or substory route.
 - `gpui-storybook` re-exports the wrapper as the application-facing API.
 - The interaction-gated MCP surface lists targets for the active route.
-- `storybook_run_steps` accepts a `click_target` step and resolves the target
-  after route selection, viewport sizing, scrolling, and rendering.
+- `storybook_click_target` accepts explicit `story_key` and `target_key`
+  inputs, resolves the target after route selection, scrolling, and rendering,
+  and dispatches exactly one click.
 - Target clicks use the same pointer move/down/up dispatch and partial-progress
   reporting as coordinate clicks.
 
@@ -96,10 +114,10 @@ pin is updated.
 4. Build and run `tm_zmq_server` on the Windows Mitsubishi VM.
 5. Launch `tm-zmq-client-ui` on Linux with the headless launcher and Storybook
    MCP interaction enabled.
-6. Discover `execute-request`, invoke it through `click_target`, and poll the
-   generated route's `response` semantic value until it contains a real
-   current-position response; verify the matching Windows server trace without
-   requesting frame capture.
+6. Invoke `execute-request` through `storybook_click_target`, then use
+   `storybook_wait_for_value` on the generated route's `response` semantic
+   value until it contains a real current-position response; verify the
+   matching Windows server trace without requesting frame capture.
 7. Close MCP stdin and verify the Linux GUI and compositor exit without an
    explicit quit action.
 8. Restore portable Git dependencies, update the Storybook revision, and run a
@@ -131,9 +149,11 @@ pin is updated.
   temporary-runtime cleanup.
 - The Mitsubishi form generator check and `tm-zmq-client-ui` MCP build passed
   on Linux while Storybook was imported by local path.
-- The Windows VM built and ran `tm_zmq_server`; the Linux GUI opened
-  `tm-zmq-client-ui-GetCurrentPositionForm`, discovered `execute-request`,
-  clicked it semantically, and read the route-local `response` as
+- The Windows VM built and ran `tm_zmq_server`; the Linux GUI's first catalog
+  call became ready in 0.16 seconds, opened
+  `tm-zmq-client-ui-GetCurrentPositionForm`, clicked `execute-request` once
+  through `storybook_click_target`, matched `/status` in one frame through
+  `storybook_wait_for_value`, and read the Serde-derived `response` as
   `{ "status": "success", "value": { "Position": { "position": 0.0 } } }`.
   The workflow made no capture call. The server trace recorded the matching
   position request and successful response.

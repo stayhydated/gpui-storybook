@@ -78,6 +78,8 @@ JSON object per line in this order:
 
 Read the matching response ID before closing standard input. Use each entry's
 advertised `inputSchema` when constructing later calls.
+The first tool call waits up to 30 seconds for the gallery or dock to publish
+its story catalog and attach the live automation host.
 
 Set `GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1` only when the client should receive
 generic in-process interaction tools. The value must be exactly `1`; otherwise
@@ -95,12 +97,15 @@ the controller installed by `gpui_storybook::init`.
 - `storybook_open_story`
 - `storybook_read_controls`
 - `storybook_read_semantic_values`
+- `storybook_read_value`
+- `storybook_wait_for_value`
 - `storybook_set_control`
 - `storybook_reset_control`
 - `storybook_capture_current_story`
 - `storybook_capture_launch_env`
 - `storybook_list_actions` (interaction capability)
 - `storybook_list_interaction_targets` (interaction capability)
+- `storybook_click_target` (interaction capability)
 - `storybook_run_steps` (interaction capability)
 
 Use advertised typed fields. Width and height are optional only as a pair.
@@ -108,23 +113,23 @@ Control operations use tagged `ControlValue` objects shared with the UI:
 
 ```json
 {
-  "key": "disabled",
+  "control_key": "disabled",
   "value": { "type": "boolean", "value": true }
 }
 ```
 
-Read controls after opening the intended route. Reset with a key for one value
-or omit the key for all values. A capture request can include a `controls` map
+Read controls after opening the intended route. Reset with a `control_key` for
+one value or omit it for all values. A capture request can include a `controls` map
 so it applies serialized values immediately before rendering.
 
-Import `gpui_storybook::StorybookElementExt as _`, wrap rendered application
-state with `.storybook_value(json_value)`, then call
-`storybook_read_semantic_values` to receive the active route's values in stable
-key order. The tool refreshes the route before reading and remains available
-without the generic interaction capability. Use it for semantic postconditions;
-use capture when pixels and layout are the evidence. The implicit method uses
-the GPUI element ID as its key and derives the label; use
-`.storybook_value_as(key, label, value)` for explicit metadata.
+Import `gpui_storybook::StorybookElementExt as _`, wrap Serde-serializable
+application state with `.storybook_value(&state)`, then use
+`storybook_read_value` for one `value_key` or `storybook_wait_for_value` for a
+bounded exact match on the complete value or an RFC 6901 JSON Pointer. The wait
+performs fresh reads and never retries the preceding interaction. Use capture
+when pixels and layout are the evidence. The implicit method uses the GPUI
+element ID as its key and derives the label; use
+`.storybook_value_as(key, label, &state)` for explicit metadata.
 
 Capture requests also accept `responsive`, `mobile`, `tablet`, or `desktop` as
 a `viewport`. Explicit paired width and height take precedence. The live
@@ -143,16 +148,17 @@ every launch.
 
 Wrap visible controls with `.storybook_target()`. After opening a route,
 call `storybook_list_interaction_targets` to discover live route-relative
-bounds, then use `{ "type": "click_target", "key": "..." }`. Keys must be
+bounds, then call `storybook_click_target` with `target_key`, or use
+`{ "type": "click_target", "target_key": "..." }` in a batch. Keys must be
 unique within one story or substory route. The implicit method uses the GPUI
 element ID and derives a readable label; use
 `.storybook_target_as(key, label)` when those values need to differ.
 
-`storybook_run_steps` accepts an optional route, controls, paired rendered-pixel
+`storybook_run_steps` accepts an optional `story_key`, controls, paired rendered-pixel
 dimensions or viewport, a required non-empty step list, and an optional final
 capture. Step types are `focus_next`, `focus_previous`, `blur`, `keystrokes`,
 `text`, `dispatch_action`, `click_target`, `pointer_move`, `pointer_click`, `scroll`, and
-`wait_frames`. Supplying a route focuses the selected story's focus handle
+`wait_frames`. Supplying a `story_key` focuses the selected story's focus handle
 before the first step.
 
 GPUI defers registered-action dispatch; the executor resumes with the next step

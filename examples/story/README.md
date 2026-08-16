@@ -34,9 +34,9 @@ capture](../../book/src/automation.md) for MCP usage.
 keyboard-operated select, semantic `pointer-target`, schema-backed
 `interaction_story::SetAutomationStatus` action, viewport readout, typed
 `prefix` control, a one-frame `pressed` state, and a structured
-`fixture-state` semantic value. Call `storybook_read_semantic_values` after an
-interaction to inspect its status, click count, input, and selection without a
-screenshot. Exercise the same route in gallery or dock mode:
+`fixture-state` semantic value. Use `storybook_click_target` for one semantic
+click and `storybook_wait_for_value` to establish a bounded JSON postcondition
+without a screenshot. Exercise the same route in gallery or dock mode:
 
 ```bash
 GPUI_STORYBOOK_MCP_STDIO=1 \
