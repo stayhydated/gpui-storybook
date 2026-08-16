@@ -73,7 +73,10 @@ launcher](../../book/src/automation.md#enable-mcp-support) to the same session.
 
 The gate adds `storybook_list_actions`, `storybook_list_interaction_targets`,
 and `storybook_run_steps`. When it is unset or has any other value, all three
-tools are absent from discovery. Direct
+tools are absent from discovery. The read-only
+`storybook_read_semantic_values` tool is always advertised; it reads JSON
+values registered with `gpui_storybook::semantic_value` after refreshing the
+selected route. Direct
 embedders can avoid process environment changes:
 
 ```rust
@@ -92,6 +95,12 @@ Wrap important story controls with
 `storybook_list_interaction_targets` returns the selected route's stable keys,
 labels, and live route-relative bounds. A `click_target` step clicks the center
 of one discovered key and rejects missing or duplicate keys before dispatch.
+
+Wrap rendered state with
+`gpui_storybook::semantic_value(key, label, json_value, child)` and call
+`storybook_read_semantic_values` to verify application state after an
+interaction. This read does not capture a frame; use capture only for visual
+rendering assertions.
 
 `storybook_run_steps` performs one ordered batch against the active story or
 substory capture region. It can open a route, apply tagged control values, size

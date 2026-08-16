@@ -65,6 +65,9 @@ description: >-
   Keep typed controls as the preferred reproducible input, then wrap important
   visible controls with stable route-local `interaction_target` keys before
   falling back to coordinates.
+- Wrap machine-readable rendered state with route-local `semantic_value` keys
+  and use `storybook_read_semantic_values` for postconditions. Reserve capture
+  for assertions about visual presentation.
 - Treat interaction batches as potentially destructive and non-idempotent.
   Rediscover runtime actions after each launch and never retry partial batches
   automatically.

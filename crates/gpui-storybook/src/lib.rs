@@ -22,6 +22,9 @@
 //! automation. Only marked fields are registered. `#[derive(ComponentStory)]`
 //! accepts the same field metadata and derives reset defaults from its
 //! configured example.
+//! [`semantic_value`] associates route-local JSON state with a rendered child.
+//! MCP clients can read those values after a fresh frame without requiring a
+//! screenshot; capture remains the visual-presentation assertion surface.
 //!
 //! [`init`] and `generate_stories` load crate-local `storybook.toml` files for
 //! discovered story crates and select a runtime config by matching the running
@@ -103,6 +106,7 @@ pub use gpui_storybook_core::{
     capture_region::{
         capture_route_slug, capture_substory, capture_substory_route_id,
         capture_substory_route_id_with_key, capture_substory_with_key, interaction_target,
+        semantic_value,
     },
     controls::{
         ControlBounds, ControlColor, ControlError, ControlKind, ControlSnapshot, ControlSpec,

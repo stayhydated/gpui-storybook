@@ -94,6 +94,7 @@ the controller installed by `gpui_storybook::init`.
 - `storybook_current_story`
 - `storybook_open_story`
 - `storybook_read_controls`
+- `storybook_read_semantic_values`
 - `storybook_set_control`
 - `storybook_reset_control`
 - `storybook_capture_current_story`
@@ -115,6 +116,13 @@ Control operations use tagged `ControlValue` objects shared with the UI:
 Read controls after opening the intended route. Reset with a key for one value
 or omit the key for all values. A capture request can include a `controls` map
 so it applies serialized values immediately before rendering.
+
+Wrap rendered application state with
+`gpui_storybook::semantic_value(key, label, json_value, child)`, then call
+`storybook_read_semantic_values` to receive the active route's values in stable
+key order. The tool refreshes the route before reading and remains available
+without the generic interaction capability. Use it for semantic postconditions;
+use capture when pixels and layout are the evidence.
 
 Capture requests also accept `responsive`, `mobile`, `tablet`, or `desktop` as
 a `viewport`. Explicit paired width and height take precedence. The live
@@ -215,6 +223,7 @@ window. Use returned pixel dimensions as the rendered source of truth.
   construction and rediscover tools.
 - Invalid action: rediscover actions for this launch and use its JSON schema.
 - Invalid semantic target: list targets after opening the route and remove duplicate route-local keys.
+- Invalid semantic value: render the wrapper in the active route and remove duplicate route-local keys.
 - Partial interaction failure: inspect the dispatched count and do not retry.
 - Invalid dimensions: provide positive width and height together.
 - Corrupt stdio: move application logs to standard error.

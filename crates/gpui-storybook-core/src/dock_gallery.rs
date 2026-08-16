@@ -1059,6 +1059,21 @@ impl StoryWorkspace {
                     },
                 }
             },
+            StorybookAutomationCommand::ReadSemanticValues { response } => {
+                let result = self
+                    .automation
+                    .as_ref()
+                    .and_then(|automation| automation.current_story().story)
+                    .ok_or(StorybookAutomationError::NoActiveStory);
+                match result {
+                    Ok(story) => {
+                        crate::automation::schedule_semantic_value_read(story, response, window)
+                    },
+                    Err(error) => {
+                        let _ = response.send(Err(error));
+                    },
+                }
+            },
             StorybookAutomationCommand::RunSteps {
                 request_id,
                 request,

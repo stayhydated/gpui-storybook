@@ -33,8 +33,10 @@ capture](../../book/src/automation.md) for MCP usage.
 `InteractionStory` is the inert automation fixture. It provides a text input,
 keyboard-operated select, semantic `pointer-target`, schema-backed
 `interaction_story::SetAutomationStatus` action, viewport readout, typed
-`prefix` control, and a one-frame `pressed` state. Exercise the same route in
-gallery or dock mode:
+`prefix` control, a one-frame `pressed` state, and a structured
+`fixture-state` semantic value. Call `storybook_read_semantic_values` after an
+interaction to inspect its status, click count, input, and selection without a
+screenshot. Exercise the same route in gallery or dock mode:
 
 ```bash
 GPUI_STORYBOOK_MCP_STDIO=1 \

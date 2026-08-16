@@ -5,6 +5,7 @@ Status: complete (2026-08-15)
 ## Outcome
 
 GPUI Storybook MCP sessions provide stable semantic interaction targets,
+route-local structured value readback,
 launch through one reusable Linux headless command, and terminate the GPUI
 application when the stdio session ends. The Mitsubishi ZMQ client validates
 the resulting workflow through a local path dependency before its portable Git
@@ -24,6 +25,20 @@ pin is updated.
   after route selection, viewport sizing, scrolling, and rendering.
 - Target clicks use the same pointer move/down/up dispatch and partial-progress
   reporting as coordinate clicks.
+
+### Structured semantic values
+
+- `gpui-storybook-core` owns a second route-scoped prepaint registry for stable
+  keys, human-readable labels, and JSON values sourced from application state.
+- `gpui-storybook` exposes `semantic_value(key, label, value, child)` as the
+  application-facing wrapper. Keys are unique within one story or substory
+  route.
+- The read-only `storybook_read_semantic_values` MCP tool requests a fresh
+  frame and returns values for the active route in stable key order.
+- Semantic reads can observe transitional asynchronous state and are safe to
+  poll. They do not acquire the mutation guard or retry an interaction.
+- Structured values establish state postconditions. Frame capture remains a
+  separate surface for validating pixels, layout, and other visual behavior.
 
 ### Linux launcher
 
@@ -58,6 +73,9 @@ pin is updated.
    READMEs, catalog copy, Rustdocs, and the public Storybook skill.
 8. Execute one process-level Linux smoke workflow covering launch, MCP discovery,
    semantic target discovery, target clicking, and EOF shutdown.
+9. Add route-scoped structured value registration and a read-only MCP tool,
+   then extend the smoke workflow to establish its postcondition without frame
+   capture.
 
 ## Downstream proof
 
@@ -71,8 +89,10 @@ pin is updated.
 4. Build and run `tm_zmq_server` on the Windows Mitsubishi VM.
 5. Launch `tm-zmq-client-ui` on Linux with the headless launcher and Storybook
    MCP interaction enabled.
-6. Discover `execute-request`, invoke it through `click_target`, and verify a
-   real current-position response plus the matching Windows server trace.
+6. Discover `execute-request`, invoke it through `click_target`, and poll the
+   generated route's `response` semantic value until it contains a real
+   current-position response; verify the matching Windows server trace without
+   requesting frame capture.
 7. Close MCP stdin and verify the Linux GUI and compositor exit without an
    explicit quit action.
 8. Restore portable Git dependencies, update the Storybook revision, and run a
@@ -81,7 +101,8 @@ pin is updated.
 ## Acceptance evidence
 
 - Focused core and MCP unit tests cover target uniqueness, target lookup,
-  strict schemas, coordinate resolution, and error reporting.
+  semantic-value uniqueness and ordering, strict schemas, coordinate
+  resolution, and error reporting.
 - Launcher tests cover argument parsing, environment construction, child exit
   propagation, and cleanup.
 - The process smoke test proves real JSON-RPC stdio and EOF shutdown.
@@ -90,7 +111,8 @@ pin is updated.
 - The Mitsubishi generator check and targeted Rust package checks pass on
   Linux.
 - The Windows server build succeeds and the Linux Storybook returns a current
-  position through semantic MCP interaction.
+  position through semantic MCP interaction and structured readback without a
+  screenshot.
 
 ## Completed validation
 
@@ -104,8 +126,9 @@ pin is updated.
   on Linux while Storybook was imported by local path.
 - The Windows VM built and ran `tm_zmq_server`; the Linux GUI opened
   `tm-zmq-client-ui-GetCurrentPositionForm`, discovered `execute-request`,
-  clicked it semantically, and rendered
-  `Position(AxisPosition { position: 0.0 })`. The server trace recorded the
-  matching position request and successful response.
+  clicked it semantically, and read the route-local `response` as
+  `{ "status": "success", "value": { "Position": { "position": 0.0 } } }`.
+  The workflow made no capture call. The server trace recorded the matching
+  position request and successful response.
 - Closing MCP stdin removed the GPUI windows and terminated the Linux GUI,
   launcher, and private Sway process with exit status 0.

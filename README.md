@@ -86,6 +86,22 @@ gpui_storybook::interaction_target(
 )
 ```
 
+Wrap rendered application state with `semantic_value` when automation needs a
+machine-readable postcondition:
+
+```rust
+gpui_storybook::semantic_value(
+    "response",
+    "Response",
+    serde_json::json!({ "status": "success", "position": 12.5 }),
+    response_panel,
+)
+```
+
+`storybook_read_semantic_values` refreshes the active route and returns these
+JSON values without capturing a frame. Use screenshot capture separately when
+the rendered appearance itself is the assertion.
+
 Linux automation uses the normal Wayland-backed GPUI application under Sway's
 wlroots headless backend. Install Sway and Mesa's software graphics drivers;
 install `gpui-storybook-launch`, then run the Cargo command through it.

@@ -4,6 +4,7 @@ use gpui::{
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet},
@@ -35,6 +36,18 @@ pub struct StoryInteractionTargetSnapshot {
     pub bounds: StoryInteractionTargetBounds,
 }
 
+/// One stable machine-readable value rendered by a story route.
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct StorySemanticValueSnapshot {
+    /// Stable value key supplied by the story author.
+    pub key: String,
+    /// Human-readable value label supplied by the story author.
+    pub label: String,
+    /// Current JSON value captured from application state during rendering.
+    pub value: Value,
+}
+
 #[derive(Clone)]
 pub(crate) struct CaptureRegionBounds {
     pub bounds: Bounds<Pixels>,
@@ -56,12 +69,20 @@ struct InteractionTargetRecord {
     bounds: Bounds<Pixels>,
 }
 
+#[derive(Clone)]
+struct SemanticValueRecord {
+    label: String,
+    value: Value,
+}
+
 #[derive(Default)]
 struct CaptureRegionRegistry {
     scopes: Vec<CaptureScope>,
     regions: BTreeMap<String, CaptureRegionBounds>,
     interaction_targets: BTreeMap<String, BTreeMap<String, InteractionTargetRecord>>,
     duplicate_interaction_targets: BTreeMap<String, BTreeSet<String>>,
+    semantic_values: BTreeMap<String, BTreeMap<String, SemanticValueRecord>>,
+    duplicate_semantic_values: BTreeMap<String, BTreeSet<String>>,
 }
 
 thread_local! {
@@ -103,6 +124,25 @@ pub fn interaction_target(
     InteractionTargetElement {
         key: key.into(),
         label: label.into(),
+        child: child.into_any_element(),
+    }
+}
+
+/// Mark one rendered child as the source of a stable machine-readable value.
+///
+/// Values are refreshed from application state during prepaint and exposed by
+/// Storybook automation for the active story or substory route. Keys must be
+/// unique within that route.
+pub fn semantic_value(
+    key: impl Into<String>,
+    label: impl Into<String>,
+    value: Value,
+    child: impl IntoElement,
+) -> impl IntoElement {
+    SemanticValueElement {
+        key: key.into(),
+        label: label.into(),
+        value,
         child: child.into_any_element(),
     }
 }
@@ -206,6 +246,12 @@ pub(crate) enum InteractionTargetLookupError {
     DuplicateKey(String),
 }
 
+#[derive(Debug)]
+pub(crate) enum SemanticValueLookupError {
+    RouteNotRendered,
+    DuplicateKey(String),
+}
+
 pub(crate) fn interaction_targets(
     route_id: &str,
 ) -> Result<Vec<StoryInteractionTargetSnapshot>, InteractionTargetLookupError> {
@@ -236,6 +282,35 @@ pub(crate) fn interaction_targets(
                     width: f32::from(target.bounds.size.width),
                     height: f32::from(target.bounds.size.height),
                 },
+            })
+            .collect())
+    })
+}
+
+pub(crate) fn semantic_values(
+    route_id: &str,
+) -> Result<Vec<StorySemanticValueSnapshot>, SemanticValueLookupError> {
+    CAPTURE_REGIONS.with_borrow(|registry| {
+        if !registry.regions.contains_key(route_id) {
+            return Err(SemanticValueLookupError::RouteNotRendered);
+        }
+        if let Some(key) = registry
+            .duplicate_semantic_values
+            .get(route_id)
+            .and_then(|keys| keys.first())
+        {
+            return Err(SemanticValueLookupError::DuplicateKey(key.clone()));
+        }
+
+        Ok(registry
+            .semantic_values
+            .get(route_id)
+            .into_iter()
+            .flat_map(|values| values.iter())
+            .map(|(key, value)| StorySemanticValueSnapshot {
+                key: key.clone(),
+                label: value.label.clone(),
+                value: value.value.clone(),
             })
             .collect())
     })
@@ -293,10 +368,36 @@ fn record_region(route_id: String, bounds: Bounds<Pixels>, scope: &CaptureScope)
     });
 }
 
-fn clear_interaction_targets(route_id: &str) {
+fn clear_route_automation_values(route_id: &str) {
     CAPTURE_REGIONS.with_borrow_mut(|registry| {
         registry.interaction_targets.remove(route_id);
         registry.duplicate_interaction_targets.remove(route_id);
+        registry.semantic_values.remove(route_id);
+        registry.duplicate_semantic_values.remove(route_id);
+    });
+}
+
+fn record_semantic_value(route_id: String, key: String, label: String, value: Value) {
+    CAPTURE_REGIONS.with_borrow_mut(|registry| {
+        let duplicate = match registry
+            .semantic_values
+            .entry(route_id.clone())
+            .or_default()
+            .entry(key.clone())
+        {
+            std::collections::btree_map::Entry::Vacant(entry) => {
+                entry.insert(SemanticValueRecord { label, value });
+                false
+            },
+            std::collections::btree_map::Entry::Occupied(_) => true,
+        };
+        if duplicate {
+            registry
+                .duplicate_semantic_values
+                .entry(route_id)
+                .or_default()
+                .insert(key);
+        }
     });
 }
 
@@ -409,7 +510,7 @@ impl Element for CaptureScopeElement {
         };
 
         if let Some(story_key) = self.story_key.clone() {
-            clear_interaction_targets(&story_key);
+            clear_route_automation_values(&story_key);
             record_region(story_key, bounds, &scope);
         }
 
@@ -516,7 +617,7 @@ impl Element for CaptureSubstoryElement {
             && let Some(story_key) = scope.story_key.clone()
         {
             let route_id = capture_substory_route_id_with_key(story_key, &self.route_key);
-            clear_interaction_targets(&route_id);
+            clear_route_automation_values(&route_id);
             record_region(route_id.clone(), bounds, &scope);
             with_scope(
                 CaptureScope {
@@ -609,6 +710,78 @@ impl Element for InteractionTargetElement {
     ) -> Self::PrepaintState {
         if let Some(route_id) = current_scope().and_then(|scope| scope.route_id) {
             record_interaction_target(route_id, self.key.clone(), self.label.clone(), bounds);
+        }
+        self.child.prepaint(window, cx);
+    }
+
+    fn paint(
+        &mut self,
+        _id: Option<&GlobalElementId>,
+        _inspector_id: Option<&InspectorElementId>,
+        _bounds: Bounds<Pixels>,
+        _request_layout: &mut Self::RequestLayoutState,
+        _prepaint: &mut Self::PrepaintState,
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        self.child.paint(window, cx);
+    }
+}
+
+struct SemanticValueElement {
+    key: String,
+    label: String,
+    value: Value,
+    child: AnyElement,
+}
+
+impl IntoElement for SemanticValueElement {
+    type Element = Self;
+
+    fn into_element(self) -> Self::Element {
+        self
+    }
+}
+
+impl Element for SemanticValueElement {
+    type RequestLayoutState = LayoutId;
+    type PrepaintState = ();
+
+    fn id(&self) -> Option<ElementId> {
+        None
+    }
+
+    fn source_location(&self) -> Option<&'static std::panic::Location<'static>> {
+        None
+    }
+
+    fn request_layout(
+        &mut self,
+        _id: Option<&GlobalElementId>,
+        _inspector_id: Option<&InspectorElementId>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> (LayoutId, Self::RequestLayoutState) {
+        let layout_id = self.child.request_layout(window, cx);
+        (layout_id, layout_id)
+    }
+
+    fn prepaint(
+        &mut self,
+        _id: Option<&GlobalElementId>,
+        _inspector_id: Option<&InspectorElementId>,
+        _bounds: Bounds<Pixels>,
+        _request_layout: &mut Self::RequestLayoutState,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Self::PrepaintState {
+        if let Some(route_id) = current_scope().and_then(|scope| scope.route_id) {
+            record_semantic_value(
+                route_id,
+                self.key.clone(),
+                self.label.clone(),
+                self.value.clone(),
+            );
         }
         self.child.prepaint(window, cx);
     }
@@ -754,6 +927,11 @@ mod tests {
         let target = interaction_target("execute", "Execute", div()).into_element();
         assert!(target.id().is_none());
         assert!(target.source_location().is_none());
+
+        let value =
+            semantic_value("response", "Response", serde_json::json!(42), div()).into_element();
+        assert!(value.id().is_none());
+        assert!(value.source_location().is_none());
     }
 
     #[test]
@@ -826,6 +1004,64 @@ mod tests {
         assert!(matches!(
             interaction_targets("story-key"),
             Err(InteractionTargetLookupError::DuplicateKey(key)) if key == "duplicate"
+        ));
+    }
+
+    #[test]
+    fn semantic_values_are_structured_and_sorted_by_key() {
+        clear_registry();
+        let scope = CaptureScope {
+            story_key: Some("story-key".to_string()),
+            route_id: Some("story-key".to_string()),
+            viewport_bounds: None,
+            scroll_handle: None,
+        };
+        record_region("story-key".to_string(), Bounds::default(), &scope);
+        record_semantic_value(
+            "story-key".to_string(),
+            "status".to_string(),
+            "Status".to_string(),
+            serde_json::json!({ "ready": true }),
+        );
+        record_semantic_value(
+            "story-key".to_string(),
+            "response".to_string(),
+            "Response".to_string(),
+            serde_json::json!({ "position": 12.5 }),
+        );
+
+        let values = semantic_values("story-key").expect("values should resolve");
+        assert_eq!(values[0].key, "response");
+        assert_eq!(values[0].value, serde_json::json!({ "position": 12.5 }));
+        assert_eq!(values[1].key, "status");
+    }
+
+    #[test]
+    fn duplicate_semantic_value_keys_are_rejected() {
+        clear_registry();
+        let scope = CaptureScope {
+            story_key: Some("story-key".to_string()),
+            route_id: Some("story-key".to_string()),
+            viewport_bounds: None,
+            scroll_handle: None,
+        };
+        record_region("story-key".to_string(), Bounds::default(), &scope);
+        record_semantic_value(
+            "story-key".to_string(),
+            "response".to_string(),
+            "First".to_string(),
+            serde_json::json!(1),
+        );
+        record_semantic_value(
+            "story-key".to_string(),
+            "response".to_string(),
+            "Second".to_string(),
+            serde_json::json!(2),
+        );
+
+        assert!(matches!(
+            semantic_values("story-key"),
+            Err(SemanticValueLookupError::DuplicateKey(key)) if key == "response"
         ));
     }
 }

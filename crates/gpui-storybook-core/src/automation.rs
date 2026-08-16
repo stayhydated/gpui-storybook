@@ -22,11 +22,14 @@
 use crate::capture_output::CaptureOutputStore;
 pub(crate) mod interaction;
 
-pub use crate::capture_region::{StoryInteractionTargetBounds, StoryInteractionTargetSnapshot};
+pub use crate::capture_region::{
+    StoryInteractionTargetBounds, StoryInteractionTargetSnapshot, StorySemanticValueSnapshot,
+};
 use crate::{
     capture_region::{
-        InteractionTargetLookupError, capture_region_bounds, capture_route_story_key,
-        interaction_targets, scroll_capture_region_into_view,
+        InteractionTargetLookupError, SemanticValueLookupError, capture_region_bounds,
+        capture_route_story_key, interaction_targets, scroll_capture_region_into_view,
+        semantic_values,
     },
     controls::{ControlSnapshot, ControlValue},
     presentation::StoryViewportPreset,
@@ -178,6 +181,16 @@ pub struct StoryInteractionTargetsSnapshot {
     pub targets: Vec<StoryInteractionTargetSnapshot>,
 }
 
+/// Machine-readable values currently rendered by the selected story route.
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[schemars(deny_unknown_fields)]
+pub struct StorySemanticValuesSnapshot {
+    /// Story or substory route whose values were read.
+    pub story: StorySnapshot,
+    /// Stable values in deterministic key order.
+    pub values: Vec<StorySemanticValueSnapshot>,
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[schemars(deny_unknown_fields)]
 pub struct StoryCaptureSnapshot {
@@ -288,6 +301,20 @@ pub enum StorybookAutomationError {
         /// Duplicated stable target key.
         key: String,
     },
+    /// The active story route has not rendered semantic values.
+    #[error("semantic values are unavailable because route `{route}` is not rendered")]
+    SemanticValuesUnavailable {
+        /// Active story or substory route.
+        route: String,
+    },
+    /// A story rendered the same semantic value key more than once.
+    #[error("semantic value `{key}` is duplicated in route `{route}`")]
+    DuplicateSemanticValue {
+        /// Active story or substory route.
+        route: String,
+        /// Duplicated stable value key.
+        key: String,
+    },
 }
 
 pub(crate) enum StorybookAutomationCommand {
@@ -322,6 +349,9 @@ pub(crate) enum StorybookAutomationCommand {
     ListInteractionTargets {
         response:
             oneshot::Sender<Result<StoryInteractionTargetsSnapshot, StorybookAutomationError>>,
+    },
+    ReadSemanticValues {
+        response: oneshot::Sender<Result<StorySemanticValuesSnapshot, StorybookAutomationError>>,
     },
     RunSteps {
         request_id: u64,
@@ -582,6 +612,17 @@ impl StorybookAutomation {
         receive_host_response(receiver).await
     }
 
+    /// Reads stable machine-readable values rendered by the selected route.
+    pub async fn read_semantic_values(
+        &self,
+    ) -> Result<StorySemanticValuesSnapshot, StorybookAutomationError> {
+        let (response, receiver) = self.live_command_channel()?;
+        self.command_tx
+            .send(StorybookAutomationCommand::ReadSemanticValues { response })
+            .map_err(|_| StorybookAutomationError::NoLiveHost)?;
+        receive_host_response(receiver).await
+    }
+
     /// Runs one validated interaction batch on the live GPUI window thread.
     ///
     /// The batch owns the shared operation guard through every frame wait and
@@ -697,6 +738,37 @@ pub(crate) fn rendered_interaction_targets(
         },
     })?;
     Ok(StoryInteractionTargetsSnapshot { story, targets })
+}
+
+pub(crate) fn rendered_semantic_values(
+    story: StorySnapshot,
+) -> Result<StorySemanticValuesSnapshot, StorybookAutomationError> {
+    let route = story.capture_route_id.clone();
+    let values = semantic_values(&route).map_err(|error| match error {
+        SemanticValueLookupError::RouteNotRendered => {
+            StorybookAutomationError::SemanticValuesUnavailable {
+                route: route.clone(),
+            }
+        },
+        SemanticValueLookupError::DuplicateKey(key) => {
+            StorybookAutomationError::DuplicateSemanticValue {
+                route: route.clone(),
+                key,
+            }
+        },
+    })?;
+    Ok(StorySemanticValuesSnapshot { story, values })
+}
+
+pub(crate) fn schedule_semantic_value_read(
+    story: StorySnapshot,
+    response: oneshot::Sender<Result<StorySemanticValuesSnapshot, StorybookAutomationError>>,
+    window: &mut Window,
+) {
+    window.refresh();
+    window.on_next_frame(move |_window, _cx| {
+        let _ = response.send(rendered_semantic_values(story));
+    });
 }
 
 async fn receive_host_response<T>(
@@ -1384,6 +1456,19 @@ mod tests {
                     key: "execute".to_string(),
                 },
                 "interaction target `execute` is duplicated in route `story`",
+            ),
+            (
+                StorybookAutomationError::SemanticValuesUnavailable {
+                    route: "story/section".to_string(),
+                },
+                "semantic values are unavailable because route `story/section` is not rendered",
+            ),
+            (
+                StorybookAutomationError::DuplicateSemanticValue {
+                    route: "story".to_string(),
+                    key: "response".to_string(),
+                },
+                "semantic value `response` is duplicated in route `story`",
             ),
         ];
 

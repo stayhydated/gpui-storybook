@@ -143,13 +143,22 @@ impl Render for InteractionStory {
                     }))
                     .child("Pointer target"),
             ))
-            .child(
+            .child(gpui_storybook::semantic_value(
+                "fixture-state",
+                "Fixture state",
+                serde_json::json!({
+                    "clicks": self.clicks,
+                    "hovered": self.hovered,
+                    "input": input_value.to_string(),
+                    "selected": selected,
+                    "status": self.status.clone(),
+                }),
                 h_flex()
                     .gap_4()
                     .child(format!("{} status:{}", self.prefix, self.status))
                     .child(format!("hovered:{}", self.hovered))
                     .child(format!("clicks:{}", self.clicks)),
-            )
+            ))
             .child(format!("input:{input_value}"))
             .child(format!("selected:{selected}"))
             .child(format!(

@@ -121,6 +121,7 @@ terminates the GPUI application; the launcher then stops Sway.
 | `storybook_current_story` | Inspect the story displayed by the live window |
 | `storybook_open_story` | Navigate the live window to a route |
 | `storybook_read_controls` | Read control metadata and current values from the active variant |
+| `storybook_read_semantic_values` | Read route-local JSON values refreshed from rendered application state |
 | `storybook_set_control` | Set one control on the active story instance |
 | `storybook_reset_control` | Reset one control, or all controls when `key` is omitted |
 | `storybook_capture_current_story` | Capture the active story region |
@@ -159,6 +160,25 @@ the returned key in a batch:
 
 Target keys must be unique within each story or substory route. Storybook
 resolves the target's live bounds after route preparation and clicks its center.
+
+Expose a machine-readable postcondition by wrapping the element that presents
+it:
+
+```rust
+gpui_storybook::semantic_value(
+    "response",
+    "Response",
+    serde_json::json!({ "status": "success", "position": 12.5 }),
+    response_panel,
+)
+```
+
+After input dispatch, call `storybook_read_semantic_values`. Storybook requests
+a fresh frame and returns the active route's values in stable key order. Poll a
+transitional value such as `{ "status": "loading" }` when the application
+finishes work asynchronously. This readback is independent from capture:
+semantic values prove state, while PNG capture proves visual presentation.
+Value keys, like target keys, must be unique within a story or substory route.
 
 `storybook_run_steps` can open a route, apply a `controls` map, size the story
 region for paired rendered-pixel `width` and `height` values or a named
@@ -406,6 +426,7 @@ Do not retry an interaction batch automatically.
 | Interaction tools are missing | Set `GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1` before server construction and rediscover tools |
 | Action is unknown or arguments are invalid | Call `storybook_list_actions` for this launch and follow its argument schema |
 | Semantic target is missing or duplicated | Open the intended route, call `storybook_list_interaction_targets`, and give every wrapper a unique route-local key |
+| Semantic value is missing or duplicated | Render the wrapper in the active route and give every `semantic_value` a unique route-local key |
 | Pointer point is rejected | Use finite normalized coordinates in `0.0..=1.0` or route-relative logical pixels inside the rendered bounds |
 | Interaction reports partial execution | Inspect `steps_dispatched`; establish postconditions with a capture or read and do not retry automatically |
 | Stdio messages cannot be decoded | Route tracing and diagnostics to standard error |

@@ -1,9 +1,9 @@
 //! MCP tools for driving a live `gpui-storybook` window.
 //!
 //! Tools can navigate stable routes, read/set/reset the selected story's typed
-//! controls, apply a serialized control map before capture, and use named or
-//! explicit viewport dimensions. These operations reuse the core
-//! `ControlSpec` and `ControlValue` contracts.
+//! controls, read route-local structured application values, apply a serialized
+//! control map before capture, and use named or explicit viewport dimensions.
+//! These operations reuse the core `ControlSpec` and `ControlValue` contracts.
 //! Generic actions, focus, keyboard, pointer, frame waits, and atomic
 //! post-interaction capture are registered only when interaction automation is
 //! explicitly enabled with [`StorybookMcpServerOptions`] or
@@ -36,8 +36,9 @@ pub use gpui_storybook_core::automation::{
     StoryInteractionDispatch, StoryInteractionObservation, StoryInteractionRequest,
     StoryInteractionSnapshot, StoryInteractionStep, StoryInteractionTargetBounds,
     StoryInteractionTargetSnapshot, StoryInteractionTargetsSnapshot, StoryModifier, StoryModifiers,
-    StoryMouseButton, StoryPoint, StoryPointSpace, StoryScreenshotRequest, StorySnapshot,
-    StorybookAutomation, StorybookAutomationError,
+    StoryMouseButton, StoryPoint, StoryPointSpace, StoryScreenshotRequest,
+    StorySemanticValueSnapshot, StorySemanticValuesSnapshot, StorySnapshot, StorybookAutomation,
+    StorybookAutomationError,
 };
 pub use gpui_storybook_core::controls::{
     ControlBounds, ControlColor, ControlKind, ControlSnapshot, ControlSpec, ControlValue,
@@ -75,6 +76,7 @@ pub const TOOL_CAPTURE_CURRENT_STORY: &str = "storybook_capture_current_story";
 pub const TOOL_CAPTURE_LAUNCH_ENV: &str = "storybook_capture_launch_env";
 pub const TOOL_LIST_ACTIONS: &str = "storybook_list_actions";
 pub const TOOL_LIST_INTERACTION_TARGETS: &str = "storybook_list_interaction_targets";
+pub const TOOL_READ_SEMANTIC_VALUES: &str = "storybook_read_semantic_values";
 pub const TOOL_RUN_STEPS: &str = "storybook_run_steps";
 
 const CAPTURE_SESSION_TIMEOUT_SECS: u64 = 30;
@@ -552,6 +554,28 @@ pub fn register_tools_with_options(
         },
     )?;
 
+    server.add_typed_tool_async(
+        tool::<EmptyInput>(
+            TOOL_READ_SEMANTIC_VALUES,
+            "Read Semantic Values",
+            "Read stable machine-readable values rendered from application state by the selected story or substory route.",
+            semantic_values_output_schema(),
+            ToolHints::read_only(),
+        )?,
+        {
+            let automation = automation.clone();
+            move |_input| {
+                let automation = automation.clone();
+                async move {
+                    match automation.read_semantic_values().await {
+                        Ok(snapshot) => tool_structured_result(json!(snapshot)),
+                        Err(error) => automation_tool_error(error),
+                    }
+                }
+            }
+        },
+    )?;
+
     if options.interaction_enabled() {
         server.add_typed_tool_async(
             tool::<EmptyInput>(
@@ -988,6 +1012,15 @@ fn structured_automation_error(error: StorybookAutomationError) -> McpToolError 
             "target_key": key,
             "steps_dispatched": 0,
         }),
+        StorybookAutomationError::SemanticValuesUnavailable { route } => json!({
+            "code": "semantic_values_unavailable",
+            "route": route,
+        }),
+        StorybookAutomationError::DuplicateSemanticValue { route, key } => json!({
+            "code": "duplicate_semantic_value",
+            "route": route,
+            "value_key": key,
+        }),
         StorybookAutomationError::StoryNotFound { key } => json!({
             "code": "story_not_found",
             "route": key,
@@ -1279,6 +1312,10 @@ fn interaction_targets_output_schema() -> McpSchema {
     serialize_schema::<StoryInteractionTargetsSnapshot>()
 }
 
+fn semantic_values_output_schema() -> McpSchema {
+    serialize_schema::<StorySemanticValuesSnapshot>()
+}
+
 fn capture_launch_env_output_schema() -> McpSchema {
     serialize_schema::<CaptureLaunchEnv>()
 }
@@ -1382,11 +1419,12 @@ pub mod prelude {
         StoryInteractionRequest, StoryInteractionSnapshot, StoryInteractionStep,
         StoryInteractionTargetBounds, StoryInteractionTargetSnapshot,
         StoryInteractionTargetsSnapshot, StoryModifier, StoryModifiers, StoryMouseButton,
-        StoryPoint, StoryPointSpace, StoryScreenshotRequest, StorySnapshot, StorybookAutomation,
-        StorybookAutomationError, StorybookCaptureConfig, StorybookCaptureSession,
-        StorybookMcpServerOptions, StorybookStdioCompletion, capture_catalog, read_capture_session,
-        server, server_with_options, start_capture_session, start_capture_session_from_env,
-        start_stdio, stdio_requested,
+        StoryPoint, StoryPointSpace, StoryScreenshotRequest, StorySemanticValueSnapshot,
+        StorySemanticValuesSnapshot, StorySnapshot, StorybookAutomation, StorybookAutomationError,
+        StorybookCaptureConfig, StorybookCaptureSession, StorybookMcpServerOptions,
+        StorybookStdioCompletion, capture_catalog, read_capture_session, server,
+        server_with_options, start_capture_session, start_capture_session_from_env, start_stdio,
+        stdio_requested,
     };
 }
 
@@ -1501,6 +1539,22 @@ mod tests {
         assert_eq!(
             read_controls["outputSchema"]["properties"]["controls"]["type"],
             "array"
+        );
+
+        let semantic_values = find(TOOL_READ_SEMANTIC_VALUES);
+        assert_eq!(
+            semantic_values["inputSchema"]["additionalProperties"],
+            false
+        );
+        assert_eq!(semantic_values["annotations"]["readOnlyHint"], true);
+        assert_eq!(
+            semantic_values["outputSchema"]["properties"]["values"]["type"],
+            "array"
+        );
+        assert_eq!(
+            semantic_values["outputSchema"]["properties"]["values"]["items"]["properties"]["value"]
+                ["description"],
+            "Current JSON value captured from application state during rendering."
         );
 
         let set_control = find(TOOL_SET_CONTROL);
@@ -1710,7 +1764,7 @@ mod tests {
     }
 
     #[test]
-    fn semantic_target_errors_have_stable_structured_codes() {
+    fn semantic_automation_errors_have_stable_structured_codes() {
         let cases = [
             (
                 StorybookAutomationError::InteractionTargetsUnavailable {
@@ -1731,6 +1785,19 @@ mod tests {
                     key: "execute".to_owned(),
                 },
                 "duplicate_interaction_target",
+            ),
+            (
+                StorybookAutomationError::SemanticValuesUnavailable {
+                    route: "story/section".to_owned(),
+                },
+                "semantic_values_unavailable",
+            ),
+            (
+                StorybookAutomationError::DuplicateSemanticValue {
+                    route: "story".to_owned(),
+                    key: "response".to_owned(),
+                },
+                "duplicate_semantic_value",
             ),
         ];
 
@@ -2127,6 +2194,15 @@ mod tests {
             .expect("controls result should serialize");
         assert_eq!(controls["isError"], true);
         assert_eq!(controls["structuredContent"]["error"]["kind"], "validation");
+
+        let semantic_values =
+            serde_json::to_value(server.call_tool(TOOL_READ_SEMANTIC_VALUES, Some(json!({}))))
+                .expect("semantic values result should serialize");
+        assert_eq!(semantic_values["isError"], true);
+        assert_eq!(
+            semantic_values["structuredContent"]["error"]["details"][0]["code"],
+            "no_live_host"
+        );
 
         let invalid = serde_json::to_value(server.call_tool(
             TOOL_SET_CONTROL,
