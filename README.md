@@ -79,23 +79,29 @@ Wrap important controls with stable semantic targets so an MCP client can
 discover and activate them without screen coordinates:
 
 ```rust
-gpui_storybook::interaction_target(
-    "execute-request",
-    "Execute request",
-    Button::new("execute").label("Execute"),
-)
+use gpui::InteractiveElement as _;
+use gpui_storybook::StorybookElementExt as _;
+
+Button::new("execute-request")
+    .label("Execute")
+    .storybook_target()
 ```
 
-Wrap rendered application state with `semantic_value` when automation needs a
+The GPUI element ID becomes the stable route-local key, and Storybook derives
+its display label (`execute-request` becomes `Execute request`). Use
+`storybook_target_as(key, label)` when those values need to differ.
+
+Wrap rendered application state with `storybook_value` when automation needs a
 machine-readable postcondition:
 
 ```rust
-gpui_storybook::semantic_value(
-    "response",
-    "Response",
-    serde_json::json!({ "status": "success", "position": 12.5 }),
-    response_panel,
-)
+div()
+    .id("response")
+    .child(response_panel)
+    .storybook_value(serde_json::json!({
+        "status": "success",
+        "position": 12.5,
+    }))
 ```
 
 `storybook_read_semantic_values` refreshes the active route and returns these

@@ -141,15 +141,22 @@ semantic application commands, semantic interaction targets for visible
 controls, keystrokes for keyboard behavior, and story-relative pointer
 coordinates as the fallback.
 
-Wrap a visible child with a stable key and label:
+Import the Storybook element extension trait and give the visible child a
+stable GPUI ID:
 
 ```rust
-gpui_storybook::interaction_target(
-    "execute-request",
-    "Execute request",
-    Button::new("execute").label("Execute"),
-)
+use gpui::InteractiveElement as _;
+use gpui_storybook::StorybookElementExt as _;
+
+Button::new("execute-request")
+    .label("Execute")
+    .storybook_target()
 ```
+
+Storybook uses the displayed element ID as the route-local key and humanizes it
+for the label (`execute-request` becomes `Execute request`). Call
+`.storybook_target_as(key, label)` for an opaque element or when stable identity
+and display copy need separate values.
 
 After opening the route, call `storybook_list_interaction_targets`, then use
 the returned key in a batch:
@@ -165,12 +172,13 @@ Expose a machine-readable postcondition by wrapping the element that presents
 it:
 
 ```rust
-gpui_storybook::semantic_value(
-    "response",
-    "Response",
-    serde_json::json!({ "status": "success", "position": 12.5 }),
-    response_panel,
-)
+div()
+    .id("response")
+    .child(response_panel)
+    .storybook_value(serde_json::json!({
+        "status": "success",
+        "position": 12.5,
+    }))
 ```
 
 After input dispatch, call `storybook_read_semantic_values`. Storybook requests
@@ -179,6 +187,8 @@ transitional value such as `{ "status": "loading" }` when the application
 finishes work asynchronously. This readback is independent from capture:
 semantic values prove state, while PNG capture proves visual presentation.
 Value keys, like target keys, must be unique within a story or substory route.
+Call `.storybook_value_as(key, label, value)` when the element does not expose
+an ID or when the label needs explicit wording.
 
 `storybook_run_steps` can open a route, apply a `controls` map, size the story
 region for paired rendered-pixel `width` and `height` values or a named
@@ -425,8 +435,8 @@ Do not retry an interaction batch automatically.
 | Automation is busy | Wait for the active capture or mutation to complete; requests are not queued |
 | Interaction tools are missing | Set `GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1` before server construction and rediscover tools |
 | Action is unknown or arguments are invalid | Call `storybook_list_actions` for this launch and follow its argument schema |
-| Semantic target is missing or duplicated | Open the intended route, call `storybook_list_interaction_targets`, and give every wrapper a unique route-local key |
-| Semantic value is missing or duplicated | Render the wrapper in the active route and give every `semantic_value` a unique route-local key |
+| Semantic target is missing or duplicated | Open the intended route, call `storybook_list_interaction_targets`, and give every `.storybook_target()` element a unique route-local GPUI ID |
+| Semantic value is missing or duplicated | Render the value in the active route and give every `.storybook_value(...)` element a unique route-local GPUI ID |
 | Pointer point is rejected | Use finite normalized coordinates in `0.0..=1.0` or route-relative logical pixels inside the rendered bounds |
 | Interaction reports partial execution | Inspect `steps_dispatched`; establish postconditions with a capture or read and do not retry automatically |
 | Stdio messages cannot be decoded | Route tracing and diagnostics to standard error |

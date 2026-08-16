@@ -40,9 +40,11 @@ window input independently so validation, cancellation boundaries, and capture
 ordering remain consistent. Capture sizing preserves the surrounding shell and
 targets the rendered story region used for pointer bounds and PNG output.
 Application bootstrap remains the embedding application's responsibility.
-`interaction_target` records stable keys and route-relative live bounds during
-prepaint. `semantic_value` records route-local JSON state during the same phase
-for read-only automation. Duplicate keys within either registry are rejected.
+`StorybookElementExt` records stable keys and route-relative live bounds during
+prepaint with `storybook_target`, and route-local JSON state during the same
+phase with `storybook_value`. The implicit methods use the GPUI element ID as
+the key and derive a readable label; the `_as` methods accept both explicitly.
+Duplicate keys within either registry are rejected.
 On Linux,
 non-interactive automation should run the normal Wayland application through
 the `gpui-storybook-launch` Sway wrapper.

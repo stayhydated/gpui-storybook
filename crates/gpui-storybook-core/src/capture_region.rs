@@ -1,6 +1,6 @@
 use gpui::{
-    AnyElement, App, Bounds, Element, ElementId, GlobalElementId, InspectorElementId, IntoElement,
-    LayoutId, Pixels, ScrollHandle, SharedString, Window, point,
+    AnyElement, App, Bounds, Element, ElementId, GlobalElementId, InspectorElementId,
+    InteractiveElement, IntoElement, LayoutId, Pixels, ScrollHandle, SharedString, Window, point,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -112,39 +112,129 @@ pub(crate) fn capture_story_view_with_scroll(
     }
 }
 
-/// Mark one rendered child as a stable semantic target for Storybook automation.
+/// Fluent Storybook automation metadata for GPUI elements.
 ///
-/// Keys must be unique within a story or substory route. The target is exposed
-/// by MCP only when generic interaction tools are explicitly enabled.
-pub fn interaction_target(
-    key: impl Into<String>,
-    label: impl Into<String>,
-    child: impl IntoElement,
-) -> impl IntoElement {
-    InteractionTargetElement {
-        key: key.into(),
-        label: label.into(),
-        child: child.into_any_element(),
+/// Import this trait as `_`, then call [`storybook_target`](Self::storybook_target)
+/// or [`storybook_value`](Self::storybook_value) on an interactive element with
+/// a stable GPUI ID. Storybook uses the displayed [`ElementId`] as the
+/// route-local key and derives a human-readable label from it:
+///
+/// ```no_run
+/// use gpui::{InteractiveElement as _, div};
+/// use gpui_storybook_core::capture_region::StorybookElementExt as _;
+///
+/// let button = div().id("execute-request").storybook_target();
+/// let response = div()
+///     .id("response")
+///     .storybook_value(serde_json::json!({ "status": "success" }));
+/// ```
+///
+/// Use [`storybook_target_as`](Self::storybook_target_as) or
+/// [`storybook_value_as`](Self::storybook_value_as) when the rendered type does
+/// not expose [`InteractiveElement`], or when the stable key and display label
+/// need to differ from its GPUI ID.
+pub trait StorybookElementExt: IntoElement {
+    /// Mark this element as a stable semantic target for Storybook automation.
+    ///
+    /// The element's GPUI ID becomes the route-local key. Separators in that ID
+    /// become spaces in the inferred label. The target is exposed by MCP only
+    /// when generic interaction tools are explicitly enabled.
+    #[track_caller]
+    fn storybook_target(mut self) -> impl IntoElement
+    where
+        Self: InteractiveElement,
+    {
+        let (key, label) = implicit_automation_identity(&mut self);
+        self.storybook_target_as(key, label)
+    }
+
+    /// Mark this element as a semantic target with an explicit key and label.
+    ///
+    /// Keys must be unique within a story or substory route.
+    fn storybook_target_as(
+        self,
+        key: impl Into<String>,
+        label: impl Into<String>,
+    ) -> impl IntoElement {
+        InteractionTargetElement {
+            key: key.into(),
+            label: label.into(),
+            child: self.into_any_element(),
+        }
+    }
+
+    /// Mark this element as the source of a stable machine-readable value.
+    ///
+    /// The element's GPUI ID becomes the route-local key. Values are refreshed
+    /// from application state during prepaint and exposed by Storybook
+    /// automation for the active story or substory route.
+    #[track_caller]
+    fn storybook_value(mut self, value: Value) -> impl IntoElement
+    where
+        Self: InteractiveElement,
+    {
+        let (key, label) = implicit_automation_identity(&mut self);
+        self.storybook_value_as(key, label, value)
+    }
+
+    /// Mark this element as a machine-readable value with an explicit key and label.
+    ///
+    /// Keys must be unique within a story or substory route.
+    fn storybook_value_as(
+        self,
+        key: impl Into<String>,
+        label: impl Into<String>,
+        value: Value,
+    ) -> impl IntoElement {
+        SemanticValueElement {
+            key: key.into(),
+            label: label.into(),
+            value,
+            child: self.into_any_element(),
+        }
     }
 }
 
-/// Mark one rendered child as the source of a stable machine-readable value.
-///
-/// Values are refreshed from application state during prepaint and exposed by
-/// Storybook automation for the active story or substory route. Keys must be
-/// unique within that route.
-pub fn semantic_value(
-    key: impl Into<String>,
-    label: impl Into<String>,
-    value: Value,
-    child: impl IntoElement,
-) -> impl IntoElement {
-    SemanticValueElement {
-        key: key.into(),
-        label: label.into(),
-        value,
-        child: child.into_any_element(),
+impl<T: IntoElement> StorybookElementExt for T {}
+
+#[track_caller]
+fn implicit_automation_identity(element: &mut impl InteractiveElement) -> (String, String) {
+    let id = element
+        .interactivity()
+        .element_id
+        .as_ref()
+        .expect("implicit Storybook automation metadata requires a GPUI element ID; assign an ID or use the explicit `_as` method")
+        .to_string();
+    assert!(
+        !id.is_empty(),
+        "implicit Storybook automation metadata requires a non-empty GPUI element ID; assign a non-empty ID or use the explicit `_as` method"
+    );
+    let label = automation_label(&id);
+    (id, label)
+}
+
+fn automation_label(key: &str) -> String {
+    let mut label = String::with_capacity(key.len());
+    let mut previous_was_separator = false;
+
+    for ch in key.chars() {
+        if ch.is_alphanumeric() {
+            if previous_was_separator && !label.is_empty() {
+                label.push(' ');
+            }
+            label.push(ch);
+            previous_was_separator = false;
+        } else {
+            previous_was_separator = true;
+        }
     }
+
+    if let Some(first) = label.chars().next() {
+        let uppercase = first.to_uppercase().to_string();
+        label.replace_range(..first.len_utf8(), &uppercase);
+    }
+
+    label
 }
 
 pub(crate) fn capture_scroll_scope(
@@ -804,6 +894,7 @@ impl Element for SemanticValueElement {
 mod tests {
     use super::*;
     use gpui::{ScrollHandle, div, point, px};
+    use gpui_component::button::Button;
 
     fn clear_registry() {
         CAPTURE_REGIONS.with_borrow_mut(|registry| *registry = CaptureRegionRegistry::default());
@@ -924,14 +1015,43 @@ mod tests {
         let keyed_substory = capture_substory_with_key("stable-key", div()).into_element();
         assert!(keyed_substory.id().is_none());
 
-        let target = interaction_target("execute", "Execute", div()).into_element();
+        let target = div()
+            .storybook_target_as("execute", "Execute")
+            .into_element();
         assert!(target.id().is_none());
         assert!(target.source_location().is_none());
 
-        let value =
-            semantic_value("response", "Response", serde_json::json!(42), div()).into_element();
+        let value = div()
+            .storybook_value_as("response", "Response", serde_json::json!(42))
+            .into_element();
         assert!(value.id().is_none());
         assert!(value.source_location().is_none());
+    }
+
+    #[test]
+    fn automation_identity_uses_element_id_and_humanizes_its_label() {
+        let mut element = div().id("execute-request");
+        let mut button = Button::new("submit-order").label("Submit");
+
+        assert_eq!(
+            implicit_automation_identity(&mut element),
+            ("execute-request".to_owned(), "Execute request".to_owned())
+        );
+        assert_eq!(
+            implicit_automation_identity(&mut button),
+            ("submit-order".to_owned(), "Submit order".to_owned())
+        );
+        assert_eq!(
+            automation_label("fixture_state.value"),
+            "Fixture state value"
+        );
+        assert_eq!(automation_label("MCP2-response"), "MCP2 response");
+    }
+
+    #[test]
+    #[should_panic(expected = "implicit Storybook automation metadata requires a GPUI element ID")]
+    fn implicit_automation_identity_requires_an_element_id() {
+        let _ = div().storybook_target();
     }
 
     #[test]

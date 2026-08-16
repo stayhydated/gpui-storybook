@@ -117,12 +117,14 @@ Read controls after opening the intended route. Reset with a key for one value
 or omit the key for all values. A capture request can include a `controls` map
 so it applies serialized values immediately before rendering.
 
-Wrap rendered application state with
-`gpui_storybook::semantic_value(key, label, json_value, child)`, then call
+Import `gpui_storybook::StorybookElementExt as _`, wrap rendered application
+state with `.storybook_value(json_value)`, then call
 `storybook_read_semantic_values` to receive the active route's values in stable
 key order. The tool refreshes the route before reading and remains available
 without the generic interaction capability. Use it for semantic postconditions;
-use capture when pixels and layout are the evidence.
+use capture when pixels and layout are the evidence. The implicit method uses
+the GPUI element ID as its key and derives the label; use
+`.storybook_value_as(key, label, value)` for explicit metadata.
 
 Capture requests also accept `responsive`, `mobile`, `tablet`, or `desktop` as
 a `viewport`. Explicit paired width and height take precedence. The live
@@ -139,11 +141,12 @@ finally story-relative pointer coordinates. Discover non-internal runtime
 actions and their JSON argument schemas with `storybook_list_actions` after
 every launch.
 
-Wrap visible controls with
-`gpui_storybook::interaction_target(key, label, child)`. After opening a route,
+Wrap visible controls with `.storybook_target()`. After opening a route,
 call `storybook_list_interaction_targets` to discover live route-relative
 bounds, then use `{ "type": "click_target", "key": "..." }`. Keys must be
-unique within one story or substory route.
+unique within one story or substory route. The implicit method uses the GPUI
+element ID and derives a readable label; use
+`.storybook_target_as(key, label)` when those values need to differ.
 
 `storybook_run_steps` accepts an optional route, controls, paired rendered-pixel
 dimensions or viewport, a required non-empty step list, and an optional final

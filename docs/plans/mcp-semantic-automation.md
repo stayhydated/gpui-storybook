@@ -18,6 +18,9 @@ pin is updated.
 - `gpui-storybook-core` owns an element wrapper that records a stable target
   key, a human-readable label, and fresh story-relative bounds during
   prepaint.
+- `StorybookElementExt::storybook_target()` derives the key and label from the
+  element's stable GPUI ID. `storybook_target_as(key, label)` handles opaque
+  elements and independent display copy.
 - Target keys are unique within one story or substory route.
 - `gpui-storybook` re-exports the wrapper as the application-facing API.
 - The interaction-gated MCP surface lists targets for the active route.
@@ -30,9 +33,10 @@ pin is updated.
 
 - `gpui-storybook-core` owns a second route-scoped prepaint registry for stable
   keys, human-readable labels, and JSON values sourced from application state.
-- `gpui-storybook` exposes `semantic_value(key, label, value, child)` as the
-  application-facing wrapper. Keys are unique within one story or substory
-  route.
+- `gpui-storybook` exposes `StorybookElementExt::storybook_value(value)` as the
+  application-facing wrapper. It derives metadata from the element ID;
+  `storybook_value_as(key, label, value)` accepts explicit metadata. Keys are
+  unique within one story or substory route.
 - The read-only `storybook_read_semantic_values` MCP tool requests a fresh
   frame and returns values for the active route in stable key order.
 - Semantic reads can observe transitional asynchronous state and are safe to
@@ -76,6 +80,9 @@ pin is updated.
 9. Add route-scoped structured value registration and a read-only MCP tool,
    then extend the smoke workflow to establish its postcondition without frame
    capture.
+10. Replace nested wrapper calls with `StorybookElementExt`; derive route-local
+    keys and labels from stable GPUI element IDs while retaining explicit `_as`
+    methods for opaque elements and independent display copy.
 
 ## Downstream proof
 

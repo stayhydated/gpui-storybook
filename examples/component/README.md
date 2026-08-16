@@ -42,5 +42,6 @@ Named and paired capture dimensions target the selected component story region;
 the gallery or dock chrome remains mounted around that region. On Linux, run
 MCP and startup-capture sessions through `gpui-storybook-launch` and Sway's
 wlroots headless backend as described in the automation guide; the normal
-application remains Wayland-backed. Component stories can wrap important
-children with `interaction_target` for stable MCP discovery and clicking.
+application remains Wayland-backed. Component stories can import
+`StorybookElementExt` and mark important children with `.storybook_target()`
+for stable MCP discovery and clicking.

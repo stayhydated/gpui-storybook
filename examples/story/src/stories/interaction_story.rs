@@ -9,6 +9,7 @@ use gpui_component::{
     select::{Select, SelectEvent, SelectState},
     v_flex,
 };
+use gpui_storybook::StorybookElementExt as _;
 use schemars::JsonSchema;
 use serde::Deserialize;
 
@@ -107,11 +108,9 @@ impl Render for InteractionStory {
             .child("Deterministic in-process interaction target")
             .child(Input::new(&self.input))
             .child(Select::new(&self.select).placeholder("Choose a fixture value"))
-            .child(gpui_storybook::interaction_target(
-                "pointer-target",
-                "Pointer target",
+            .child(
                 div()
-                    .id("interaction-pointer-target")
+                    .id("pointer-target")
                     .w_full()
                     .h(px(96.0))
                     .flex()
@@ -141,24 +140,24 @@ impl Render for InteractionStory {
                         });
                         cx.notify();
                     }))
-                    .child("Pointer target"),
-            ))
-            .child(gpui_storybook::semantic_value(
-                "fixture-state",
-                "Fixture state",
-                serde_json::json!({
-                    "clicks": self.clicks,
-                    "hovered": self.hovered,
-                    "input": input_value.to_string(),
-                    "selected": selected,
-                    "status": self.status.clone(),
-                }),
+                    .child("Pointer target")
+                    .storybook_target(),
+            )
+            .child(
                 h_flex()
+                    .id("fixture-state")
                     .gap_4()
                     .child(format!("{} status:{}", self.prefix, self.status))
                     .child(format!("hovered:{}", self.hovered))
-                    .child(format!("clicks:{}", self.clicks)),
-            ))
+                    .child(format!("clicks:{}", self.clicks))
+                    .storybook_value(serde_json::json!({
+                        "clicks": self.clicks,
+                        "hovered": self.hovered,
+                        "input": input_value.to_string(),
+                        "selected": selected,
+                        "status": self.status.clone(),
+                    })),
+            )
             .child(format!("input:{input_value}"))
             .child(format!("selected:{selected}"))
             .child(format!(

@@ -1107,7 +1107,7 @@ fn send_interaction_snapshot(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::capture_region::{capture_story_view_with_scroll, interaction_target};
+    use crate::capture_region::{StorybookElementExt as _, capture_story_view_with_scroll};
     use gpui::{
         AppContext as _, Context, Focusable, InteractiveElement as _, IntoElement, KeyDownEvent,
         Render, StatefulInteractiveElement as _, Styled as _, div,
@@ -1141,35 +1141,32 @@ mod tests {
             capture_story_view_with_scroll(
                 "interaction-test",
                 None,
-                interaction_target(
-                    "harness",
-                    "Interaction harness",
-                    div()
-                        .id("interaction-harness")
-                        .size_full()
-                        .track_focus(&self.focus_handle)
-                        .on_action(cx.listener(|this, action: &SetCounter, _, cx| {
-                            this.action_value = action.value;
-                            this.events.push("action");
+                div()
+                    .id("interaction-harness")
+                    .size_full()
+                    .track_focus(&self.focus_handle)
+                    .on_action(cx.listener(|this, action: &SetCounter, _, cx| {
+                        this.action_value = action.value;
+                        this.events.push("action");
+                        cx.notify();
+                    }))
+                    .on_key_down(cx.listener(|this, event: &KeyDownEvent, _, cx| {
+                        if let Some(text) = event.keystroke.key_char.as_deref() {
+                            this.text.push_str(text);
+                            cx.stop_propagation();
                             cx.notify();
-                        }))
-                        .on_key_down(cx.listener(|this, event: &KeyDownEvent, _, cx| {
-                            if let Some(text) = event.keystroke.key_char.as_deref() {
-                                this.text.push_str(text);
-                                cx.stop_propagation();
-                                cx.notify();
-                            }
-                        }))
-                        .on_hover(cx.listener(|this, hovered, _, cx| {
-                            this.hovered = *hovered;
-                            cx.notify();
-                        }))
-                        .on_click(cx.listener(|this, _, _, cx| {
-                            this.clicks += 1;
-                            this.events.push("click");
-                            cx.notify();
-                        })),
-                ),
+                        }
+                    }))
+                    .on_hover(cx.listener(|this, hovered, _, cx| {
+                        this.hovered = *hovered;
+                        cx.notify();
+                    }))
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        this.clicks += 1;
+                        this.events.push("click");
+                        cx.notify();
+                    }))
+                    .storybook_target_as("harness", "Interaction harness"),
             )
         }
     }

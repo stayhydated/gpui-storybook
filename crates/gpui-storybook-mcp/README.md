@@ -75,8 +75,8 @@ The gate adds `storybook_list_actions`, `storybook_list_interaction_targets`,
 and `storybook_run_steps`. When it is unset or has any other value, all three
 tools are absent from discovery. The read-only
 `storybook_read_semantic_values` tool is always advertised; it reads JSON
-values registered with `gpui_storybook::semantic_value` after refreshing the
-selected route. Direct
+values registered with `StorybookElementExt::storybook_value` after refreshing
+the selected route. Direct
 embedders can avoid process environment changes:
 
 ```rust
@@ -90,17 +90,19 @@ documentation, and JSON argument schemas from the launched GPUI application.
 GPUI keymap sentinels and Storybook-private workbench actions are omitted.
 Registrations are runtime state, so rediscover actions for every launch.
 
-Wrap important story controls with
-`gpui_storybook::interaction_target(key, label, child)`.
+Import `gpui_storybook::StorybookElementExt as _`, then mark important story
+controls with `.storybook_target()`. The GPUI element ID becomes the key and
+also supplies a human-readable label; use `.storybook_target_as(key, label)`
+when either needs an explicit value.
 `storybook_list_interaction_targets` returns the selected route's stable keys,
 labels, and live route-relative bounds. A `click_target` step clicks the center
 of one discovered key and rejects missing or duplicate keys before dispatch.
 
-Wrap rendered state with
-`gpui_storybook::semantic_value(key, label, json_value, child)` and call
+Wrap rendered state with `.storybook_value(json_value)` and call
 `storybook_read_semantic_values` to verify application state after an
-interaction. This read does not capture a frame; use capture only for visual
-rendering assertions.
+interaction. Use `.storybook_value_as(key, label, json_value)` when the element
+does not expose a GPUI ID or its label differs. This read does not capture a
+frame; use capture only for visual rendering assertions.
 
 `storybook_run_steps` performs one ordered batch against the active story or
 substory capture region. It can open a route, apply tagged control values, size
