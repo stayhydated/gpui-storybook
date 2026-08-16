@@ -102,7 +102,7 @@ pub use gpui_storybook_core::{
     assets::Assets,
     capture_region::{
         capture_route_slug, capture_substory, capture_substory_route_id,
-        capture_substory_route_id_with_key, capture_substory_with_key,
+        capture_substory_route_id_with_key, capture_substory_with_key, interaction_target,
     },
     controls::{
         ControlBounds, ControlColor, ControlError, ControlKind, ControlSnapshot, ControlSpec,
@@ -694,10 +694,27 @@ fn init_mcp_automation(cx: &mut ::gpui::App) {
             )
         });
 
-    if gpui_storybook_mcp::stdio_requested()
-        && let Err(error) = gpui_storybook_mcp::start_stdio(automation.clone())
-    {
-        eprintln!("failed to start gpui-storybook MCP stdio server: {error}");
+    if gpui_storybook_mcp::stdio_requested() {
+        match gpui_storybook_mcp::start_stdio(automation.clone()) {
+            Ok(completion) => {
+                cx.spawn(async move |cx| {
+                    if let Err(error) = completion.await {
+                        eprintln!("gpui-storybook MCP stdio server failed: {error}");
+                    }
+                    cx.update(|cx| {
+                        for handle in cx.windows() {
+                            let _ = handle.update(cx, |_, window, _| window.remove_window());
+                        }
+                        cx.quit();
+                    });
+                })
+                .detach();
+            },
+            Err(error) => {
+                eprintln!("failed to start gpui-storybook MCP stdio server: {error}");
+                cx.quit();
+            },
+        }
     }
 
     if let Err(error) = gpui_storybook_mcp::start_capture_session_from_env(automation) {

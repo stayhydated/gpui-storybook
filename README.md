@@ -75,11 +75,22 @@ GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1 \
 cargo run -p my-app-storybook --features mcp
 ```
 
+Wrap important controls with stable semantic targets so an MCP client can
+discover and activate them without screen coordinates:
+
+```rust
+gpui_storybook::interaction_target(
+    "execute-request",
+    "Execute request",
+    Button::new("execute").label("Execute"),
+)
+```
+
 Linux automation uses the normal Wayland-backed GPUI application under Sway's
 wlroots headless backend. Install Sway and Mesa's software graphics drivers;
-`storybook_capture_launch_env` generates the complete compositor wrapper
-automatically on Linux. macOS and Windows keep their normal native launch
-commands.
+install `gpui-storybook-launch`, then run the Cargo command through it.
+`storybook_capture_launch_env` emits this launcher automatically on Linux.
+macOS and Windows keep their normal native launch commands.
 
 Interaction runs inside the live GPUI window; it does not require compositor
 or operating-system input injection. Named and paired capture dimensions target

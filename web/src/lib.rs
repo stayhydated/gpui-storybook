@@ -3,7 +3,7 @@ use stayhydated_dioxus::{Project, ProjectSite, StayhydatedEmbeddedDemoProjectApp
 
 const PROJECT: Project = Project::new(
     "gpui-storybook",
-    "Storybook for GPUI with sidebar-contained, pane-centered previews, per-window viewport settings, responsive resizing with reachable handles, appearance-aware theme selection and live editing, optional Inspector integration, ordered in-process interaction automation, and reproducible story-region capture.",
+    "Storybook for GPUI with sidebar-contained, pane-centered previews, per-window viewport settings, responsive resizing with reachable handles, appearance-aware theme selection and live editing, optional Inspector integration, semantic in-process interaction automation, and reproducible story-region capture.",
 )
     .with_skill_command("npx skills add stayhydated/gpui-storybook");
 const SITE_URL: &str = "https://stayhydated.github.io/gpui-storybook/";

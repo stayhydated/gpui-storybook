@@ -107,7 +107,9 @@ impl Render for InteractionStory {
             .child("Deterministic in-process interaction target")
             .child(Input::new(&self.input))
             .child(Select::new(&self.select).placeholder("Choose a fixture value"))
-            .child(
+            .child(gpui_storybook::interaction_target(
+                "pointer-target",
+                "Pointer target",
                 div()
                     .id("interaction-pointer-target")
                     .w_full()
@@ -140,7 +142,7 @@ impl Render for InteractionStory {
                         cx.notify();
                     }))
                     .child("Pointer target"),
-            )
+            ))
             .child(
                 h_flex()
                     .gap_4()

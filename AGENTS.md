@@ -169,6 +169,11 @@ Build `web/public/book`, `web/public/llms*`, `web/public/gpui-demo`, and
   Docs: [README](crates/gpui-storybook-mcp/README.md), crate Rustdocs
   Role: MCP tools, stdio serving, environment-driven capture startup, and capture launch helpers exposed through the facade crate's `mcp` feature.
 
+- `crates/gpui-storybook-launch`
+  Audience: **Public integration**
+  Docs: [README](crates/gpui-storybook-launch/README.md), crate Rustdocs
+  Role: standalone Linux headless Sway lifecycle wrapper used by MCP and startup-capture hosts; non-Linux targets execute the child directly.
+
 ### Internal Crates
 
 - `crates/gpui-storybook-components`

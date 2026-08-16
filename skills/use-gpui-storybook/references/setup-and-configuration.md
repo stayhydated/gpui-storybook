@@ -20,10 +20,11 @@ Use the facade's startup order:
 Opening the window before step 5 can render a first frame with default
 preferences.
 
-On Linux, run MCP and startup-capture sessions through Sway's wlroots headless
-backend. This preserves the normal Wayland-backed application path while
-providing an in-memory compositor; see the automation reference for the command
-and runtime packages.
+On Linux, run MCP and startup-capture sessions through
+`gpui-storybook-launch`, which owns Sway's wlroots headless lifecycle. This
+preserves the normal Wayland-backed application path while providing an
+in-memory compositor; see the automation reference for the command and runtime
+packages.
 
 ## Locale contract
 

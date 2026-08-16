@@ -504,6 +504,24 @@ impl Gallery {
                     cx,
                 )));
             },
+            StorybookAutomationCommand::ListInteractionTargets { response } => {
+                let result = self
+                    .automation
+                    .as_ref()
+                    .and_then(|automation| automation.current_story().story)
+                    .or_else(|| self.active_story_snapshot(cx))
+                    .ok_or(StorybookAutomationError::NoActiveStory);
+                match result {
+                    Ok(story) => {
+                        crate::automation::interaction::schedule_interaction_target_listing(
+                            story, response, window,
+                        );
+                    },
+                    Err(error) => {
+                        let _ = response.send(Err(error));
+                    },
+                }
+            },
             StorybookAutomationCommand::RunSteps {
                 request_id,
                 request,

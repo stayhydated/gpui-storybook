@@ -16,10 +16,17 @@ sudo apt-get install --no-install-recommends \
   libgl1-mesa-dri mesa-vulkan-drivers sway
 ```
 
-The `command` returned by `storybook_capture_launch_env` includes the complete
-Linux wrapper; its separate `env` map must be merged into the child process
-environment before executing that command. macOS and Windows commands continue
-to launch Cargo directly.
+Install the reusable Linux launcher once:
+
+```bash
+cargo install gpui-storybook-launch
+```
+
+The `command` returned by `storybook_capture_launch_env` invokes this launcher;
+its separate `env` map must be merged into the child process environment before
+executing that command. Set `GPUI_STORYBOOK_SWAY` when Sway comes from a private
+package extraction. macOS and Windows commands continue to launch Cargo
+directly.
 
 ```toml
 [dependencies]
@@ -62,11 +69,11 @@ For a repository-local smoke test, use
 shows the raw MCP initialization, discovery, and tool-call sequence.
 
 On Linux, apply the complete [headless Sway
-wrapper](../../book/src/automation.md#enable-mcp-support) to the same session.
-Set both MCP variables on the final Cargo command inside that wrapper.
+launcher](../../book/src/automation.md#enable-mcp-support) to the same session.
 
-The gate adds `storybook_list_actions` and `storybook_run_steps`. When it is
-unset or has any other value, both tools are absent from discovery. Direct
+The gate adds `storybook_list_actions`, `storybook_list_interaction_targets`,
+and `storybook_run_steps`. When it is unset or has any other value, all three
+tools are absent from discovery. Direct
 embedders can avoid process environment changes:
 
 ```rust
@@ -79,6 +86,12 @@ let server = gpui_storybook::mcp::server_with_options(automation, options)?;
 documentation, and JSON argument schemas from the launched GPUI application.
 GPUI keymap sentinels and Storybook-private workbench actions are omitted.
 Registrations are runtime state, so rediscover actions for every launch.
+
+Wrap important story controls with
+`gpui_storybook::interaction_target(key, label, child)`.
+`storybook_list_interaction_targets` returns the selected route's stable keys,
+labels, and live route-relative bounds. A `click_target` step clicks the center
+of one discovered key and rejects missing or duplicate keys before dispatch.
 
 `storybook_run_steps` performs one ordered batch against the active story or
 substory capture region. It can open a route, apply tagged control values, size
@@ -111,8 +124,8 @@ the last step:
 }
 ```
 
-Other steps are `focus_previous`, `blur`, `pointer_move`, `pointer_click`, and
-`scroll`. Opening the route focuses the story's focus handle, which is the
+Other steps are `focus_previous`, `blur`, `click_target`, `pointer_move`,
+`pointer_click`, and `scroll`. Opening the route focuses the story's focus handle, which is the
 fixture input, so the example inserts text before moving focus to the select.
 Pointer points use `normalized` coordinates in `0.0..=1.0` by default, or
 non-negative `logical_pixels`

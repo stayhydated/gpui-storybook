@@ -57,11 +57,14 @@ description: >-
 - Forward optional package features explicitly when users launch with
   `--features dock`, `--features inspector`, or `--features mcp`.
 - Send logs to standard error during MCP stdio sessions.
-- Run Linux MCP and startup-capture sessions through Sway's wlroots headless
-  backend; keep the application on its normal Wayland platform backend.
+- Run Linux MCP and startup-capture sessions through
+  `gpui-storybook-launch`; keep the application on its normal Wayland platform
+  backend and use `GPUI_STORYBOOK_SWAY` for a private Sway executable.
 - Require `GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1` before generic focus,
-  keyboard, action, pointer, scroll, or frame-wait automation. Keep typed
-  controls as the preferred reproducible input.
+  keyboard, action, semantic-target, pointer, scroll, or frame-wait automation.
+  Keep typed controls as the preferred reproducible input, then wrap important
+  visible controls with stable route-local `interaction_target` keys before
+  falling back to coordinates.
 - Treat interaction batches as potentially destructive and non-idempotent.
   Rediscover runtime actions after each launch and never retry partial batches
   automatically.

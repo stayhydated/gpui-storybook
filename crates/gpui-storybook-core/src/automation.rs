@@ -22,9 +22,11 @@
 use crate::capture_output::CaptureOutputStore;
 pub(crate) mod interaction;
 
+pub use crate::capture_region::{StoryInteractionTargetBounds, StoryInteractionTargetSnapshot};
 use crate::{
     capture_region::{
-        capture_region_bounds, capture_route_story_key, scroll_capture_region_into_view,
+        InteractionTargetLookupError, capture_region_bounds, capture_route_story_key,
+        interaction_targets, scroll_capture_region_into_view,
     },
     controls::{ControlSnapshot, ControlValue},
     presentation::StoryViewportPreset,
@@ -166,6 +168,16 @@ pub struct StoryControlsSnapshot {
     pub controls: Vec<ControlSnapshot>,
 }
 
+/// Semantic interaction targets currently rendered by the selected route.
+#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
+#[schemars(deny_unknown_fields)]
+pub struct StoryInteractionTargetsSnapshot {
+    /// Story or substory route whose rendered targets were inspected.
+    pub story: StorySnapshot,
+    /// Stable targets in deterministic key order.
+    pub targets: Vec<StoryInteractionTargetSnapshot>,
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[schemars(deny_unknown_fields)]
 pub struct StoryCaptureSnapshot {
@@ -254,6 +266,28 @@ pub enum StorybookAutomationError {
         /// Control failure detail.
         message: String,
     },
+    /// The active story route has not rendered semantic target bounds.
+    #[error("interaction targets are unavailable because route `{route}` is not rendered")]
+    InteractionTargetsUnavailable {
+        /// Active story or substory route.
+        route: String,
+    },
+    /// A semantic target key is not present in the active route.
+    #[error("interaction target `{key}` was not found in route `{route}`")]
+    InteractionTargetNotFound {
+        /// Active story or substory route.
+        route: String,
+        /// Requested stable target key.
+        key: String,
+    },
+    /// A story rendered the same semantic target key more than once.
+    #[error("interaction target `{key}` is duplicated in route `{route}`")]
+    DuplicateInteractionTarget {
+        /// Active story or substory route.
+        route: String,
+        /// Duplicated stable target key.
+        key: String,
+    },
 }
 
 pub(crate) enum StorybookAutomationCommand {
@@ -284,6 +318,10 @@ pub(crate) enum StorybookAutomationCommand {
     },
     ListActions {
         response: oneshot::Sender<Result<Vec<StoryActionSnapshot>, StorybookAutomationError>>,
+    },
+    ListInteractionTargets {
+        response:
+            oneshot::Sender<Result<StoryInteractionTargetsSnapshot, StorybookAutomationError>>,
     },
     RunSteps {
         request_id: u64,
@@ -533,6 +571,17 @@ impl StorybookAutomation {
         receive_host_response(receiver).await
     }
 
+    /// Lists stable semantic targets rendered by the selected story route.
+    pub async fn list_interaction_targets(
+        &self,
+    ) -> Result<StoryInteractionTargetsSnapshot, StorybookAutomationError> {
+        let (response, receiver) = self.live_command_channel()?;
+        self.command_tx
+            .send(StorybookAutomationCommand::ListInteractionTargets { response })
+            .map_err(|_| StorybookAutomationError::NoLiveHost)?;
+        receive_host_response(receiver).await
+    }
+
     /// Runs one validated interaction batch on the live GPUI window thread.
     ///
     /// The batch owns the shared operation guard through every frame wait and
@@ -628,6 +677,26 @@ impl StorybookAutomation {
             revision: state.revision,
         })
     }
+}
+
+pub(crate) fn rendered_interaction_targets(
+    story: StorySnapshot,
+) -> Result<StoryInteractionTargetsSnapshot, StorybookAutomationError> {
+    let route = story.capture_route_id.clone();
+    let targets = interaction_targets(&route).map_err(|error| match error {
+        InteractionTargetLookupError::RouteNotRendered => {
+            StorybookAutomationError::InteractionTargetsUnavailable {
+                route: route.clone(),
+            }
+        },
+        InteractionTargetLookupError::DuplicateKey(key) => {
+            StorybookAutomationError::DuplicateInteractionTarget {
+                route: route.clone(),
+                key,
+            }
+        },
+    })?;
+    Ok(StoryInteractionTargetsSnapshot { story, targets })
 }
 
 async fn receive_host_response<T>(
@@ -1295,6 +1364,26 @@ mod tests {
                     message: "invalid".to_string(),
                 },
                 "invalid",
+            ),
+            (
+                StorybookAutomationError::InteractionTargetsUnavailable {
+                    route: "story/section".to_string(),
+                },
+                "interaction targets are unavailable because route `story/section` is not rendered",
+            ),
+            (
+                StorybookAutomationError::InteractionTargetNotFound {
+                    route: "story".to_string(),
+                    key: "execute".to_string(),
+                },
+                "interaction target `execute` was not found in route `story`",
+            ),
+            (
+                StorybookAutomationError::DuplicateInteractionTarget {
+                    route: "story".to_string(),
+                    key: "execute".to_string(),
+                },
+                "interaction target `execute` is duplicated in route `story`",
             ),
         ];
 

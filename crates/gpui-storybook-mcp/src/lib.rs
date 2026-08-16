@@ -34,7 +34,8 @@ pub use gpui_storybook_core::automation::{
     SharedStoryController, SharedStorybookAutomation, StoryActionSnapshot, StoryCaptureSnapshot,
     StoryControlsSnapshot, StoryCurrentSnapshot, StoryDefaultSize, StoryInteractionCaptureRequest,
     StoryInteractionDispatch, StoryInteractionObservation, StoryInteractionRequest,
-    StoryInteractionSnapshot, StoryInteractionStep, StoryModifier, StoryModifiers,
+    StoryInteractionSnapshot, StoryInteractionStep, StoryInteractionTargetBounds,
+    StoryInteractionTargetSnapshot, StoryInteractionTargetsSnapshot, StoryModifier, StoryModifiers,
     StoryMouseButton, StoryPoint, StoryPointSpace, StoryScreenshotRequest, StorySnapshot,
     StorybookAutomation, StorybookAutomationError,
 };
@@ -46,8 +47,17 @@ use rmcp::model::CallToolResult as ToolCallResult;
 use schemars::{JsonSchema, generate::SchemaSettings};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use std::{collections::BTreeMap, path::PathBuf, thread, time::Duration};
+use std::{
+    collections::BTreeMap,
+    future::Future,
+    path::PathBuf,
+    pin::Pin,
+    task::{Context, Poll},
+    thread,
+    time::Duration,
+};
 use thiserror::Error;
+use tokio::sync::oneshot;
 
 pub use gpui_storybook_core::automation;
 
@@ -64,6 +74,7 @@ pub const TOOL_RESET_CONTROL: &str = "storybook_reset_control";
 pub const TOOL_CAPTURE_CURRENT_STORY: &str = "storybook_capture_current_story";
 pub const TOOL_CAPTURE_LAUNCH_ENV: &str = "storybook_capture_launch_env";
 pub const TOOL_LIST_ACTIONS: &str = "storybook_list_actions";
+pub const TOOL_LIST_INTERACTION_TARGETS: &str = "storybook_list_interaction_targets";
 pub const TOOL_RUN_STEPS: &str = "storybook_run_steps";
 
 const CAPTURE_SESSION_TIMEOUT_SECS: u64 = 30;
@@ -278,15 +289,42 @@ pub fn capture_requested() -> bool {
     std::env::var_os(env.route_var()).is_some() || std::env::var_os(env.path_var()).is_some()
 }
 
+/// Awaitable completion of the MCP stdio server thread.
+///
+/// The future resolves when stdin reaches EOF or the server fails. Facade
+/// initialization uses this signal to quit the GPUI application cleanly.
+pub struct StorybookStdioCompletion {
+    receiver: oneshot::Receiver<ServeStdioResult>,
+}
+
+impl Future for StorybookStdioCompletion {
+    type Output = ServeStdioResult;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        match Pin::new(&mut self.receiver).poll(cx) {
+            Poll::Ready(Ok(result)) => Poll::Ready(result),
+            Poll::Ready(Err(error)) => Poll::Ready(Err(Box::new(std::io::Error::other(format!(
+                "gpui-storybook MCP stdio thread ended without a result: {error}"
+            ))))),
+            Poll::Pending => Poll::Pending,
+        }
+    }
+}
+
 pub fn start_stdio(
     automation: SharedStorybookAutomation,
-) -> std::io::Result<thread::JoinHandle<ServeStdioResult>> {
+) -> std::io::Result<StorybookStdioCompletion> {
+    let (result_tx, receiver) = oneshot::channel();
     thread::Builder::new()
         .name("gpui-storybook-mcp-stdio".to_string())
-        .spawn(move || match server(automation) {
-            Ok(server) => server.serve_stdio_blocking(),
-            Err(error) => Err(Box::new(error) as Box<dyn std::error::Error + Send + Sync>),
-        })
+        .spawn(move || {
+            let result = match server(automation) {
+                Ok(server) => server.serve_stdio_blocking(),
+                Err(error) => Err(Box::new(error) as Box<dyn std::error::Error + Send + Sync>),
+            };
+            let _ = result_tx.send(result);
+        })?;
+    Ok(StorybookStdioCompletion { receiver })
 }
 
 pub fn start_capture_session_from_env(
@@ -533,6 +571,28 @@ pub fn register_tools_with_options(
                                 tool_structured_result(json!(ListActionsOutput { actions }))
                             },
                             Err(error) => automation_tool_error(error),
+                        }
+                    }
+                }
+            },
+        )?;
+
+        server.add_typed_tool_async(
+            tool::<EmptyInput>(
+                TOOL_LIST_INTERACTION_TARGETS,
+                "List Interaction Targets",
+                "List stable semantic targets and live route-relative bounds rendered by the selected story or substory route.",
+                interaction_targets_output_schema(),
+                ToolHints::read_only(),
+            )?,
+            {
+                let automation = automation.clone();
+                move |_input| {
+                    let automation = automation.clone();
+                    async move {
+                        match automation.list_interaction_targets().await {
+                            Ok(snapshot) => tool_structured_result(json!(snapshot)),
+                            Err(error) => interaction_automation_tool_error(error),
                         }
                     }
                 }
@@ -912,6 +972,22 @@ fn structured_automation_error(error: StorybookAutomationError) -> McpToolError 
         StorybookAutomationError::ControlOperationFailed { .. } => {
             json!({ "code": "control_operation_failed" })
         },
+        StorybookAutomationError::InteractionTargetsUnavailable { route } => json!({
+            "code": "interaction_targets_unavailable",
+            "route": route,
+        }),
+        StorybookAutomationError::InteractionTargetNotFound { route, key } => json!({
+            "code": "interaction_target_not_found",
+            "route": route,
+            "target_key": key,
+            "steps_dispatched": 0,
+        }),
+        StorybookAutomationError::DuplicateInteractionTarget { route, key } => json!({
+            "code": "duplicate_interaction_target",
+            "route": route,
+            "target_key": key,
+            "steps_dispatched": 0,
+        }),
         StorybookAutomationError::StoryNotFound { key } => json!({
             "code": "story_not_found",
             "route": key,
@@ -1107,6 +1183,38 @@ fn interaction_step_schema() -> McpSchema {
             ["point"],
         ),
         tagged_interaction_step_schema(
+            "click_target",
+            [
+                (
+                    "key".to_owned(),
+                    McpSchema::string()
+                        .with_extension("minLength", json!(1))
+                        .with_extension(
+                            "maxLength",
+                            json!(gpui_storybook_core::automation::MAX_INTERACTION_TEXT_BYTES),
+                        ),
+                ),
+                (
+                    "button".to_owned(),
+                    McpSchema::string()
+                        .with_enum_values(["left", "right", "middle"])
+                        .with_default("left"),
+                ),
+                (
+                    "click_count".to_owned(),
+                    McpSchema::integer()
+                        .with_minimum(1_u64)
+                        .with_extension("maximum", json!(u8::MAX))
+                        .with_default(1),
+                ),
+                (
+                    "modifiers".to_owned(),
+                    story_modifiers_schema().with_default(json!([])),
+                ),
+            ],
+            ["key"],
+        ),
+        tagged_interaction_step_schema(
             "scroll",
             [
                 ("point".to_owned(), story_point_schema()),
@@ -1167,6 +1275,10 @@ fn interaction_output_schema() -> McpSchema {
     serialize_schema::<StoryInteractionSnapshot>()
 }
 
+fn interaction_targets_output_schema() -> McpSchema {
+    serialize_schema::<StoryInteractionTargetsSnapshot>()
+}
+
 fn capture_launch_env_output_schema() -> McpSchema {
     serialize_schema::<CaptureLaunchEnv>()
 }
@@ -1219,19 +1331,8 @@ fn build_capture_launch_env(
 fn cargo_launch_command(cargo_args: &[String]) -> Vec<String> {
     #[cfg(target_os = "linux")]
     let mut command = vec![
-        "env".to_string(),
-        "-u".to_string(),
-        "DISPLAY".to_string(),
-        "-u".to_string(),
-        "WAYLAND_DISPLAY".to_string(),
-        "-u".to_string(),
-        "WAYLAND_SOCKET".to_string(),
-        "-u".to_string(),
-        "ZED_HEADLESS".to_string(),
-        "sh".to_string(),
-        "-c".to_string(),
-        LINUX_SWAY_HEADLESS_SCRIPT.to_string(),
-        "sh".to_string(),
+        "gpui-storybook-launch".to_string(),
+        "--".to_string(),
         "cargo".to_string(),
     ];
 
@@ -1241,85 +1342,6 @@ fn cargo_launch_command(cargo_args: &[String]) -> Vec<String> {
     command.extend(cargo_args.iter().cloned());
     command
 }
-
-#[cfg(target_os = "linux")]
-const LINUX_SWAY_HEADLESS_SCRIPT: &str = r#"storybook_runtime_dir=$(mktemp -d) || exit 1
-if ! chmod 700 "$storybook_runtime_dir"; then
-    rm -rf "$storybook_runtime_dir"
-    exit 1
-fi
-storybook_sway_config="$storybook_runtime_dir/sway.conf"
-storybook_sway_log="$storybook_runtime_dir/sway.log"
-storybook_sway_pid=
-
-if ! printf '%s\n' \
-    'output * mode 1920x1200' \
-    'seat seat0 fallback true' \
-    'for_window [app_id=".*"] floating enable' \
-    > "$storybook_sway_config"; then
-    rm -rf "$storybook_runtime_dir"
-    exit 1
-fi
-
-storybook_cleanup() {
-    if [ -n "$storybook_sway_pid" ]; then
-        kill "$storybook_sway_pid" 2>/dev/null || true
-        wait "$storybook_sway_pid" 2>/dev/null || true
-    fi
-    rm -rf "$storybook_runtime_dir"
-}
-
-trap storybook_cleanup EXIT
-trap 'exit 129' HUP
-trap 'exit 130' INT
-trap 'exit 143' TERM
-
-export XDG_RUNTIME_DIR="$storybook_runtime_dir"
-unset DISPLAY I3SOCK SWAYSOCK WAYLAND_DISPLAY WAYLAND_SOCKET ZED_HEADLESS
-
-WLR_BACKENDS=headless \
-WLR_HEADLESS_OUTPUTS=1 \
-WLR_LIBINPUT_NO_DEVICES=1 \
-WLR_RENDERER=pixman \
-WLR_RENDERER_ALLOW_SOFTWARE=1 \
-LIBGL_ALWAYS_SOFTWARE=1 \
-sway --unsupported-gpu --config "$storybook_sway_config" \
-    > "$storybook_sway_log" 2>&1 &
-storybook_sway_pid=$!
-
-storybook_wayland_socket=
-storybook_sway_attempts=0
-while [ -z "$storybook_wayland_socket" ]; do
-    for storybook_socket_candidate in "$XDG_RUNTIME_DIR"/wayland-*; do
-        if [ -S "$storybook_socket_candidate" ]; then
-            storybook_wayland_socket=$storybook_socket_candidate
-            break
-        fi
-    done
-    if ! kill -0 "$storybook_sway_pid" 2>/dev/null; then
-        if [ -f "$storybook_sway_log" ]; then
-            cat "$storybook_sway_log" >&2
-        fi
-        echo 'gpui-storybook: Sway exited before its Wayland socket was ready' >&2
-        exit 1
-    fi
-    storybook_sway_attempts=$((storybook_sway_attempts + 1))
-    if [ "$storybook_sway_attempts" -ge 100 ]; then
-        if [ -f "$storybook_sway_log" ]; then
-            cat "$storybook_sway_log" >&2
-        fi
-        echo 'gpui-storybook: Sway did not become ready' >&2
-        exit 1
-    fi
-    sleep 0.05
-done
-
-export WAYLAND_DISPLAY="${storybook_wayland_socket##*/}"
-export LIBGL_ALWAYS_SOFTWARE=1
-
-"$@"
-storybook_status=$?
-exit "$storybook_status""#;
 
 fn default_capture_size() -> PixelSize {
     PixelSize::new(DEFAULT_STORY_CAPTURE_WIDTH, DEFAULT_STORY_CAPTURE_HEIGHT)
@@ -1357,10 +1379,12 @@ pub mod prelude {
         SharedStoryController, SharedStorybookAutomation, StoryActionSnapshot,
         StoryCaptureSnapshot, StoryCurrentSnapshot, StoryDefaultSize,
         StoryInteractionCaptureRequest, StoryInteractionDispatch, StoryInteractionObservation,
-        StoryInteractionRequest, StoryInteractionSnapshot, StoryInteractionStep, StoryModifier,
-        StoryModifiers, StoryMouseButton, StoryPoint, StoryPointSpace, StoryScreenshotRequest,
-        StorySnapshot, StorybookAutomation, StorybookAutomationError, StorybookCaptureConfig,
-        StorybookCaptureSession, StorybookMcpServerOptions, capture_catalog, read_capture_session,
+        StoryInteractionRequest, StoryInteractionSnapshot, StoryInteractionStep,
+        StoryInteractionTargetBounds, StoryInteractionTargetSnapshot,
+        StoryInteractionTargetsSnapshot, StoryModifier, StoryModifiers, StoryMouseButton,
+        StoryPoint, StoryPointSpace, StoryScreenshotRequest, StorySnapshot, StorybookAutomation,
+        StorybookAutomationError, StorybookCaptureConfig, StorybookCaptureSession,
+        StorybookMcpServerOptions, StorybookStdioCompletion, capture_catalog, read_capture_session,
         server, server_with_options, start_capture_session, start_capture_session_from_env,
         start_stdio, stdio_requested,
     };
@@ -1537,7 +1561,7 @@ mod tests {
         assert!(!disabled_tools.iter().any(|tool| {
             matches!(
                 tool["name"].as_str(),
-                Some(TOOL_LIST_ACTIONS | TOOL_RUN_STEPS)
+                Some(TOOL_LIST_ACTIONS | TOOL_LIST_INTERACTION_TARGETS | TOOL_RUN_STEPS)
             )
         }));
 
@@ -1560,6 +1584,14 @@ mod tests {
         assert_eq!(actions["annotations"]["openWorldHint"], false);
         assert_eq!(actions["outputSchema"]["additionalProperties"], false);
 
+        let targets = find(TOOL_LIST_INTERACTION_TARGETS);
+        assert_eq!(targets["inputSchema"]["additionalProperties"], false);
+        assert_eq!(targets["annotations"]["readOnlyHint"], true);
+        assert_eq!(
+            targets["outputSchema"]["properties"]["targets"]["type"],
+            "array"
+        );
+
         let run_steps = find(TOOL_RUN_STEPS);
         assert_eq!(run_steps["inputSchema"]["required"], json!(["steps"]));
         assert_eq!(run_steps["inputSchema"]["additionalProperties"], false);
@@ -1574,7 +1606,7 @@ mod tests {
         let variants = run_steps["inputSchema"]["properties"]["steps"]["items"]["oneOf"]
             .as_array()
             .expect("steps should use oneOf");
-        assert_eq!(variants.len(), 10);
+        assert_eq!(variants.len(), 11);
         assert!(
             variants
                 .iter()
@@ -1604,6 +1636,12 @@ mod tests {
         );
         assert_eq!(
             variant("pointer_click")["properties"]["click_count"]["maximum"],
+            u8::MAX
+        );
+        assert_eq!(variant("click_target")["required"], json!(["type", "key"]));
+        assert_eq!(variant("click_target")["properties"]["key"]["minLength"], 1);
+        assert_eq!(
+            variant("click_target")["properties"]["click_count"]["maximum"],
             u8::MAX
         );
         assert_eq!(
@@ -1668,6 +1706,42 @@ mod tests {
         {
             let _enabled = EnvGuard::set(&[(ALLOW_INTERACTION_ENV_VAR, "1")]);
             assert!(StorybookMcpServerOptions::from_env().interaction_enabled());
+        }
+    }
+
+    #[test]
+    fn semantic_target_errors_have_stable_structured_codes() {
+        let cases = [
+            (
+                StorybookAutomationError::InteractionTargetsUnavailable {
+                    route: "story/section".to_owned(),
+                },
+                "interaction_targets_unavailable",
+            ),
+            (
+                StorybookAutomationError::InteractionTargetNotFound {
+                    route: "story".to_owned(),
+                    key: "execute".to_owned(),
+                },
+                "interaction_target_not_found",
+            ),
+            (
+                StorybookAutomationError::DuplicateInteractionTarget {
+                    route: "story".to_owned(),
+                    key: "execute".to_owned(),
+                },
+                "duplicate_interaction_target",
+            ),
+        ];
+
+        for (error, expected_code) in cases {
+            let result = serde_json::to_value(interaction_automation_tool_error(error))
+                .expect("target error should serialize");
+            assert_eq!(result["isError"], true);
+            assert_eq!(
+                result["structuredContent"]["error"]["details"][0]["code"],
+                expected_code
+            );
         }
     }
 
@@ -1786,19 +1860,8 @@ mod tests {
         assert_eq!(
             structured["command"],
             json!([
-                "env",
-                "-u",
-                "DISPLAY",
-                "-u",
-                "WAYLAND_DISPLAY",
-                "-u",
-                "WAYLAND_SOCKET",
-                "-u",
-                "ZED_HEADLESS",
-                "sh",
-                "-c",
-                LINUX_SWAY_HEADLESS_SCRIPT,
-                "sh",
+                "gpui-storybook-launch",
+                "--",
                 "cargo",
                 "run",
                 "-p",
@@ -1993,23 +2056,7 @@ mod tests {
         #[cfg(target_os = "linux")]
         assert_eq!(
             launch.command,
-            vec![
-                "env",
-                "-u",
-                "DISPLAY",
-                "-u",
-                "WAYLAND_DISPLAY",
-                "-u",
-                "WAYLAND_SOCKET",
-                "-u",
-                "ZED_HEADLESS",
-                "sh",
-                "-c",
-                LINUX_SWAY_HEADLESS_SCRIPT,
-                "sh",
-                "cargo",
-                "run",
-            ]
+            vec!["gpui-storybook-launch", "--", "cargo", "run",]
         );
         #[cfg(not(target_os = "linux"))]
         assert_eq!(launch.command, vec!["cargo", "run"]);

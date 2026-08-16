@@ -59,12 +59,15 @@ With `mcp` enabled, set both `GPUI_STORYBOOK_MCP_STDIO=1` and
 registered-action, story-relative pointer, scroll, frame-wait, and atomic
 post-interaction capture tools. The interaction gate is separate because a
 story action can have arbitrary application effects. Typed controls remain the
-preferred reproducible input contract. Capture dimensions size the story region
-without replacing the surrounding gallery or dock layout. On Linux,
-`storybook_capture_launch_env` generates a Sway-wrapped launch command so the
-normal Wayland application can run without a physical display. The wrapper
-waits for the compositor socket before starting Cargo. The returned PNG is
-cropped to the story region and excludes the mounted Storybook chrome.
+preferred reproducible input contract. Wrap important controls with
+`interaction_target(key, label, child)` so MCP can list their live bounds and
+use a `click_target` step without screen coordinates. Capture dimensions size
+the story region without replacing the surrounding gallery or dock layout. On
+Linux, install `gpui-storybook-launch`; `storybook_capture_launch_env` emits
+that Sway-backed command so the normal Wayland application can run without a
+physical display. The returned PNG is cropped to the story region and excludes
+the mounted Storybook chrome. Closing MCP stdin terminates the GUI process and
+lets the launcher stop its compositor.
 
 See the [getting-started guide](../../book/src/getting_started.md), [story
 guide](../../book/src/stories.md), [workbench guide](../../book/src/workbench.md),

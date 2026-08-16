@@ -4398,6 +4398,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "gpui-storybook-launch"
+version = "0.5.0"
+dependencies = [
+ "tempfile",
+]
+
+[[package]]
 name = "gpui-storybook-macros"
 version = "0.5.0"
 dependencies = [

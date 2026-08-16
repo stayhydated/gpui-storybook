@@ -6,6 +6,7 @@ members = [
   "crates/gpui-storybook-core",
   "crates/gpui-storybook-macros",
   "crates/gpui-storybook-mcp",
+  "crates/gpui-storybook-launch",
   "crates/gpui-storybook-preferences",
   "crates/gpui-storybook-toml",
   "examples/story",
@@ -45,6 +46,7 @@ gpui-es-fluent = { git = "https://github.com/stayhydated/gpui-es-fluent", rev = 
 gpui-storybook = { path = "crates/gpui-storybook", version = "0.5.0" }
 gpui-storybook-components = { path = "crates/gpui-storybook-components", version = "0.5.0" }
 gpui-storybook-core = { path = "crates/gpui-storybook-core", version = "0.5.0" }
+gpui-storybook-launch = { path = "crates/gpui-storybook-launch", version = "0.5.0" }
 gpui-storybook-macros = { path = "crates/gpui-storybook-macros", version = "0.5.0" }
 gpui-storybook-mcp = { path = "crates/gpui-storybook-mcp", version = "0.5.0" }
 gpui-storybook-preferences = { path = "crates/gpui-storybook-preferences", version = "0.5.0" }

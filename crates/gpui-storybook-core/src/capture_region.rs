@@ -2,7 +2,38 @@ use gpui::{
     AnyElement, App, Bounds, Element, ElementId, GlobalElementId, InspectorElementId, IntoElement,
     LayoutId, Pixels, ScrollHandle, SharedString, Window, point,
 };
-use std::{cell::RefCell, collections::BTreeMap};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+use std::{
+    cell::RefCell,
+    collections::{BTreeMap, BTreeSet},
+};
+
+/// Logical bounds of a semantic interaction target relative to its story route.
+#[derive(Clone, Copy, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct StoryInteractionTargetBounds {
+    /// Horizontal offset from the route origin in logical pixels.
+    pub x: f32,
+    /// Vertical offset from the route origin in logical pixels.
+    pub y: f32,
+    /// Target width in logical pixels.
+    pub width: f32,
+    /// Target height in logical pixels.
+    pub height: f32,
+}
+
+/// One stable semantic interaction target rendered by a story route.
+#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct StoryInteractionTargetSnapshot {
+    /// Stable target key supplied by the story author.
+    pub key: String,
+    /// Human-readable target label supplied by the story author.
+    pub label: String,
+    /// Target bounds in logical pixels relative to the active route.
+    pub bounds: StoryInteractionTargetBounds,
+}
 
 #[derive(Clone)]
 pub(crate) struct CaptureRegionBounds {
@@ -14,14 +45,23 @@ pub(crate) struct CaptureRegionBounds {
 #[derive(Clone)]
 struct CaptureScope {
     story_key: Option<String>,
+    route_id: Option<String>,
     viewport_bounds: Option<Bounds<Pixels>>,
     scroll_handle: Option<ScrollHandle>,
+}
+
+#[derive(Clone)]
+struct InteractionTargetRecord {
+    label: String,
+    bounds: Bounds<Pixels>,
 }
 
 #[derive(Default)]
 struct CaptureRegionRegistry {
     scopes: Vec<CaptureScope>,
     regions: BTreeMap<String, CaptureRegionBounds>,
+    interaction_targets: BTreeMap<String, BTreeMap<String, InteractionTargetRecord>>,
+    duplicate_interaction_targets: BTreeMap<String, BTreeSet<String>>,
 }
 
 thread_local! {
@@ -47,6 +87,22 @@ pub(crate) fn capture_story_view_with_scroll(
     CaptureScopeElement {
         story_key: Some(story_key.into()),
         scroll_handle,
+        child: child.into_any_element(),
+    }
+}
+
+/// Mark one rendered child as a stable semantic target for Storybook automation.
+///
+/// Keys must be unique within a story or substory route. The target is exposed
+/// by MCP only when generic interaction tools are explicitly enabled.
+pub fn interaction_target(
+    key: impl Into<String>,
+    label: impl Into<String>,
+    child: impl IntoElement,
+) -> impl IntoElement {
+    InteractionTargetElement {
+        key: key.into(),
+        label: label.into(),
         child: child.into_any_element(),
     }
 }
@@ -144,6 +200,47 @@ pub(crate) fn capture_region_bounds(route_id: &str) -> Option<CaptureRegionBound
     CAPTURE_REGIONS.with_borrow(|registry| registry.regions.get(route_id).cloned())
 }
 
+#[derive(Debug)]
+pub(crate) enum InteractionTargetLookupError {
+    RouteNotRendered,
+    DuplicateKey(String),
+}
+
+pub(crate) fn interaction_targets(
+    route_id: &str,
+) -> Result<Vec<StoryInteractionTargetSnapshot>, InteractionTargetLookupError> {
+    CAPTURE_REGIONS.with_borrow(|registry| {
+        let Some(region) = registry.regions.get(route_id) else {
+            return Err(InteractionTargetLookupError::RouteNotRendered);
+        };
+        if let Some(key) = registry
+            .duplicate_interaction_targets
+            .get(route_id)
+            .and_then(|keys| keys.first())
+        {
+            return Err(InteractionTargetLookupError::DuplicateKey(key.clone()));
+        }
+
+        let route_origin = region.bounds.origin;
+        Ok(registry
+            .interaction_targets
+            .get(route_id)
+            .into_iter()
+            .flat_map(|targets| targets.iter())
+            .map(|(key, target)| StoryInteractionTargetSnapshot {
+                key: key.clone(),
+                label: target.label.clone(),
+                bounds: StoryInteractionTargetBounds {
+                    x: f32::from(target.bounds.origin.x - route_origin.x),
+                    y: f32::from(target.bounds.origin.y - route_origin.y),
+                    width: f32::from(target.bounds.size.width),
+                    height: f32::from(target.bounds.size.height),
+                },
+            })
+            .collect())
+    })
+}
+
 pub(crate) fn current_capture_scroll_handle() -> Option<ScrollHandle> {
     current_scope().and_then(|scope| scope.scroll_handle)
 }
@@ -196,6 +293,37 @@ fn record_region(route_id: String, bounds: Bounds<Pixels>, scope: &CaptureScope)
     });
 }
 
+fn clear_interaction_targets(route_id: &str) {
+    CAPTURE_REGIONS.with_borrow_mut(|registry| {
+        registry.interaction_targets.remove(route_id);
+        registry.duplicate_interaction_targets.remove(route_id);
+    });
+}
+
+fn record_interaction_target(route_id: String, key: String, label: String, bounds: Bounds<Pixels>) {
+    CAPTURE_REGIONS.with_borrow_mut(|registry| {
+        let duplicate = match registry
+            .interaction_targets
+            .entry(route_id.clone())
+            .or_default()
+            .entry(key.clone())
+        {
+            std::collections::btree_map::Entry::Vacant(entry) => {
+                entry.insert(InteractionTargetRecord { label, bounds });
+                false
+            },
+            std::collections::btree_map::Entry::Occupied(_) => true,
+        };
+        if duplicate {
+            registry
+                .duplicate_interaction_targets
+                .entry(route_id)
+                .or_default()
+                .insert(key);
+        }
+    });
+}
+
 struct CaptureScopeElement {
     story_key: Option<String>,
     scroll_handle: Option<ScrollHandle>,
@@ -229,10 +357,23 @@ impl Element for CaptureScopeElement {
         window: &mut Window,
         cx: &mut App,
     ) -> (LayoutId, Self::RequestLayoutState) {
+        let inherited = current_scope();
+        let story_key = self
+            .story_key
+            .clone()
+            .or_else(|| inherited.as_ref().and_then(|scope| scope.story_key.clone()));
         let scope = CaptureScope {
-            story_key: self.story_key.clone(),
+            route_id: self
+                .story_key
+                .clone()
+                .or_else(|| inherited.as_ref().and_then(|scope| scope.route_id.clone())),
+            story_key,
             viewport_bounds: None,
-            scroll_handle: self.scroll_handle.clone(),
+            scroll_handle: self.scroll_handle.clone().or_else(|| {
+                inherited
+                    .as_ref()
+                    .and_then(|scope| scope.scroll_handle.clone())
+            }),
         };
         let layout_id = with_scope(scope, || self.child.request_layout(window, cx));
         (layout_id, layout_id)
@@ -247,13 +388,28 @@ impl Element for CaptureScopeElement {
         window: &mut Window,
         cx: &mut App,
     ) -> Self::PrepaintState {
+        let inherited = current_scope();
+        let story_key = self
+            .story_key
+            .clone()
+            .or_else(|| inherited.as_ref().and_then(|scope| scope.story_key.clone()));
+        let route_id = self
+            .story_key
+            .clone()
+            .or_else(|| inherited.as_ref().and_then(|scope| scope.route_id.clone()));
         let scope = CaptureScope {
-            story_key: self.story_key.clone(),
+            story_key,
+            route_id,
             viewport_bounds: Some(bounds),
-            scroll_handle: self.scroll_handle.clone(),
+            scroll_handle: self.scroll_handle.clone().or_else(|| {
+                inherited
+                    .as_ref()
+                    .and_then(|scope| scope.scroll_handle.clone())
+            }),
         };
 
         if let Some(story_key) = self.story_key.clone() {
+            clear_interaction_targets(&story_key);
             record_region(story_key, bounds, &scope);
         }
 
@@ -272,10 +428,22 @@ impl Element for CaptureScopeElement {
         window: &mut Window,
         cx: &mut App,
     ) {
+        let inherited = current_scope();
         let scope = CaptureScope {
-            story_key: self.story_key.clone(),
-            viewport_bounds: current_scope().and_then(|scope| scope.viewport_bounds),
-            scroll_handle: self.scroll_handle.clone(),
+            story_key: self
+                .story_key
+                .clone()
+                .or_else(|| inherited.as_ref().and_then(|scope| scope.story_key.clone())),
+            route_id: self
+                .story_key
+                .clone()
+                .or_else(|| inherited.as_ref().and_then(|scope| scope.route_id.clone())),
+            viewport_bounds: inherited.as_ref().and_then(|scope| scope.viewport_bounds),
+            scroll_handle: self.scroll_handle.clone().or_else(|| {
+                inherited
+                    .as_ref()
+                    .and_then(|scope| scope.scroll_handle.clone())
+            }),
         };
 
         with_scope(scope, || {
@@ -316,7 +484,22 @@ impl Element for CaptureSubstoryElement {
         window: &mut Window,
         cx: &mut App,
     ) -> (LayoutId, Self::RequestLayoutState) {
-        let layout_id = self.child.request_layout(window, cx);
+        let scope = current_scope().and_then(|scope| {
+            let story_key = scope.story_key.clone()?;
+            Some(CaptureScope {
+                route_id: Some(capture_substory_route_id_with_key(
+                    &story_key,
+                    &self.route_key,
+                )),
+                story_key: Some(story_key),
+                ..scope
+            })
+        });
+        let layout_id = if let Some(scope) = scope {
+            with_scope(scope, || self.child.request_layout(window, cx))
+        } else {
+            self.child.request_layout(window, cx)
+        };
         (layout_id, layout_id)
     }
 
@@ -332,13 +515,101 @@ impl Element for CaptureSubstoryElement {
         if let Some(scope) = current_scope()
             && let Some(story_key) = scope.story_key.clone()
         {
-            record_region(
-                capture_substory_route_id_with_key(story_key, &self.route_key),
-                bounds,
-                &scope,
+            let route_id = capture_substory_route_id_with_key(story_key, &self.route_key);
+            clear_interaction_targets(&route_id);
+            record_region(route_id.clone(), bounds, &scope);
+            with_scope(
+                CaptureScope {
+                    route_id: Some(route_id),
+                    ..scope
+                },
+                || {
+                    self.child.prepaint(window, cx);
+                },
             );
+            return;
         }
 
+        self.child.prepaint(window, cx);
+    }
+
+    fn paint(
+        &mut self,
+        _id: Option<&GlobalElementId>,
+        _inspector_id: Option<&InspectorElementId>,
+        _bounds: Bounds<Pixels>,
+        _request_layout: &mut Self::RequestLayoutState,
+        _prepaint: &mut Self::PrepaintState,
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        let scope = current_scope().and_then(|scope| {
+            let story_key = scope.story_key.clone()?;
+            Some(CaptureScope {
+                route_id: Some(capture_substory_route_id_with_key(
+                    story_key,
+                    &self.route_key,
+                )),
+                ..scope
+            })
+        });
+        if let Some(scope) = scope {
+            with_scope(scope, || self.child.paint(window, cx));
+        } else {
+            self.child.paint(window, cx);
+        }
+    }
+}
+
+struct InteractionTargetElement {
+    key: String,
+    label: String,
+    child: AnyElement,
+}
+
+impl IntoElement for InteractionTargetElement {
+    type Element = Self;
+
+    fn into_element(self) -> Self::Element {
+        self
+    }
+}
+
+impl Element for InteractionTargetElement {
+    type RequestLayoutState = LayoutId;
+    type PrepaintState = ();
+
+    fn id(&self) -> Option<ElementId> {
+        None
+    }
+
+    fn source_location(&self) -> Option<&'static std::panic::Location<'static>> {
+        None
+    }
+
+    fn request_layout(
+        &mut self,
+        _id: Option<&GlobalElementId>,
+        _inspector_id: Option<&InspectorElementId>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> (LayoutId, Self::RequestLayoutState) {
+        let layout_id = self.child.request_layout(window, cx);
+        (layout_id, layout_id)
+    }
+
+    fn prepaint(
+        &mut self,
+        _id: Option<&GlobalElementId>,
+        _inspector_id: Option<&InspectorElementId>,
+        bounds: Bounds<Pixels>,
+        _request_layout: &mut Self::RequestLayoutState,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Self::PrepaintState {
+        if let Some(route_id) = current_scope().and_then(|scope| scope.route_id) {
+            record_interaction_target(route_id, self.key.clone(), self.label.clone(), bounds);
+        }
         self.child.prepaint(window, cx);
     }
 
@@ -398,6 +669,7 @@ mod tests {
         clear_registry();
         let outer = CaptureScope {
             story_key: Some("story-key".to_string()),
+            route_id: Some("story-key".to_string()),
             viewport_bounds: None,
             scroll_handle: None,
         };
@@ -432,6 +704,7 @@ mod tests {
         handle.set_offset(point(px(5.), px(10.)));
         let scope = CaptureScope {
             story_key: Some("story-key".to_string()),
+            route_id: Some("story-key".to_string()),
             viewport_bounds: Some(Bounds {
                 origin: point(px(20.), px(30.)),
                 size: gpui::size(px(100.), px(100.)),
@@ -477,5 +750,82 @@ mod tests {
 
         let keyed_substory = capture_substory_with_key("stable-key", div()).into_element();
         assert!(keyed_substory.id().is_none());
+
+        let target = interaction_target("execute", "Execute", div()).into_element();
+        assert!(target.id().is_none());
+        assert!(target.source_location().is_none());
+    }
+
+    #[test]
+    fn interaction_targets_are_relative_to_route_and_sorted_by_key() {
+        clear_registry();
+        let scope = CaptureScope {
+            story_key: Some("story-key".to_string()),
+            route_id: Some("story-key".to_string()),
+            viewport_bounds: None,
+            scroll_handle: None,
+        };
+        let route_bounds = Bounds {
+            origin: point(px(10.), px(20.)),
+            size: gpui::size(px(200.), px(100.)),
+        };
+        record_region("story-key".to_string(), route_bounds, &scope);
+        record_interaction_target(
+            "story-key".to_string(),
+            "second".to_string(),
+            "Second".to_string(),
+            Bounds {
+                origin: point(px(40.), px(50.)),
+                size: gpui::size(px(60.), px(20.)),
+            },
+        );
+        record_interaction_target(
+            "story-key".to_string(),
+            "first".to_string(),
+            "First".to_string(),
+            Bounds {
+                origin: point(px(20.), px(30.)),
+                size: gpui::size(px(30.), px(10.)),
+            },
+        );
+
+        let targets = interaction_targets("story-key").expect("targets should resolve");
+        assert_eq!(targets[0].key, "first");
+        assert_eq!(targets[0].bounds.x, 10.0);
+        assert_eq!(targets[0].bounds.y, 10.0);
+        assert_eq!(targets[1].key, "second");
+    }
+
+    #[test]
+    fn duplicate_interaction_target_keys_are_rejected() {
+        clear_registry();
+        let scope = CaptureScope {
+            story_key: Some("story-key".to_string()),
+            route_id: Some("story-key".to_string()),
+            viewport_bounds: None,
+            scroll_handle: None,
+        };
+        let bounds = Bounds {
+            origin: point(px(0.), px(0.)),
+            size: gpui::size(px(10.), px(10.)),
+        };
+        record_region("story-key".to_string(), bounds, &scope);
+        record_interaction_target(
+            "story-key".to_string(),
+            "duplicate".to_string(),
+            "First".to_string(),
+            bounds,
+        );
+        record_interaction_target(
+            "story-key".to_string(),
+            "duplicate".to_string(),
+            "Second".to_string(),
+            bounds,
+        );
+
+        assert!(matches!(
+            interaction_targets("story-key"),
+            Err(InteractionTargetLookupError::DuplicateKey(key)) if key == "duplicate"
+        ));
     }
 }
