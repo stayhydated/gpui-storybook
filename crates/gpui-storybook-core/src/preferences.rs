@@ -10,7 +10,7 @@ use gpui_component::{
     Theme, ThemeMode, ThemeRegistry, WindowExt as _,
     button::{Button, ButtonVariants as _},
     notification::Notification,
-    scroll::ScrollbarShow,
+    scroll::ScrollbarMode,
 };
 use gpui_storybook_preferences::{
     AvailableThemeResolver, DetectedLocales, LanguageTag, LocaleDetector, PersistenceMode,
@@ -455,7 +455,7 @@ where
             Theme::global_mut(cx).apply_config(&config);
             self.applied_theme = Some(effective_theme);
         }
-        Theme::global_mut(cx).scrollbar_show = scrollbar_show(self.state.resolved.scrollbar);
+        Theme::global_mut(cx).scrollbar_mode = scrollbar_mode(self.state.resolved.scrollbar);
 
         let language = self.state.resolved.language.language.clone();
         if self.applied_language.as_ref() != Some(&language) {
@@ -1058,11 +1058,11 @@ fn theme_mode(scheme: SystemColorScheme) -> ThemeMode {
     }
 }
 
-fn scrollbar_show(scrollbar: PreferredScrollbar) -> ScrollbarShow {
+fn scrollbar_mode(scrollbar: PreferredScrollbar) -> ScrollbarMode {
     match scrollbar {
-        PreferredScrollbar::Scrolling => ScrollbarShow::Scrolling,
-        PreferredScrollbar::Hover => ScrollbarShow::Hover,
-        PreferredScrollbar::Always => ScrollbarShow::Always,
+        PreferredScrollbar::Scrolling => ScrollbarMode::Scrolling,
+        PreferredScrollbar::Hover => ScrollbarMode::Hover,
+        PreferredScrollbar::Always => ScrollbarMode::Always,
     }
 }
 
@@ -1353,7 +1353,7 @@ mod tests {
 
         assert_eq!(cx.theme().font_size, px(21.));
         assert_eq!(cx.theme().radius, px(11.));
-        assert_eq!(Theme::global(cx).scrollbar_show, ScrollbarShow::Always);
+        assert_eq!(Theme::global(cx).scrollbar_mode, ScrollbarMode::Always);
         assert_eq!(
             runtime.applied_theme,
             Some(AppliedTheme {
@@ -1695,6 +1695,7 @@ mod tests {
         let retry_count = Rc::new(Cell::new(0));
         cx.update(|cx| {
             gpui_component::init(cx);
+            cx.set_reduce_motion(true);
             let retry_count = retry_count.clone();
             cx.on_action(move |_: &crate::actions::RetryPreferences, _: &mut App| {
                 retry_count.set(retry_count.get() + 1);
@@ -1719,11 +1720,16 @@ mod tests {
             notifications.read_with(cx, |notifications, _| notifications.notifications().len()),
             1
         );
+        cx.update(|window, cx| {
+            window.activate_window();
+            window.draw(cx).clear(cx);
+        });
 
         let retry_bounds = cx
             .debug_bounds("retry-preference-save")
             .expect("retry action should be rendered");
         cx.simulate_click(retry_bounds.center(), gpui::Modifiers::none());
+        cx.run_until_parked();
         assert_eq!(retry_count.get(), 1);
 
         cx.background_executor
@@ -1751,7 +1757,7 @@ mod tests {
         runtime.select_scrollbar(PreferredScrollbar::Always, cx);
         assert_eq!(runtime.state.saved.scrollbar, PreferredScrollbar::Always);
         assert_eq!(runtime.state.resolved.scrollbar, PreferredScrollbar::Always);
-        assert_eq!(Theme::global(cx).scrollbar_show, ScrollbarShow::Always);
+        assert_eq!(Theme::global(cx).scrollbar_mode, ScrollbarMode::Always);
     }
 
     #[gpui::test]

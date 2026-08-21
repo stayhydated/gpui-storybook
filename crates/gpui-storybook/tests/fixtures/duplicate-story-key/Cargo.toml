@@ -5,6 +5,7 @@ name = "gpui-storybook-duplicate-fixture"
 version = "0.0.0"
 edition = "2024"
 publish = false
+rust-version = "1.98"
 
 [dependencies]
 gpui = { branch = "linux-headless-renderer", git = "https://github.com/stayhydated/zed", version = "0.2.2" }

@@ -7,12 +7,15 @@ use gpui::{
 };
 
 use serde::{Deserialize, Serialize};
-use std::{borrow::Borrow, rc::Rc, sync::Arc};
+use std::{borrow::Borrow, rc::Rc};
 
 use gpui_component::{
     ActiveTheme as _, ElementExt as _, IconName, Sizable as _,
     button::{Button, ButtonVariants as _},
-    dock::{Panel, PanelControl, PanelEvent, PanelInfo, PanelState, PanelView, TitleStyle},
+    dock::{
+        BasePanel, Panel, PanelControl, PanelEvent, PanelId, PanelInfo, PanelState, TabGroup,
+        TitleStyle, panel_handle,
+    },
     group_box::{GroupBox, GroupBoxVariants as _},
     h_flex,
     menu::PopupMenu,
@@ -284,7 +287,7 @@ pub struct StoryContainer {
     story_scroll_handle: ScrollHandle,
     width: Option<gpui::Pixels>,
     height: Option<gpui::Pixels>,
-    tab_panel: Option<gpui::WeakEntity<gpui_component::dock::TabPanel>>,
+    tab_group: Option<gpui::WeakEntity<TabGroup>>,
     story: Option<AnyView>,
     control_target: Option<Rc<dyn ControlTarget>>,
     presentation: StoryPresentation,
@@ -500,7 +503,7 @@ impl StoryContainer {
             story_scroll_handle: ScrollHandle::new(),
             width: None,
             height: None,
-            tab_panel: None,
+            tab_group: None,
             story: None,
             control_target: None,
             presentation: StoryPresentation::default(),
@@ -894,62 +897,17 @@ impl StoryState {
     }
 }
 
-impl Panel for StoryContainer {
+impl BasePanel for StoryContainer {
     fn panel_name(&self) -> &'static str {
         "StoryContainer"
-    }
-
-    fn title(&mut self, _window: &mut Window, _cx: &mut gpui::Context<Self>) -> impl IntoElement {
-        let tab_panel = self.tab_panel.clone();
-        let story_panel = _cx.entity().downgrade();
-        let title = self.display_title(_cx).into_any_element();
-
-        h_flex()
-            .items_center()
-            .gap_1()
-            .child(title)
-            .when(self.closable && self.is_active, |this| {
-                this.child(
-                    Button::new(format!(
-                        "close-story-tab-{}",
-                        self.story_klass.clone().unwrap_or_default()
-                    ))
-                    .icon(IconName::Close)
-                    .xsmall()
-                    .ghost()
-                    .tab_stop(false)
-                    .on_click(
-                        move |_: &ClickEvent, window: &mut Window, cx: &mut App| {
-                            cx.stop_propagation();
-                            let Some(tab_panel) = tab_panel.clone().and_then(|tab| tab.upgrade())
-                            else {
-                                return;
-                            };
-                            let Some(story_panel) = story_panel.upgrade() else {
-                                return;
-                            };
-                            tab_panel.update(cx, |tab_panel, cx| {
-                                tab_panel.remove_panel(Arc::new(story_panel.clone()), window, cx);
-                            });
-                        },
-                    ),
-                )
-            })
-    }
-
-    fn title_style(&self, cx: &App) -> Option<TitleStyle> {
-        self.title_bg.map(|bg| TitleStyle {
-            background: bg,
-            foreground: cx.theme().foreground,
-        })
     }
 
     fn closable(&self, _cx: &App) -> bool {
         self.closable
     }
 
-    fn zoomable(&self, _cx: &App) -> Option<PanelControl> {
-        self.zoomable
+    fn zoomable(&self, _cx: &App) -> bool {
+        self.zoomable.is_some()
     }
 
     fn visible(&self, cx: &App) -> bool {
@@ -973,9 +931,9 @@ impl Panel for StoryContainer {
                 .and_then(gpui::WeakEntity::upgrade)
         {
             let story = cx.entity();
-            // `PanelView::set_active` updates this entity while GPUI's tab panel is
-            // synchronizing its selection. Defer the workbench update so it can
-            // inspect the story after the current entity lease has been released.
+            // Panel activation updates this entity while the dock group is
+            // synchronizing its selection. Defer the workbench update so it
+            // can inspect the story after the current entity lease is released.
             window.defer(cx, move |_, cx| {
                 state.update(cx, |state, cx| state.set_active_story(Some(story), cx));
             });
@@ -989,16 +947,76 @@ impl Panel for StoryContainer {
 
     fn on_added_to(
         &mut self,
-        tab_panel: gpui::WeakEntity<gpui_component::dock::TabPanel>,
+        tab_group: gpui::WeakEntity<TabGroup>,
         _window: &mut Window,
         _cx: &mut gpui::Context<Self>,
     ) {
-        self.tab_panel = Some(tab_panel);
+        self.tab_group = Some(tab_group);
     }
 
     fn on_removed(&mut self, _window: &mut Window, _cx: &mut gpui::Context<Self>) {
-        self.tab_panel = None;
+        self.tab_group = None;
         self.is_active = false;
+    }
+
+    fn dump(&self, _cx: &App) -> PanelState {
+        let mut state = PanelState::new(self.panel_name());
+        if let Some(story_klass) = self.story_klass.clone() {
+            let story_state = StoryState { story_klass };
+            state.info = PanelInfo::panel(story_state.to_value());
+        }
+        state
+    }
+}
+
+impl Panel for StoryContainer {
+    fn title(&mut self, _window: &mut Window, _cx: &mut gpui::Context<Self>) -> impl IntoElement {
+        let tab_group = self.tab_group.clone();
+        let story_panel = _cx.entity().downgrade();
+        let title = self.display_title(_cx).into_any_element();
+
+        h_flex()
+            .items_center()
+            .gap_1()
+            .child(title)
+            .when(self.closable && self.is_active, |this| {
+                this.child(
+                    Button::new(format!(
+                        "close-story-tab-{}",
+                        self.story_klass.clone().unwrap_or_default()
+                    ))
+                    .icon(IconName::Close)
+                    .xsmall()
+                    .ghost()
+                    .tab_stop(false)
+                    .on_click(
+                        move |_: &ClickEvent, _window: &mut Window, cx: &mut App| {
+                            cx.stop_propagation();
+                            let Some(tab_group) = tab_group.clone().and_then(|tab| tab.upgrade())
+                            else {
+                                return;
+                            };
+                            let Some(story_panel) = story_panel.upgrade() else {
+                                return;
+                            };
+                            tab_group.update(cx, |tab_group, cx| {
+                                tab_group.close_panel(PanelId::from(story_panel.entity_id()), cx);
+                            });
+                        },
+                    ),
+                )
+            })
+    }
+
+    fn title_style(&self, cx: &App) -> Option<TitleStyle> {
+        self.title_bg.map(|bg| TitleStyle {
+            background: bg,
+            foreground: cx.theme().foreground,
+        })
+    }
+
+    fn zoom_control(&self, _cx: &App) -> Option<PanelControl> {
+        self.zoomable
     }
 
     fn dropdown_menu(
@@ -1009,15 +1027,6 @@ impl Panel for StoryContainer {
     ) -> PopupMenu {
         menu.menu("Info", Box::new(ShowPanelInfo))
     }
-
-    fn dump(&self, _cx: &App) -> PanelState {
-        let mut state = PanelState::new(self);
-        if let Some(story_klass) = self.story_klass.clone() {
-            let story_state = StoryState { story_klass };
-            state.info = PanelInfo::panel(story_state.to_value());
-        }
-        state
-    }
 }
 
 pub fn reveal_story_panel(
@@ -1025,23 +1034,29 @@ pub fn reveal_story_panel(
     window: &mut Window,
     cx: &mut App,
 ) -> bool {
-    let (is_active, tab_panel) = {
+    let (is_active, tab_group) = {
         let story = story.read(cx);
-        (story.is_active, story.tab_panel.clone())
+        (story.is_active, story.tab_group.clone())
     };
 
     if is_active {
         return true;
     }
 
-    let Some(tab_panel) = tab_panel.and_then(|tab| tab.upgrade()) else {
+    let Some(tab_group) = tab_group.and_then(|tab| tab.upgrade()) else {
         return false;
     };
 
-    let panel: Arc<dyn PanelView> = Arc::new(story.clone());
-    tab_panel.update(cx, |tab_panel, cx| {
-        tab_panel.remove_panel(panel.clone(), window, cx);
-        tab_panel.add_panel(panel, window, cx);
+    let panel = panel_handle(story.clone());
+    tab_group.update(cx, |tab_group, cx| {
+        let Some(ix) = tab_group
+            .panels()
+            .iter()
+            .position(|candidate| candidate.panel_id(cx) == panel.panel_id(cx))
+        else {
+            return;
+        };
+        tab_group.select_tab(ix, window, cx);
     });
 
     true
@@ -1700,7 +1715,7 @@ mod tests {
 
         window
             .update(cx, |story, window, cx| {
-                Panel::set_active(story, true, window, cx);
+                BasePanel::set_active(story, true, window, cx);
                 assert!(state.read(cx).active_story().is_none());
             })
             .expect("panel activation should not reenter the story entity");

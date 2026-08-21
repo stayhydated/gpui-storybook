@@ -1,12 +1,12 @@
 use gpui::Action;
-use gpui_component::scroll::ScrollbarShow;
+use gpui_component::scroll::ScrollbarMode;
 use gpui_storybook_preferences::{PreferredColorScheme, SystemColorScheme};
 use serde::Deserialize;
 use unic_langid::LanguageIdentifier;
 
 #[derive(Action, Clone, Deserialize, Eq, PartialEq)]
 #[action(namespace = story, no_json)]
-pub struct SelectScrollbarShow(pub ScrollbarShow);
+pub struct SelectScrollbarMode(pub ScrollbarMode);
 
 #[derive(Action, Clone, Deserialize, Eq, PartialEq)]
 #[action(namespace = story, no_json)]

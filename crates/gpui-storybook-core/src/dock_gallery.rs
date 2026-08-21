@@ -18,16 +18,17 @@ use crate::{
 };
 use anyhow::{Context as _, Result};
 use gpui::{
-    Action, AnyElement, App, AppContext as _, ClickEvent, Context, Edges, Entity, EntityId,
-    EventEmitter, FocusHandle, Focusable, InteractiveElement as _, IntoElement, ParentElement as _,
-    Render, SharedString, Styled as _, Subscription, Window, div, px, relative,
+    Action, AnyElement, App, AppContext as _, ClickEvent, Context, Entity, EntityId, EventEmitter,
+    FocusHandle, Focusable, InteractiveElement as _, IntoElement, ParentElement as _, Render,
+    SharedString, Styled as _, Subscription, Window, div, px, relative,
 };
 use gpui_component::{
     ActiveTheme as _, Root, Side, Sizable as _,
     button::{Button, ButtonVariants as _},
     dock::{
-        ClosePanel, DockArea, DockAreaState, DockEvent, DockItem, DockPlacement, Panel,
-        PanelControl, PanelEvent, PanelInfo, PanelView, ToggleZoom, register_panel,
+        BasePanel, ClosePanel, DockArea, DockAreaState, DockEvent, DockLayout, DockPlacement,
+        DockSkin, Panel, PanelControl, PanelEvent, PanelInfo, ToggleZoom, panel_handle,
+        register_panel,
     },
     h_flex,
     input::{Input, InputEvent, InputState},
@@ -37,7 +38,8 @@ use gpui_component::{
 use gpui_storybook_components::{StoryDrag, StorySidebarItem};
 use std::{
     collections::BTreeMap,
-    sync::{Arc, LazyLock, Mutex},
+    rc::Rc,
+    sync::{LazyLock, Mutex},
 };
 
 #[derive(Action, Clone, Debug, Default, Eq, PartialEq)]
@@ -176,16 +178,16 @@ impl StorySidebar {
             return;
         }
 
-        let panel: Arc<dyn PanelView> = Arc::new(story.clone());
+        let panel = panel_handle(story.clone());
         let state = dock_area.update(cx, |dock_area, cx| {
-            // Keep the declarative DockItem tree synced with runtime state before adding.
-            // This avoids stale split children on gpui-component/main.
+            // Normalize the persisted tree before extending the live layout.
+            // This avoids retaining stale split children across additions.
             let state = dock_area.dump(cx);
             if let Ok(state) = DockLayoutStore::sanitize_state(state) {
                 let _ = dock_area.load(state, window, cx);
             }
 
-            dock_area.add_panel(panel, DockPlacement::Center, None, window, cx);
+            dock_area.add_panel_view(panel, DockPlacement::Center, None, window, cx);
             dock_area.dump(cx)
         });
 
@@ -462,20 +464,26 @@ impl StorySidebar {
     }
 }
 
-impl Panel for StorySidebar {
+impl BasePanel for StorySidebar {
     fn panel_name(&self) -> &'static str {
         "StorySidebar"
-    }
-
-    fn title(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        "Stories"
     }
 
     fn closable(&self, _cx: &App) -> bool {
         false
     }
 
-    fn zoomable(&self, _cx: &App) -> Option<PanelControl> {
+    fn zoomable(&self, _cx: &App) -> bool {
+        false
+    }
+}
+
+impl Panel for StorySidebar {
+    fn title(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+        "Stories"
+    }
+
+    fn zoom_control(&self, _cx: &App) -> Option<PanelControl> {
         None
     }
 }
@@ -593,6 +601,7 @@ impl Render for StorySidebar {
 pub struct StoryWorkspace {
     title_bar: Entity<AppTitleBar>,
     dock_area: Entity<DockArea>,
+    dock_skin: Rc<DockSkin>,
     workbench_state: Entity<WorkbenchState>,
     automation: Option<SharedStorybookAutomation>,
     last_layout_state: Option<DockAreaState>,
@@ -612,8 +621,8 @@ impl StoryWorkspace {
             automation.set_stories(story_snapshots_from_containers(&stories, cx));
         }
 
-        let dock_area =
-            cx.new(|cx| DockArea::new(MAIN_DOCK_AREA.id, Some(MAIN_DOCK_AREA.version), window, cx));
+        let (dock_area, dock_skin) =
+            DockSkin::dock_area(MAIN_DOCK_AREA.id, Some(MAIN_DOCK_AREA.version), window, cx);
         let weak_dock_area = dock_area.downgrade();
         let workbench_state = cx.new(|_| WorkbenchState::new(None));
         workbench_state.update(cx, |state, cx| {
@@ -638,9 +647,7 @@ impl StoryWorkspace {
                 );
             },
         };
-        dock_area.update(cx, |dock_area, cx| {
-            dock_area.set_toggle_button_visible(false, cx);
-        });
+        dock_skin.set_toggle_button_visible(false, cx);
 
         cx.subscribe_in(
             &dock_area,
@@ -706,6 +713,7 @@ impl StoryWorkspace {
 
         let this = Self {
             dock_area,
+            dock_skin,
             workbench_state,
             title_bar,
             automation,
@@ -724,12 +732,8 @@ impl StoryWorkspace {
         let (left_collapsed, right_collapsed) = {
             let dock_area = dock_area.read(cx);
             (
-                dock_area
-                    .left_dock()
-                    .is_none_or(|dock| !dock.read(cx).is_open()),
-                dock_area
-                    .right_dock()
-                    .is_none_or(|dock| !dock.read(cx).is_open()),
+                !dock_area.is_dock_open(DockPlacement::Left),
+                !dock_area.is_dock_open(DockPlacement::Right),
             )
         };
         let dock_area_for_left = dock_area.clone();
@@ -824,16 +828,13 @@ impl StoryWorkspace {
 
         dock_area.update(cx, |dock_area, cx| {
             dock_area.load(state, window, cx).context("load layout")?;
-            dock_area.set_dock_collapsible(
-                Edges {
-                    left: true,
-                    bottom: true,
-                    right: true,
-                    ..Default::default()
-                },
-                window,
-                cx,
-            );
+            for placement in [
+                DockPlacement::Left,
+                DockPlacement::Bottom,
+                DockPlacement::Right,
+            ] {
+                dock_area.set_dock_collapsible(placement, true, window, cx);
+            }
             Ok::<(), anyhow::Error>(())
         })
     }
@@ -845,27 +846,26 @@ impl StoryWorkspace {
         window: &mut Window,
         cx: &mut App,
     ) {
-        let dock_item = Self::build_center_layout(stories, &dock_area, window, cx);
+        let dock_layout = Self::build_center_layout();
 
         // Create sidebar panel for the left dock
         let sidebar_panel = Self::build_sidebar(stories, &dock_area, automation, window, cx);
         let workbench_panel = Self::build_workbench(&dock_area, WorkbenchTab::Controls, window, cx);
 
         _ = dock_area.update(cx, |view, cx| {
-            view.set_version(MAIN_DOCK_AREA.version, window, cx);
-            view.set_center(dock_item, window, cx);
-            view.set_left_dock(sidebar_panel, Some(px(260.)), true, window, cx);
-            view.set_right_dock(workbench_panel, Some(px(320.)), true, window, cx);
-            view.set_dock_collapsible(
-                Edges {
-                    left: true,
-                    bottom: true,
-                    right: true,
-                    ..Default::default()
-                },
-                window,
-                cx,
-            );
+            view.set_version(Some(MAIN_DOCK_AREA.version), cx);
+            view.set_center(dock_layout, window, cx);
+            for (placement, layout, size) in [
+                (DockPlacement::Left, sidebar_panel, px(260.)),
+                (DockPlacement::Right, workbench_panel, px(320.)),
+            ] {
+                view.set_dock(placement, layout, window, cx);
+                view.set_dock_size(placement, size, window, cx);
+                view.set_dock_collapsible(placement, true, window, cx);
+                if !view.is_dock_open(placement) {
+                    view.toggle_dock(placement, window, cx);
+                }
+            }
         });
     }
 
@@ -875,12 +875,12 @@ impl StoryWorkspace {
         automation: Option<SharedStorybookAutomation>,
         window: &mut Window,
         cx: &mut App,
-    ) -> DockItem {
-        let sidebar: Arc<dyn PanelView> = Arc::new(cx.new(|cx| {
+    ) -> DockLayout {
+        let sidebar = cx.new(|cx| {
             StorySidebar::new(stories.to_vec(), dock_area.clone(), automation, window, cx)
-        }));
+        });
 
-        DockItem::panel(sidebar)
+        DockLayout::tabs().panel_view(panel_handle(sidebar), cx)
     }
 
     fn build_workbench(
@@ -888,28 +888,17 @@ impl StoryWorkspace {
         selected_tab: WorkbenchTab,
         window: &mut Window,
         cx: &mut App,
-    ) -> DockItem {
+    ) -> DockLayout {
         let state = workbench_state(dock_area)
             .expect("dock workbench state must be registered before building its panel");
-        let workbench: Arc<dyn PanelView> =
-            Arc::new(cx.new(|cx| StoryWorkbench::new(state, selected_tab, window, cx)));
-        DockItem::panel(workbench)
+        let workbench = cx.new(|cx| StoryWorkbench::new(state, selected_tab, window, cx));
+        DockLayout::tabs().panel_view(panel_handle(workbench), cx)
     }
 
-    fn build_center_layout(
-        _stories: &[Entity<StoryContainer>],
-        dock_area: &gpui::WeakEntity<DockArea>,
-        window: &mut Window,
-        cx: &mut App,
-    ) -> DockItem {
-        // Wrap center tabs in a split so TabPanel gets a parent StackPanel.
+    fn build_center_layout() -> DockLayout {
+        // Wrap center tabs in a split so the tab group gets a parent split.
         // This enables tab drag/drop and split indicators.
-        DockItem::v_split(
-            vec![DockItem::tabs(vec![], dock_area, window, cx)],
-            dock_area,
-            window,
-            cx,
-        )
+        DockLayout::v_split().child(DockLayout::tabs(), None)
     }
 
     pub fn view(
@@ -1203,9 +1192,8 @@ impl StoryWorkspace {
     ) {
         self.toggle_button_visible = !self.toggle_button_visible;
 
-        self.dock_area.update(cx, |dock_area, cx| {
-            dock_area.set_toggle_button_visible(self.toggle_button_visible, cx);
-        });
+        self.dock_skin
+            .set_toggle_button_visible(self.toggle_button_visible, cx);
     }
 
     fn on_action_reset_layout(
@@ -1264,50 +1252,41 @@ impl Render for StoryWorkspace {
 
 /// Register StoryContainer panel for deserialization
 pub fn register_story_panels(cx: &mut App) {
-    register_panel(
-        cx,
-        "StoryContainer",
-        |dock_area, _state, info, window, cx| {
-            let PanelInfo::Panel(panel_value) = info else {
-                panic!("StoryContainer panel state must be PanelInfo::Panel");
-            };
+    register_panel(cx, "StoryContainer", |context, window, cx| {
+        let PanelInfo::Panel(panel_value) = context.info() else {
+            panic!("StoryContainer panel state must be PanelInfo::Panel");
+        };
 
-            let story_state = serde_json::from_value::<StoryState>(panel_value.clone())
-                .expect("StoryContainer panel state must contain StoryState");
+        let story_state = serde_json::from_value::<StoryState>(panel_value.clone())
+            .expect("StoryContainer panel state must contain StoryState");
+        let dock_area = context.dock_area();
 
-            Box::new(
-                StorySidebar::create_story_by_klass(
-                    story_state.story_klass.as_ref(),
-                    &dock_area,
-                    window,
-                    cx,
-                )
-                .expect("StoryContainer panel state must reference a registered story"),
+        panel_handle(
+            StorySidebar::create_story_by_klass(
+                story_state.story_klass.as_ref(),
+                &dock_area,
+                window,
+                cx,
             )
-        },
-    );
+            .expect("StoryContainer panel state must reference a registered story"),
+        )
+    });
 
     // Register StorySidebar panel
-    register_panel(
-        cx,
-        "StorySidebar",
-        |dock_area, _state, _info, window, cx| {
-            let stories = StorySidebar::seeded_stories(&dock_area, window, cx);
+    register_panel(cx, "StorySidebar", |context, window, cx| {
+        let dock_area = context.dock_area();
+        let stories = StorySidebar::seeded_stories(&dock_area, window, cx);
 
-            Box::new(cx.new(|cx| StorySidebar::new(stories, dock_area, None, window, cx)))
-        },
-    );
+        panel_handle(cx.new(|cx| StorySidebar::new(stories, dock_area, None, window, cx)))
+    });
 
-    register_panel(
-        cx,
-        "StoryWorkbench",
-        |dock_area, _state, info, window, cx| {
-            let selected_tab = StoryWorkbench::selected_tab_from_panel(info);
-            let state = workbench_state(&dock_area)
-                .expect("StoryWorkbench panel must have a registered window state");
-            Box::new(cx.new(|cx| StoryWorkbench::new(state, selected_tab, window, cx)))
-        },
-    );
+    register_panel(cx, "StoryWorkbench", |context, window, cx| {
+        let selected_tab = StoryWorkbench::selected_tab_from_panel(context.info());
+        let dock_area = context.dock_area();
+        let state = workbench_state(&dock_area)
+            .expect("StoryWorkbench panel must have a registered window state");
+        panel_handle(cx.new(|cx| StoryWorkbench::new(state, selected_tab, window, cx)))
+    });
 }
 
 /// Create a new dock-based storybook window

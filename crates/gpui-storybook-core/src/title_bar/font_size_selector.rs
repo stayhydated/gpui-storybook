@@ -6,10 +6,10 @@ use gpui_component::{
     ActiveTheme as _, IconName, Side, Sizable as _, Theme,
     button::{Button, ButtonVariants as _},
     menu::DropdownMenu as _,
-    scroll::ScrollbarShow,
+    scroll::ScrollbarMode,
 };
 
-use crate::actions::{SelectFont, SelectRadius, SelectScrollbarShow};
+use crate::actions::{SelectFont, SelectRadius, SelectScrollbarMode};
 
 pub struct FontSizeSelector {
     focus_handle: FocusHandle,
@@ -42,16 +42,16 @@ impl FontSizeSelector {
         window.refresh();
     }
 
-    fn on_select_scrollbar_show(
+    fn on_select_scrollbar_mode(
         &mut self,
-        show: &SelectScrollbarShow,
+        mode: &SelectScrollbarMode,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let preference = match show.0 {
-            ScrollbarShow::Scrolling => gpui_storybook_preferences::PreferredScrollbar::Scrolling,
-            ScrollbarShow::Hover => gpui_storybook_preferences::PreferredScrollbar::Hover,
-            ScrollbarShow::Always => gpui_storybook_preferences::PreferredScrollbar::Always,
+        let preference = match mode.0 {
+            ScrollbarMode::Scrolling => gpui_storybook_preferences::PreferredScrollbar::Scrolling,
+            ScrollbarMode::Hover => gpui_storybook_preferences::PreferredScrollbar::Hover,
+            ScrollbarMode::Always => gpui_storybook_preferences::PreferredScrollbar::Always,
         };
         crate::preferences::select_scrollbar(preference, cx);
         window.refresh();
@@ -63,7 +63,7 @@ impl Render for FontSizeSelector {
         let focus_handle = self.focus_handle.clone();
         let font_size = cx.theme().font_size.as_f32() as i32;
         let radius = cx.theme().radius.as_f32() as i32;
-        let scroll_show = cx.theme().scrollbar_show;
+        let scrollbar_mode = cx.theme().scrollbar_mode;
 
         div()
             .id("font-size-selector")
@@ -71,7 +71,7 @@ impl Render for FontSizeSelector {
             .track_focus(&focus_handle)
             .on_action(cx.listener(Self::on_select_font))
             .on_action(cx.listener(Self::on_select_radius))
-            .on_action(cx.listener(Self::on_select_scrollbar_show))
+            .on_action(cx.listener(Self::on_select_scrollbar_mode))
             .child(
                 Button::new("btn")
                     .small()
@@ -103,18 +103,18 @@ impl Render for FontSizeSelector {
                             .label("Scrollbar")
                             .menu_with_check(
                                 "Scrolling to show",
-                                scroll_show == ScrollbarShow::Scrolling,
-                                Box::new(SelectScrollbarShow(ScrollbarShow::Scrolling)),
+                                scrollbar_mode == ScrollbarMode::Scrolling,
+                                Box::new(SelectScrollbarMode(ScrollbarMode::Scrolling)),
                             )
                             .menu_with_check(
                                 "Hover to show",
-                                scroll_show == ScrollbarShow::Hover,
-                                Box::new(SelectScrollbarShow(ScrollbarShow::Hover)),
+                                scrollbar_mode == ScrollbarMode::Hover,
+                                Box::new(SelectScrollbarMode(ScrollbarMode::Hover)),
                             )
                             .menu_with_check(
                                 "Always show",
-                                scroll_show == ScrollbarShow::Always,
-                                Box::new(SelectScrollbarShow(ScrollbarShow::Always)),
+                                scrollbar_mode == ScrollbarMode::Always,
+                                Box::new(SelectScrollbarMode(ScrollbarMode::Always)),
                             )
                     })
                     .anchor(Anchor::TopRight),

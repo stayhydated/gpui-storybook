@@ -19,7 +19,7 @@ use gpui_component::{
     checkbox::Checkbox,
     clipboard::Clipboard,
     color_picker::{ColorPicker, ColorPickerEvent, ColorPickerState},
-    dock::{Panel, PanelControl, PanelEvent, PanelInfo, PanelState},
+    dock::{BasePanel, Panel, PanelControl, PanelEvent, PanelInfo, PanelState},
     h_flex,
     input::{Input, InputEvent, InputState, NumberInput},
     link::Link,
@@ -1106,21 +1106,17 @@ impl Focusable for StoryWorkbench {
     }
 }
 
-impl Panel for StoryWorkbench {
+impl BasePanel for StoryWorkbench {
     fn panel_name(&self) -> &'static str {
         "StoryWorkbench"
-    }
-
-    fn title(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        "Workbench"
     }
 
     fn closable(&self, _: &App) -> bool {
         false
     }
 
-    fn zoomable(&self, _: &App) -> Option<PanelControl> {
-        None
+    fn zoomable(&self, _: &App) -> bool {
+        false
     }
 
     fn dump(&self, _: &App) -> PanelState {
@@ -1134,6 +1130,16 @@ impl Panel for StoryWorkbench {
                 .expect("workbench panel state serializes"),
             ),
         }
+    }
+}
+
+impl Panel for StoryWorkbench {
+    fn title(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        "Workbench"
+    }
+
+    fn zoom_control(&self, _: &App) -> Option<PanelControl> {
+        None
     }
 
     fn inner_padding(&self, _: &App) -> bool {
