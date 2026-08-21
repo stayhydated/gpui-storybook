@@ -35,6 +35,9 @@ unic-langid = { workspace = true }
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 gpui_tokio = { workspace = true }
 
+[target.'cfg(unix)'.dependencies]
+libc = { workspace = true }
+
 [dev-dependencies]
 es-fluent = { workspace = true }
 gpui = { features = [ "test-support" ], workspace = true }

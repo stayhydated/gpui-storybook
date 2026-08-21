@@ -29,19 +29,27 @@ shared automation controller. The `inspector` feature adds
 integration. The facade re-exports the application-facing parts.
 
 The automation module also owns the MCP-independent interaction request and
-result types, runtime action discovery, story-relative coordinate validation,
-and one frame-aware executor shared by gallery and dock hosts. Navigation,
-control mutations, capture, and interaction batches share an exclusive
-operation guard; catalog, current-story, control, and action reads remain
-available while a batch is active and may observe intermediate rendered state.
+result types, runtime action and semantic-target discovery, structured
+semantic-value reads, story-relative coordinate validation, and one frame-aware
+executor shared by gallery and dock hosts. Navigation, control mutations,
+capture, and interaction batches share an exclusive operation guard; catalog,
+current-story, control, action, and semantic-value reads remain available while
+a batch is active and may observe intermediate rendered state.
 Custom integrations should use `StorybookAutomation` instead of dispatching
 window input independently so validation, cancellation boundaries, and capture
 ordering remain consistent. Capture sizing preserves the surrounding shell and
 targets the rendered story region used for pointer bounds and PNG output.
-Application bootstrap remains the embedding application's responsibility. On
-Linux, non-interactive automation should run the normal Wayland application
-through Sway's wlroots headless backend; the MCP launch helper supplies that
-compositor wrapper.
+Facade-created controllers expose a readiness future that completes after the
+standard gallery or dock publishes its catalog and attaches the live command
+receiver. Application bootstrap remains the embedding application's responsibility.
+`StorybookElementExt` records stable keys and route-relative live bounds during
+prepaint with `storybook_target`, and route-local Serde-serializable state during
+the same phase with `storybook_value`. The implicit methods use the GPUI element ID as
+the key and derive a readable label; the `_as` methods accept both explicitly.
+Duplicate keys within either registry are rejected.
+On Linux,
+non-interactive automation should run the normal Wayland application through
+the `gpui-storybook-launch` Sway wrapper.
 
 In native debug builds, `STORYBOOK_THEME_DIR` selects the consumer-owned custom
 theme directory watched by the runtime. With no override, the runtime watches

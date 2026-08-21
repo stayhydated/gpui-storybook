@@ -1042,6 +1042,38 @@ impl StoryWorkspace {
                     cx,
                 )));
             },
+            StorybookAutomationCommand::ListInteractionTargets { response } => {
+                let result = self
+                    .automation
+                    .as_ref()
+                    .and_then(|automation| automation.current_story().story)
+                    .ok_or(StorybookAutomationError::NoActiveStory);
+                match result {
+                    Ok(story) => {
+                        crate::automation::interaction::schedule_interaction_target_listing(
+                            story, response, window,
+                        );
+                    },
+                    Err(error) => {
+                        let _ = response.send(Err(error));
+                    },
+                }
+            },
+            StorybookAutomationCommand::ReadSemanticValues { response } => {
+                let result = self
+                    .automation
+                    .as_ref()
+                    .and_then(|automation| automation.current_story().story)
+                    .ok_or(StorybookAutomationError::NoActiveStory);
+                match result {
+                    Ok(story) => {
+                        crate::automation::schedule_semantic_value_read(story, response, window)
+                    },
+                    Err(error) => {
+                        let _ = response.send(Err(error));
+                    },
+                }
+            },
             StorybookAutomationCommand::RunSteps {
                 request_id,
                 request,
@@ -1058,7 +1090,7 @@ impl StoryWorkspace {
                         &request.steps,
                         cx,
                     )?;
-                    if let Some(route) = &request.route {
+                    if let Some(route) = &request.story_key {
                         self.open_story_by_key(route, window, cx)?;
                     }
                     self.workbench_state
@@ -1076,7 +1108,7 @@ impl StoryWorkspace {
                         .active_story()
                         .ok_or(StorybookAutomationError::NoActiveStory)?;
                     set_capture_target_size(&story_entity, window, target_size, cx);
-                    if request.route.is_some() {
+                    if request.story_key.is_some() {
                         gpui::Focusable::focus_handle(&story_entity, cx).focus(window, cx);
                     }
                     cx.notify();
@@ -1358,7 +1390,7 @@ mod tests {
                     StorybookAutomationCommand::RunSteps {
                         request_id: 9,
                         request: crate::automation::StoryInteractionRequest {
-                            route: Some("missing-route".to_owned()),
+                            story_key: Some("missing-route".to_owned()),
                             controls: BTreeMap::new(),
                             width: None,
                             height: None,
@@ -1390,7 +1422,7 @@ mod tests {
                     StorybookAutomationCommand::RunSteps {
                         request_id: 10,
                         request: crate::automation::StoryInteractionRequest {
-                            route: None,
+                            story_key: None,
                             controls: BTreeMap::new(),
                             width: None,
                             height: None,

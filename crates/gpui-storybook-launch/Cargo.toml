@@ -1,0 +1,16 @@
+[package]
+name = "gpui-storybook-launch"
+description = "Portable process launcher for Linux GPUI Storybook automation sessions."
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+repository.workspace = true
+readme = "README.md"
+
+[dependencies]
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

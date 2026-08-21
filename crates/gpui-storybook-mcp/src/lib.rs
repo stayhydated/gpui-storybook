@@ -1,13 +1,16 @@
 //! MCP tools for driving a live `gpui-storybook` window.
 //!
 //! Tools can navigate stable routes, read/set/reset the selected story's typed
-//! controls, apply a serialized control map before capture, and use named or
-//! explicit viewport dimensions. These operations reuse the core
-//! `ControlSpec` and `ControlValue` contracts.
-//! Generic actions, focus, keyboard, pointer, frame waits, and atomic
-//! post-interaction capture are registered only when interaction automation is
-//! explicitly enabled with [`StorybookMcpServerOptions`] or
-//! [`ALLOW_INTERACTION_ENV_VAR`]. The environment value must equal `1`.
+//! controls, read or wait for route-local structured application values, apply
+//! a serialized control map before capture, and use named or explicit viewport
+//! dimensions. Facade-created controllers wait for the standard gallery or dock
+//! to publish and attach before handling the first tool call.
+//! These operations reuse the core `ControlSpec` and `ControlValue` contracts.
+//! Generic actions, focused semantic target clicks, keyboard, pointer, frame
+//! waits, and atomic post-interaction capture are registered only when
+//! interaction automation is explicitly enabled with
+//! [`StorybookMcpServerOptions`] or [`ALLOW_INTERACTION_ENV_VAR`]. The
+//! environment value must equal `1`.
 //! Interaction is destructive, non-idempotent, and open-world: the capability
 //! authorizes event dispatch but does not constrain downstream story behavior.
 //!
@@ -34,9 +37,11 @@ pub use gpui_storybook_core::automation::{
     SharedStoryController, SharedStorybookAutomation, StoryActionSnapshot, StoryCaptureSnapshot,
     StoryControlsSnapshot, StoryCurrentSnapshot, StoryDefaultSize, StoryInteractionCaptureRequest,
     StoryInteractionDispatch, StoryInteractionObservation, StoryInteractionRequest,
-    StoryInteractionSnapshot, StoryInteractionStep, StoryModifier, StoryModifiers,
-    StoryMouseButton, StoryPoint, StoryPointSpace, StoryScreenshotRequest, StorySnapshot,
-    StorybookAutomation, StorybookAutomationError,
+    StoryInteractionSnapshot, StoryInteractionStep, StoryInteractionTargetBounds,
+    StoryInteractionTargetSnapshot, StoryInteractionTargetsSnapshot, StoryModifier, StoryModifiers,
+    StoryMouseButton, StoryPoint, StoryPointSpace, StoryScreenshotRequest,
+    StorySemanticValueSnapshot, StorySemanticValuesSnapshot, StorySnapshot, StorybookAutomation,
+    StorybookAutomationError,
 };
 pub use gpui_storybook_core::controls::{
     ControlBounds, ControlColor, ControlKind, ControlSnapshot, ControlSpec, ControlValue,
@@ -46,8 +51,17 @@ use rmcp::model::CallToolResult as ToolCallResult;
 use schemars::{JsonSchema, generate::SchemaSettings};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use std::{collections::BTreeMap, path::PathBuf, thread, time::Duration};
+use std::{
+    collections::BTreeMap,
+    future::Future,
+    path::PathBuf,
+    pin::Pin,
+    task::{Context, Poll},
+    thread,
+    time::Duration,
+};
 use thiserror::Error;
+use tokio::sync::oneshot;
 
 pub use gpui_storybook_core::automation;
 
@@ -64,9 +78,16 @@ pub const TOOL_RESET_CONTROL: &str = "storybook_reset_control";
 pub const TOOL_CAPTURE_CURRENT_STORY: &str = "storybook_capture_current_story";
 pub const TOOL_CAPTURE_LAUNCH_ENV: &str = "storybook_capture_launch_env";
 pub const TOOL_LIST_ACTIONS: &str = "storybook_list_actions";
+pub const TOOL_LIST_INTERACTION_TARGETS: &str = "storybook_list_interaction_targets";
+pub const TOOL_READ_SEMANTIC_VALUES: &str = "storybook_read_semantic_values";
+pub const TOOL_READ_VALUE: &str = "storybook_read_value";
+pub const TOOL_WAIT_FOR_VALUE: &str = "storybook_wait_for_value";
+pub const TOOL_CLICK_TARGET: &str = "storybook_click_target";
 pub const TOOL_RUN_STEPS: &str = "storybook_run_steps";
 
 const CAPTURE_SESSION_TIMEOUT_SECS: u64 = 30;
+const AUTOMATION_STARTUP_TIMEOUT_SECS: u64 = 30;
+const SEMANTIC_VALUE_WAIT_TIMEOUT_SECS: u64 = 30;
 const CAPTURE_ENV_PREFIX: &str = "WGPU";
 
 /// Runtime capabilities exposed by a Storybook MCP server.
@@ -145,6 +166,21 @@ struct StoryOutput {
     story: StorySnapshot,
 }
 
+#[derive(Debug, JsonSchema, PartialEq, Serialize)]
+#[schemars(deny_unknown_fields)]
+struct SemanticValueOutput {
+    story: StorySnapshot,
+    semantic_value: StorySemanticValueSnapshot,
+}
+
+#[derive(Debug, JsonSchema, PartialEq, Serialize)]
+#[schemars(deny_unknown_fields)]
+struct WaitForValueOutput {
+    story: StorySnapshot,
+    semantic_value: StorySemanticValueSnapshot,
+    frames_waited: u16,
+}
+
 #[derive(JsonSchema, Serialize)]
 #[schemars(deny_unknown_fields)]
 struct ListActionsOutput {
@@ -169,8 +205,8 @@ impl McpToolInput for EmptyInput {
 /// Select one registered story or sub-story route.
 #[derive(Clone, Debug, component_shape_mcp::McpToolInput)]
 struct StoryKeyInput {
-    /// Stable story key or `story-key/substory-key` capture route.
-    key: String,
+    /// Stable story key or `story-key/substory-key` route.
+    story_key: String,
 }
 
 /// Capture the story currently displayed by the live storybook window.
@@ -192,7 +228,7 @@ struct CaptureCurrentStoryInput {
 #[derive(Clone, Debug, component_shape_mcp::McpToolInput)]
 struct RunStepsInput {
     /// Stable story or substory route to open before interaction.
-    route: Option<String>,
+    story_key: Option<String>,
     /// Tagged `ControlValue` objects applied before interaction.
     controls: Option<BTreeMap<String, SchemarsValue<ControlValue>>>,
     /// Requested story-region width in physical pixels. Set together with `height`.
@@ -211,7 +247,7 @@ struct RunStepsInput {
 #[derive(Clone, Debug, component_shape_mcp::McpToolInput)]
 struct SetControlInput {
     /// Control key from `storybook_read_controls`.
-    key: String,
+    control_key: String,
     /// Tagged `ControlValue`, for example `{ "type": "boolean", "value": true }`.
     value: SchemarsValue<ControlValue>,
 }
@@ -220,14 +256,43 @@ struct SetControlInput {
 #[derive(Clone, Debug, Default, component_shape_mcp::McpToolInput)]
 struct ResetControlInput {
     /// Control key to reset. Omit to reset all controls.
-    key: Option<String>,
+    control_key: Option<String>,
+}
+
+/// Click one semantic target, optionally opening its story route first.
+#[derive(Clone, Debug, component_shape_mcp::McpToolInput)]
+struct ClickTargetInput {
+    /// Stable story or substory route to open before the click.
+    story_key: Option<String>,
+    /// Stable key from `storybook_list_interaction_targets`.
+    target_key: String,
+}
+
+/// Read one semantic value from the active story route.
+#[derive(Clone, Debug, component_shape_mcp::McpToolInput)]
+struct ReadValueInput {
+    /// Stable key from `storybook_read_semantic_values`.
+    value_key: String,
+}
+
+/// Wait for one semantic value, or one JSON Pointer inside it, to equal a value.
+#[derive(Clone, Debug, component_shape_mcp::McpToolInput)]
+struct WaitForValueInput {
+    /// Stable key from `storybook_read_semantic_values`.
+    value_key: String,
+    /// RFC 6901 JSON Pointer inside the semantic value. Omit to compare the complete value.
+    json_pointer: Option<String>,
+    /// Exact JSON value expected at `json_pointer` or at the semantic value root.
+    expected: SchemarsValue<Value>,
+    /// Positive number of freshly rendered frames to inspect, defaulting to 120.
+    max_frames: Option<u16>,
 }
 
 /// Build the environment and platform command for launching a capture-enabled storybook.
 #[derive(Clone, Debug, component_shape_mcp::McpToolInput)]
 struct CaptureLaunchEnvInput {
-    /// Stable story key or `story-key/substory-key` capture route.
-    key: String,
+    /// Stable story key or `story-key/substory-key` route.
+    story_key: String,
     /// PNG output path. Omit it to open the route without taking a capture.
     output_path: Option<PathBuf>,
     /// One-based frame number to capture.
@@ -278,15 +343,42 @@ pub fn capture_requested() -> bool {
     std::env::var_os(env.route_var()).is_some() || std::env::var_os(env.path_var()).is_some()
 }
 
+/// Awaitable completion of the MCP stdio server thread.
+///
+/// The future resolves when stdin reaches EOF or the server fails. Facade
+/// initialization uses this signal to quit the GPUI application cleanly.
+pub struct StorybookStdioCompletion {
+    receiver: oneshot::Receiver<ServeStdioResult>,
+}
+
+impl Future for StorybookStdioCompletion {
+    type Output = ServeStdioResult;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        match Pin::new(&mut self.receiver).poll(cx) {
+            Poll::Ready(Ok(result)) => Poll::Ready(result),
+            Poll::Ready(Err(error)) => Poll::Ready(Err(Box::new(std::io::Error::other(format!(
+                "gpui-storybook MCP stdio thread ended without a result: {error}"
+            ))))),
+            Poll::Pending => Poll::Pending,
+        }
+    }
+}
+
 pub fn start_stdio(
     automation: SharedStorybookAutomation,
-) -> std::io::Result<thread::JoinHandle<ServeStdioResult>> {
+) -> std::io::Result<StorybookStdioCompletion> {
+    let (result_tx, receiver) = oneshot::channel();
     thread::Builder::new()
         .name("gpui-storybook-mcp-stdio".to_string())
-        .spawn(move || match server(automation) {
-            Ok(server) => server.serve_stdio_blocking(),
-            Err(error) => Err(Box::new(error) as Box<dyn std::error::Error + Send + Sync>),
-        })
+        .spawn(move || {
+            let result = match server(automation) {
+                Ok(server) => server.serve_stdio_blocking(),
+                Err(error) => Err(Box::new(error) as Box<dyn std::error::Error + Send + Sync>),
+            };
+            let _ = result_tx.send(result);
+        })?;
+    Ok(StorybookStdioCompletion { receiver })
 }
 
 pub fn start_capture_session_from_env(
@@ -443,7 +535,7 @@ pub fn register_tools_with_options(
     automation: SharedStorybookAutomation,
     options: StorybookMcpServerOptions,
 ) -> Result<(), McpToolError> {
-    server.add_typed_tool(
+    server.add_typed_tool_async(
         tool::<EmptyInput>(
             TOOL_LIST_STORIES,
             "List Stories",
@@ -454,14 +546,20 @@ pub fn register_tools_with_options(
         {
             let automation = automation.clone();
             move |_input| {
-                tool_structured_result(json!(ListStoriesOutput {
-                    stories: automation.stories(),
-                }))
+                let automation = automation.clone();
+                async move {
+                    if let Err(error) = await_automation_startup(&automation).await {
+                        return automation_tool_error(error);
+                    }
+                    tool_structured_result(json!(ListStoriesOutput {
+                        stories: automation.stories(),
+                    }))
+                }
             }
         },
     )?;
 
-    server.add_typed_tool(
+    server.add_typed_tool_async(
         tool::<StoryKeyInput>(
             TOOL_GET_STORY,
             "Get Story",
@@ -471,14 +569,22 @@ pub fn register_tools_with_options(
         )?,
         {
             let automation = automation.clone();
-            move |input| match automation.get_story(&input.key) {
-                Ok(story) => tool_structured_result(json!(StoryOutput { story })),
-                Err(error) => automation_tool_error(error),
+            move |input| {
+                let automation = automation.clone();
+                async move {
+                    if let Err(error) = await_automation_startup(&automation).await {
+                        return automation_tool_error(error);
+                    }
+                    match automation.get_story(&input.story_key) {
+                        Ok(story) => tool_structured_result(json!(StoryOutput { story })),
+                        Err(error) => automation_tool_error(error),
+                    }
+                }
             }
         },
     )?;
 
-    server.add_typed_tool(
+    server.add_typed_tool_async(
         tool::<EmptyInput>(
             TOOL_CURRENT_STORY,
             "Current Story",
@@ -488,7 +594,15 @@ pub fn register_tools_with_options(
         )?,
         {
             let automation = automation.clone();
-            move |_input| tool_structured_result(json!(automation.current_story()))
+            move |_input| {
+                let automation = automation.clone();
+                async move {
+                    if let Err(error) = await_automation_startup(&automation).await {
+                        return automation_tool_error(error);
+                    }
+                    tool_structured_result(json!(automation.current_story()))
+                }
+            }
         },
     )?;
 
@@ -505,7 +619,10 @@ pub fn register_tools_with_options(
             move |input| {
                 let automation = automation.clone();
                 async move {
-                    match automation.open_story(input.key).await {
+                    if let Err(error) = await_automation_startup(&automation).await {
+                        return automation_tool_error(error);
+                    }
+                    match automation.open_story(input.story_key).await {
                         Ok(snapshot) => tool_structured_result(json!(snapshot)),
                         Err(error) => automation_tool_error(error),
                     }
@@ -513,6 +630,75 @@ pub fn register_tools_with_options(
             }
         },
     )?;
+
+    server.add_typed_tool_async(
+        tool::<EmptyInput>(
+            TOOL_READ_SEMANTIC_VALUES,
+            "Read Semantic Values",
+            "Read stable machine-readable values rendered from application state by the selected story or substory route.",
+            semantic_values_output_schema(),
+            ToolHints::read_only(),
+        )?,
+        {
+            let automation = automation.clone();
+            move |_input| {
+                let automation = automation.clone();
+                async move {
+                    if let Err(error) = await_automation_startup(&automation).await {
+                        return automation_tool_error(error);
+                    }
+                    match automation.read_semantic_values().await {
+                        Ok(snapshot) => tool_structured_result(json!(snapshot)),
+                        Err(error) => automation_tool_error(error),
+                    }
+                }
+            }
+        },
+    )?;
+
+    server.add_typed_tool_async(
+        tool::<ReadValueInput>(
+            TOOL_READ_VALUE,
+            "Read Value",
+            "Read one stable machine-readable value rendered by the selected story or substory route.",
+            semantic_value_output_schema(),
+            ToolHints::read_only(),
+        )?,
+        {
+            let automation = automation.clone();
+            move |input| {
+                let automation = automation.clone();
+                async move {
+                    if let Err(error) = await_automation_startup(&automation).await {
+                        return automation_tool_error(error);
+                    }
+                    match read_semantic_value(&automation, &input.value_key).await {
+                        Ok(output) => tool_structured_result(json!(output)),
+                        Err(error) => automation_tool_error(error),
+                    }
+                }
+            }
+        },
+    )?;
+
+    server.add_typed_tool_async(wait_for_value_tool()?, {
+        let automation = automation.clone();
+        move |input| {
+            let automation = automation.clone();
+            async move {
+                if let Err(error) = validate_wait_for_value_input(&input) {
+                    return tool_error_result_for(error);
+                }
+                if let Err(error) = await_automation_startup(&automation).await {
+                    return automation_tool_error(error);
+                }
+                match wait_for_semantic_value(&automation, input).await {
+                    Ok(output) => tool_structured_result(json!(output)),
+                    Err(error) => automation_tool_error(error),
+                }
+            }
+        }
+    })?;
 
     if options.interaction_enabled() {
         server.add_typed_tool_async(
@@ -528,6 +714,9 @@ pub fn register_tools_with_options(
                 move |_input| {
                     let automation = automation.clone();
                     async move {
+                        if let Err(error) = await_automation_startup(&automation).await {
+                            return automation_tool_error(error);
+                        }
                         match automation.list_actions().await {
                             Ok(actions) => {
                                 tool_structured_result(json!(ListActionsOutput { actions }))
@@ -539,11 +728,65 @@ pub fn register_tools_with_options(
             },
         )?;
 
+        server.add_typed_tool_async(
+            tool::<EmptyInput>(
+                TOOL_LIST_INTERACTION_TARGETS,
+                "List Interaction Targets",
+                "List stable semantic targets and live route-relative bounds rendered by the selected story or substory route.",
+                interaction_targets_output_schema(),
+                ToolHints::read_only(),
+            )?,
+            {
+                let automation = automation.clone();
+                move |_input| {
+                    let automation = automation.clone();
+                    async move {
+                        if let Err(error) = await_automation_startup(&automation).await {
+                            return automation_tool_error(error);
+                        }
+                        match automation.list_interaction_targets().await {
+                            Ok(snapshot) => tool_structured_result(json!(snapshot)),
+                            Err(error) => interaction_automation_tool_error(error),
+                        }
+                    }
+                }
+            },
+        )?;
+
+        server.add_typed_tool_async(
+            tool::<ClickTargetInput>(
+                TOOL_CLICK_TARGET,
+                "Click Target",
+                "Click one stable semantic target once, optionally opening its story route first. This operation is destructive, non-idempotent, and is never retried automatically.",
+                interaction_output_schema(),
+                ToolHints::interaction(),
+            )?,
+            {
+                let automation = automation.clone();
+                move |input| {
+                    let automation = automation.clone();
+                    async move {
+                        if let Err(error) = await_automation_startup(&automation).await {
+                            return automation_tool_error(error);
+                        }
+                        let request = click_target_request(input);
+                        match automation.run_steps(request).await {
+                            Ok(snapshot) => tool_structured_result(json!(snapshot)),
+                            Err(error) => interaction_automation_tool_error(error),
+                        }
+                    }
+                }
+            },
+        )?;
+
         server.add_typed_tool_async(interaction_tool()?, {
             let automation = automation.clone();
             move |input| {
                 let automation = automation.clone();
                 async move {
+                    if let Err(error) = await_automation_startup(&automation).await {
+                        return automation_tool_error(error);
+                    }
                     let request = decode_interaction_request(input);
                     match automation.run_steps(request).await {
                         Ok(snapshot) => tool_structured_result(json!(snapshot)),
@@ -567,6 +810,9 @@ pub fn register_tools_with_options(
             move |_input| {
                 let automation = automation.clone();
                 async move {
+                    if let Err(error) = await_automation_startup(&automation).await {
+                        return automation_tool_error(error);
+                    }
                     match automation.read_controls().await {
                         Ok(snapshot) => tool_structured_result(json!(snapshot)),
                         Err(error) => automation_tool_error(error),
@@ -589,8 +835,11 @@ pub fn register_tools_with_options(
             move |input| {
                 let automation = automation.clone();
                 async move {
+                    if let Err(error) = await_automation_startup(&automation).await {
+                        return automation_tool_error(error);
+                    }
                     match automation
-                        .set_control(input.key, input.value.into_inner())
+                        .set_control(input.control_key, input.value.into_inner())
                         .await
                     {
                         Ok(snapshot) => tool_structured_result(json!(snapshot)),
@@ -605,7 +854,7 @@ pub fn register_tools_with_options(
         tool::<ResetControlInput>(
             TOOL_RESET_CONTROL,
             "Reset Control",
-            "Reset one active-story control, or every control when no key is supplied.",
+            "Reset one active-story control, or every control when no control_key is supplied.",
             story_controls_output_schema(),
             ToolHints::mutation(true, false),
         )?,
@@ -614,7 +863,10 @@ pub fn register_tools_with_options(
             move |input| {
                 let automation = automation.clone();
                 async move {
-                    match automation.reset_control(input.key).await {
+                    if let Err(error) = await_automation_startup(&automation).await {
+                        return automation_tool_error(error);
+                    }
+                    match automation.reset_control(input.control_key).await {
                         Ok(snapshot) => tool_structured_result(json!(snapshot)),
                         Err(error) => automation_tool_error(error),
                     }
@@ -635,6 +887,9 @@ pub fn register_tools_with_options(
         move |input| {
             let automation = automation.clone();
             async move {
+                if let Err(error) = await_automation_startup(&automation).await {
+                    return automation_tool_error(error);
+                }
                 let request = StoryScreenshotRequest {
                     output_path: input.output_path,
                     width: input.width,
@@ -834,6 +1089,27 @@ fn interaction_tool() -> Result<McpTypedTool<RunStepsInput>, McpToolError> {
     Ok(tool)
 }
 
+fn wait_for_value_tool() -> Result<McpTypedTool<WaitForValueInput>, McpToolError> {
+    let mut tool = tool::<WaitForValueInput>(
+        TOOL_WAIT_FOR_VALUE,
+        "Wait for Value",
+        "Refresh the active story for a bounded number of frames until one semantic value, or one JSON Pointer inside it, exactly matches the expected JSON value.",
+        wait_for_value_output_schema(),
+        ToolHints::read_only(),
+    )?;
+    if let Some(properties) = std::sync::Arc::make_mut(&mut tool.definition_mut().input_schema)
+        .get_mut("properties")
+        .and_then(Value::as_object_mut)
+    {
+        set_optional_bounded_integer(
+            properties,
+            "max_frames",
+            u64::from(MAX_INTERACTION_WAITED_FRAMES),
+        );
+    }
+    Ok(tool)
+}
+
 fn set_optional_positive_integer(properties: &mut serde_json::Map<String, Value>, field: &str) {
     let Some(branches) = properties
         .get_mut(field)
@@ -851,10 +1127,33 @@ fn set_optional_positive_integer(properties: &mut serde_json::Map<String, Value>
     }
 }
 
+fn set_optional_bounded_integer(
+    properties: &mut serde_json::Map<String, Value>,
+    field: &str,
+    maximum: u64,
+) {
+    set_optional_positive_integer(properties, field);
+    let Some(branches) = properties
+        .get_mut(field)
+        .and_then(Value::as_object_mut)
+        .and_then(|schema| schema.get_mut("anyOf"))
+        .and_then(Value::as_array_mut)
+    else {
+        return;
+    };
+    if let Some(integer) = branches.iter_mut().find_map(|branch| {
+        let object = branch.as_object_mut()?;
+        (object.get("type").and_then(Value::as_str) == Some("integer")).then_some(object)
+    }) {
+        integer.insert("maximum".to_string(), json!(maximum));
+        integer.insert("default".to_string(), json!(maximum));
+    }
+}
+
 fn automation_tool_error(error: StorybookAutomationError) -> ToolCallResult {
     let error = match error {
         StorybookAutomationError::StoryNotFound { key } => {
-            McpToolError::invalid_field_value("key", key)
+            McpToolError::invalid_field_value("story_key", key)
         },
         error => structured_automation_error(error),
     };
@@ -864,7 +1163,7 @@ fn automation_tool_error(error: StorybookAutomationError) -> ToolCallResult {
 fn interaction_automation_tool_error(error: StorybookAutomationError) -> ToolCallResult {
     let error = match error {
         StorybookAutomationError::StoryNotFound { key } => {
-            McpToolError::invalid_field_value("route", key)
+            McpToolError::invalid_field_value("story_key", key)
         },
         error => structured_automation_error(error),
     };
@@ -873,6 +1172,10 @@ fn interaction_automation_tool_error(error: StorybookAutomationError) -> ToolCal
 
 fn structured_automation_error(error: StorybookAutomationError) -> McpToolError {
     let detail = match &error {
+        StorybookAutomationError::StartupTimedOut { seconds } => json!({
+            "code": "startup_timed_out",
+            "seconds": seconds,
+        }),
         StorybookAutomationError::NoLiveHost => json!({ "code": "no_live_host" }),
         StorybookAutomationError::HostDisconnected {
             steps_dispatched, ..
@@ -912,9 +1215,49 @@ fn structured_automation_error(error: StorybookAutomationError) -> McpToolError 
         StorybookAutomationError::ControlOperationFailed { .. } => {
             json!({ "code": "control_operation_failed" })
         },
+        StorybookAutomationError::InteractionTargetsUnavailable { route } => json!({
+            "code": "interaction_targets_unavailable",
+            "story_key": route,
+        }),
+        StorybookAutomationError::InteractionTargetNotFound { route, key } => json!({
+            "code": "interaction_target_not_found",
+            "story_key": route,
+            "target_key": key,
+            "steps_dispatched": 0,
+        }),
+        StorybookAutomationError::DuplicateInteractionTarget { route, key } => json!({
+            "code": "duplicate_interaction_target",
+            "story_key": route,
+            "target_key": key,
+            "steps_dispatched": 0,
+        }),
+        StorybookAutomationError::SemanticValuesUnavailable { route } => json!({
+            "code": "semantic_values_unavailable",
+            "story_key": route,
+        }),
+        StorybookAutomationError::SemanticValueNotFound { route, key } => json!({
+            "code": "semantic_value_not_found",
+            "story_key": route,
+            "value_key": key,
+        }),
+        StorybookAutomationError::SemanticValueWaitTimedOut {
+            route,
+            key,
+            max_frames,
+        } => json!({
+            "code": "semantic_value_wait_timed_out",
+            "story_key": route,
+            "value_key": key,
+            "max_frames": max_frames,
+        }),
+        StorybookAutomationError::DuplicateSemanticValue { route, key } => json!({
+            "code": "duplicate_semantic_value",
+            "story_key": route,
+            "value_key": key,
+        }),
         StorybookAutomationError::StoryNotFound { key } => json!({
             "code": "story_not_found",
-            "route": key,
+            "story_key": key,
         }),
     };
     McpToolError::validation_structured_details(error.to_string(), [detail])
@@ -932,7 +1275,7 @@ fn decode_control_map(
 
 fn decode_interaction_request(input: RunStepsInput) -> StoryInteractionRequest {
     StoryInteractionRequest {
-        route: input.route,
+        story_key: input.story_key,
         controls: decode_control_map(input.controls),
         width: input.width,
         height: input.height,
@@ -944,6 +1287,156 @@ fn decode_interaction_request(input: RunStepsInput) -> StoryInteractionRequest {
             .collect(),
         capture: input.capture.map(SchemarsValue::into_inner),
     }
+}
+
+async fn await_automation_startup(
+    automation: &StorybookAutomation,
+) -> Result<(), StorybookAutomationError> {
+    tokio::time::timeout(
+        Duration::from_secs(AUTOMATION_STARTUP_TIMEOUT_SECS),
+        automation.wait_until_ready(),
+    )
+    .await
+    .map_err(|_| StorybookAutomationError::StartupTimedOut {
+        seconds: AUTOMATION_STARTUP_TIMEOUT_SECS,
+    })
+}
+
+async fn read_semantic_value(
+    automation: &StorybookAutomation,
+    value_key: &str,
+) -> Result<SemanticValueOutput, StorybookAutomationError> {
+    let snapshot = automation.read_semantic_values().await?;
+    semantic_value_output(snapshot, value_key)
+}
+
+fn semantic_value_output(
+    snapshot: StorySemanticValuesSnapshot,
+    value_key: &str,
+) -> Result<SemanticValueOutput, StorybookAutomationError> {
+    let route = snapshot.story.capture_route_id.clone();
+    let semantic_value = snapshot
+        .values
+        .into_iter()
+        .find(|value| value.key == value_key)
+        .ok_or_else(|| StorybookAutomationError::SemanticValueNotFound {
+            route,
+            key: value_key.to_owned(),
+        })?;
+    Ok(SemanticValueOutput {
+        story: snapshot.story,
+        semantic_value,
+    })
+}
+
+async fn wait_for_semantic_value(
+    automation: &StorybookAutomation,
+    input: WaitForValueInput,
+) -> Result<WaitForValueOutput, StorybookAutomationError> {
+    let max_frames = input.max_frames.unwrap_or(MAX_INTERACTION_WAITED_FRAMES);
+    let value_key = input.value_key;
+    let json_pointer = input.json_pointer;
+    let expected = input.expected.into_inner();
+    let wait = async {
+        let mut last_route = automation
+            .current_story()
+            .story
+            .map(|story| story.capture_route_id)
+            .unwrap_or_else(|| "<active-story>".to_owned());
+
+        for frames_waited in 1..=max_frames {
+            let snapshot = automation.read_semantic_values().await?;
+            last_route.clone_from(&snapshot.story.capture_route_id);
+            if let Some(semantic_value) = snapshot
+                .values
+                .into_iter()
+                .find(|value| value.key == value_key)
+                && semantic_value_matches(&semantic_value, json_pointer.as_deref(), &expected)
+            {
+                return Ok(WaitForValueOutput {
+                    story: snapshot.story,
+                    semantic_value,
+                    frames_waited,
+                });
+            }
+        }
+
+        Err(StorybookAutomationError::SemanticValueWaitTimedOut {
+            route: last_route,
+            key: value_key.clone(),
+            max_frames,
+        })
+    };
+
+    tokio::time::timeout(Duration::from_secs(SEMANTIC_VALUE_WAIT_TIMEOUT_SECS), wait)
+        .await
+        .unwrap_or_else(|_| {
+            Err(StorybookAutomationError::SemanticValueWaitTimedOut {
+                route: automation
+                    .current_story()
+                    .story
+                    .map(|story| story.capture_route_id)
+                    .unwrap_or_else(|| "<active-story>".to_owned()),
+                key: value_key,
+                max_frames,
+            })
+        })
+}
+
+fn semantic_value_matches(
+    semantic_value: &StorySemanticValueSnapshot,
+    json_pointer: Option<&str>,
+    expected: &Value,
+) -> bool {
+    json_pointer.map_or(Some(&semantic_value.value), |pointer| {
+        semantic_value.value.pointer(pointer)
+    }) == Some(expected)
+}
+
+fn click_target_request(input: ClickTargetInput) -> StoryInteractionRequest {
+    StoryInteractionRequest {
+        story_key: input.story_key,
+        controls: BTreeMap::new(),
+        width: None,
+        height: None,
+        viewport: None,
+        steps: vec![StoryInteractionStep::ClickTarget {
+            target_key: input.target_key,
+            button: StoryMouseButton::default(),
+            click_count: 1,
+            modifiers: StoryModifiers::default(),
+        }],
+        capture: None,
+    }
+}
+
+fn validate_wait_for_value_input(input: &WaitForValueInput) -> Result<(), McpToolError> {
+    if input.value_key.trim().is_empty() {
+        return Err(McpToolError::invalid_field_value(
+            "value_key",
+            "value keys must not be empty",
+        ));
+    }
+    if input
+        .json_pointer
+        .as_deref()
+        .is_some_and(|pointer| !pointer.is_empty() && !pointer.starts_with('/'))
+    {
+        return Err(McpToolError::invalid_field_value(
+            "json_pointer",
+            "JSON Pointers must be empty or start with `/`",
+        ));
+    }
+    if input
+        .max_frames
+        .is_some_and(|frames| frames == 0 || frames > MAX_INTERACTION_WAITED_FRAMES)
+    {
+        return Err(McpToolError::invalid_field_value(
+            "max_frames",
+            format!("max_frames must be between 1 and {MAX_INTERACTION_WAITED_FRAMES}"),
+        ));
+    }
+    Ok(())
 }
 
 fn schema_with_settings<T: JsonSchema>(settings: SchemaSettings) -> McpSchema {
@@ -1107,6 +1600,38 @@ fn interaction_step_schema() -> McpSchema {
             ["point"],
         ),
         tagged_interaction_step_schema(
+            "click_target",
+            [
+                (
+                    "target_key".to_owned(),
+                    McpSchema::string()
+                        .with_extension("minLength", json!(1))
+                        .with_extension(
+                            "maxLength",
+                            json!(gpui_storybook_core::automation::MAX_INTERACTION_TEXT_BYTES),
+                        ),
+                ),
+                (
+                    "button".to_owned(),
+                    McpSchema::string()
+                        .with_enum_values(["left", "right", "middle"])
+                        .with_default("left"),
+                ),
+                (
+                    "click_count".to_owned(),
+                    McpSchema::integer()
+                        .with_minimum(1_u64)
+                        .with_extension("maximum", json!(u8::MAX))
+                        .with_default(1),
+                ),
+                (
+                    "modifiers".to_owned(),
+                    story_modifiers_schema().with_default(json!([])),
+                ),
+            ],
+            ["target_key"],
+        ),
+        tagged_interaction_step_schema(
             "scroll",
             [
                 ("point".to_owned(), story_point_schema()),
@@ -1167,6 +1692,22 @@ fn interaction_output_schema() -> McpSchema {
     serialize_schema::<StoryInteractionSnapshot>()
 }
 
+fn interaction_targets_output_schema() -> McpSchema {
+    serialize_schema::<StoryInteractionTargetsSnapshot>()
+}
+
+fn semantic_values_output_schema() -> McpSchema {
+    serialize_schema::<StorySemanticValuesSnapshot>()
+}
+
+fn semantic_value_output_schema() -> McpSchema {
+    serialize_schema::<SemanticValueOutput>()
+}
+
+fn wait_for_value_output_schema() -> McpSchema {
+    serialize_schema::<WaitForValueOutput>()
+}
+
 fn capture_launch_env_output_schema() -> McpSchema {
     serialize_schema::<CaptureLaunchEnv>()
 }
@@ -1183,7 +1724,7 @@ fn build_capture_launch_env(
     };
     let size = FrameCaptureLaunchEnv::optional_size(width, height)?;
     let mut env = FrameCaptureLaunchEnv::builder()
-        .route_id(input.key)?
+        .route_id(input.story_key)?
         .env(storybook_capture_env())
         .maybe_output_path(input.output_path)?
         .maybe_frame(input.frame)?
@@ -1219,19 +1760,8 @@ fn build_capture_launch_env(
 fn cargo_launch_command(cargo_args: &[String]) -> Vec<String> {
     #[cfg(target_os = "linux")]
     let mut command = vec![
-        "env".to_string(),
-        "-u".to_string(),
-        "DISPLAY".to_string(),
-        "-u".to_string(),
-        "WAYLAND_DISPLAY".to_string(),
-        "-u".to_string(),
-        "WAYLAND_SOCKET".to_string(),
-        "-u".to_string(),
-        "ZED_HEADLESS".to_string(),
-        "sh".to_string(),
-        "-c".to_string(),
-        LINUX_SWAY_HEADLESS_SCRIPT.to_string(),
-        "sh".to_string(),
+        "gpui-storybook-launch".to_string(),
+        "--".to_string(),
         "cargo".to_string(),
     ];
 
@@ -1241,85 +1771,6 @@ fn cargo_launch_command(cargo_args: &[String]) -> Vec<String> {
     command.extend(cargo_args.iter().cloned());
     command
 }
-
-#[cfg(target_os = "linux")]
-const LINUX_SWAY_HEADLESS_SCRIPT: &str = r#"storybook_runtime_dir=$(mktemp -d) || exit 1
-if ! chmod 700 "$storybook_runtime_dir"; then
-    rm -rf "$storybook_runtime_dir"
-    exit 1
-fi
-storybook_sway_config="$storybook_runtime_dir/sway.conf"
-storybook_sway_log="$storybook_runtime_dir/sway.log"
-storybook_sway_pid=
-
-if ! printf '%s\n' \
-    'output * mode 1920x1200' \
-    'seat seat0 fallback true' \
-    'for_window [app_id=".*"] floating enable' \
-    > "$storybook_sway_config"; then
-    rm -rf "$storybook_runtime_dir"
-    exit 1
-fi
-
-storybook_cleanup() {
-    if [ -n "$storybook_sway_pid" ]; then
-        kill "$storybook_sway_pid" 2>/dev/null || true
-        wait "$storybook_sway_pid" 2>/dev/null || true
-    fi
-    rm -rf "$storybook_runtime_dir"
-}
-
-trap storybook_cleanup EXIT
-trap 'exit 129' HUP
-trap 'exit 130' INT
-trap 'exit 143' TERM
-
-export XDG_RUNTIME_DIR="$storybook_runtime_dir"
-unset DISPLAY I3SOCK SWAYSOCK WAYLAND_DISPLAY WAYLAND_SOCKET ZED_HEADLESS
-
-WLR_BACKENDS=headless \
-WLR_HEADLESS_OUTPUTS=1 \
-WLR_LIBINPUT_NO_DEVICES=1 \
-WLR_RENDERER=pixman \
-WLR_RENDERER_ALLOW_SOFTWARE=1 \
-LIBGL_ALWAYS_SOFTWARE=1 \
-sway --unsupported-gpu --config "$storybook_sway_config" \
-    > "$storybook_sway_log" 2>&1 &
-storybook_sway_pid=$!
-
-storybook_wayland_socket=
-storybook_sway_attempts=0
-while [ -z "$storybook_wayland_socket" ]; do
-    for storybook_socket_candidate in "$XDG_RUNTIME_DIR"/wayland-*; do
-        if [ -S "$storybook_socket_candidate" ]; then
-            storybook_wayland_socket=$storybook_socket_candidate
-            break
-        fi
-    done
-    if ! kill -0 "$storybook_sway_pid" 2>/dev/null; then
-        if [ -f "$storybook_sway_log" ]; then
-            cat "$storybook_sway_log" >&2
-        fi
-        echo 'gpui-storybook: Sway exited before its Wayland socket was ready' >&2
-        exit 1
-    fi
-    storybook_sway_attempts=$((storybook_sway_attempts + 1))
-    if [ "$storybook_sway_attempts" -ge 100 ]; then
-        if [ -f "$storybook_sway_log" ]; then
-            cat "$storybook_sway_log" >&2
-        fi
-        echo 'gpui-storybook: Sway did not become ready' >&2
-        exit 1
-    fi
-    sleep 0.05
-done
-
-export WAYLAND_DISPLAY="${storybook_wayland_socket##*/}"
-export LIBGL_ALWAYS_SOFTWARE=1
-
-"$@"
-storybook_status=$?
-exit "$storybook_status""#;
 
 fn default_capture_size() -> PixelSize {
     PixelSize::new(DEFAULT_STORY_CAPTURE_WIDTH, DEFAULT_STORY_CAPTURE_HEIGHT)
@@ -1357,12 +1808,15 @@ pub mod prelude {
         SharedStoryController, SharedStorybookAutomation, StoryActionSnapshot,
         StoryCaptureSnapshot, StoryCurrentSnapshot, StoryDefaultSize,
         StoryInteractionCaptureRequest, StoryInteractionDispatch, StoryInteractionObservation,
-        StoryInteractionRequest, StoryInteractionSnapshot, StoryInteractionStep, StoryModifier,
-        StoryModifiers, StoryMouseButton, StoryPoint, StoryPointSpace, StoryScreenshotRequest,
-        StorySnapshot, StorybookAutomation, StorybookAutomationError, StorybookCaptureConfig,
-        StorybookCaptureSession, StorybookMcpServerOptions, capture_catalog, read_capture_session,
-        server, server_with_options, start_capture_session, start_capture_session_from_env,
-        start_stdio, stdio_requested,
+        StoryInteractionRequest, StoryInteractionSnapshot, StoryInteractionStep,
+        StoryInteractionTargetBounds, StoryInteractionTargetSnapshot,
+        StoryInteractionTargetsSnapshot, StoryModifier, StoryModifiers, StoryMouseButton,
+        StoryPoint, StoryPointSpace, StoryScreenshotRequest, StorySemanticValueSnapshot,
+        StorySemanticValuesSnapshot, StorySnapshot, StorybookAutomation, StorybookAutomationError,
+        StorybookCaptureConfig, StorybookCaptureSession, StorybookMcpServerOptions,
+        StorybookStdioCompletion, capture_catalog, read_capture_session, server,
+        server_with_options, start_capture_session, start_capture_session_from_env, start_stdio,
+        stdio_requested,
     };
 }
 
@@ -1468,8 +1922,11 @@ mod tests {
         assert_eq!(list["annotations"]["openWorldHint"], false);
 
         let get = find(TOOL_GET_STORY);
-        assert_eq!(get["inputSchema"]["required"], json!(["key"]));
-        assert_eq!(get["inputSchema"]["properties"]["key"]["type"], "string");
+        assert_eq!(get["inputSchema"]["required"], json!(["story_key"]));
+        assert_eq!(
+            get["inputSchema"]["properties"]["story_key"]["type"],
+            "string"
+        );
         assert_eq!(get["outputSchema"]["properties"]["story"]["type"], "object");
 
         let read_controls = find(TOOL_READ_CONTROLS);
@@ -1479,10 +1936,53 @@ mod tests {
             "array"
         );
 
+        let semantic_values = find(TOOL_READ_SEMANTIC_VALUES);
+        assert_eq!(
+            semantic_values["inputSchema"]["additionalProperties"],
+            false
+        );
+        assert_eq!(semantic_values["annotations"]["readOnlyHint"], true);
+        assert_eq!(
+            semantic_values["outputSchema"]["properties"]["values"]["type"],
+            "array"
+        );
+        assert_eq!(
+            semantic_values["outputSchema"]["properties"]["values"]["items"]["properties"]["value"]
+                ["description"],
+            "Current JSON value captured from application state during rendering."
+        );
+
+        let read_value = find(TOOL_READ_VALUE);
+        assert_eq!(read_value["inputSchema"]["required"], json!(["value_key"]));
+        assert_eq!(read_value["annotations"]["readOnlyHint"], true);
+        assert_eq!(
+            read_value["outputSchema"]["properties"]["semantic_value"]["type"],
+            "object"
+        );
+
+        let wait_for_value = find(TOOL_WAIT_FOR_VALUE);
+        assert_eq!(
+            wait_for_value["inputSchema"]["required"],
+            json!(["value_key", "expected"])
+        );
+        assert_eq!(wait_for_value["annotations"]["readOnlyHint"], true);
+        assert_eq!(
+            wait_for_value["inputSchema"]["properties"]["max_frames"]["anyOf"][0]["minimum"],
+            1
+        );
+        assert_eq!(
+            wait_for_value["inputSchema"]["properties"]["max_frames"]["anyOf"][0]["maximum"],
+            MAX_INTERACTION_WAITED_FRAMES
+        );
+        assert_eq!(
+            wait_for_value["inputSchema"]["properties"]["max_frames"]["anyOf"][0]["default"],
+            MAX_INTERACTION_WAITED_FRAMES
+        );
+
         let set_control = find(TOOL_SET_CONTROL);
         assert_eq!(
             set_control["inputSchema"]["required"],
-            json!(["key", "value"])
+            json!(["control_key", "value"])
         );
         assert_eq!(set_control["annotations"]["idempotentHint"], true);
 
@@ -1510,7 +2010,7 @@ mod tests {
         );
 
         let launch = find(TOOL_CAPTURE_LAUNCH_ENV);
-        assert_eq!(launch["inputSchema"]["required"], json!(["key"]));
+        assert_eq!(launch["inputSchema"]["required"], json!(["story_key"]));
         assert_eq!(
             launch["inputSchema"]["properties"]["features"]["anyOf"][0]["type"],
             "array"
@@ -1537,7 +2037,12 @@ mod tests {
         assert!(!disabled_tools.iter().any(|tool| {
             matches!(
                 tool["name"].as_str(),
-                Some(TOOL_LIST_ACTIONS | TOOL_RUN_STEPS)
+                Some(
+                    TOOL_LIST_ACTIONS
+                        | TOOL_LIST_INTERACTION_TARGETS
+                        | TOOL_CLICK_TARGET
+                        | TOOL_RUN_STEPS
+                )
             )
         }));
 
@@ -1560,9 +2065,35 @@ mod tests {
         assert_eq!(actions["annotations"]["openWorldHint"], false);
         assert_eq!(actions["outputSchema"]["additionalProperties"], false);
 
+        let targets = find(TOOL_LIST_INTERACTION_TARGETS);
+        assert_eq!(targets["inputSchema"]["additionalProperties"], false);
+        assert_eq!(targets["annotations"]["readOnlyHint"], true);
+        assert_eq!(
+            targets["outputSchema"]["properties"]["targets"]["type"],
+            "array"
+        );
+
+        let click_target = find(TOOL_CLICK_TARGET);
+        assert_eq!(
+            click_target["inputSchema"]["required"],
+            json!(["target_key"])
+        );
+        assert_eq!(click_target["annotations"]["destructiveHint"], true);
+        assert_eq!(click_target["annotations"]["idempotentHint"], false);
+        assert_eq!(click_target["annotations"]["openWorldHint"], true);
+
         let run_steps = find(TOOL_RUN_STEPS);
         assert_eq!(run_steps["inputSchema"]["required"], json!(["steps"]));
         assert_eq!(run_steps["inputSchema"]["additionalProperties"], false);
+        assert!(
+            run_steps["inputSchema"]["properties"]
+                .get("route")
+                .is_none()
+        );
+        assert_eq!(
+            run_steps["inputSchema"]["properties"]["story_key"]["anyOf"][0]["type"],
+            "string"
+        );
         assert_eq!(
             run_steps["inputSchema"]["properties"]["steps"]["minItems"],
             1
@@ -1574,7 +2105,7 @@ mod tests {
         let variants = run_steps["inputSchema"]["properties"]["steps"]["items"]["oneOf"]
             .as_array()
             .expect("steps should use oneOf");
-        assert_eq!(variants.len(), 10);
+        assert_eq!(variants.len(), 11);
         assert!(
             variants
                 .iter()
@@ -1604,6 +2135,18 @@ mod tests {
         );
         assert_eq!(
             variant("pointer_click")["properties"]["click_count"]["maximum"],
+            u8::MAX
+        );
+        assert_eq!(
+            variant("click_target")["required"],
+            json!(["type", "target_key"])
+        );
+        assert_eq!(
+            variant("click_target")["properties"]["target_key"]["minLength"],
+            1
+        );
+        assert_eq!(
+            variant("click_target")["properties"]["click_count"]["maximum"],
             u8::MAX
         );
         assert_eq!(
@@ -1672,6 +2215,152 @@ mod tests {
     }
 
     #[test]
+    fn semantic_automation_errors_have_stable_structured_codes() {
+        let cases = [
+            (
+                StorybookAutomationError::StartupTimedOut { seconds: 30 },
+                "startup_timed_out",
+            ),
+            (
+                StorybookAutomationError::InteractionTargetsUnavailable {
+                    route: "story/section".to_owned(),
+                },
+                "interaction_targets_unavailable",
+            ),
+            (
+                StorybookAutomationError::InteractionTargetNotFound {
+                    route: "story".to_owned(),
+                    key: "execute".to_owned(),
+                },
+                "interaction_target_not_found",
+            ),
+            (
+                StorybookAutomationError::DuplicateInteractionTarget {
+                    route: "story".to_owned(),
+                    key: "execute".to_owned(),
+                },
+                "duplicate_interaction_target",
+            ),
+            (
+                StorybookAutomationError::SemanticValuesUnavailable {
+                    route: "story/section".to_owned(),
+                },
+                "semantic_values_unavailable",
+            ),
+            (
+                StorybookAutomationError::SemanticValueNotFound {
+                    route: "story".to_owned(),
+                    key: "response".to_owned(),
+                },
+                "semantic_value_not_found",
+            ),
+            (
+                StorybookAutomationError::SemanticValueWaitTimedOut {
+                    route: "story".to_owned(),
+                    key: "response".to_owned(),
+                    max_frames: 12,
+                },
+                "semantic_value_wait_timed_out",
+            ),
+            (
+                StorybookAutomationError::DuplicateSemanticValue {
+                    route: "story".to_owned(),
+                    key: "response".to_owned(),
+                },
+                "duplicate_semantic_value",
+            ),
+        ];
+
+        for (error, expected_code) in cases {
+            let result = serde_json::to_value(interaction_automation_tool_error(error))
+                .expect("target error should serialize");
+            assert_eq!(result["isError"], true);
+            assert_eq!(
+                result["structuredContent"]["error"]["details"][0]["code"],
+                expected_code
+            );
+        }
+    }
+
+    #[test]
+    fn focused_click_builds_exactly_one_non_retrying_target_step() {
+        let request = click_target_request(ClickTargetInput {
+            story_key: Some("example-ButtonStory".to_owned()),
+            target_key: "execute-request".to_owned(),
+        });
+
+        assert_eq!(request.story_key.as_deref(), Some("example-ButtonStory"));
+        assert_eq!(request.steps.len(), 1);
+        assert_eq!(
+            request.steps[0],
+            StoryInteractionStep::ClickTarget {
+                target_key: "execute-request".to_owned(),
+                button: StoryMouseButton::Left,
+                click_count: 1,
+                modifiers: StoryModifiers::default(),
+            }
+        );
+        assert!(request.capture.is_none());
+    }
+
+    #[test]
+    fn focused_value_read_selects_one_key_and_reports_missing_values() {
+        let snapshot = StorySemanticValuesSnapshot {
+            story: sample_story(),
+            values: vec![StorySemanticValueSnapshot {
+                key: "response".to_owned(),
+                label: "Response".to_owned(),
+                value: json!({ "status": "success", "value": { "position": 12.5 } }),
+            }],
+        };
+
+        let output = semantic_value_output(snapshot.clone(), "response")
+            .expect("focused value should resolve");
+        assert_eq!(output.semantic_value.key, "response");
+        assert!(semantic_value_matches(
+            &output.semantic_value,
+            Some("/status"),
+            &json!("success")
+        ));
+        assert!(!semantic_value_matches(
+            &output.semantic_value,
+            Some("/status"),
+            &json!("loading")
+        ));
+
+        assert_eq!(
+            semantic_value_output(snapshot, "missing"),
+            Err(StorybookAutomationError::SemanticValueNotFound {
+                route: "example-ButtonStory".to_owned(),
+                key: "missing".to_owned(),
+            })
+        );
+    }
+
+    #[test]
+    fn value_wait_validation_is_bounded_and_requires_json_pointer_syntax() {
+        let valid = WaitForValueInput {
+            value_key: "response".to_owned(),
+            json_pointer: Some("/status".to_owned()),
+            expected: SchemarsValue(json!("success")),
+            max_frames: Some(MAX_INTERACTION_WAITED_FRAMES),
+        };
+        assert!(validate_wait_for_value_input(&valid).is_ok());
+
+        let invalid_pointer = WaitForValueInput {
+            json_pointer: Some("status".to_owned()),
+            ..valid.clone()
+        };
+        assert!(validate_wait_for_value_input(&invalid_pointer).is_err());
+
+        let invalid_frames = WaitForValueInput {
+            max_frames: Some(0),
+            ..valid
+        };
+        assert!(validate_wait_for_value_input(&invalid_frames).is_err());
+    }
+
+    #[test]
     fn typed_tool_calls_reject_bad_arguments_and_return_structured_results() {
         let story = sample_story();
         let server = server(StorybookAutomation::with_stories(vec![story.clone()]))
@@ -1685,7 +2374,7 @@ mod tests {
         );
 
         let found = serde_json::to_value(
-            server.call_tool(TOOL_GET_STORY, Some(json!({ "key": story.key }))),
+            server.call_tool(TOOL_GET_STORY, Some(json!({ "story_key": story.key }))),
         )
         .expect("result should serialize");
         assert_eq!(found["structuredContent"]["story"]["title"], story.title);
@@ -1712,9 +2401,10 @@ mod tests {
             "missing_field"
         );
 
-        let unknown = serde_json::to_value(
-            server.call_tool(TOOL_GET_STORY, Some(json!({ "key": "missing-story" }))),
-        )
+        let unknown = serde_json::to_value(server.call_tool(
+            TOOL_GET_STORY,
+            Some(json!({ "story_key": "missing-story" })),
+        ))
         .expect("result should serialize");
         assert_eq!(
             unknown["structuredContent"]["error"]["kind"],
@@ -1758,7 +2448,7 @@ mod tests {
         let result = server.call_tool(
             TOOL_CAPTURE_LAUNCH_ENV,
             Some(json!({
-                "key": "gpui-storybook-example-story-ButtonStory",
+                "story_key": "gpui-storybook-example-story-ButtonStory",
                 "output_path": "target/storybook-captures/button.png",
                 "width": 900,
                 "height": 700,
@@ -1786,19 +2476,8 @@ mod tests {
         assert_eq!(
             structured["command"],
             json!([
-                "env",
-                "-u",
-                "DISPLAY",
-                "-u",
-                "WAYLAND_DISPLAY",
-                "-u",
-                "WAYLAND_SOCKET",
-                "-u",
-                "ZED_HEADLESS",
-                "sh",
-                "-c",
-                LINUX_SWAY_HEADLESS_SCRIPT,
-                "sh",
+                "gpui-storybook-launch",
+                "--",
                 "cargo",
                 "run",
                 "-p",
@@ -1856,7 +2535,7 @@ mod tests {
     #[test]
     fn capture_launch_env_rejects_invalid_frame_capture_values() {
         let error = build_capture_launch_env(CaptureLaunchEnvInput {
-            key: "gpui-storybook-example-story-ButtonStory".to_string(),
+            story_key: "gpui-storybook-example-story-ButtonStory".to_string(),
             output_path: Some(PathBuf::from("target/storybook-captures/button.png")),
             frame: Some(0),
             width: None,
@@ -1875,7 +2554,7 @@ mod tests {
         );
 
         let error = build_capture_launch_env(CaptureLaunchEnvInput {
-            key: "gpui-storybook-example-story-ButtonStory".to_string(),
+            story_key: "gpui-storybook-example-story-ButtonStory".to_string(),
             output_path: None,
             frame: None,
             width: Some(900),
@@ -1976,7 +2655,7 @@ mod tests {
     #[test]
     fn capture_launch_env_supports_minimal_non_stdio_commands() {
         let launch = build_capture_launch_env(CaptureLaunchEnvInput {
-            key: "example-ButtonStory".to_string(),
+            story_key: "example-ButtonStory".to_string(),
             output_path: None,
             frame: None,
             width: None,
@@ -1993,23 +2672,7 @@ mod tests {
         #[cfg(target_os = "linux")]
         assert_eq!(
             launch.command,
-            vec![
-                "env",
-                "-u",
-                "DISPLAY",
-                "-u",
-                "WAYLAND_DISPLAY",
-                "-u",
-                "WAYLAND_SOCKET",
-                "-u",
-                "ZED_HEADLESS",
-                "sh",
-                "-c",
-                LINUX_SWAY_HEADLESS_SCRIPT,
-                "sh",
-                "cargo",
-                "run",
-            ]
+            vec!["gpui-storybook-launch", "--", "cargo", "run",]
         );
         #[cfg(not(target_os = "linux"))]
         assert_eq!(launch.command, vec!["cargo", "run"]);
@@ -2017,7 +2680,7 @@ mod tests {
         assert_eq!(launch.env["WGPU_CAPTURE_ROUTE"], "example-ButtonStory");
 
         let mobile = build_capture_launch_env(CaptureLaunchEnvInput {
-            key: "example-ButtonStory".to_string(),
+            story_key: "example-ButtonStory".to_string(),
             output_path: Some(PathBuf::from("mobile.png")),
             frame: None,
             width: None,
@@ -2058,7 +2721,7 @@ mod tests {
 
         let open = serde_json::to_value(server.call_tool(
             TOOL_OPEN_STORY,
-            Some(json!({ "key": "example-ButtonStory" })),
+            Some(json!({ "story_key": "example-ButtonStory" })),
         ))
         .expect("open result should serialize");
         assert_eq!(open["isError"], true);
@@ -2081,9 +2744,18 @@ mod tests {
         assert_eq!(controls["isError"], true);
         assert_eq!(controls["structuredContent"]["error"]["kind"], "validation");
 
+        let semantic_values =
+            serde_json::to_value(server.call_tool(TOOL_READ_SEMANTIC_VALUES, Some(json!({}))))
+                .expect("semantic values result should serialize");
+        assert_eq!(semantic_values["isError"], true);
+        assert_eq!(
+            semantic_values["structuredContent"]["error"]["details"][0]["code"],
+            "no_live_host"
+        );
+
         let invalid = serde_json::to_value(server.call_tool(
             TOOL_SET_CONTROL,
-            Some(json!({ "key": "disabled", "value": true })),
+            Some(json!({ "control_key": "disabled", "value": true })),
         ))
         .expect("invalid control result should serialize");
         assert_eq!(invalid["isError"], true);

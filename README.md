@@ -75,11 +75,46 @@ GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1 \
 cargo run -p my-app-storybook --features mcp
 ```
 
+Wrap important controls with stable semantic targets so an MCP client can
+discover and activate them without screen coordinates:
+
+```rust
+use gpui::InteractiveElement as _;
+use gpui_storybook::StorybookElementExt as _;
+
+Button::new("execute-request")
+    .label("Execute")
+    .storybook_target()
+```
+
+The GPUI element ID becomes the stable route-local key, and Storybook derives
+its display label (`execute-request` becomes `Execute request`). Use
+`storybook_target_as(key, label)` when those values need to differ.
+
+Wrap Serde-serializable rendered application state with `storybook_value` when
+automation needs a machine-readable postcondition:
+
+```rust
+div()
+    .id("response")
+    .child(response_panel)
+    .storybook_value(&response_state)
+```
+
+`storybook_read_value` reads one key and `storybook_wait_for_value` refreshes a
+bounded number of frames until the value or a JSON Pointer matches. The
+interaction-gated `storybook_click_target` performs one semantic click without
+constructing a step batch. MCP uses explicit `story_key`, `target_key`,
+`value_key`, and `control_key` input names, and its initial tool call waits for
+the live Storybook host with a bounded deadline. None of these semantic reads
+capture a frame; use screenshot capture when rendered appearance is the
+assertion.
+
 Linux automation uses the normal Wayland-backed GPUI application under Sway's
 wlroots headless backend. Install Sway and Mesa's software graphics drivers;
-`storybook_capture_launch_env` generates the complete compositor wrapper
-automatically on Linux. macOS and Windows keep their normal native launch
-commands.
+install `gpui-storybook-launch`, then run the Cargo command through it.
+`storybook_capture_launch_env` emits this launcher automatically on Linux.
+macOS and Windows keep their normal native launch commands.
 
 Interaction runs inside the live GPUI window; it does not require compositor
 or operating-system input injection. Named and paired capture dimensions target

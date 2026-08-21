@@ -28,62 +28,20 @@ sudo apt-get install --no-install-recommends \
   libgl1-mesa-dri mesa-vulkan-drivers sway
 ```
 
-Then run MCP sessions through a headless Wayland compositor:
+Install the reusable launcher, then run MCP sessions through its private
+headless Wayland compositor:
 
 ```bash
-(
-  runtime_dir="$(mktemp -d)"
-  chmod 700 "$runtime_dir"
-  printf '%s\n' \
-    'output * mode 1920x1200' \
-    'seat seat0 fallback true' \
-    'for_window [app_id=".*"] floating enable' \
-    > "$runtime_dir/sway.conf"
-
-  cleanup() {
-    kill "$sway_pid" 2>/dev/null || true
-    wait "$sway_pid" 2>/dev/null || true
-    rm -rf "$runtime_dir"
-  }
-  trap cleanup EXIT
-
-  export XDG_RUNTIME_DIR="$runtime_dir"
-  unset DISPLAY I3SOCK SWAYSOCK WAYLAND_DISPLAY WAYLAND_SOCKET ZED_HEADLESS
-  WLR_BACKENDS=headless \
-  WLR_HEADLESS_OUTPUTS=1 \
-  WLR_LIBINPUT_NO_DEVICES=1 \
-  WLR_RENDERER=pixman \
-  WLR_RENDERER_ALLOW_SOFTWARE=1 \
-  LIBGL_ALWAYS_SOFTWARE=1 \
-  sway --unsupported-gpu --config "$runtime_dir/sway.conf" \
-    > "$runtime_dir/sway.log" 2>&1 &
-  sway_pid=$!
-
-  until wayland_socket="$(find "$runtime_dir" -maxdepth 1 \
-    -type s -name 'wayland-*' -print -quit)" && \
-    [ -n "$wayland_socket" ]; do
-    if ! kill -0 "$sway_pid" 2>/dev/null; then
-      cat "$runtime_dir/sway.log" >&2
-      exit 1
-    fi
-    sleep 0.05
-  done
-
-  export WAYLAND_DISPLAY="${wayland_socket##*/}"
-  export LIBGL_ALWAYS_SOFTWARE=1
-  GPUI_STORYBOOK_MCP_STDIO=1 \
-  cargo run -p my-app-storybook --features mcp
-)
+cargo install gpui-storybook-launch
+GPUI_STORYBOOK_MCP_STDIO=1 \
+gpui-storybook-launch -- cargo run -p my-app-storybook --features mcp
 ```
 
-This uses the normal Wayland-backed GPUI application. The private
-`XDG_RUNTIME_DIR` and discovered `WAYLAND_DISPLAY` select Sway's in-memory
-wlroots compositor, which provides a compatibility seat, window management,
-and frame callbacks. Pixman renders the compositor, and Mesa renders the
-application in software.
-macOS and Windows continue to use their native launch paths.
-`--unsupported-gpu` bypasses Sway's host-driver startup check; the explicit
-headless backend and software renderer keep this wrapper off the physical GPU.
+This uses the normal Wayland-backed GPUI application. The launcher creates a
+private `XDG_RUNTIME_DIR`, starts Sway with wlroots' headless backend and the
+Pixman software renderer, waits for `WAYLAND_DISPLAY`, inherits MCP stdio, and
+stops Sway after the child exits. Set `GPUI_STORYBOOK_SWAY=/path/to/sway` for a
+private package extraction. macOS and Windows execute the child directly.
 
 This launch exposes route, control, and capture tools. Generic input can invoke
 arbitrary application behavior, so enable it separately and only against a
@@ -92,7 +50,7 @@ safe Storybook backend:
 ```bash
 GPUI_STORYBOOK_MCP_STDIO=1 \
 GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1 \
-cargo run -p my-app-storybook --features mcp
+gpui-storybook-launch -- cargo run -p my-app-storybook --features mcp
 ```
 
 The interaction variable must equal `1`. When it is absent or has another
@@ -109,12 +67,12 @@ language. It does not overwrite interactive preferences.
 ### Verify raw stdio with the example
 
 Inside this repository, use the explicit story example as a safe end-to-end
-target. Replace the final Cargo command in the Sway wrapper with:
+target. Run that Cargo command through the launcher:
 
 ```bash
 GPUI_STORYBOOK_MCP_STDIO=1 \
 GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1 \
-cargo run -p gpui-storybook-example-story --features mcp
+gpui-storybook-launch -- cargo run -p gpui-storybook-example-story --features mcp
 ```
 
 The stable route
@@ -151,7 +109,11 @@ JSON object per line in this order:
    ```
 
 Read the matching response ID before closing standard input. Use each entry's
-advertised `inputSchema` when constructing later calls.
+advertised `inputSchema` when constructing later calls. Closing standard input
+terminates the GPUI application; the launcher then stops Sway.
+The first tool call waits up to 30 seconds for the standard gallery or dock to
+publish its story catalog and attach the live automation host, so clients do
+not need a startup polling loop.
 
 ## Use the MCP tools
 
@@ -162,22 +124,97 @@ advertised `inputSchema` when constructing later calls.
 | `storybook_current_story` | Inspect the story displayed by the live window |
 | `storybook_open_story` | Navigate the live window to a route |
 | `storybook_read_controls` | Read control metadata and current values from the active variant |
+| `storybook_read_semantic_values` | Read route-local JSON values refreshed from rendered application state |
+| `storybook_read_value` | Read one route-local JSON value by `value_key` |
+| `storybook_wait_for_value` | Refresh up to a bounded frame count until a value or JSON Pointer equals the expected JSON |
 | `storybook_set_control` | Set one control on the active story instance |
-| `storybook_reset_control` | Reset one control, or all controls when `key` is omitted |
+| `storybook_reset_control` | Reset one control, or all controls when `control_key` is omitted |
 | `storybook_capture_current_story` | Capture the active story region |
 | `storybook_capture_launch_env` | Build environment variables and a platform launch command |
 | `storybook_list_actions` | List runtime GPUI actions, documentation, and argument schemas; interaction gate required |
+| `storybook_list_interaction_targets` | List stable semantic targets and live route-relative bounds; interaction gate required |
+| `storybook_click_target` | Click one semantic target exactly once; interaction gate required |
 | `storybook_run_steps` | Run one ordered in-process interaction batch with optional capture; interaction gate required |
 
-Tool inputs and outputs use closed typed schemas. Use the advertised `key`,
-`output_path`, `width`, `height`, `viewport`, `controls`, and launch properties;
-unknown, missing, or invalid fields return structured errors.
+Tool inputs and outputs use closed typed schemas. Route, target, value, and
+control inputs use `story_key`, `target_key`, `value_key`, and `control_key`
+respectively. Unknown, missing, or invalid fields return structured errors.
 
 ## Run an in-process interaction batch
 
 Use typed controls first when a story exposes them. Use registered actions for
-semantic application commands, keystrokes for keyboard behavior, and
-story-relative pointer coordinates as the fallback.
+semantic application commands, semantic interaction targets for visible
+controls, keystrokes for keyboard behavior, and story-relative pointer
+coordinates as the fallback.
+
+Import the Storybook element extension trait and give the visible child a
+stable GPUI ID:
+
+```rust
+use gpui::InteractiveElement as _;
+use gpui_storybook::StorybookElementExt as _;
+
+Button::new("execute-request")
+    .label("Execute")
+    .storybook_target()
+```
+
+Storybook uses the displayed element ID as the route-local key and humanizes it
+for the label (`execute-request` becomes `Execute request`). Call
+`.storybook_target_as(key, label)` for an opaque element or when stable identity
+and display copy need separate values.
+
+After opening the route, call `storybook_list_interaction_targets`, then use
+the returned key in a batch:
+
+```json
+{ "type": "click_target", "target_key": "execute-request" }
+```
+
+Target keys must be unique within each story or substory route. Storybook
+resolves the target's live bounds after route preparation and clicks its center.
+
+Expose a machine-readable postcondition by wrapping the element that presents
+it:
+
+```rust
+div()
+    .id("response")
+    .child(response_panel)
+    .storybook_value(serde_json::json!({
+        "status": "success",
+        "position": 12.5,
+    }))
+```
+
+After input dispatch, use `storybook_read_value` for one known key or
+`storybook_read_semantic_values` for the complete route. For asynchronous work,
+`storybook_wait_for_value` refreshes a bounded number of frames and compares
+either the complete value or an RFC 6901 JSON Pointer inside it. This readback
+is independent from capture: semantic values prove state, while PNG capture
+proves visual presentation.
+Value keys, like target keys, must be unique within a story or substory route.
+Call `.storybook_value_as(key, label, value)` when the element does not expose
+an ID or when the label needs explicit wording.
+
+The common click-and-wait flow uses two focused calls. The click is dispatched
+once and is never retried by the wait:
+
+```json
+{
+  "story_key": "gpui-storybook-example-story-InteractionStory",
+  "target_key": "pointer-target"
+}
+```
+
+```json
+{
+  "value_key": "fixture-state",
+  "json_pointer": "/clicks",
+  "expected": 1,
+  "max_frames": 120
+}
+```
 
 `storybook_run_steps` can open a route, apply a `controls` map, size the story
 region for paired rendered-pixel `width` and `height` values or a named
@@ -187,7 +224,7 @@ select navigation, and a typed action:
 
 ```json
 {
-  "route": "gpui-storybook-example-story-InteractionStory",
+  "story_key": "gpui-storybook-example-story-InteractionStory",
   "viewport": "mobile",
   "controls": {
     "prefix": { "type": "text", "value": "mcp" }
@@ -210,7 +247,7 @@ select navigation, and a typed action:
 }
 ```
 
-When `route` is supplied, Storybook focuses that story's focus handle before
+When `story_key` is supplied, Storybook focuses that story's focus handle before
 the first step. The fixture maps its focus handle to the text input, so the
 first `focus_next` moves from that input to the select.
 
@@ -224,6 +261,7 @@ The closed step variants are:
 | `dispatch_action` | Build a registered action by `name` and optional JSON `args`, dispatch it, and resume the batch after GPUI delivers that deferred dispatch |
 | `pointer_move` | Dispatch a move at the story-relative `point` |
 | `pointer_click` | Dispatch move, down, and up at `point`; optional `button`, `click_count`, and `modifiers` default to a single left click with no modifiers |
+| `click_target` | Dispatch move, down, and up at the center of semantic `target_key`; accepts the same optional button, count, and modifiers |
 | `scroll` | Dispatch pixel `delta_x` and `delta_y` at `point` |
 | `wait_frames` | Refresh and continue after the positive rendered-frame `count` |
 
@@ -237,8 +275,9 @@ Both normalized coordinates must be finite and in `0.0..=1.0`. Use
 `"space": "logical_pixels"` for non-negative GPUI logical pixels measured
 from the current route origin. The executor resolves fresh bounds after route
 opening and story-region sizing, rejects points beyond those bounds, and
-translates them to window coordinates. It cannot target the gallery sidebar,
-dock panels, title bar, global screen, or an element selector.
+translates them to window coordinates. Semantic targets provide the stable
+selector path; neither interaction mode can target the gallery sidebar, dock
+panels, title bar, or global screen.
 
 A batch allows at most 64 steps, up to 64 binding strings in each `keystrokes`
 step, 4 KiB across UTF-8 `text` values and keystroke syntax, 120 explicitly
@@ -279,7 +318,7 @@ Open the route before reading or changing its controls:
 
 ```json
 {
-  "key": "my-app-storybook-ButtonStory"
+  "story_key": "my-app-storybook-ButtonStory"
 }
 ```
 
@@ -288,7 +327,7 @@ Pass a tagged value to `storybook_set_control`:
 
 ```json
 {
-  "key": "disabled",
+  "control_key": "disabled",
   "value": { "type": "boolean", "value": true }
 }
 ```
@@ -297,8 +336,8 @@ Other value tags are `integer`, `float`, `text`, `color`, `choice`, and `json`.
 A color value contains `h`, `s`, `l`, and `a` numbers. The setter enforces the
 advertised bounds and select options before updating the concrete story entity.
 
-Call `storybook_reset_control` with a `key` to reset one value, or with an empty
-object to reset all active-story controls.
+Call `storybook_reset_control` with a `control_key` to reset one value, or with
+an empty object to reset all active-story controls.
 
 ## Address stories by stable route
 
@@ -337,7 +376,7 @@ cargo run -p my-app-storybook --features mcp
 Storybook opens the route, creates missing parent directories, writes the PNG,
 and exits after capture. Capture startup disables preference persistence and
 uses the deterministic light presentation. On Linux, wrap this command with
-headless Sway as shown above.
+`gpui-storybook-launch` as shown above.
 
 | Environment variable | Meaning |
 |---|---|
@@ -351,13 +390,14 @@ Set width and height together, and make both values greater than zero.
 `WGPU_CAPTURE_FRAME`, when present, must also be greater than zero.
 On Linux, `storybook_capture_launch_env` returns an `env` map and a `command`
 array. Merge every `env` entry into the child process environment before
-executing `command`. The command creates a private Wayland runtime, starts
-headless Sway with the software Pixman renderer, waits for its socket, and then
-runs Cargo, but it does not inline the capture or MCP variables.
+executing `command`. On Linux the command invokes the installed
+`gpui-storybook-launch`, which creates the private Wayland runtime, waits for
+headless Sway, and then runs Cargo. It does not inline the capture or MCP
+variables.
 
 ## Capture a live session
 
-Call `storybook_open_story` with a stable route, then call
+Call `storybook_open_story` with a stable `story_key`, then call
 `storybook_capture_current_story`. The capture tool accepts an optional
 `output_path`, optional paired `width` and `height`, a named `viewport`, and a
 `controls` object. The control map is applied immediately before capture:
@@ -386,8 +426,8 @@ contains the request ID, actual path, rendered pixel dimensions, and story
 metadata.
 
 `storybook_capture_launch_env` can construct the environment and platform
-command for an external launcher. It accepts a route plus optional output path,
-frame, paired dimensions, package, binary, feature list, and stdio selection.
+command for an external launcher. It accepts a `story_key` plus optional output
+path, frame, paired dimensions, package, binary, feature list, and stdio selection.
 It also accepts a named viewport when paired dimensions are omitted.
 
 ## Understand capture bounds and size
@@ -415,13 +455,16 @@ Do not retry an interaction batch automatically.
 | Symptom | Action |
 |---|---|
 | Route not found | Discover the base key with `storybook_list_stories`, inspect the substory definition, and check filtering |
+| Automation startup times out | Ensure the initialized application constructs a standard `Gallery` or `StoryWorkspace` within 30 seconds |
 | No live host is attached | Await initialization and construct a standard `Gallery` or `StoryWorkspace` view |
 | Width or height is rejected | Set both dimensions to positive integers |
 | A control is rejected | Read the current control specs and use the advertised type, bounds, and options |
 | Automation is busy | Wait for the active capture or mutation to complete; requests are not queued |
 | Interaction tools are missing | Set `GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1` before server construction and rediscover tools |
 | Action is unknown or arguments are invalid | Call `storybook_list_actions` for this launch and follow its argument schema |
+| Semantic target is missing or duplicated | Open the intended route, call `storybook_list_interaction_targets`, and give every `.storybook_target()` element a unique route-local GPUI ID |
+| Semantic value is missing or duplicated | Render the value in the active route and give every `.storybook_value(...)` element a unique route-local GPUI ID |
 | Pointer point is rejected | Use finite normalized coordinates in `0.0..=1.0` or route-relative logical pixels inside the rendered bounds |
-| Interaction reports partial execution | Inspect `steps_dispatched`; establish postconditions with a capture or read and do not retry automatically |
+| Interaction reports partial execution | Inspect `steps_dispatched`; establish postconditions with `storybook_read_value` or `storybook_wait_for_value` and do not retry automatically |
 | Stdio messages cannot be decoded | Route tracing and diagnostics to standard error |
 | Startup capture times out | Confirm registrations are linked and test the same route interactively |

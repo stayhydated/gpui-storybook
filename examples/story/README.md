@@ -31,10 +31,12 @@ theme editing, and optional inspection, and [Automation and
 capture](../../book/src/automation.md) for MCP usage.
 
 `InteractionStory` is the inert automation fixture. It provides a text input,
-keyboard-operated select, hover/click target, schema-backed
+keyboard-operated select, semantic `pointer-target`, schema-backed
 `interaction_story::SetAutomationStatus` action, viewport readout, typed
-`prefix` control, and a one-frame `pressed` state. Exercise the same route in
-gallery or dock mode:
+`prefix` control, a one-frame `pressed` state, and a structured
+`fixture-state` semantic value. Use `storybook_click_target` for one semantic
+click and `storybook_wait_for_value` to establish a bounded JSON postcondition
+without a screenshot. Exercise the same route in gallery or dock mode:
 
 ```bash
 GPUI_STORYBOOK_MCP_STDIO=1 \
@@ -42,9 +44,9 @@ GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1 \
 cargo run -p gpui-storybook-example-story --features mcp
 ```
 
-On Linux, supply the headless Sway wrapper documented in the automation guide
-for the same stdio session. The application remains on GPUI's normal Wayland
-backend and receives compositor-driven frame callbacks.
+On Linux, install `gpui-storybook-launch` and place it before the Cargo command
+as documented in the automation guide. The application remains on GPUI's normal
+Wayland backend and receives compositor-driven frame callbacks.
 
 Add `dock` to the feature list to run the identical executor through the dock
 host. Rediscover registered actions after each launch before dispatching one.

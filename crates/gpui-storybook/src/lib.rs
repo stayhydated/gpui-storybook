@@ -22,6 +22,10 @@
 //! automation. Only marked fields are registered. `#[derive(ComponentStory)]`
 //! accepts the same field metadata and derives reset defaults from its
 //! configured example.
+//! [`StorybookElementExt`] associates route-local automation targets and JSON
+//! state with rendered children. MCP clients can read semantic values after a
+//! fresh frame without requiring a screenshot; capture remains the
+//! visual-presentation assertion surface.
 //!
 //! [`init`] and `generate_stories` load crate-local `storybook.toml` files for
 //! discovered story crates and select a runtime config by matching the running
@@ -101,7 +105,7 @@ pub use gpui_storybook_core::window_view::DockWindowView;
 pub use gpui_storybook_core::{
     assets::Assets,
     capture_region::{
-        capture_route_slug, capture_substory, capture_substory_route_id,
+        StorybookElementExt, capture_route_slug, capture_substory, capture_substory_route_id,
         capture_substory_route_id_with_key, capture_substory_with_key,
     },
     controls::{
@@ -694,15 +698,48 @@ fn init_mcp_automation(cx: &mut ::gpui::App) {
             )
         });
 
-    if gpui_storybook_mcp::stdio_requested()
-        && let Err(error) = gpui_storybook_mcp::start_stdio(automation.clone())
-    {
-        eprintln!("failed to start gpui-storybook MCP stdio server: {error}");
+    if gpui_storybook_mcp::stdio_requested() {
+        match gpui_storybook_mcp::start_stdio(automation.clone()) {
+            Ok(completion) => {
+                cx.spawn(async move |cx| {
+                    let exit_code = match completion.await {
+                        Ok(()) => 0,
+                        Err(error) => {
+                            eprintln!("gpui-storybook MCP stdio server failed: {error}");
+                            1
+                        },
+                    };
+                    cx.update(move |_cx| {
+                        // A stdio session owns this process. Exit directly after
+                        // transport completion so native window and renderer
+                        // teardown cannot race the headless compositor cleanup.
+                        exit_after_mcp_stdio(exit_code);
+                    });
+                })
+                .detach();
+            },
+            Err(error) => {
+                eprintln!("failed to start gpui-storybook MCP stdio server: {error}");
+                cx.quit();
+            },
+        }
     }
 
     if let Err(error) = gpui_storybook_mcp::start_capture_session_from_env(automation) {
         eprintln!("failed to start storybook capture session: {error}");
     }
+}
+
+#[cfg(all(feature = "mcp", unix))]
+fn exit_after_mcp_stdio(exit_code: i32) -> ! {
+    // SAFETY: the stdio transport has completed and the automation session owns
+    // this process. `_exit` avoids native platform and thread-local teardown.
+    unsafe { libc::_exit(exit_code) }
+}
+
+#[cfg(all(feature = "mcp", not(unix)))]
+fn exit_after_mcp_stdio(exit_code: i32) -> ! {
+    std::process::exit(exit_code)
 }
 
 /// Discovers registered stories, applies `storybook.toml` filtering, and

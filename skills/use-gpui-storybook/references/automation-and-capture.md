@@ -16,70 +16,31 @@ Set `GPUI_STORYBOOK_MCP_STDIO=1` to serve MCP over stdio. Route tracing and
 diagnostic logs to standard error.
 
 On Linux, install Sway plus `libgl1-mesa-dri` and `mesa-vulkan-drivers`, then
-run stdio and startup-capture sessions through a headless Wayland compositor:
+install the reusable launcher and run stdio and startup-capture sessions
+through it:
 
 ```bash
-(
-  runtime_dir="$(mktemp -d)"
-  chmod 700 "$runtime_dir"
-  printf '%s\n' \
-    'output * mode 1920x1200' \
-    'seat seat0 fallback true' \
-    'for_window [app_id=".*"] floating enable' \
-    > "$runtime_dir/sway.conf"
-
-  cleanup() {
-    kill "$sway_pid" 2>/dev/null || true
-    wait "$sway_pid" 2>/dev/null || true
-    rm -rf "$runtime_dir"
-  }
-  trap cleanup EXIT
-
-  export XDG_RUNTIME_DIR="$runtime_dir"
-  unset DISPLAY I3SOCK SWAYSOCK WAYLAND_DISPLAY WAYLAND_SOCKET ZED_HEADLESS
-  WLR_BACKENDS=headless \
-  WLR_HEADLESS_OUTPUTS=1 \
-  WLR_LIBINPUT_NO_DEVICES=1 \
-  WLR_RENDERER=pixman \
-  WLR_RENDERER_ALLOW_SOFTWARE=1 \
-  LIBGL_ALWAYS_SOFTWARE=1 \
-  sway --unsupported-gpu --config "$runtime_dir/sway.conf" \
-    > "$runtime_dir/sway.log" 2>&1 &
-  sway_pid=$!
-
-  until wayland_socket="$(find "$runtime_dir" -maxdepth 1 \
-    -type s -name 'wayland-*' -print -quit)" && \
-    [ -n "$wayland_socket" ]; do
-    if ! kill -0 "$sway_pid" 2>/dev/null; then
-      cat "$runtime_dir/sway.log" >&2
-      exit 1
-    fi
-    sleep 0.05
-  done
-
-  export WAYLAND_DISPLAY="${wayland_socket##*/}"
-  export LIBGL_ALWAYS_SOFTWARE=1
-  GPUI_STORYBOOK_MCP_STDIO=1 \
-  cargo run -p my-app-storybook --features mcp
-)
+cargo install gpui-storybook-launch
+GPUI_STORYBOOK_MCP_STDIO=1 \
+gpui-storybook-launch -- cargo run -p my-app-storybook --features mcp
 ```
 
-Sway provides a compatibility seat, window management, and frame callbacks
-while retaining GPUI's normal Wayland backend. The launch-env tool emits a
-bounded-readiness version of this wrapper on Linux and continues to emit a
+The launcher provides a compatibility seat, window management, bounded socket
+readiness, and frame callbacks while retaining GPUI's normal Wayland backend.
+It selects the headless backend and software Pixman renderer, inherits MCP
+stdio, and stops Sway when the child exits. Set `GPUI_STORYBOOK_SWAY` for a
+private Sway executable. The launch-env tool emits this command on Linux and a
 direct Cargo command elsewhere.
-The `--unsupported-gpu` flag only bypasses Sway's host-driver check; the
-headless backend and software Pixman renderer remain explicitly selected.
 
 ### Verify raw stdio in this repository
 
-Use the explicit story example for a safe end-to-end check. Replace the final
-Cargo command in the Sway wrapper with:
+Use the explicit story example for a safe end-to-end check. Run that Cargo
+command through the launcher:
 
 ```bash
 GPUI_STORYBOOK_MCP_STDIO=1 \
 GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1 \
-cargo run -p gpui-storybook-example-story --features mcp
+gpui-storybook-launch -- cargo run -p gpui-storybook-example-story --features mcp
 ```
 
 The stable route
@@ -117,6 +78,8 @@ JSON object per line in this order:
 
 Read the matching response ID before closing standard input. Use each entry's
 advertised `inputSchema` when constructing later calls.
+The first tool call waits up to 30 seconds for the gallery or dock to publish
+its story catalog and attach the live automation host.
 
 Set `GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1` only when the client should receive
 generic in-process interaction tools. The value must be exactly `1`; otherwise
@@ -133,11 +96,16 @@ the controller installed by `gpui_storybook::init`.
 - `storybook_current_story`
 - `storybook_open_story`
 - `storybook_read_controls`
+- `storybook_read_semantic_values`
+- `storybook_read_value`
+- `storybook_wait_for_value`
 - `storybook_set_control`
 - `storybook_reset_control`
 - `storybook_capture_current_story`
 - `storybook_capture_launch_env`
 - `storybook_list_actions` (interaction capability)
+- `storybook_list_interaction_targets` (interaction capability)
+- `storybook_click_target` (interaction capability)
 - `storybook_run_steps` (interaction capability)
 
 Use advertised typed fields. Width and height are optional only as a pair.
@@ -145,14 +113,23 @@ Control operations use tagged `ControlValue` objects shared with the UI:
 
 ```json
 {
-  "key": "disabled",
+  "control_key": "disabled",
   "value": { "type": "boolean", "value": true }
 }
 ```
 
-Read controls after opening the intended route. Reset with a key for one value
-or omit the key for all values. A capture request can include a `controls` map
+Read controls after opening the intended route. Reset with a `control_key` for
+one value or omit it for all values. A capture request can include a `controls` map
 so it applies serialized values immediately before rendering.
+
+Import `gpui_storybook::StorybookElementExt as _`, wrap Serde-serializable
+application state with `.storybook_value(&state)`, then use
+`storybook_read_value` for one `value_key` or `storybook_wait_for_value` for a
+bounded exact match on the complete value or an RFC 6901 JSON Pointer. The wait
+performs fresh reads and never retries the preceding interaction. Use capture
+when pixels and layout are the evidence. The implicit method uses the GPUI
+element ID as its key and derives the label; use
+`.storybook_value_as(key, label, &state)` for explicit metadata.
 
 Capture requests also accept `responsive`, `mobile`, `tablet`, or `desktop` as
 a `viewport`. Explicit paired width and height take precedence. The live
@@ -164,15 +141,24 @@ story can describe its logical live-window bounds instead of the PNG size.
 
 ## Interaction batches
 
-Prefer controls, then registered actions, then keystrokes, and finally
-story-relative pointer coordinates. Discover non-internal runtime actions and
-their JSON argument schemas with `storybook_list_actions` after every launch.
+Prefer controls, then registered actions, semantic targets, keystrokes, and
+finally story-relative pointer coordinates. Discover non-internal runtime
+actions and their JSON argument schemas with `storybook_list_actions` after
+every launch.
 
-`storybook_run_steps` accepts an optional route, controls, paired rendered-pixel
+Wrap visible controls with `.storybook_target()`. After opening a route,
+call `storybook_list_interaction_targets` to discover live route-relative
+bounds, then call `storybook_click_target` with `target_key`, or use
+`{ "type": "click_target", "target_key": "..." }` in a batch. Keys must be
+unique within one story or substory route. The implicit method uses the GPUI
+element ID and derives a readable label; use
+`.storybook_target_as(key, label)` when those values need to differ.
+
+`storybook_run_steps` accepts an optional `story_key`, controls, paired rendered-pixel
 dimensions or viewport, a required non-empty step list, and an optional final
 capture. Step types are `focus_next`, `focus_previous`, `blur`, `keystrokes`,
-`text`, `dispatch_action`, `pointer_move`, `pointer_click`, `scroll`, and
-`wait_frames`. Supplying a route focuses the selected story's focus handle
+`text`, `dispatch_action`, `click_target`, `pointer_move`, `pointer_click`, `scroll`, and
+`wait_frames`. Supplying a `story_key` focuses the selected story's focus handle
 before the first step.
 
 GPUI defers registered-action dispatch; the executor resumes with the next step
@@ -228,8 +214,9 @@ Capture startup disables persistence and forces light appearance, the
 uses the same presentation with temporary storage. On Linux,
 `storybook_capture_launch_env` returns an `env` map and a `command` array. Merge
 every `env` entry into the child process environment before executing
-`command`; the command creates a private Wayland runtime, waits for headless
-Sway, and then runs Cargo, but it does not inline the capture or MCP variables.
+`command`; on Linux the command invokes the installed launcher, which creates a
+private Wayland runtime, waits for headless Sway, and then runs Cargo. It does
+not inline the capture or MCP variables.
 
 Captures exclude gallery or dock chrome. A substory route crops to its section.
 Paired dimensions target the story region rather than collapsing the complete
@@ -244,6 +231,8 @@ window. Use returned pixel dimensions as the rendered source of truth.
 - Interaction tools missing: set the explicit capability before server
   construction and rediscover tools.
 - Invalid action: rediscover actions for this launch and use its JSON schema.
+- Invalid semantic target: list targets after opening the route and remove duplicate route-local keys.
+- Invalid semantic value: render the wrapper in the active route and remove duplicate route-local keys.
 - Partial interaction failure: inspect the dispatched count and do not retry.
 - Invalid dimensions: provide positive width and height together.
 - Corrupt stdio: move application logs to standard error.

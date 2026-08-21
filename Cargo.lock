@@ -4303,6 +4303,7 @@ dependencies = [
  "gpui-storybook-toml",
  "gpui_tokio",
  "inventory",
+ "libc",
  "strum 0.28.0",
  "thiserror 2.0.19",
  "toml 1.1.4+spec-1.1.0",
@@ -4391,10 +4392,18 @@ dependencies = [
  "rust-embed",
  "schemars",
  "serde",
+ "serde_json",
  "strum 0.28.0",
  "tracing",
  "tracing-subscriber",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "gpui-storybook-launch"
+version = "0.5.0"
+dependencies = [
+ "tempfile",
 ]
 
 [[package]]

@@ -16,10 +16,17 @@ sudo apt-get install --no-install-recommends \
   libgl1-mesa-dri mesa-vulkan-drivers sway
 ```
 
-The `command` returned by `storybook_capture_launch_env` includes the complete
-Linux wrapper; its separate `env` map must be merged into the child process
-environment before executing that command. macOS and Windows commands continue
-to launch Cargo directly.
+Install the reusable Linux launcher once:
+
+```bash
+cargo install gpui-storybook-launch
+```
+
+The `command` returned by `storybook_capture_launch_env` invokes this launcher;
+its separate `env` map must be merged into the child process environment before
+executing that command. Set `GPUI_STORYBOOK_SWAY` when Sway comes from a private
+package extraction. macOS and Windows commands continue to launch Cargo
+directly.
 
 ```toml
 [dependencies]
@@ -33,16 +40,19 @@ JSON model as the workbench:
 
 ```json
 {
-  "key": "disabled",
+  "control_key": "disabled",
   "value": { "type": "boolean", "value": true }
 }
 ```
 
 The default tools are `storybook_list_stories`, `storybook_get_story`,
 `storybook_current_story`, `storybook_open_story`,
-`storybook_read_controls`, `storybook_set_control`,
+`storybook_read_controls`, `storybook_read_semantic_values`,
+`storybook_read_value`, `storybook_wait_for_value`, `storybook_set_control`,
 `storybook_reset_control`, `storybook_capture_current_story`, and
 `storybook_capture_launch_env`.
+The first tool call waits for the standard gallery or dock to publish its
+catalog and attach the live host, with a 30-second startup deadline.
 
 ## Enable interaction intentionally
 
@@ -62,11 +72,14 @@ For a repository-local smoke test, use
 shows the raw MCP initialization, discovery, and tool-call sequence.
 
 On Linux, apply the complete [headless Sway
-wrapper](../../book/src/automation.md#enable-mcp-support) to the same session.
-Set both MCP variables on the final Cargo command inside that wrapper.
+launcher](../../book/src/automation.md#enable-mcp-support) to the same session.
 
-The gate adds `storybook_list_actions` and `storybook_run_steps`. When it is
-unset or has any other value, both tools are absent from discovery. Direct
+The gate adds `storybook_list_actions`, `storybook_list_interaction_targets`,
+`storybook_click_target`, and `storybook_run_steps`. When it is unset or has
+any other value, those tools are absent from discovery. The read-only semantic
+value tools are always advertised; they read JSON values registered with
+`StorybookElementExt::storybook_value` after refreshing the selected route.
+Direct
 embedders can avoid process environment changes:
 
 ```rust
@@ -80,6 +93,23 @@ documentation, and JSON argument schemas from the launched GPUI application.
 GPUI keymap sentinels and Storybook-private workbench actions are omitted.
 Registrations are runtime state, so rediscover actions for every launch.
 
+Import `gpui_storybook::StorybookElementExt as _`, then mark important story
+controls with `.storybook_target()`. The GPUI element ID becomes the key and
+also supplies a human-readable label; use `.storybook_target_as(key, label)`
+when either needs an explicit value.
+`storybook_list_interaction_targets` returns the selected route's stable keys,
+labels, and live route-relative bounds. `storybook_click_target` accepts an
+optional `story_key` and required `target_key`, then clicks that target exactly
+once. Advanced batches use a `click_target` step with `target_key` and reject
+missing or duplicate targets before dispatch.
+
+Wrap any Serde-serializable rendered state with `.storybook_value(&state)`.
+Use `storybook_read_value` for one known `value_key`, or
+`storybook_wait_for_value` with an optional JSON Pointer and bounded frame count
+for asynchronous state. `.storybook_value_as(key, label, &state)` handles
+elements without GPUI IDs or independent display labels. These reads do not
+capture a frame; use capture only for visual rendering assertions.
+
 `storybook_run_steps` performs one ordered batch against the active story or
 substory capture region. It can open a route, apply tagged control values, size
 the story region for paired rendered-pixel dimensions or a named viewport,
@@ -88,7 +118,7 @@ the last step:
 
 ```json
 {
-  "route": "gpui-storybook-example-story-InteractionStory",
+  "story_key": "gpui-storybook-example-story-InteractionStory",
   "viewport": "mobile",
   "controls": {
     "prefix": { "type": "text", "value": "mcp" }
@@ -111,8 +141,8 @@ the last step:
 }
 ```
 
-Other steps are `focus_previous`, `blur`, `pointer_move`, `pointer_click`, and
-`scroll`. Opening the route focuses the story's focus handle, which is the
+Other steps are `focus_previous`, `blur`, `click_target`, `pointer_move`,
+`pointer_click`, and `scroll`. Opening the route focuses the story's focus handle, which is the
 fixture input, so the example inserts text before moving focus to the select.
 Pointer points use `normalized` coordinates in `0.0..=1.0` by default, or
 non-negative `logical_pixels`

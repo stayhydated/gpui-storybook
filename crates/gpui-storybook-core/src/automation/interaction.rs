@@ -1,7 +1,7 @@
 use super::{
-    AutomationOperationGuard, StoryCaptureSnapshot, StoryScreenshotRequest, StorySnapshot,
-    StorybookAutomationError, ensure_capture_target_visible, render_story_capture,
-    validate_capture_target_size,
+    AutomationOperationGuard, StoryCaptureSnapshot, StoryInteractionTargetsSnapshot,
+    StoryScreenshotRequest, StorySnapshot, StorybookAutomationError, ensure_capture_target_visible,
+    render_story_capture, rendered_interaction_targets, validate_capture_target_size,
 };
 use crate::{
     capture_region::{capture_region_bounds, scroll_capture_region_into_view},
@@ -151,6 +151,20 @@ pub enum StoryInteractionStep {
         #[serde(default)]
         modifiers: StoryModifiers,
     },
+    /// Click the center of one stable semantic target in the active route.
+    ClickTarget {
+        /// Target key returned by semantic target discovery.
+        target_key: String,
+        /// Button, defaulting to left.
+        #[serde(default)]
+        button: StoryMouseButton,
+        /// Positive click count, defaulting to one.
+        #[serde(default = "default_click_count")]
+        click_count: u8,
+        /// Modifiers held for move, down, and up.
+        #[serde(default)]
+        modifiers: StoryModifiers,
+    },
     /// Dispatch one pixel scroll event inside the active route bounds.
     Scroll {
         /// Route-relative event destination.
@@ -184,7 +198,7 @@ pub struct StoryInteractionCaptureRequest {
 #[serde(deny_unknown_fields)]
 pub struct StoryInteractionRequest {
     /// Stable story or substory route opened before controls and input.
-    pub route: Option<String>,
+    pub story_key: Option<String>,
     /// Typed control values applied before input.
     #[serde(default)]
     pub controls: BTreeMap<String, ControlValue>,
@@ -298,6 +312,22 @@ pub(crate) fn validate_interaction_request(
             StoryInteractionStep::PointerClick { click_count: 0, .. } => {
                 return invalid_step(step_index, "click_count must be greater than zero");
             },
+            StoryInteractionStep::ClickTarget {
+                target_key,
+                click_count: 0,
+                ..
+            } => {
+                if target_key.trim().is_empty() {
+                    return invalid_step(step_index, "target key must not be empty");
+                }
+                return invalid_step(step_index, "click_count must be greater than zero");
+            },
+            StoryInteractionStep::ClickTarget { target_key, .. } => {
+                if target_key.trim().is_empty() {
+                    return invalid_step(step_index, "target key must not be empty");
+                }
+                text_bytes = text_bytes.saturating_add(target_key.len());
+            },
             StoryInteractionStep::PointerMove { point }
             | StoryInteractionStep::PointerClick { point, .. } => {
                 validate_point(*point, step_index)?;
@@ -406,6 +436,12 @@ pub(crate) enum PreparedInteractionStep {
         click_count: u8,
         modifiers: StoryModifiers,
     },
+    ClickTarget {
+        key: String,
+        button: StoryMouseButton,
+        click_count: u8,
+        modifiers: StoryModifiers,
+    },
     Scroll {
         point: StoryPoint,
         delta_x: f32,
@@ -459,6 +495,17 @@ pub(crate) fn prepare_interaction_steps(
                 modifiers,
             } => Ok(PreparedInteractionStep::PointerClick {
                 point: *point,
+                button: *button,
+                click_count: *click_count,
+                modifiers: modifiers.clone(),
+            }),
+            StoryInteractionStep::ClickTarget {
+                target_key,
+                button,
+                click_count,
+                modifiers,
+            } => Ok(PreparedInteractionStep::ClickTarget {
+                key: target_key.clone(),
                 button: *button,
                 click_count: *click_count,
                 modifiers: modifiers.clone(),
@@ -526,6 +573,50 @@ pub(crate) fn schedule_story_interaction(
     });
 }
 
+pub(crate) fn schedule_interaction_target_listing(
+    story: StorySnapshot,
+    response: oneshot::Sender<Result<StoryInteractionTargetsSnapshot, StorybookAutomationError>>,
+    window: &mut Window,
+) {
+    window.refresh();
+    window.on_next_frame(move |window, _cx| {
+        let resized = match ensure_capture_target_visible(&story.capture_route_id, window) {
+            Ok(resized) => resized,
+            Err(error) => {
+                let _ = response.send(Err(error));
+                return;
+            },
+        };
+        if resized {
+            window.refresh();
+            window.on_next_frame(move |window, _cx| {
+                prepare_interaction_target_listing(story, response, window);
+            });
+        } else {
+            prepare_interaction_target_listing(story, response, window);
+        }
+    });
+}
+
+fn prepare_interaction_target_listing(
+    story: StorySnapshot,
+    response: oneshot::Sender<Result<StoryInteractionTargetsSnapshot, StorybookAutomationError>>,
+    window: &mut Window,
+) {
+    if !scroll_capture_region_into_view(&story.capture_route_id) {
+        let _ = response.send(Err(
+            StorybookAutomationError::InteractionTargetsUnavailable {
+                route: story.capture_route_id,
+            },
+        ));
+        return;
+    }
+    window.refresh();
+    window.on_next_frame(move |_window, _cx| {
+        let _ = response.send(rendered_interaction_targets(story));
+    });
+}
+
 fn prepare_interaction_route(interaction: PreparedStoryInteraction, window: &mut Window) {
     if interaction.response.is_closed() {
         return;
@@ -578,17 +669,33 @@ fn start_interaction_runner(
         return;
     };
 
+    let targets = if interaction
+        .steps
+        .iter()
+        .any(|step| matches!(step, PreparedInteractionStep::ClickTarget { .. }))
+    {
+        match rendered_interaction_targets(interaction.story.clone()) {
+            Ok(snapshot) => Some(snapshot.targets),
+            Err(error) => {
+                let _ = interaction.response.send(Err(error));
+                return;
+            },
+        }
+    } else {
+        None
+    };
     let mut steps = VecDeque::with_capacity(interaction.steps.len());
     for (step_index, step) in interaction.steps.into_iter().enumerate() {
-        match resolve_step_point(step, &region.bounds) {
+        match resolve_step_point(
+            step,
+            step_index,
+            &interaction.story.capture_route_id,
+            &region.bounds,
+            targets.as_deref().unwrap_or_default(),
+        ) {
             Ok(step) => steps.push_back((step_index, step)),
-            Err(message) => {
-                let _ = interaction.response.send(Err(
-                    StorybookAutomationError::InvalidInteractionStep {
-                        step_index,
-                        message,
-                    },
-                ));
+            Err(error) => {
+                let _ = interaction.response.send(Err(error));
                 return;
             },
         }
@@ -612,9 +719,19 @@ fn start_interaction_runner(
 
 fn resolve_step_point(
     step: PreparedInteractionStep,
+    step_index: usize,
+    route: &str,
     bounds: &gpui::Bounds<gpui::Pixels>,
-) -> Result<PreparedInteractionStep, String> {
-    let resolve = |point: StoryPoint| resolve_story_point(point, bounds);
+    targets: &[crate::capture_region::StoryInteractionTargetSnapshot],
+) -> Result<PreparedInteractionStep, StorybookAutomationError> {
+    let resolve = |point: StoryPoint| {
+        resolve_story_point(point, bounds).map_err(|message| {
+            StorybookAutomationError::InvalidInteractionStep {
+                step_index,
+                message,
+            }
+        })
+    };
     match step {
         PreparedInteractionStep::PointerMove(point) => {
             resolve(point).map(PreparedInteractionStep::PointerMove)
@@ -630,6 +747,44 @@ fn resolve_step_point(
             click_count,
             modifiers,
         }),
+        PreparedInteractionStep::ClickTarget {
+            key,
+            button,
+            click_count,
+            modifiers,
+        } => {
+            let target = targets
+                .iter()
+                .find(|target| target.key == key)
+                .ok_or_else(|| StorybookAutomationError::InteractionTargetNotFound {
+                    route: route.to_owned(),
+                    key: key.clone(),
+                })?;
+            let target_bounds = target.bounds;
+            if !target_bounds.x.is_finite()
+                || !target_bounds.y.is_finite()
+                || !target_bounds.width.is_finite()
+                || !target_bounds.height.is_finite()
+                || target_bounds.width <= 0.0
+                || target_bounds.height <= 0.0
+            {
+                return Err(StorybookAutomationError::InvalidInteractionStep {
+                    step_index,
+                    message: format!("interaction target `{key}` has no usable area"),
+                });
+            }
+            resolve(StoryPoint {
+                space: StoryPointSpace::LogicalPixels,
+                x: target_bounds.x + target_bounds.width / 2.0,
+                y: target_bounds.y + target_bounds.height / 2.0,
+            })
+            .map(|point| PreparedInteractionStep::PointerClick {
+                point,
+                button,
+                click_count,
+                modifiers,
+            })
+        },
         PreparedInteractionStep::Scroll {
             point,
             delta_x,
@@ -664,7 +819,7 @@ fn resolve_story_point(
     let (x, y) = match point.space {
         StoryPointSpace::Normalized => (point.x * width, point.y * height),
         StoryPointSpace::LogicalPixels => {
-            if point.x > width || point.y > height {
+            if point.x < 0.0 || point.y < 0.0 || point.x > width || point.y > height {
                 return Err(format!(
                     "logical point ({}, {}) is outside the rendered route size ({width}, {height})",
                     point.x, point.y
@@ -846,6 +1001,9 @@ fn dispatch_step(
             window,
             cx,
         )],
+        PreparedInteractionStep::ClickTarget { .. } => {
+            unreachable!("semantic target clicks are resolved before dispatch")
+        },
         PreparedInteractionStep::WaitFrames(_) => unreachable!("wait steps are scheduled"),
     }
 }
@@ -949,7 +1107,7 @@ fn send_interaction_snapshot(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::capture_region::capture_story_view_with_scroll;
+    use crate::capture_region::{StorybookElementExt as _, capture_story_view_with_scroll};
     use gpui::{
         AppContext as _, Context, Focusable, InteractiveElement as _, IntoElement, KeyDownEvent,
         Render, StatefulInteractiveElement as _, Styled as _, div,
@@ -1007,14 +1165,15 @@ mod tests {
                         this.clicks += 1;
                         this.events.push("click");
                         cx.notify();
-                    })),
+                    }))
+                    .storybook_target_as("harness", "Interaction harness"),
             )
         }
     }
 
     fn request(steps: Vec<StoryInteractionStep>) -> StoryInteractionRequest {
         StoryInteractionRequest {
-            route: None,
+            story_key: None,
             controls: BTreeMap::new(),
             width: None,
             height: None,
@@ -1113,6 +1272,15 @@ mod tests {
                     x: 1.0,
                     y: 1.01,
                 },
+                button: StoryMouseButton::Left,
+                click_count: 1,
+                modifiers: StoryModifiers::default(),
+            }])),
+            Err(StorybookAutomationError::InvalidInteractionStep { step_index: 0, .. })
+        ));
+        assert!(matches!(
+            validate_interaction_request(&request(vec![StoryInteractionStep::ClickTarget {
+                target_key: " ".to_owned(),
                 button: StoryMouseButton::Left,
                 click_count: 1,
                 modifiers: StoryModifiers::default(),
@@ -1284,6 +1452,12 @@ mod tests {
                             click_count: 1,
                             modifiers: StoryModifiers::default(),
                         },
+                        StoryInteractionStep::ClickTarget {
+                            target_key: "harness".to_owned(),
+                            button: StoryMouseButton::Left,
+                            click_count: 1,
+                            modifiers: StoryModifiers::default(),
+                        },
                         StoryInteractionStep::WaitFrames { count: 1 },
                     ];
                     let prepared = prepare_interaction_steps(&steps, cx)
@@ -1336,14 +1510,14 @@ mod tests {
             .expect("runner should respond")
             .expect("runner should complete");
         assert_eq!(snapshot.request_id, 9);
-        assert_eq!(snapshot.steps_dispatched, 6);
-        assert_eq!(snapshot.observations.len(), 6);
+        assert_eq!(snapshot.steps_dispatched, 7);
+        assert_eq!(snapshot.observations.len(), 7);
         assert!(!pending.load(Ordering::SeqCst));
         cx.update(|cx| {
             let harness = harness.read(cx);
             assert_eq!(harness.action_value, 7);
-            assert_eq!(harness.clicks, 1);
-            assert_eq!(harness.events, ["action", "click"]);
+            assert_eq!(harness.clicks, 2);
+            assert_eq!(harness.events, ["action", "click", "click"]);
             assert!(harness.hovered);
             assert_eq!(harness.text, "héllo 世界");
         });

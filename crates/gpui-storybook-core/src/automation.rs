@@ -22,9 +22,14 @@
 use crate::capture_output::CaptureOutputStore;
 pub(crate) mod interaction;
 
+pub use crate::capture_region::{
+    StoryInteractionTargetBounds, StoryInteractionTargetSnapshot, StorySemanticValueSnapshot,
+};
 use crate::{
     capture_region::{
-        capture_region_bounds, capture_route_story_key, scroll_capture_region_into_view,
+        InteractionTargetLookupError, SemanticValueLookupError, capture_region_bounds,
+        capture_route_story_key, interaction_targets, scroll_capture_region_into_view,
+        semantic_values,
     },
     controls::{ControlSnapshot, ControlValue},
     presentation::StoryViewportPreset,
@@ -52,7 +57,7 @@ use std::{
     },
 };
 use thiserror::Error;
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::{mpsc, oneshot, watch};
 
 pub const DEFAULT_STORY_CAPTURE_WIDTH: u32 = 1280;
 pub const DEFAULT_STORY_CAPTURE_HEIGHT: u32 = 720;
@@ -166,6 +171,26 @@ pub struct StoryControlsSnapshot {
     pub controls: Vec<ControlSnapshot>,
 }
 
+/// Semantic interaction targets currently rendered by the selected route.
+#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
+#[schemars(deny_unknown_fields)]
+pub struct StoryInteractionTargetsSnapshot {
+    /// Story or substory route whose rendered targets were inspected.
+    pub story: StorySnapshot,
+    /// Stable targets in deterministic key order.
+    pub targets: Vec<StoryInteractionTargetSnapshot>,
+}
+
+/// Machine-readable values currently rendered by the selected story route.
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[schemars(deny_unknown_fields)]
+pub struct StorySemanticValuesSnapshot {
+    /// Story or substory route whose values were read.
+    pub story: StorySnapshot,
+    /// Stable values in deterministic key order.
+    pub values: Vec<StorySemanticValueSnapshot>,
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[schemars(deny_unknown_fields)]
 pub struct StoryCaptureSnapshot {
@@ -179,6 +204,13 @@ pub struct StoryCaptureSnapshot {
 /// Structured live-host, validation, control, interaction, and capture errors.
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
 pub enum StorybookAutomationError {
+    /// The standard gallery or dock did not finish publishing and attaching its
+    /// live automation host within the MCP startup deadline.
+    #[error("GPUI storybook automation did not become ready within {seconds} seconds")]
+    StartupTimedOut {
+        /// Bounded startup wait in seconds.
+        seconds: u64,
+    },
     /// No gallery or dock window has attached the automation command receiver.
     #[error("no live GPUI storybook host is attached")]
     NoLiveHost,
@@ -254,6 +286,61 @@ pub enum StorybookAutomationError {
         /// Control failure detail.
         message: String,
     },
+    /// The active story route has not rendered semantic target bounds.
+    #[error("interaction targets are unavailable because route `{route}` is not rendered")]
+    InteractionTargetsUnavailable {
+        /// Active story or substory route.
+        route: String,
+    },
+    /// A semantic target key is not present in the active route.
+    #[error("interaction target `{key}` was not found in route `{route}`")]
+    InteractionTargetNotFound {
+        /// Active story or substory route.
+        route: String,
+        /// Requested stable target key.
+        key: String,
+    },
+    /// A story rendered the same semantic target key more than once.
+    #[error("interaction target `{key}` is duplicated in route `{route}`")]
+    DuplicateInteractionTarget {
+        /// Active story or substory route.
+        route: String,
+        /// Duplicated stable target key.
+        key: String,
+    },
+    /// The active story route has not rendered semantic values.
+    #[error("semantic values are unavailable because route `{route}` is not rendered")]
+    SemanticValuesUnavailable {
+        /// Active story or substory route.
+        route: String,
+    },
+    /// A semantic value key is not present in the active route.
+    #[error("semantic value `{key}` was not found in route `{route}`")]
+    SemanticValueNotFound {
+        /// Active story or substory route.
+        route: String,
+        /// Requested stable value key.
+        key: String,
+    },
+    /// A semantic value did not match the requested JSON value within the
+    /// bounded number of refreshed frames.
+    #[error("semantic value `{key}` in route `{route}` did not match within {max_frames} frame(s)")]
+    SemanticValueWaitTimedOut {
+        /// Active story or substory route.
+        route: String,
+        /// Requested stable value key.
+        key: String,
+        /// Maximum refreshed frames requested by the caller.
+        max_frames: u16,
+    },
+    /// A story rendered the same semantic value key more than once.
+    #[error("semantic value `{key}` is duplicated in route `{route}`")]
+    DuplicateSemanticValue {
+        /// Active story or substory route.
+        route: String,
+        /// Duplicated stable value key.
+        key: String,
+    },
 }
 
 pub(crate) enum StorybookAutomationCommand {
@@ -285,6 +372,13 @@ pub(crate) enum StorybookAutomationCommand {
     ListActions {
         response: oneshot::Sender<Result<Vec<StoryActionSnapshot>, StorybookAutomationError>>,
     },
+    ListInteractionTargets {
+        response:
+            oneshot::Sender<Result<StoryInteractionTargetsSnapshot, StorybookAutomationError>>,
+    },
+    ReadSemanticValues {
+        response: oneshot::Sender<Result<StorySemanticValuesSnapshot, StorybookAutomationError>>,
+    },
     RunSteps {
         request_id: u64,
         request: StoryInteractionRequest,
@@ -311,11 +405,25 @@ struct StorybookAutomationState {
     revision: u64,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+struct StorybookAutomationReadiness {
+    catalog_published: bool,
+    live_host_attached: bool,
+}
+
+impl StorybookAutomationReadiness {
+    const fn ready(self) -> bool {
+        self.catalog_published && self.live_host_attached
+    }
+}
+
 pub struct StorybookAutomation {
     state: Mutex<StorybookAutomationState>,
     command_tx: mpsc::UnboundedSender<StorybookAutomationCommand>,
     command_rx: Mutex<Option<mpsc::UnboundedReceiver<StorybookAutomationCommand>>>,
     live_host_attached: AtomicBool,
+    startup_wait_required: AtomicBool,
+    readiness_tx: watch::Sender<StorybookAutomationReadiness>,
     operation_pending: Arc<AtomicBool>,
     next_request_id: AtomicU64,
 }
@@ -351,12 +459,23 @@ impl StorySnapshot {
 
 impl StorybookAutomation {
     pub fn new() -> SharedStorybookAutomation {
-        Self::with_stories(Vec::new())
+        Self::build(Vec::new(), true)
     }
 
     pub fn with_stories(stories: Vec<StorySnapshot>) -> SharedStorybookAutomation {
+        Self::build(stories, false)
+    }
+
+    fn build(
+        stories: Vec<StorySnapshot>,
+        startup_wait_required: bool,
+    ) -> SharedStorybookAutomation {
         let (command_tx, command_rx) = mpsc::unbounded_channel();
         let current_story_key = stories.first().map(|story| story.key.clone());
+        let (readiness_tx, _) = watch::channel(StorybookAutomationReadiness {
+            catalog_published: !startup_wait_required,
+            live_host_attached: false,
+        });
 
         Arc::new(Self {
             state: Mutex::new(StorybookAutomationState {
@@ -367,6 +486,8 @@ impl StorybookAutomation {
             command_tx,
             command_rx: Mutex::new(Some(command_rx)),
             live_host_attached: AtomicBool::new(false),
+            startup_wait_required: AtomicBool::new(startup_wait_required),
+            readiness_tx,
             operation_pending: Arc::new(AtomicBool::new(false)),
             next_request_id: AtomicU64::new(1),
         })
@@ -385,6 +506,40 @@ impl StorybookAutomation {
         }
 
         state.stories = stories;
+        drop(state);
+        self.update_readiness(|readiness| readiness.catalog_published = true);
+    }
+
+    /// Wait until the standard gallery or dock has published its catalog and
+    /// attached the live automation command receiver.
+    ///
+    /// Controllers built with [`with_stories`](Self::with_stories) are treated
+    /// as explicitly configured low-level integrations and return immediately.
+    /// The MCP layer applies its own bounded timeout around this future.
+    pub async fn wait_until_ready(&self) {
+        if !self.startup_wait_required.load(Ordering::SeqCst) {
+            return;
+        }
+
+        let mut readiness = self.readiness_tx.subscribe();
+        loop {
+            if readiness.borrow_and_update().ready() {
+                self.startup_wait_required.store(false, Ordering::SeqCst);
+                return;
+            }
+            if readiness.changed().await.is_err() {
+                return;
+            }
+        }
+    }
+
+    fn update_readiness(&self, update: impl FnOnce(&mut StorybookAutomationReadiness)) {
+        self.readiness_tx.send_modify(|readiness| {
+            update(readiness);
+            if readiness.ready() {
+                self.startup_wait_required.store(false, Ordering::SeqCst);
+            }
+        });
     }
 
     pub fn stories(&self) -> Vec<StorySnapshot> {
@@ -533,6 +688,28 @@ impl StorybookAutomation {
         receive_host_response(receiver).await
     }
 
+    /// Lists stable semantic targets rendered by the selected story route.
+    pub async fn list_interaction_targets(
+        &self,
+    ) -> Result<StoryInteractionTargetsSnapshot, StorybookAutomationError> {
+        let (response, receiver) = self.live_command_channel()?;
+        self.command_tx
+            .send(StorybookAutomationCommand::ListInteractionTargets { response })
+            .map_err(|_| StorybookAutomationError::NoLiveHost)?;
+        receive_host_response(receiver).await
+    }
+
+    /// Reads stable machine-readable values rendered by the selected route.
+    pub async fn read_semantic_values(
+        &self,
+    ) -> Result<StorySemanticValuesSnapshot, StorybookAutomationError> {
+        let (response, receiver) = self.live_command_channel()?;
+        self.command_tx
+            .send(StorybookAutomationCommand::ReadSemanticValues { response })
+            .map_err(|_| StorybookAutomationError::NoLiveHost)?;
+        receive_host_response(receiver).await
+    }
+
     /// Runs one validated interaction batch on the live GPUI window thread.
     ///
     /// The batch owns the shared operation guard through every frame wait and
@@ -602,6 +779,7 @@ impl StorybookAutomation {
 
         if receiver.is_some() {
             self.live_host_attached.store(true, Ordering::SeqCst);
+            self.update_readiness(|readiness| readiness.live_host_attached = true);
         }
 
         receiver
@@ -628,6 +806,57 @@ impl StorybookAutomation {
             revision: state.revision,
         })
     }
+}
+
+pub(crate) fn rendered_interaction_targets(
+    story: StorySnapshot,
+) -> Result<StoryInteractionTargetsSnapshot, StorybookAutomationError> {
+    let route = story.capture_route_id.clone();
+    let targets = interaction_targets(&route).map_err(|error| match error {
+        InteractionTargetLookupError::RouteNotRendered => {
+            StorybookAutomationError::InteractionTargetsUnavailable {
+                route: route.clone(),
+            }
+        },
+        InteractionTargetLookupError::DuplicateKey(key) => {
+            StorybookAutomationError::DuplicateInteractionTarget {
+                route: route.clone(),
+                key,
+            }
+        },
+    })?;
+    Ok(StoryInteractionTargetsSnapshot { story, targets })
+}
+
+pub(crate) fn rendered_semantic_values(
+    story: StorySnapshot,
+) -> Result<StorySemanticValuesSnapshot, StorybookAutomationError> {
+    let route = story.capture_route_id.clone();
+    let values = semantic_values(&route).map_err(|error| match error {
+        SemanticValueLookupError::RouteNotRendered => {
+            StorybookAutomationError::SemanticValuesUnavailable {
+                route: route.clone(),
+            }
+        },
+        SemanticValueLookupError::DuplicateKey(key) => {
+            StorybookAutomationError::DuplicateSemanticValue {
+                route: route.clone(),
+                key,
+            }
+        },
+    })?;
+    Ok(StorySemanticValuesSnapshot { story, values })
+}
+
+pub(crate) fn schedule_semantic_value_read(
+    story: StorySnapshot,
+    response: oneshot::Sender<Result<StorySemanticValuesSnapshot, StorybookAutomationError>>,
+    window: &mut Window,
+) {
+    window.refresh();
+    window.on_next_frame(move |_window, _cx| {
+        let _ = response.send(rendered_semantic_values(story));
+    });
 }
 
 async fn receive_host_response<T>(
@@ -1152,6 +1381,41 @@ mod tests {
     }
 
     #[test]
+    fn facade_automation_waits_for_catalog_and_live_host() {
+        let automation = StorybookAutomation::new();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .expect("test runtime should build");
+
+        runtime.block_on(async {
+            let waiting = automation.clone();
+            let ready = tokio::spawn(async move { waiting.wait_until_ready().await });
+            tokio::task::yield_now().await;
+            assert!(!ready.is_finished());
+
+            automation.set_stories(vec![sample_story("crate-ButtonStory", "Button")]);
+            tokio::task::yield_now().await;
+            assert!(!ready.is_finished());
+
+            let _receiver = automation
+                .take_command_receiver()
+                .expect("live host should attach once");
+            ready.await.expect("readiness task should complete");
+        });
+    }
+
+    #[test]
+    fn explicitly_seeded_automation_skips_facade_startup_wait() {
+        let automation =
+            StorybookAutomation::with_stories(vec![sample_story("crate-ButtonStory", "Button")]);
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .expect("test runtime should build");
+
+        runtime.block_on(automation.wait_until_ready());
+    }
+
+    #[test]
     fn operation_guard_rejects_mutations_until_its_owner_drops() {
         let automation =
             StorybookAutomation::with_stories(vec![sample_story("crate-ButtonStory", "Button")]);
@@ -1295,6 +1559,39 @@ mod tests {
                     message: "invalid".to_string(),
                 },
                 "invalid",
+            ),
+            (
+                StorybookAutomationError::InteractionTargetsUnavailable {
+                    route: "story/section".to_string(),
+                },
+                "interaction targets are unavailable because route `story/section` is not rendered",
+            ),
+            (
+                StorybookAutomationError::InteractionTargetNotFound {
+                    route: "story".to_string(),
+                    key: "execute".to_string(),
+                },
+                "interaction target `execute` was not found in route `story`",
+            ),
+            (
+                StorybookAutomationError::DuplicateInteractionTarget {
+                    route: "story".to_string(),
+                    key: "execute".to_string(),
+                },
+                "interaction target `execute` is duplicated in route `story`",
+            ),
+            (
+                StorybookAutomationError::SemanticValuesUnavailable {
+                    route: "story/section".to_string(),
+                },
+                "semantic values are unavailable because route `story/section` is not rendered",
+            ),
+            (
+                StorybookAutomationError::DuplicateSemanticValue {
+                    route: "story".to_string(),
+                    key: "response".to_string(),
+                },
+                "semantic value `response` is duplicated in route `story`",
             ),
         ];
 
