@@ -1528,15 +1528,14 @@ mod tests {
         let (window, receiver, progress, pending) = cx.update(|cx| {
             let window = cx
                 .open_window(Default::default(), |_, cx| {
-                    let entity = cx.new(|cx| InteractionHarness {
+                    cx.new(|cx| InteractionHarness {
                         focus_handle: cx.focus_handle().tab_stop(true),
                         text: String::new(),
                         clicks: 0,
                         hovered: false,
                         action_value: 0,
                         events: Vec::new(),
-                    });
-                    entity
+                    })
                 })
                 .expect("interaction test window should open");
             let (response, receiver) = oneshot::channel();
