@@ -28,7 +28,7 @@ version = "0.5.0"
 [workspace.dependencies]
 anyhow = "1.0"
 clap = "4.6"
-component-shape-mcp = { git = "https://github.com/stayhydated/component-shape", rev = "8b879b2150caea99284e98044cdf0488d613cbdb", version = "0.2.0" }
+component-shape-mcp = { git = "https://github.com/stayhydated/component-shape", rev = "8dd9335217121c089793c0106339ca5a8f61f4f7", version = "0.2.0" }
 darling = "0.24"
 derive_more = "2.1"
 dioxus = { default-features = false, version = "0.7" }
@@ -38,7 +38,7 @@ es-fluent-lang = { git = "https://github.com/stayhydated/es-fluent", rev = "69ae
 es-fluent-manager-core = { git = "https://github.com/stayhydated/es-fluent", rev = "69aeaa62c03b23317be13d0ce0661f3160d62db7", version = "0.18.1" }
 es-fluent-manager-embedded = { git = "https://github.com/stayhydated/es-fluent", rev = "69aeaa62c03b23317be13d0ce0661f3160d62db7", version = "0.18.1" }
 fluent-langneg = "=0.13.1"
-frame-capture = { git = "https://github.com/stayhydated/frame-capture", rev = "a081d560d44309acb78f96d4c6ac9b60c5d833d8", version = "0.1.0" }
+frame-capture = { git = "https://github.com/stayhydated/frame-capture", rev = "9d060141da6e224808f245946fccedee756fbab3", version = "0.1.0" }
 gpui = { branch = "linux-headless-renderer", git = "https://github.com/stayhydated/zed", version = "0.2.2" }
 gpui-component = { git = "https://github.com/stayhydated/gpui-component", rev = "33f25d368447a47ab5da2c674b2e833826c79fb1" }
 gpui-component-assets = { git = "https://github.com/stayhydated/gpui-component", rev = "33f25d368447a47ab5da2c674b2e833826c79fb1" }

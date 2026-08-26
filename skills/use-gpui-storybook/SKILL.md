@@ -57,6 +57,9 @@ description: >-
 - Forward optional package features explicitly when users launch with
   `--features dock`, `--features inspector`, or `--features mcp`.
 - Send logs to standard error during MCP stdio sessions.
+- Retain the MCP automation handle for the host lifetime. Tool completion
+  does not request shutdown; stdin, cancellation, or application policy ends
+  the host explicitly.
 - Run Linux MCP and startup-capture sessions through
   `gpui-storybook-launch`; keep the application on its normal Wayland platform
   backend and use `GPUI_STORYBOOK_SWAY` for a private Sway executable.

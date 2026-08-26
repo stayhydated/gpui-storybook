@@ -21,10 +21,13 @@
 //! overwriting persistent interactive choices. On Linux, generated launch
 //! commands run the Wayland application through Sway's wlroots headless backend
 //! so GPUI receives compositor-driven frame callbacks without a physical display.
+//! MCP servers retain the shared automation registry for the complete live-host
+//! lifetime; completing an automation call never requests application
+//! shutdown.
 
 use component_shape_mcp::{
     McpJsonSchema, McpSchema, McpSchemaProperties, McpServer, McpToolError, McpToolInput,
-    McpToolMetadata, McpTypedTool, ServeStdioResult, nullable_schema,
+    McpToolMetadata, McpToolRegistry, McpTypedTool, ServeStdioResult, nullable_schema,
     tool_definition_for_input_with_metadata, tool_error_result_for, tool_structured_result,
 };
 use frame_capture::{
@@ -517,25 +520,44 @@ pub fn server_with_options(
     automation: SharedStorybookAutomation,
     options: StorybookMcpServerOptions,
 ) -> Result<McpServer, McpToolError> {
-    let mut server = McpServer::new("gpui-storybook", env!("CARGO_PKG_VERSION"));
-    register_tools_with_options(&mut server, automation, options)?;
-    Ok(server)
+    Ok(McpServer::from_tool_registry(
+        "gpui-storybook",
+        env!("CARGO_PKG_VERSION"),
+        tool_registry_with_options(automation, options)?,
+    ))
+}
+
+/// Build the Storybook MCP tool registry.
+pub fn tool_registry(
+    automation: SharedStorybookAutomation,
+) -> Result<McpToolRegistry, McpToolError> {
+    tool_registry_with_options(automation, StorybookMcpServerOptions::from_env())
+}
+
+/// Build the Storybook tool registry with explicit runtime capabilities.
+pub fn tool_registry_with_options(
+    automation: SharedStorybookAutomation,
+    options: StorybookMcpServerOptions,
+) -> Result<McpToolRegistry, McpToolError> {
+    let mut tools = McpToolRegistry::new();
+    register_tools_with_options(&mut tools, automation, options)?;
+    Ok(tools)
 }
 
 pub fn register_tools(
-    server: &mut McpServer,
+    tools: &mut McpToolRegistry,
     automation: SharedStorybookAutomation,
 ) -> Result<(), McpToolError> {
-    register_tools_with_options(server, automation, StorybookMcpServerOptions::from_env())
+    register_tools_with_options(tools, automation, StorybookMcpServerOptions::from_env())
 }
 
 /// Register Storybook tools with explicit runtime capabilities.
 pub fn register_tools_with_options(
-    server: &mut McpServer,
+    tools: &mut McpToolRegistry,
     automation: SharedStorybookAutomation,
     options: StorybookMcpServerOptions,
 ) -> Result<(), McpToolError> {
-    server.add_typed_tool_async(
+    tools.add_typed_tool_async(
         tool::<EmptyInput>(
             TOOL_LIST_STORIES,
             "List Stories",
@@ -559,7 +581,7 @@ pub fn register_tools_with_options(
         },
     )?;
 
-    server.add_typed_tool_async(
+    tools.add_typed_tool_async(
         tool::<StoryKeyInput>(
             TOOL_GET_STORY,
             "Get Story",
@@ -584,7 +606,7 @@ pub fn register_tools_with_options(
         },
     )?;
 
-    server.add_typed_tool_async(
+    tools.add_typed_tool_async(
         tool::<EmptyInput>(
             TOOL_CURRENT_STORY,
             "Current Story",
@@ -606,7 +628,7 @@ pub fn register_tools_with_options(
         },
     )?;
 
-    server.add_typed_tool_async(
+    tools.add_typed_tool_async(
         tool::<StoryKeyInput>(
             TOOL_OPEN_STORY,
             "Open Story",
@@ -631,7 +653,7 @@ pub fn register_tools_with_options(
         },
     )?;
 
-    server.add_typed_tool_async(
+    tools.add_typed_tool_async(
         tool::<EmptyInput>(
             TOOL_READ_SEMANTIC_VALUES,
             "Read Semantic Values",
@@ -656,7 +678,7 @@ pub fn register_tools_with_options(
         },
     )?;
 
-    server.add_typed_tool_async(
+    tools.add_typed_tool_async(
         tool::<ReadValueInput>(
             TOOL_READ_VALUE,
             "Read Value",
@@ -681,7 +703,7 @@ pub fn register_tools_with_options(
         },
     )?;
 
-    server.add_typed_tool_async(wait_for_value_tool()?, {
+    tools.add_typed_tool_async(wait_for_value_tool()?, {
         let automation = automation.clone();
         move |input| {
             let automation = automation.clone();
@@ -701,7 +723,7 @@ pub fn register_tools_with_options(
     })?;
 
     if options.interaction_enabled() {
-        server.add_typed_tool_async(
+        tools.add_typed_tool_async(
             tool::<EmptyInput>(
                 TOOL_LIST_ACTIONS,
                 "List Actions",
@@ -728,7 +750,7 @@ pub fn register_tools_with_options(
             },
         )?;
 
-        server.add_typed_tool_async(
+        tools.add_typed_tool_async(
             tool::<EmptyInput>(
                 TOOL_LIST_INTERACTION_TARGETS,
                 "List Interaction Targets",
@@ -753,7 +775,7 @@ pub fn register_tools_with_options(
             },
         )?;
 
-        server.add_typed_tool_async(
+        tools.add_typed_tool_async(
             tool::<ClickTargetInput>(
                 TOOL_CLICK_TARGET,
                 "Click Target",
@@ -779,7 +801,7 @@ pub fn register_tools_with_options(
             },
         )?;
 
-        server.add_typed_tool_async(interaction_tool()?, {
+        tools.add_typed_tool_async(interaction_tool()?, {
             let automation = automation.clone();
             move |input| {
                 let automation = automation.clone();
@@ -797,7 +819,7 @@ pub fn register_tools_with_options(
         })?;
     }
 
-    server.add_typed_tool_async(
+    tools.add_typed_tool_async(
         tool::<EmptyInput>(
             TOOL_READ_CONTROLS,
             "Read Controls",
@@ -822,7 +844,7 @@ pub fn register_tools_with_options(
         },
     )?;
 
-    server.add_typed_tool_async(
+    tools.add_typed_tool_async(
         tool::<SetControlInput>(
             TOOL_SET_CONTROL,
             "Set Control",
@@ -850,7 +872,7 @@ pub fn register_tools_with_options(
         },
     )?;
 
-    server.add_typed_tool_async(
+    tools.add_typed_tool_async(
         tool::<ResetControlInput>(
             TOOL_RESET_CONTROL,
             "Reset Control",
@@ -875,7 +897,7 @@ pub fn register_tools_with_options(
         },
     )?;
 
-    server.add_typed_tool_async(
+    tools.add_typed_tool_async(
         capture_tool::<CaptureCurrentStoryInput>(
             TOOL_CAPTURE_CURRENT_STORY,
             "Capture Current Story",
@@ -907,7 +929,7 @@ pub fn register_tools_with_options(
         },
     )?;
 
-    server.add_typed_tool(
+    tools.add_typed_tool(
         capture_tool::<CaptureLaunchEnvInput>(
             TOOL_CAPTURE_LAUNCH_ENV,
             "Capture Launch Env",

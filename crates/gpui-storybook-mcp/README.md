@@ -88,6 +88,10 @@ let options = gpui_storybook::mcp::StorybookMcpServerOptions::default()
 let server = gpui_storybook::mcp::server_with_options(automation, options)?;
 ```
 
+`tool_registry_with_options` builds the shared MCP definitions and handlers.
+MCP retains the live automation state across calls until its transport or
+application host is explicitly stopped.
+
 `storybook_list_actions` returns automation-visible action names,
 documentation, and JSON argument schemas from the launched GPUI application.
 GPUI keymap sentinels and Storybook-private workbench actions are omitted.

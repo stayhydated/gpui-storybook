@@ -88,6 +88,8 @@ story action or input handler, so use an inert fixture or a safe backend.
 
 The standard `Gallery::view` and `StoryWorkspace::view` constructors attach
 the controller installed by `gpui_storybook::init`.
+Retain the MCP automation state across calls until the transport or
+application host is explicitly stopped.
 
 ## MCP tools
 

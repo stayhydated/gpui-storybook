@@ -1495,7 +1495,7 @@ dependencies = [
 [[package]]
 name = "component-shape"
 version = "0.2.0"
-source = "git+https://github.com/stayhydated/component-shape?rev=8b879b2150caea99284e98044cdf0488d613cbdb#8b879b2150caea99284e98044cdf0488d613cbdb"
+source = "git+https://github.com/stayhydated/component-shape?rev=8dd9335217121c089793c0106339ca5a8f61f4f7#8dd9335217121c089793c0106339ca5a8f61f4f7"
 dependencies = [
  "derive_more",
  "heck 0.5.0",
@@ -1507,7 +1507,7 @@ dependencies = [
 [[package]]
 name = "component-shape-mcp"
 version = "0.2.0"
-source = "git+https://github.com/stayhydated/component-shape?rev=8b879b2150caea99284e98044cdf0488d613cbdb#8b879b2150caea99284e98044cdf0488d613cbdb"
+source = "git+https://github.com/stayhydated/component-shape?rev=8dd9335217121c089793c0106339ca5a8f61f4f7#8dd9335217121c089793c0106339ca5a8f61f4f7"
 dependencies = [
  "component-shape",
  "component-shape-mcp-macros",
@@ -1522,7 +1522,7 @@ dependencies = [
 [[package]]
 name = "component-shape-mcp-macros"
 version = "0.2.0"
-source = "git+https://github.com/stayhydated/component-shape?rev=8b879b2150caea99284e98044cdf0488d613cbdb#8b879b2150caea99284e98044cdf0488d613cbdb"
+source = "git+https://github.com/stayhydated/component-shape?rev=8dd9335217121c089793c0106339ca5a8f61f4f7#8dd9335217121c089793c0106339ca5a8f61f4f7"
 dependencies = [
  "proc-macro-crate 3.5.0",
  "proc-macro2",
@@ -3556,7 +3556,7 @@ dependencies = [
 [[package]]
 name = "frame-capture"
 version = "0.1.0"
-source = "git+https://github.com/stayhydated/frame-capture?rev=a081d560d44309acb78f96d4c6ac9b60c5d833d8#a081d560d44309acb78f96d4c6ac9b60c5d833d8"
+source = "git+https://github.com/stayhydated/frame-capture?rev=9d060141da6e224808f245946fccedee756fbab3#9d060141da6e224808f245946fccedee756fbab3"
 dependencies = [
  "bon",
  "derive_more",
@@ -3571,7 +3571,7 @@ dependencies = [
 [[package]]
 name = "frame-capture-macros"
 version = "0.1.0"
-source = "git+https://github.com/stayhydated/frame-capture?rev=a081d560d44309acb78f96d4c6ac9b60c5d833d8#a081d560d44309acb78f96d4c6ac9b60c5d833d8"
+source = "git+https://github.com/stayhydated/frame-capture?rev=9d060141da6e224808f245946fccedee756fbab3#9d060141da6e224808f245946fccedee756fbab3"
 dependencies = [
  "darling 0.24.1",
  "frame-capture-toml",
@@ -3585,7 +3585,7 @@ dependencies = [
 [[package]]
 name = "frame-capture-toml"
 version = "0.1.0"
-source = "git+https://github.com/stayhydated/frame-capture?rev=a081d560d44309acb78f96d4c6ac9b60c5d833d8#a081d560d44309acb78f96d4c6ac9b60c5d833d8"
+source = "git+https://github.com/stayhydated/frame-capture?rev=9d060141da6e224808f245946fccedee756fbab3#9d060141da6e224808f245946fccedee756fbab3"
 dependencies = [
  "serde",
  "thiserror 2.0.20",

@@ -312,6 +312,11 @@ let options = gpui_storybook::mcp::StorybookMcpServerOptions::default()
 let server = gpui_storybook::mcp::server_with_options(automation, options)?;
 ```
 
+Use `tool_registry_with_options` when one host assembles the shared
+Storybook MCP definitions and handlers independently from the server. MCP
+retains the automation handle across calls and remains active until stdin
+closes, the client cancels, or application policy requests shutdown.
+
 ## Reproduce a controlled story
 
 Open the route before reading or changing its controls:
