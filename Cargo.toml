@@ -40,8 +40,8 @@ es-fluent-manager-embedded = { git = "https://github.com/stayhydated/es-fluent",
 fluent-langneg = "=0.13.1"
 frame-capture = { git = "https://github.com/stayhydated/frame-capture", rev = "9d060141da6e224808f245946fccedee756fbab3", version = "0.1.0" }
 gpui = { branch = "linux-headless-renderer", git = "https://github.com/stayhydated/zed", version = "0.2.2" }
-gpui-component = { git = "https://github.com/stayhydated/gpui-component", rev = "33f25d368447a47ab5da2c674b2e833826c79fb1" }
-gpui-component-assets = { git = "https://github.com/stayhydated/gpui-component", rev = "33f25d368447a47ab5da2c674b2e833826c79fb1" }
+gpui-component = { git = "https://github.com/stayhydated/gpui-component", rev = "cdba027283fec36e37fb4b90dea862b1e116aa2d" }
+gpui-component-assets = { git = "https://github.com/stayhydated/gpui-component", rev = "cdba027283fec36e37fb4b90dea862b1e116aa2d" }
 gpui-es-fluent = { git = "https://github.com/stayhydated/gpui-es-fluent", rev = "f7fb536779286caaf2334cf9b56f2081841a86ff", version = "0.1.0" }
 gpui-storybook = { path = "crates/gpui-storybook", version = "0.5.0" }
 gpui-storybook-components = { path = "crates/gpui-storybook-components", version = "0.5.0" }

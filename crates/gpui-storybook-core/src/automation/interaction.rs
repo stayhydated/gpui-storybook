@@ -921,7 +921,7 @@ fn dispatch_step(
             vec![StoryInteractionDispatch::Dispatched]
         },
         PreparedInteractionStep::Blur => {
-            window.blur();
+            window.blur(cx);
             vec![StoryInteractionDispatch::Dispatched]
         },
         PreparedInteractionStep::Keystrokes(keys) => keys
