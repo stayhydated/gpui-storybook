@@ -42,7 +42,7 @@ frame-capture = { git = "https://github.com/stayhydated/frame-capture", rev = "9
 gpui = { branch = "linux-headless-renderer", git = "https://github.com/stayhydated/zed", version = "0.2.2" }
 gpui-component = { git = "https://github.com/stayhydated/gpui-component", rev = "cdba027283fec36e37fb4b90dea862b1e116aa2d" }
 gpui-component-assets = { git = "https://github.com/stayhydated/gpui-component", rev = "cdba027283fec36e37fb4b90dea862b1e116aa2d" }
-gpui-es-fluent = { git = "https://github.com/stayhydated/gpui-es-fluent", rev = "bf549faa89b1981b0564f677f5a32e365be56ad5", version = "0.1.0" }
+gpui-es-fluent = { git = "https://github.com/stayhydated/gpui-es-fluent", rev = "b3cec2eebc2e5d53b7dbd4ab77271c272a1ac07e", version = "0.1.0" }
 gpui-storybook = { path = "crates/gpui-storybook", version = "0.5.0" }
 gpui-storybook-components = { path = "crates/gpui-storybook-components", version = "0.5.0" }
 gpui-storybook-core = { path = "crates/gpui-storybook-core", version = "0.5.0" }
