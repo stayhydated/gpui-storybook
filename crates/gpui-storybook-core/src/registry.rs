@@ -1,5 +1,37 @@
+use crate::catalog::StaticControlSpec;
 use crate::story::StoryContainer;
+use serde::Serialize;
 use std::borrow::Borrow;
+
+/// Documentation and control metadata captured at story registration time.
+///
+/// This is deliberately static: a story's localized title, description, and
+/// control defaults can depend on a live [`gpui::App`] and therefore belong to
+/// a live story instance. The static catalog uses this value for source
+/// documentation and control shape metadata that macros can obtain without
+/// constructing a story.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+pub struct StoryAutodoc {
+    docs: &'static str,
+    controls: &'static [StaticControlSpec],
+}
+
+impl StoryAutodoc {
+    /// Creates static documentation metadata for one registered story.
+    pub const fn new(docs: &'static str, controls: &'static [StaticControlSpec]) -> Self {
+        Self { docs, controls }
+    }
+
+    /// Returns the Rust documentation captured from the story declaration.
+    pub const fn docs(self) -> &'static str {
+        self.docs
+    }
+
+    /// Returns control shape metadata captured from marked story fields.
+    pub const fn controls(self) -> &'static [StaticControlSpec] {
+        self.controls
+    }
+}
 
 /// Stable runtime key for a registered story.
 ///
@@ -203,6 +235,7 @@ pub struct StoryEntry {
     pub crate_dir: &'static str,
     pub file: &'static str,
     pub line: u32,
+    autodoc: StoryAutodoc,
 }
 
 /// Compile-time source provenance for a registered story.
@@ -259,7 +292,13 @@ impl StoryEntry {
             crate_dir: source.crate_dir,
             file: source.file,
             line: source.line,
+            autodoc: StoryAutodoc::new("", &[]),
         }
+    }
+
+    /// Adds static documentation and control metadata to a registry entry.
+    pub const fn with_autodoc(self, autodoc: StoryAutodoc) -> Self {
+        Self { autodoc, ..self }
     }
 
     /// Returns this story's stable machine key.
@@ -267,8 +306,9 @@ impl StoryEntry {
         self.key
     }
 
-    /// Returns the typed metadata that should be copied into runtime
-    /// [`StoryContainer`] values.
+    /// Returns the typed identity and source metadata that should be copied
+    /// into runtime [`StoryContainer`] values. Static autodocs are available
+    /// separately through [`StoryEntry::autodoc`].
     pub const fn metadata(&self) -> RegisteredStoryMetadata {
         RegisteredStoryMetadata::new(
             self.key,
@@ -279,6 +319,12 @@ impl StoryEntry {
             self.file,
             self.line,
         )
+    }
+
+    /// Returns the static documentation and control metadata captured for this
+    /// entry.
+    pub const fn autodoc(&self) -> StoryAutodoc {
+        self.autodoc
     }
 }
 
@@ -393,6 +439,8 @@ mod tests {
         assert_eq!(metadata.crate_dir(), "/tmp/storybook");
         assert_eq!(metadata.source_file(), "src/lib.rs");
         assert_eq!(metadata.source_line(), 42);
+        assert_eq!(entry.autodoc().docs(), "");
+        assert!(entry.autodoc().controls().is_empty());
     }
 
     #[test]

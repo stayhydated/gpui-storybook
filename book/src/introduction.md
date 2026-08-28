@@ -11,10 +11,12 @@ A Storybook binary can provide:
 
 - a searchable gallery of linked stories;
 - a dock workspace for panel-based inspection;
-- stateful stories with their own focus, actions, and lifecycle;
+- stateful stories with their own interaction focus, explicit root action
+  scope, and lifecycle;
 - component stories generated from example data;
 - a right-side workbench with controls, theme editing, preview settings, story
-  source details, and opt-in GPUI Inspector integration;
+  source details, selected-story actions and key bindings, opt-in performance
+  telemetry, and opt-in GPUI Inspector integration;
 - persistent, consumer-scoped appearance and language preferences;
 - stable story and substory routes for MCP automation and PNG capture.
 

@@ -2,7 +2,7 @@
 
 `gpui-storybook` is the public facade for adding a searchable Storybook window
 to a GPUI application. It exposes initialization, gallery and window helpers,
-story registration, typed controls, the live controls, theme, and inspect
+story registration, typed controls, the live controls, theme, inspect, and actions
 workbench, typed preferences, localization support, and optional GPUI Inspector,
 dock, and MCP integrations.
 
@@ -17,6 +17,7 @@ crates.
 | `dock` | No | Add the panel-based `StoryWorkspace` |
 | `inspector` | No | Add the GPUI Inspector button, UI, and story-root metadata |
 | `mcp` | No | Add MCP tools, opt-in in-process interaction, and PNG capture support |
+| `performance` | No | Add GPUI window timing histograms and the debug frame overlay to the workbench |
 
 Initialization is asynchronous: call `gpui_storybook::init`, await the returned
 readiness task, and only then create the first story window.
@@ -33,6 +34,19 @@ struct ButtonStory {
     disabled: bool,
 }
 ```
+
+Implement `Story::scenarios()` for explicit stories, or pass
+`scenarios = Component::scenarios()` to `ComponentStory`, to publish reusable
+named interaction flows. The Scenarios workbench tab and MCP list/run tools use
+the same executor. Every scenario recreates its concrete story before applying
+controls, presentation, steps, exact semantic postconditions, and optional
+capture.
+
+`static_story_catalog()` and the JSON export helpers read linked registration
+metadata without constructing a story or opening GPUI. The deterministic output
+contains stable keys, section/source provenance, declaration Rustdocs, and
+static control kinds, labels, bounds, and options. Localized runtime copy and
+constructor-derived defaults remain in the live catalog.
 
 The preview canvas stays centered inside a visible frame. **Mobile**, **Tablet**,
 and **Desktop** use locked preset dimensions; **Responsive** exposes resize
@@ -53,6 +67,20 @@ changes.
 The Inspect tab always shows the selected story's key and source. With
 `inspector` enabled, it also opens GPUI Component's Inspector and publishes the
 selected story's key, title, source, and control keys to that Inspector.
+
+The Actions tab follows the selected story's opt-in
+`Story::action_scope_focus_handle` and lists default-buildable actions,
+documentation, argument schemas, and effective key bindings on that explicit
+page/component root. Actions from nested inputs and the Storybook shell/root
+stay out of the list. Dispatch targets the same scope even while the workbench
+is focused; stories without a scope expose no inferred actions. With
+`performance` enabled, the Perf tab shows frame and input-latency percentiles
+and controls GPUI's debug frame overlay.
+
+The explicit example's
+[`ActionsAndScenariosStory`](../../examples/story/src/stories/actions_scenarios_story.rs)
+shows Buttons, contextual shortcuts, the Actions tab, and scenarios dispatching
+the same GPUI commands.
 
 With `mcp` enabled, set both `GPUI_STORYBOOK_MCP_STDIO=1` and
 `GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1` to advertise generic focus, keyboard,
@@ -81,4 +109,7 @@ lets the launcher stop its compositor.
 See the [getting-started guide](../../book/src/getting_started.md), [story
 guide](../../book/src/stories.md), [workbench guide](../../book/src/workbench.md),
 the [automation guide](../../book/src/automation.md), and [API
-documentation](https://docs.rs/gpui-storybook/).
+documentation](https://docs.rs/gpui-storybook/). Use the public-integration
+[`gpui-storybook-test`](../gpui-storybook-test/README.md) crate and the
+[portable-testing guide](../../book/src/portable_testing.md) for fresh headless
+stories, capture matrices, visual baselines, and frame budgets.

@@ -17,6 +17,7 @@ dock = [ "gpui-storybook-core/dock" ]
 inspector = [ "gpui-storybook-core/inspector" ]
 macros = [ "dep:gpui-storybook-macros" ]
 mcp = [ "dep:gpui-storybook-mcp", "gpui-storybook-core/capture" ]
+performance = [ "gpui-storybook-core/performance" ]
 
 [dependencies]
 gpui = { workspace = true }

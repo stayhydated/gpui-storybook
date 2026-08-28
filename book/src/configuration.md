@@ -116,9 +116,10 @@ gpui_storybook::create_dock_window(
 ```
 
 Registration, filtering, preferences, and MCP routes are the same in both
-window modes. Both modes include the Controls, Theme, and Inspect workbench
-tabs. The opt-in `inspector` feature adds GPUI Inspector activation and
-story-root metadata. Gallery mode renders the workbench as a third resizable
+window modes. Both modes include the Controls, Theme, Inspect, and Actions
+workbench tabs. The opt-in `performance` feature adds the Perf tab; the opt-in
+`inspector` feature adds GPUI Inspector activation and story-root metadata.
+Gallery mode renders the workbench as a third resizable
 region.
 
 Dock mode installs it as an open, collapsible right dock. The saved layout

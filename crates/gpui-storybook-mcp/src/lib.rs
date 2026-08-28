@@ -35,16 +35,18 @@ use frame_capture::{
     CaptureLaunchEnvError, CaptureRouteId, PixelSize,
 };
 pub use gpui_storybook_core::automation::{
-    DEFAULT_STORY_CAPTURE_HEIGHT, DEFAULT_STORY_CAPTURE_WIDTH, MAX_INTERACTION_STEPS,
+    DEFAULT_INTERACTION_POSTCONDITION_FRAMES, DEFAULT_STORY_CAPTURE_HEIGHT,
+    DEFAULT_STORY_CAPTURE_WIDTH, MAX_INTERACTION_POSTCONDITIONS, MAX_INTERACTION_STEPS,
     MAX_INTERACTION_TEXT_BYTES, MAX_INTERACTION_WAITED_FRAMES, SharedStoryCaptureController,
     SharedStoryController, SharedStorybookAutomation, StoryActionSnapshot, StoryCaptureSnapshot,
     StoryControlsSnapshot, StoryCurrentSnapshot, StoryDefaultSize, StoryInteractionCaptureRequest,
-    StoryInteractionDispatch, StoryInteractionObservation, StoryInteractionRequest,
-    StoryInteractionSnapshot, StoryInteractionStep, StoryInteractionTargetBounds,
-    StoryInteractionTargetSnapshot, StoryInteractionTargetsSnapshot, StoryModifier, StoryModifiers,
-    StoryMouseButton, StoryPoint, StoryPointSpace, StoryScreenshotRequest,
-    StorySemanticValueSnapshot, StorySemanticValuesSnapshot, StorySnapshot, StorybookAutomation,
-    StorybookAutomationError,
+    StoryInteractionDispatch, StoryInteractionObservation, StoryInteractionPostcondition,
+    StoryInteractionPostconditionSnapshot, StoryInteractionRequest, StoryInteractionSnapshot,
+    StoryInteractionStep, StoryInteractionTargetBounds, StoryInteractionTargetSnapshot,
+    StoryInteractionTargetsSnapshot, StoryModifier, StoryModifiers, StoryMouseButton, StoryPoint,
+    StoryPointSpace, StoryScenarioRunSnapshot, StoryScenarioSnapshot, StoryScenarioStep,
+    StoryScenariosSnapshot, StoryScreenshotRequest, StorySemanticValueSnapshot,
+    StorySemanticValuesSnapshot, StorySnapshot, StorybookAutomation, StorybookAutomationError,
 };
 pub use gpui_storybook_core::controls::{
     ControlBounds, ControlColor, ControlKind, ControlSnapshot, ControlSpec, ControlValue,
@@ -72,6 +74,8 @@ pub const STDIO_ENV_VAR: &str = "GPUI_STORYBOOK_MCP_STDIO";
 pub const ALLOW_INTERACTION_ENV_VAR: &str = "GPUI_STORYBOOK_MCP_ALLOW_INTERACTION";
 
 pub const TOOL_LIST_STORIES: &str = "storybook_list_stories";
+pub const TOOL_LIST_SCENARIOS: &str = "storybook_list_scenarios";
+pub const TOOL_RUN_SCENARIO: &str = "storybook_run_scenario";
 pub const TOOL_GET_STORY: &str = "storybook_get_story";
 pub const TOOL_CURRENT_STORY: &str = "storybook_current_story";
 pub const TOOL_OPEN_STORY: &str = "storybook_open_story";
@@ -165,8 +169,30 @@ struct ListStoriesOutput {
 
 #[derive(JsonSchema, Serialize)]
 #[schemars(deny_unknown_fields)]
+struct ListScenariosOutput {
+    story: StorySnapshot,
+    scenarios: Vec<StoryScenarioSnapshot>,
+}
+
+#[derive(JsonSchema, Serialize)]
+#[schemars(deny_unknown_fields)]
 struct StoryOutput {
     story: StorySnapshot,
+}
+
+#[derive(Clone, Debug, Default, component_shape_mcp::McpToolInput)]
+struct ListScenariosInput {
+    /// Stable story or sub-story route. Omit to inspect the current story.
+    story_key: Option<String>,
+}
+
+/// Run one declared story-owned interaction scenario from a fresh instance.
+#[derive(Clone, Debug, component_shape_mcp::McpToolInput)]
+struct RunScenarioInput {
+    /// Stable story or sub-story route. Omit to use the current story.
+    story_key: Option<String>,
+    /// Stable scenario key from `storybook_list_scenarios`.
+    scenario_key: String,
 }
 
 #[derive(Debug, JsonSchema, PartialEq, Serialize)]
@@ -582,6 +608,38 @@ pub fn register_tools_with_options(
     )?;
 
     tools.add_typed_tool_async(
+        tool::<ListScenariosInput>(
+            TOOL_LIST_SCENARIOS,
+            "List Scenarios",
+            "List the stable, story-owned interaction scenarios declared by the current story or a supplied story route.",
+            list_scenarios_output_schema(),
+            ToolHints::read_only(),
+        )?,
+        {
+            let automation = automation.clone();
+            move |input| {
+                let automation = automation.clone();
+                async move {
+                    if let Err(error) = await_automation_startup(&automation).await {
+                        return automation_tool_error(error);
+                    }
+                    let result = input.story_key.as_deref().map_or_else(
+                        || automation.list_scenarios(),
+                        |story_key| automation.list_scenarios_for(story_key),
+                    );
+                    match result {
+                        Ok(snapshot) => tool_structured_result(json!(ListScenariosOutput {
+                            story: snapshot.story,
+                            scenarios: snapshot.scenarios,
+                        })),
+                        Err(error) => automation_tool_error(error),
+                    }
+                }
+            }
+        },
+    )?;
+
+    tools.add_typed_tool_async(
         tool::<StoryKeyInput>(
             TOOL_GET_STORY,
             "Get Story",
@@ -793,6 +851,34 @@ pub fn register_tools_with_options(
                         }
                         let request = click_target_request(input);
                         match automation.run_steps(request).await {
+                            Ok(snapshot) => tool_structured_result(json!(snapshot)),
+                            Err(error) => interaction_automation_tool_error(error),
+                        }
+                    }
+                }
+            },
+        )?;
+
+        tools.add_typed_tool_async(
+            tool::<RunScenarioInput>(
+                TOOL_RUN_SCENARIO,
+                "Run Scenario",
+                "Run one declared story-owned interaction scenario from a freshly recreated story instance. The ordered batch is exclusive, destructive, and is never resumed or retried after a partial dispatch.",
+                scenario_run_output_schema(),
+                ToolHints::interaction(),
+            )?,
+            {
+                let automation = automation.clone();
+                move |input| {
+                    let automation = automation.clone();
+                    async move {
+                        if let Err(error) = await_automation_startup(&automation).await {
+                            return automation_tool_error(error);
+                        }
+                        match automation
+                            .run_scenario(input.story_key, input.scenario_key)
+                            .await
+                        {
                             Ok(snapshot) => tool_structured_result(json!(snapshot)),
                             Err(error) => interaction_automation_tool_error(error),
                         }
@@ -1220,6 +1306,14 @@ fn structured_automation_error(error: StorybookAutomationError) -> McpToolError 
             "step_index": step_index,
             "steps_dispatched": 0,
         }),
+        StorybookAutomationError::InvalidInteractionPostcondition {
+            postcondition_index,
+            ..
+        } => json!({
+            "code": "invalid_interaction_postcondition",
+            "postcondition_index": postcondition_index,
+            "steps_dispatched": 0,
+        }),
         StorybookAutomationError::InteractionFailed {
             request_id,
             steps_dispatched,
@@ -1277,6 +1371,22 @@ fn structured_automation_error(error: StorybookAutomationError) -> McpToolError 
             "story_key": route,
             "value_key": key,
         }),
+        StorybookAutomationError::ScenarioNotFound {
+            story_key,
+            scenario_key,
+        } => json!({
+            "code": "scenario_not_found",
+            "story_key": story_key,
+            "scenario_key": scenario_key,
+        }),
+        StorybookAutomationError::DuplicateScenarioKey {
+            story_key,
+            scenario_key,
+        } => json!({
+            "code": "duplicate_scenario_key",
+            "story_key": story_key,
+            "scenario_key": scenario_key,
+        }),
         StorybookAutomationError::StoryNotFound { key } => json!({
             "code": "story_not_found",
             "story_key": key,
@@ -1302,11 +1412,13 @@ fn decode_interaction_request(input: RunStepsInput) -> StoryInteractionRequest {
         width: input.width,
         height: input.height,
         viewport: input.viewport.map(SchemarsValue::into_inner),
+        presentation: None,
         steps: input
             .steps
             .into_iter()
             .map(SchemarsValue::into_inner)
             .collect(),
+        postconditions: Vec::new(),
         capture: input.capture.map(SchemarsValue::into_inner),
     }
 }
@@ -1422,12 +1534,14 @@ fn click_target_request(input: ClickTargetInput) -> StoryInteractionRequest {
         width: None,
         height: None,
         viewport: None,
+        presentation: None,
         steps: vec![StoryInteractionStep::ClickTarget {
             target_key: input.target_key,
             button: StoryMouseButton::default(),
             click_count: 1,
             modifiers: StoryModifiers::default(),
         }],
+        postconditions: Vec::new(),
         capture: None,
     }
 }
@@ -1694,6 +1808,14 @@ fn list_stories_output_schema() -> McpSchema {
     serialize_schema::<ListStoriesOutput>()
 }
 
+fn list_scenarios_output_schema() -> McpSchema {
+    serialize_schema::<ListScenariosOutput>()
+}
+
+fn scenario_run_output_schema() -> McpSchema {
+    serialize_schema::<StoryScenarioRunSnapshot>()
+}
+
 fn get_story_output_schema() -> McpSchema {
     serialize_schema::<StoryOutput>()
 }
@@ -1825,20 +1947,22 @@ pub mod capture {
 
 pub mod prelude {
     pub use super::{
-        ALLOW_INTERACTION_ENV_VAR, CaptureLaunchEnv, MAX_INTERACTION_STEPS,
-        MAX_INTERACTION_TEXT_BYTES, MAX_INTERACTION_WAITED_FRAMES, SharedStoryCaptureController,
-        SharedStoryController, SharedStorybookAutomation, StoryActionSnapshot,
-        StoryCaptureSnapshot, StoryCurrentSnapshot, StoryDefaultSize,
-        StoryInteractionCaptureRequest, StoryInteractionDispatch, StoryInteractionObservation,
-        StoryInteractionRequest, StoryInteractionSnapshot, StoryInteractionStep,
-        StoryInteractionTargetBounds, StoryInteractionTargetSnapshot,
+        ALLOW_INTERACTION_ENV_VAR, CaptureLaunchEnv, DEFAULT_INTERACTION_POSTCONDITION_FRAMES,
+        MAX_INTERACTION_POSTCONDITIONS, MAX_INTERACTION_STEPS, MAX_INTERACTION_TEXT_BYTES,
+        MAX_INTERACTION_WAITED_FRAMES, SharedStoryCaptureController, SharedStoryController,
+        SharedStorybookAutomation, StoryActionSnapshot, StoryCaptureSnapshot, StoryCurrentSnapshot,
+        StoryDefaultSize, StoryInteractionCaptureRequest, StoryInteractionDispatch,
+        StoryInteractionObservation, StoryInteractionPostcondition,
+        StoryInteractionPostconditionSnapshot, StoryInteractionRequest, StoryInteractionSnapshot,
+        StoryInteractionStep, StoryInteractionTargetBounds, StoryInteractionTargetSnapshot,
         StoryInteractionTargetsSnapshot, StoryModifier, StoryModifiers, StoryMouseButton,
-        StoryPoint, StoryPointSpace, StoryScreenshotRequest, StorySemanticValueSnapshot,
-        StorySemanticValuesSnapshot, StorySnapshot, StorybookAutomation, StorybookAutomationError,
-        StorybookCaptureConfig, StorybookCaptureSession, StorybookMcpServerOptions,
-        StorybookStdioCompletion, capture_catalog, read_capture_session, server,
-        server_with_options, start_capture_session, start_capture_session_from_env, start_stdio,
-        stdio_requested,
+        StoryPoint, StoryPointSpace, StoryScenarioRunSnapshot, StoryScenarioSnapshot,
+        StoryScenarioStep, StoryScenariosSnapshot, StoryScreenshotRequest,
+        StorySemanticValueSnapshot, StorySemanticValuesSnapshot, StorySnapshot,
+        StorybookAutomation, StorybookAutomationError, StorybookCaptureConfig,
+        StorybookCaptureSession, StorybookMcpServerOptions, StorybookStdioCompletion,
+        capture_catalog, read_capture_session, server, server_with_options, start_capture_session,
+        start_capture_session_from_env, start_stdio, stdio_requested,
     };
 }
 
@@ -1911,6 +2035,7 @@ mod tests {
             source_line: 12,
             capture_route_id: "example-ButtonStory".to_string(),
             default_size: StoryDefaultSize::default(),
+            scenarios: Vec::new(),
         }
     }
 
@@ -1950,6 +2075,14 @@ mod tests {
             "string"
         );
         assert_eq!(get["outputSchema"]["properties"]["story"]["type"], "object");
+
+        let scenarios = find(TOOL_LIST_SCENARIOS);
+        assert_eq!(scenarios["inputSchema"]["additionalProperties"], false);
+        assert_eq!(
+            scenarios["outputSchema"]["properties"]["scenarios"]["type"],
+            "array"
+        );
+        assert_eq!(scenarios["annotations"]["readOnlyHint"], true);
 
         let read_controls = find(TOOL_READ_CONTROLS);
         assert_eq!(read_controls["annotations"]["readOnlyHint"], true);
@@ -2056,6 +2189,11 @@ mod tests {
         let disabled_tools =
             serde_json::to_value(disabled.list_tools()).expect("disabled tools should serialize");
         let disabled_tools = disabled_tools.as_array().expect("tools should be an array");
+        assert!(
+            disabled_tools
+                .iter()
+                .any(|tool| { tool["name"] == TOOL_LIST_SCENARIOS })
+        );
         assert!(!disabled_tools.iter().any(|tool| {
             matches!(
                 tool["name"].as_str(),
@@ -2103,6 +2241,19 @@ mod tests {
         assert_eq!(click_target["annotations"]["destructiveHint"], true);
         assert_eq!(click_target["annotations"]["idempotentHint"], false);
         assert_eq!(click_target["annotations"]["openWorldHint"], true);
+
+        let run_scenario = find(TOOL_RUN_SCENARIO);
+        assert_eq!(
+            run_scenario["inputSchema"]["required"],
+            json!(["scenario_key"])
+        );
+        assert_eq!(run_scenario["annotations"]["destructiveHint"], true);
+        assert_eq!(run_scenario["annotations"]["idempotentHint"], false);
+        assert_eq!(run_scenario["annotations"]["openWorldHint"], true);
+        assert_eq!(
+            run_scenario["outputSchema"]["properties"]["scenario"]["type"],
+            "object"
+        );
 
         let run_steps = find(TOOL_RUN_STEPS);
         assert_eq!(run_steps["inputSchema"]["required"], json!(["steps"]));
@@ -2290,6 +2441,27 @@ mod tests {
                     key: "response".to_owned(),
                 },
                 "duplicate_semantic_value",
+            ),
+            (
+                StorybookAutomationError::InvalidInteractionPostcondition {
+                    postcondition_index: 1,
+                    message: "invalid".to_owned(),
+                },
+                "invalid_interaction_postcondition",
+            ),
+            (
+                StorybookAutomationError::ScenarioNotFound {
+                    story_key: "story".to_owned(),
+                    scenario_key: "scenario".to_owned(),
+                },
+                "scenario_not_found",
+            ),
+            (
+                StorybookAutomationError::DuplicateScenarioKey {
+                    story_key: "story".to_owned(),
+                    scenario_key: "scenario".to_owned(),
+                },
+                "duplicate_scenario_key",
             ),
         ];
 

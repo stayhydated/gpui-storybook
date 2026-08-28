@@ -12,13 +12,15 @@
 //! `usize` ordering key.
 //!
 //! `#[derive(ComponentStory)]` supports non-generic structs and helper
-//! attributes `title`, `description`, `section`, and `example`, plus
+//! attributes `title`, `description`, `section`, `example`, and `scenarios`, plus
 //! field-level `#[storybook(control...)]` metadata. It generates a hidden
 //! wrapper view and registers the original component type name so
 //! `disable_story = ["ComponentName"]` matches the public type the user wrote.
 //! Macro-generated story entries also include a stable automation key in the
 //! form `{crate-package-name}-{registered-story-name}` and an exported marker
-//! that makes duplicate generated keys in the same package fail to build.
+//! that makes duplicate generated keys in the same package fail to build. Rustdoc
+//! comments and static control shape metadata are captured for the static
+//! catalog; localized titles and runtime defaults remain live-story values.
 //!
 //! `#[derive(StoryControls)]` generates typed metadata, reads, and setters for
 //! explicitly marked fields. It infers `bool`, `i8` through `i64`, `isize`,
@@ -59,6 +61,7 @@ struct ComponentStoryArgs {
     description: Option<Expr>,
     section: Option<SectionArg>,
     example: Option<Expr>,
+    scenarios: Option<Expr>,
 }
 
 #[derive(Default, darling::FromAttributes)]
@@ -68,6 +71,7 @@ struct ParsedComponentStoryArgs {
     description: Option<PreservedStrExpr>,
     section: Option<SectionArg>,
     example: Option<PreservedStrExpr>,
+    scenarios: Option<PreservedStrExpr>,
 }
 
 #[derive(Default, darling::FromAttributes)]
@@ -114,9 +118,13 @@ struct GeneratedControlField {
     description: String,
     category: String,
     kind: TokenStream2,
+    static_kind: TokenStream2,
     min: TokenStream2,
     max: TokenStream2,
     step: TokenStream2,
+    static_min: Option<f64>,
+    static_max: Option<f64>,
+    static_step: Option<f64>,
     options: Vec<String>,
     choice: bool,
 }
@@ -182,10 +190,101 @@ fn section_tokens(section: Option<&SectionArg>) -> (TokenStream2, TokenStream2) 
     }
 }
 
+fn rustdoc_from_attrs(attrs: &[syn::Attribute]) -> String {
+    let mut lines = attrs
+        .iter()
+        .filter_map(|attr| {
+            if !attr.path().is_ident("doc") {
+                return None;
+            }
+            let syn::Meta::NameValue(meta) = &attr.meta else {
+                return None;
+            };
+            let Expr::Lit(ExprLit {
+                lit: Lit::Str(value),
+                ..
+            }) = &meta.value
+            else {
+                return None;
+            };
+            let value = value.value();
+            Some(value.strip_prefix(' ').unwrap_or(value.as_str()).to_owned())
+        })
+        .collect::<Vec<_>>();
+
+    while lines.last().is_some_and(String::is_empty) {
+        lines.pop();
+    }
+    lines.join("\n")
+}
+
+fn literal_f64(expr: &Expr) -> Option<f64> {
+    match expr {
+        Expr::Lit(ExprLit {
+            lit: Lit::Int(value),
+            ..
+        }) => value.base10_parse().ok(),
+        Expr::Lit(ExprLit {
+            lit: Lit::Float(value),
+            ..
+        }) => value.base10_parse().ok(),
+        Expr::Unary(unary) if matches!(&unary.op, syn::UnOp::Neg(_)) => {
+            literal_f64(&unary.expr).map(|value| -value)
+        },
+        _ => None,
+    }
+}
+
+fn static_control_tokens(fields: &[GeneratedControlField]) -> TokenStream2 {
+    let controls = fields.iter().map(|field| {
+        let key = &field.key;
+        let label = &field.label;
+        let description = &field.description;
+        let category = &field.category;
+        let kind = &field.static_kind;
+        let min = field
+            .static_min
+            .map_or_else(|| quote! { None }, |value| quote! { Some(#value) });
+        let max = field
+            .static_max
+            .map_or_else(|| quote! { None }, |value| quote! { Some(#value) });
+        let step = field
+            .static_step
+            .map_or_else(|| quote! { None }, |value| quote! { Some(#value) });
+        let options = &field.options;
+
+        quote! {
+            ::gpui_storybook::StaticControlSpec::new(
+                #key,
+                #label,
+                #description,
+                #category,
+                #kind,
+                ::gpui_storybook::ControlBounds {
+                    min: #min,
+                    max: #max,
+                    step: #step,
+                },
+                &[#(#options),*],
+            )
+        }
+    });
+
+    quote! { &[#(#controls),*] }
+}
+
+fn autodoc_tokens(docs: &str, fields: &[GeneratedControlField]) -> TokenStream2 {
+    let controls = static_control_tokens(fields);
+    quote! {
+        ::gpui_storybook::__registry::StoryAutodoc::new(#docs, #controls)
+    }
+}
+
 fn registration_tokens(
     story_type: TokenStream2,
     entry_name: &str,
     section: Option<&SectionArg>,
+    autodoc: TokenStream2,
 ) -> TokenStream2 {
     let (section_value, section_order) = section_tokens(section);
     let marker_ident = format_ident!("__gpui_storybook_story_key_marker_{entry_name}");
@@ -217,6 +316,7 @@ fn registration_tokens(
                     ::std::line!(),
                 ),
             )
+            .with_autodoc(#autodoc)
         }
     }
 }
@@ -232,10 +332,14 @@ fn story_impl(args: TokenStream2, input: TokenStream2) -> TokenStream2 {
     };
     let struct_name = &input_struct.ident;
     let struct_name_str = struct_name.to_string();
+    let control_fields =
+        generated_control_fields_for_fields(&input_struct.fields).unwrap_or_default();
+    let autodoc = autodoc_tokens(&rustdoc_from_attrs(&input_struct.attrs), &control_fields);
     let registration = registration_tokens(
         quote! { #struct_name },
         &struct_name_str,
         args.section.as_ref(),
+        autodoc,
     );
 
     quote! {
@@ -253,6 +357,7 @@ fn parse_component_story_args(input: &DeriveInput) -> syn::Result<ComponentStory
         description: parsed.description.map(Into::into),
         section: parsed.section,
         example: parsed.example.map(Into::into),
+        scenarios: parsed.scenarios.map(Into::into),
     })
 }
 
@@ -386,17 +491,10 @@ fn control_type_name(ty: &Type) -> Option<String> {
         .map(|segment| segment.ident.to_string())
 }
 
-fn generated_control_fields(input: &DeriveInput) -> syn::Result<Vec<GeneratedControlField>> {
-    let Data::Struct(data) = &input.data else {
-        return Err(syn::Error::new_spanned(
-            &input.ident,
-            "StoryControls can only be derived for structs",
-        ));
-    };
-
+fn generated_control_fields_for_fields(fields: &Fields) -> syn::Result<Vec<GeneratedControlField>> {
     let mut generated = Vec::new();
-    let Fields::Named(fields) = &data.fields else {
-        let has_control = data.fields.iter().any(|field| {
+    let Fields::Named(fields) = fields else {
+        let has_control = fields.iter().any(|field| {
             field
                 .attrs
                 .iter()
@@ -404,7 +502,7 @@ fn generated_control_fields(input: &DeriveInput) -> syn::Result<Vec<GeneratedCon
         });
         if has_control {
             return Err(syn::Error::new_spanned(
-                &data.fields,
+                fields,
                 "story controls require named struct fields",
             ));
         }
@@ -484,6 +582,27 @@ fn generated_control_fields(input: &DeriveInput) -> syn::Result<Vec<GeneratedCon
             let ty = &field.ty;
             quote! { <#ty as ::gpui_storybook::ControlValueField>::control_kind() }
         };
+        let static_kind = if choice {
+            quote! { ::gpui_storybook::StaticControlKind::Select }
+        } else if numeric && (args.min.is_some() || args.max.is_some()) {
+            quote! { ::gpui_storybook::StaticControlKind::Range }
+        } else {
+            match type_name.as_deref() {
+                Some("bool") => quote! { ::gpui_storybook::StaticControlKind::Checkbox },
+                Some(
+                    "i8" | "i16" | "i32" | "i64" | "isize" | "u8" | "u16" | "u32" | "usize" | "f32"
+                    | "f64",
+                ) => quote! { ::gpui_storybook::StaticControlKind::Number },
+                Some("String" | "SharedString") => {
+                    quote! { ::gpui_storybook::StaticControlKind::Text }
+                },
+                Some("Hsla") => quote! { ::gpui_storybook::StaticControlKind::ColorPicker },
+                _ => quote! { ::gpui_storybook::StaticControlKind::Custom("custom") },
+            }
+        };
+        let static_min = args.min.as_ref().and_then(literal_f64);
+        let static_max = args.max.as_ref().and_then(literal_f64);
+        let static_step = args.step.as_ref().and_then(literal_f64);
         let min = args
             .min
             .map_or_else(|| quote! { None }, |value| quote! { Some((#value) as f64) });
@@ -513,14 +632,29 @@ fn generated_control_fields(input: &DeriveInput) -> syn::Result<Vec<GeneratedCon
                 .collect(),
             key,
             kind,
+            static_kind,
             min,
             max,
             step,
+            static_min,
+            static_max,
+            static_step,
             choice,
         });
     }
 
     Ok(generated)
+}
+
+fn generated_control_fields(input: &DeriveInput) -> syn::Result<Vec<GeneratedControlField>> {
+    let Data::Struct(data) = &input.data else {
+        return Err(syn::Error::new_spanned(
+            &input.ident,
+            "StoryControls can only be derived for structs",
+        ));
+    };
+
+    generated_control_fields_for_fields(&data.fields)
 }
 
 fn story_controls_impl(type_ident: &syn::Ident, fields: &[GeneratedControlField]) -> TokenStream2 {
@@ -733,10 +867,19 @@ fn component_story_impl(input: TokenStream2) -> TokenStream2 {
     } else {
         story_controls_impl(&wrapper_ident, &control_fields)
     };
+    let autodoc = autodoc_tokens(&rustdoc_from_attrs(&input.attrs), &control_fields);
+    let scenarios = args.scenarios.map(|expression| {
+        quote! {
+            fn scenarios() -> ::std::vec::Vec<::gpui_storybook::StoryScenario> {
+                (#expression)
+            }
+        }
+    });
     let registration = registration_tokens(
         quote! { #wrapper_ident },
         &struct_name_str,
         args.section.as_ref(),
+        autodoc,
     );
 
     quote! {
@@ -797,6 +940,8 @@ fn component_story_impl(input: TokenStream2) -> TokenStream2 {
             ) -> ::gpui::Entity<Self> {
                 Self::view(window, cx)
             }
+
+            #scenarios
         }
 
         #registration
@@ -806,6 +951,10 @@ fn component_story_impl(input: TokenStream2) -> TokenStream2 {
 /// Attribute macro to register a story struct
 ///
 /// Optionally accepts a section name as a string literal or enum variant:
+///
+/// Rustdoc comments and marked control fields are captured in the static
+/// registration catalog. The stable key and registered name remain separate
+/// from any localized runtime title.
 /// ```ignore
 /// // String literal (sorted alphabetically by section name)
 /// #[derive(gpui_storybook::StoryControls)]
@@ -873,7 +1022,9 @@ fn story_init_impl(_args: TokenStream2, input: TokenStream2) -> TokenStream2 {
 /// By default the wrapper renders `<Self as Default>::default()`. Use `example = ...`
 /// when the component needs a custom constructor or builder configuration. `title` and
 /// `description` accept expressions that evaluate into `String`, not only string literals.
-/// Those expressions are emitted inside methods with `cx: &gpui::App` in scope.
+/// Those expressions are emitted inside methods with `cx: &gpui::App` in scope. An optional
+/// `scenarios = ...` expression evaluates to `Vec<gpui_storybook::StoryScenario>` and is
+/// copied into the runtime story container for automation.
 ///
 /// ```ignore
 /// #[derive(gpui_storybook::ComponentStory, gpui::IntoElement)]
@@ -881,6 +1032,7 @@ fn story_init_impl(_args: TokenStream2, input: TokenStream2) -> TokenStream2 {
 ///     title = "Button",
 ///     section = StorySection::Components,
 ///     example = ButtonChip::example(),
+///     scenarios = ButtonChip::scenarios(),
 /// )]
 /// pub struct ButtonChip {
 ///     #[storybook(control(category = "Content"))]
@@ -973,6 +1125,34 @@ mod tests {
     }
 
     #[test]
+    fn story_captures_rustdocs_and_static_control_metadata() {
+        let input = quote! {
+            /// A button story.
+            ///
+            /// It documents the disabled state.
+            pub struct ButtonStory {
+                #[storybook(control(label = "Disabled", description = "Prevents activation"))]
+                disabled: bool,
+                #[storybook(control(min = -1.0, max = 32.0, step = 0.5))]
+                padding: f32,
+                #[storybook(control(options = ["Primary", "Danger"]))]
+                intent: ButtonIntent,
+            }
+        };
+
+        let expanded = snapshot_tokens(story_impl(TokenStream2::new(), input));
+
+        assert!(expanded.contains("StoryAutodoc::new"));
+        assert!(expanded.contains("A button story.\\n\\nIt documents the disabled state."));
+        assert!(expanded.contains("StaticControlKind::Checkbox"));
+        assert!(expanded.contains("StaticControlKind::Range"));
+        assert!(expanded.contains("StaticControlKind::Select"));
+        assert!(expanded.contains("Some(- 1f64)"));
+        assert!(expanded.contains("Some(32f64)"));
+        assert!(expanded.contains("Some(0.5f64)"));
+    }
+
+    #[test]
     fn story_with_enum_section_generates_ordered_registry_entry() {
         let expanded = story_impl(
             quote! { crate::StorySection::Components, },
@@ -1022,6 +1202,24 @@ mod tests {
         let expanded = component_story_impl(input);
         assert_snapshot!(
             "component_story_derive_with_metadata_generates_wrapper_story_and_registry_entry",
+            snapshot_tokens(expanded)
+        );
+    }
+
+    #[test]
+    fn component_story_derive_with_scenarios_generates_story_scenarios_method() {
+        let input = quote! {
+            /// A component story with a reusable scenario.
+            #[storybook(
+                title = "Button",
+                scenarios = ButtonChip::scenarios(),
+            )]
+            pub struct ButtonChip;
+        };
+
+        let expanded = component_story_impl(input);
+        assert_snapshot!(
+            "component_story_derive_with_scenarios_generates_story_scenarios_method",
             snapshot_tokens(expanded)
         );
     }

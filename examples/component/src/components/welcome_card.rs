@@ -10,6 +10,7 @@ use gpui_component::ActiveTheme as _;
     description = String::from("A quiet editorial card registered without a custom story view"),
     section = crate::StorySection::Intro,
     example = WelcomeCard::example(),
+    scenarios = WelcomeCard::scenarios(),
 )]
 pub struct WelcomeCard {
     #[storybook(control(category = "Content"))]
@@ -39,6 +40,23 @@ impl WelcomeCard {
             "Component registration should feel invisible.",
             "Storybook owns the wrapper view; the component only owns its own markup and data.",
         )
+    }
+
+    pub fn scenarios() -> Vec<gpui_storybook::StoryScenario> {
+        vec![
+            gpui_storybook::StoryScenario::new("editorial-copy", "Editorial copy")
+                .description(
+                    "Applies a named control case to a freshly recreated component wrapper.",
+                )
+                .control(
+                    "eyebrow",
+                    gpui_storybook::ControlValue::Text("Scenario".to_owned()),
+                )
+                .step(gpui_storybook::StoryScenarioStep::new(
+                    "Settle the edited component",
+                    gpui_storybook::StoryInteractionStep::WaitFrames { count: 1 },
+                )),
+        ]
     }
 }
 

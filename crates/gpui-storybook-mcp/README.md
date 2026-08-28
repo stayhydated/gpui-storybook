@@ -47,6 +47,7 @@ JSON model as the workbench:
 
 The default tools are `storybook_list_stories`, `storybook_get_story`,
 `storybook_current_story`, `storybook_open_story`,
+`storybook_list_scenarios`,
 `storybook_read_controls`, `storybook_read_semantic_values`,
 `storybook_read_value`, `storybook_wait_for_value`, `storybook_set_control`,
 `storybook_reset_control`, `storybook_capture_current_story`, and
@@ -75,7 +76,7 @@ On Linux, apply the complete [headless Sway
 launcher](../../book/src/automation.md#enable-mcp-support) to the same session.
 
 The gate adds `storybook_list_actions`, `storybook_list_interaction_targets`,
-`storybook_click_target`, and `storybook_run_steps`. When it is unset or has
+`storybook_click_target`, `storybook_run_scenario`, and `storybook_run_steps`. When it is unset or has
 any other value, those tools are absent from discovery. The read-only semantic
 value tools are always advertised; they read JSON values registered with
 `StorybookElementExt::storybook_value` after refreshing the selected route.
@@ -96,6 +97,14 @@ application host is explicitly stopped.
 documentation, and JSON argument schemas from the launched GPUI application.
 GPUI keymap sentinels and Storybook-private workbench actions are omitted.
 Registrations are runtime state, so rediscover actions for every launch.
+
+`storybook_list_scenarios` returns declarations owned by the current story or
+an optional `story_key`. With interaction enabled,
+`storybook_run_scenario` accepts a stable `scenario_key`, recreates that story
+from constructor defaults, rebinds its controls and focus, and runs its named
+steps, exact semantic postconditions, and optional capture through the shared
+executor. The tool reports the declaration with the structured interaction
+result and never resumes or retries a partial run.
 
 Import `gpui_storybook::StorybookElementExt as _`, then mark important story
 controls with `.storybook_target()`. The GPUI element ID becomes the key and

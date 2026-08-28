@@ -24,6 +24,7 @@ default = [  ]
 dock = [ "gpui-storybook/dock" ]
 inspector = [ "gpui-storybook/inspector" ]
 mcp = [ "gpui-storybook/mcp" ]
+performance = [ "gpui-storybook/performance" ]
 
 [dependencies]
 es-fluent = { workspace = true }
@@ -37,6 +38,7 @@ gpui-storybook = { workspace = true }
 rust-embed = { workspace = true }
 schemars = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
 strum = { workspace = true }
 tracing = { workspace = true }
 

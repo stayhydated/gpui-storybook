@@ -7,7 +7,7 @@
 
 GPUI Storybook is a searchable component preview shell for GPUI applications. It
 supports stateful stories, component-derived stories, persistent appearance and
-language preferences, a live controls/theme/inspect workbench, opt-in GPUI
+language preferences, a live controls/theme/inspect/actions workbench, opt-in GPUI
 Inspector integration, an optional dock workspace, and optional MCP automation
 for typed controls, in-process interaction, and PNG capture.
 
@@ -30,6 +30,9 @@ Add `--features dock` to either command to open the dock workspace. Add
 metadata. Both features are opt-in and can be combined as
 `--features dock,inspector`.
 
+Add `--features performance` to expose GPUI's window timing histograms and
+debug frame overlay in the workbench.
+
 Both modes include a right-side workbench. Control registration is explicit:
 mark fields with `#[storybook(control)]` to edit the selected story instance
 without rebuilding, and leave all other fields unmarked:
@@ -42,6 +45,18 @@ struct ButtonStory {
     #[storybook(control(min = 0.0, max = 32.0, step = 1.0))]
     padding: f32,
 }
+```
+
+Stories can also declare named scenarios made from the same typed controls,
+semantic targets, actions, postconditions, and optional capture used by live
+automation. The Scenarios tab and MCP both recreate the concrete story before
+every run, then report named step outcomes without retrying partial input.
+
+Registration macros also capture Rust documentation and static control shapes.
+Export the linked inventory as deterministic JSON without opening a window:
+
+```bash
+cargo run -p gpui-storybook-example-story --example catalog
 ```
 
 The preview canvas stays centered inside a visible frame. **Mobile**, **Tablet**,
@@ -63,6 +78,20 @@ changes.
 The Inspect tab always shows the active story key and source location. Enable
 the `inspector` feature to add its GPUI Component Inspector button and
 Storybook metadata for selected story roots.
+
+The Actions tab uses the selected story's opt-in
+`Story::action_scope_focus_handle`. Track that handle on the element that owns
+the page or component action handlers; keep it separate from a nested input's
+primary focus handle. The tab lists only default-buildable actions on that
+explicit root scope after excluding the Storybook shell/root path, and its
+**Dispatch** buttons target the same scope. Stories without an action scope
+show no inferred actions. With `performance` enabled, the Perf tab reports draw,
+dirty-to-present, presentation-interval, and input-latency percentiles and can
+cycle GPUI's frame overlay.
+
+[`ActionsAndScenariosStory`](examples/story/src/stories/actions_scenarios_story.rs)
+shows visible Buttons, contextual shortcuts, the Actions tab, and repeatable
+scenarios sharing one GPUI command model.
 
 Enable the `mcp` feature to discover routes, drive controls, and capture the
 story region. Generic focus, keyboard, action, pointer, scroll, and frame-wait
@@ -123,6 +152,13 @@ returned PNG is cropped to the story region and excludes that chrome. See
 [Automation and capture](book/src/automation.md) for the closed step schema,
 safety limits, and capture ordering.
 
+For isolated test and CI execution, use `gpui-storybook-test`. It creates a
+fresh headless GPUI context per case, applies typed controls and presentation,
+captures root or substory regions, expands viewport/theme/language/control
+matrices, checks explicit visual-baseline policies, and optionally enforces GPUI
+draw and dirty-to-present budgets. See [Portable testing and visual
+baselines](book/src/portable_testing.md).
+
 ## Start using Storybook
 
 Most applications should depend on the `gpui-storybook` facade crate. Register
@@ -133,6 +169,7 @@ readiness, and then open a gallery or dock window.
 - [Getting started](book/src/getting_started.md)
 - [Story registration](book/src/stories.md)
 - [Use the workbench](book/src/workbench.md)
+- [Portable testing and visual baselines](book/src/portable_testing.md)
 - [Configuration](book/src/configuration.md)
 - [Automation and capture](book/src/automation.md)
 - [API documentation](https://docs.rs/gpui-storybook/)

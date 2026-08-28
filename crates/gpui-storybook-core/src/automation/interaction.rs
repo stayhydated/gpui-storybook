@@ -1,7 +1,8 @@
 use super::{
     AutomationOperationGuard, StoryCaptureSnapshot, StoryInteractionTargetsSnapshot,
-    StoryScreenshotRequest, StorySnapshot, StorybookAutomationError, ensure_capture_target_visible,
-    render_story_capture, rendered_interaction_targets, validate_capture_target_size,
+    StoryScreenshotRequest, StorySemanticValueSnapshot, StorySnapshot, StorybookAutomationError,
+    ensure_capture_target_visible, render_story_capture, rendered_interaction_targets,
+    rendered_semantic_values, validate_capture_target_size,
 };
 use crate::{
     capture_region::{capture_region_bounds, scroll_capture_region_into_view},
@@ -193,6 +194,76 @@ pub struct StoryInteractionCaptureRequest {
     pub output_path: Option<PathBuf>,
 }
 
+/// Maximum number of refreshed frames used for one semantic postcondition when
+/// the caller does not provide an explicit bound.
+pub const DEFAULT_INTERACTION_POSTCONDITION_FRAMES: u16 = MAX_INTERACTION_WAITED_FRAMES;
+
+/// Maximum number of exact semantic-value postconditions accepted by one
+/// interaction request.
+pub const MAX_INTERACTION_POSTCONDITIONS: usize = MAX_INTERACTION_STEPS;
+
+/// Exact semantic-value assertion evaluated after all interaction steps.
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct StoryInteractionPostcondition {
+    /// Stable semantic value key rendered by the active story route.
+    pub value_key: String,
+    /// Optional RFC 6901 JSON Pointer inside the semantic value.
+    #[serde(default)]
+    pub json_pointer: Option<String>,
+    /// Expected JSON value. Matching uses exact [`serde_json::Value`] equality.
+    pub expected: Value,
+    /// Maximum freshly rendered frames to inspect. Omission uses the bounded
+    /// default [`DEFAULT_INTERACTION_POSTCONDITION_FRAMES`].
+    #[serde(default)]
+    pub max_frames: Option<u16>,
+}
+
+impl StoryInteractionPostcondition {
+    /// Creates an exact assertion against the complete semantic value.
+    pub fn new(value_key: impl Into<String>, expected: Value) -> Self {
+        Self {
+            value_key: value_key.into(),
+            json_pointer: None,
+            expected,
+            max_frames: None,
+        }
+    }
+
+    /// Restricts the assertion to one RFC 6901 JSON Pointer.
+    pub fn json_pointer(mut self, json_pointer: impl Into<String>) -> Self {
+        self.json_pointer = Some(json_pointer.into());
+        self
+    }
+
+    /// Sets the bounded number of rendered frames used for matching.
+    pub fn max_frames(mut self, max_frames: u16) -> Self {
+        self.max_frames = Some(max_frames);
+        self
+    }
+
+    pub(crate) fn frame_limit(&self) -> u16 {
+        self.max_frames
+            .unwrap_or(DEFAULT_INTERACTION_POSTCONDITION_FRAMES)
+    }
+}
+
+/// Successful result for one exact semantic-value postcondition.
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct StoryInteractionPostconditionSnapshot {
+    /// Stable semantic value key checked by the executor.
+    pub value_key: String,
+    /// JSON Pointer used for the comparison, if any.
+    pub json_pointer: Option<String>,
+    /// Exact expected JSON value.
+    pub expected: Value,
+    /// Actual semantic value snapshot containing the matching value.
+    pub actual: StorySemanticValueSnapshot,
+    /// Freshly rendered frames inspected before this assertion matched.
+    pub frames_waited: u16,
+}
+
 /// One exclusive interaction batch.
 #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -208,8 +279,14 @@ pub struct StoryInteractionRequest {
     pub height: Option<u32>,
     /// Named viewport used when explicit dimensions are omitted.
     pub viewport: Option<StoryViewportPreset>,
+    /// Optional presentation applied before controls and input.
+    #[serde(default)]
+    pub presentation: Option<crate::presentation::StoryPresentation>,
     /// Ordered non-empty interaction steps.
     pub steps: Vec<StoryInteractionStep>,
+    /// Exact semantic-value checks evaluated after all interaction steps.
+    #[serde(default)]
+    pub postconditions: Vec<StoryInteractionPostcondition>,
     /// Optional first-frame capture after the final step or explicit waits.
     pub capture: Option<StoryInteractionCaptureRequest>,
 }
@@ -245,7 +322,7 @@ pub struct StoryInteractionObservation {
 }
 
 /// Result of an interaction batch executed by the live GPUI host.
-#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct StoryInteractionSnapshot {
     /// Monotonic request ID assigned by this automation controller.
@@ -258,6 +335,8 @@ pub struct StoryInteractionSnapshot {
     pub observations: Vec<StoryInteractionObservation>,
     /// Whether any focus handle exists in the window after the batch.
     pub focused: bool,
+    /// Exact semantic-value postconditions that matched after the batch.
+    pub postconditions: Vec<StoryInteractionPostconditionSnapshot>,
     /// Optional capture produced within this batch.
     pub capture: Option<StoryCaptureSnapshot>,
 }
@@ -273,6 +352,14 @@ pub(crate) fn validate_interaction_request(
     if request.steps.len() > MAX_INTERACTION_STEPS {
         return Err(StorybookAutomationError::InvalidInteractionRequest {
             message: format!("interaction steps exceed the limit of {MAX_INTERACTION_STEPS}"),
+        });
+    }
+
+    if request.postconditions.len() > MAX_INTERACTION_POSTCONDITIONS {
+        return Err(StorybookAutomationError::InvalidInteractionRequest {
+            message: format!(
+                "interaction postconditions exceed the limit of {MAX_INTERACTION_POSTCONDITIONS}"
+            ),
         });
     }
 
@@ -352,6 +439,31 @@ pub(crate) fn validate_interaction_request(
         }
     }
 
+    for (postcondition_index, postcondition) in request.postconditions.iter().enumerate() {
+        if postcondition.value_key.trim().is_empty() {
+            return invalid_postcondition(postcondition_index, "value key must not be empty");
+        }
+        if postcondition
+            .json_pointer
+            .as_deref()
+            .is_some_and(|pointer| !pointer.is_empty() && !pointer.starts_with('/'))
+        {
+            return invalid_postcondition(
+                postcondition_index,
+                "JSON Pointers must be empty or start with `/`",
+            );
+        }
+        if postcondition
+            .max_frames
+            .is_some_and(|frames| frames == 0 || frames > MAX_INTERACTION_WAITED_FRAMES)
+        {
+            return invalid_postcondition(
+                postcondition_index,
+                format!("max_frames must be between 1 and {MAX_INTERACTION_WAITED_FRAMES}"),
+            );
+        }
+    }
+
     if text_bytes > MAX_INTERACTION_TEXT_BYTES {
         return Err(StorybookAutomationError::InvalidInteractionRequest {
             message: format!(
@@ -397,6 +509,16 @@ fn invalid_step<T>(
 ) -> Result<T, StorybookAutomationError> {
     Err(StorybookAutomationError::InvalidInteractionStep {
         step_index,
+        message: message.into(),
+    })
+}
+
+fn invalid_postcondition<T>(
+    postcondition_index: usize,
+    message: impl Into<String>,
+) -> Result<T, StorybookAutomationError> {
+    Err(StorybookAutomationError::InvalidInteractionPostcondition {
+        postcondition_index,
         message: message.into(),
     })
 }
@@ -530,6 +652,7 @@ pub(crate) struct PreparedStoryInteraction {
     pub request_id: u64,
     pub story: StorySnapshot,
     pub steps: Vec<PreparedInteractionStep>,
+    pub postconditions: Vec<StoryInteractionPostcondition>,
     pub capture: Option<StoryInteractionCaptureRequest>,
     pub response: oneshot::Sender<Result<StoryInteractionSnapshot, StorybookAutomationError>>,
     pub progress: Arc<AtomicUsize>,
@@ -641,6 +764,10 @@ struct InteractionRunner {
     request_id: u64,
     story: StorySnapshot,
     steps: VecDeque<(usize, PreparedInteractionStep)>,
+    postconditions: Vec<StoryInteractionPostcondition>,
+    postcondition_index: usize,
+    postcondition_frames_waited: u16,
+    postcondition_results: Vec<StoryInteractionPostconditionSnapshot>,
     capture: Option<StoryInteractionCaptureRequest>,
     response: oneshot::Sender<Result<StoryInteractionSnapshot, StorybookAutomationError>>,
     progress: Arc<AtomicUsize>,
@@ -706,6 +833,10 @@ fn start_interaction_runner(
             request_id: interaction.request_id,
             story: interaction.story,
             steps,
+            postconditions: interaction.postconditions,
+            postcondition_index: 0,
+            postcondition_frames_waited: 0,
+            postcondition_results: Vec::new(),
             capture: interaction.capture,
             response: interaction.response,
             progress: interaction.progress,
@@ -1048,6 +1179,94 @@ fn gpui_modifiers(modifiers: &StoryModifiers) -> Modifiers {
 }
 
 fn finish_interaction(runner: InteractionRunner, window: &mut Window, cx: &mut App) {
+    if !runner.postconditions.is_empty() {
+        schedule_postcondition_check(runner, window);
+        return;
+    }
+
+    finish_interaction_capture(runner, window, cx);
+}
+
+fn schedule_postcondition_check(mut runner: InteractionRunner, window: &mut Window) {
+    if runner.response.is_closed() {
+        return;
+    }
+
+    runner.postcondition_frames_waited = runner.postcondition_frames_waited.saturating_add(1);
+    window.refresh();
+    window.on_next_frame(move |window, cx| {
+        if runner.response.is_closed() {
+            return;
+        }
+
+        let (value_key, json_pointer, expected, frame_limit) = {
+            let postcondition = &runner.postconditions[runner.postcondition_index];
+            (
+                postcondition.value_key.clone(),
+                postcondition.json_pointer.clone(),
+                postcondition.expected.clone(),
+                postcondition.frame_limit(),
+            )
+        };
+        let route = runner.story.capture_route_id.clone();
+        let values = match rendered_semantic_values(runner.story.clone()) {
+            Ok(snapshot) => snapshot.values,
+            Err(error) => {
+                let _ = runner.response.send(Err(error));
+                return;
+            },
+        };
+        let Some(actual) = values.into_iter().find(|value| value.key == value_key) else {
+            let _ = runner
+                .response
+                .send(Err(StorybookAutomationError::SemanticValueNotFound {
+                    route,
+                    key: value_key,
+                }));
+            return;
+        };
+
+        let actual_value = json_pointer
+            .as_deref()
+            .map_or(Some(&actual.value), |pointer| actual.value.pointer(pointer));
+        if actual_value == Some(&expected) {
+            runner
+                .postcondition_results
+                .push(StoryInteractionPostconditionSnapshot {
+                    value_key,
+                    json_pointer,
+                    expected,
+                    actual,
+                    frames_waited: runner.postcondition_frames_waited,
+                });
+            runner.postcondition_index += 1;
+            runner.postcondition_frames_waited = 0;
+
+            if runner.postcondition_index == runner.postconditions.len() {
+                finish_interaction_capture(runner, window, cx);
+            } else {
+                schedule_postcondition_check(runner, window);
+            }
+            return;
+        }
+
+        if runner.postcondition_frames_waited >= frame_limit {
+            let _ =
+                runner
+                    .response
+                    .send(Err(StorybookAutomationError::SemanticValueWaitTimedOut {
+                        route,
+                        key: value_key,
+                        max_frames: frame_limit,
+                    }));
+            return;
+        }
+
+        schedule_postcondition_check(runner, window);
+    });
+}
+
+fn finish_interaction_capture(runner: InteractionRunner, window: &mut Window, cx: &mut App) {
     if runner.response.is_closed() {
         return;
     }
@@ -1100,6 +1319,7 @@ fn send_interaction_snapshot(
         steps_dispatched,
         observations: runner.observations,
         focused: window.focused(cx).is_some(),
+        postconditions: runner.postcondition_results,
         capture,
     }));
 }
@@ -1178,7 +1398,9 @@ mod tests {
             width: None,
             height: None,
             viewport: None,
+            presentation: None,
             steps,
+            postconditions: Vec::new(),
             capture: None,
         }
     }
@@ -1286,6 +1508,39 @@ mod tests {
                 modifiers: StoryModifiers::default(),
             }])),
             Err(StorybookAutomationError::InvalidInteractionStep { step_index: 0, .. })
+        ));
+    }
+
+    #[test]
+    fn postcondition_validation_rejects_ambiguous_or_unbounded_assertions() {
+        let mut request = request(vec![StoryInteractionStep::FocusNext]);
+        request.postconditions = vec![StoryInteractionPostcondition::new("", Value::Null)];
+        assert!(matches!(
+            validate_interaction_request(&request),
+            Err(StorybookAutomationError::InvalidInteractionPostcondition {
+                postcondition_index: 0,
+                ..
+            })
+        ));
+
+        request.postconditions =
+            vec![StoryInteractionPostcondition::new("status", Value::Null).json_pointer("status")];
+        assert!(matches!(
+            validate_interaction_request(&request),
+            Err(StorybookAutomationError::InvalidInteractionPostcondition {
+                postcondition_index: 0,
+                ..
+            })
+        ));
+
+        request.postconditions =
+            vec![StoryInteractionPostcondition::new("status", Value::Null).max_frames(0)];
+        assert!(matches!(
+            validate_interaction_request(&request),
+            Err(StorybookAutomationError::InvalidInteractionPostcondition {
+                postcondition_index: 0,
+                ..
+            })
         ));
     }
 
@@ -1478,8 +1733,10 @@ mod tests {
                                 source_line: line!(),
                                 capture_route_id: "interaction-test".to_owned(),
                                 default_size: super::super::StoryDefaultSize::default(),
+                                scenarios: Vec::new(),
                             },
                             steps: prepared,
+                            postconditions: Vec::new(),
                             capture: None,
                             response,
                             progress: Arc::new(AtomicUsize::new(0)),
@@ -1557,9 +1814,11 @@ mod tests {
                             source_line: line!(),
                             capture_route_id: "missing-route".to_owned(),
                             default_size: super::super::StoryDefaultSize::default(),
+                            scenarios: Vec::new(),
                         },
                         steps: prepare_interaction_steps(&[StoryInteractionStep::FocusNext], cx)
                             .expect("focus step should prepare"),
+                        postconditions: Vec::new(),
                         capture: None,
                         response,
                         progress: progress.clone(),
@@ -1629,6 +1888,7 @@ mod tests {
                             source_line: line!(),
                             capture_route_id: "interaction-test".to_owned(),
                             default_size: super::super::StoryDefaultSize::default(),
+                            scenarios: Vec::new(),
                         },
                         steps: prepare_interaction_steps(
                             &[StoryInteractionStep::PointerClick {
@@ -1644,6 +1904,7 @@ mod tests {
                             cx,
                         )
                         .expect("pointer step should prepare"),
+                        postconditions: Vec::new(),
                         capture: Some(StoryInteractionCaptureRequest {
                             // `target` is an existing directory, so PNG save must fail
                             // after input dispatch without mutating repository files.

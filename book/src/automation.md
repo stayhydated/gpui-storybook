@@ -123,6 +123,7 @@ not need a startup polling loop.
 | `storybook_get_story` | Inspect one story or substory route |
 | `storybook_current_story` | Inspect the story displayed by the live window |
 | `storybook_open_story` | Navigate the live window to a route |
+| `storybook_list_scenarios` | List named scenarios owned by the current or requested story |
 | `storybook_read_controls` | Read control metadata and current values from the active variant |
 | `storybook_read_semantic_values` | Read route-local JSON values refreshed from rendered application state |
 | `storybook_read_value` | Read one route-local JSON value by `value_key` |
@@ -134,11 +135,33 @@ not need a startup polling loop.
 | `storybook_list_actions` | List runtime GPUI actions, documentation, and argument schemas; interaction gate required |
 | `storybook_list_interaction_targets` | List stable semantic targets and live route-relative bounds; interaction gate required |
 | `storybook_click_target` | Click one semantic target exactly once; interaction gate required |
+| `storybook_run_scenario` | Recreate a story and run one declared scenario; interaction gate required |
 | `storybook_run_steps` | Run one ordered in-process interaction batch with optional capture; interaction gate required |
 
 Tool inputs and outputs use closed typed schemas. Route, target, value, and
 control inputs use `story_key`, `target_key`, `value_key`, and `control_key`
 respectively. Unknown, missing, or invalid fields return structured errors.
+
+## Run a declared scenario
+
+Call `storybook_list_scenarios` with an optional `story_key` to discover stable
+scenario keys, initial controls and presentation, named steps, exact semantic
+postconditions, and optional capture. The list tool is read-only. With the
+interaction gate enabled, run one declaration from constructor defaults:
+
+```json
+{
+  "story_key": "gpui-storybook-example-story-InteractionStory",
+  "scenario_key": "type-click-and-dispatch"
+}
+```
+
+`storybook_run_scenario` recreates the concrete story entity, rebinds its
+control target and focus handle, then delegates the generated request to the
+same exclusive executor as `storybook_run_steps`. Its result returns the
+scenario descriptor and structured interaction observations, postconditions,
+and capture. Scenario execution is destructive and non-idempotent; a partial
+run is reported and never resumed or retried.
 
 ## Run an in-process interaction batch
 

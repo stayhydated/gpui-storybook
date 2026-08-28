@@ -2,6 +2,8 @@ use gpui::{
     AnyElement, App, Bounds, Element, ElementId, GlobalElementId, InspectorElementId,
     InteractiveElement, IntoElement, LayoutId, Pixels, ScrollHandle, SharedString, Window, point,
 };
+#[cfg(feature = "capture")]
+use gpui::{Size, px};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -334,6 +336,122 @@ pub(crate) fn capture_region_bounds(route_id: &str) -> Option<CaptureRegionBound
     CAPTURE_REGIONS.with_borrow(|registry| registry.regions.get(route_id).cloned())
 }
 
+/// Clears thread-local rendered route and automation state for one story key.
+///
+/// A story root performs this reset before registering each fresh frame, which
+/// prevents routes that stopped rendering from remaining discoverable. Portable
+/// runners also call it before opening an isolated same-key app context so a
+/// failed initial draw cannot observe bounds left by an earlier case.
+///
+/// Callers that manage multiple live windows on one thread should not reset a
+/// story while another window with the same registered key is being captured.
+pub fn reset_capture_regions_for_story(story_key: &str) {
+    CAPTURE_REGIONS.with_borrow_mut(|registry| {
+        registry.scopes.retain(|scope| {
+            scope.story_key.as_deref() != Some(story_key)
+                && scope
+                    .route_id
+                    .as_deref()
+                    .is_none_or(|route_id| capture_route_story_key(route_id) != story_key)
+        });
+        registry
+            .regions
+            .retain(|route_id, _| capture_route_story_key(route_id) != story_key);
+        registry
+            .interaction_targets
+            .retain(|route_id, _| capture_route_story_key(route_id) != story_key);
+        registry
+            .duplicate_interaction_targets
+            .retain(|route_id, _| capture_route_story_key(route_id) != story_key);
+        registry
+            .semantic_values
+            .retain(|route_id, _| capture_route_story_key(route_id) != story_key);
+        registry
+            .duplicate_semantic_values
+            .retain(|route_id, _| capture_route_story_key(route_id) != story_key);
+    });
+}
+
+/// Failure to crop a rendered full-window image to one registered story route.
+#[derive(Clone, Debug, Eq, thiserror::Error, PartialEq)]
+pub enum CaptureRegionImageError {
+    /// The requested route did not register bounds during the latest frame.
+    #[error("capture route `{route_id}` was not rendered")]
+    RouteNotRendered {
+        /// Fully qualified story or substory route.
+        route_id: String,
+    },
+    /// The registered route does not overlap a non-empty portion of the image.
+    #[error("capture route `{route_id}` is outside the rendered window image")]
+    RouteOutsideImage {
+        /// Fully qualified story or substory route.
+        route_id: String,
+    },
+}
+
+/// Crops a full-window image to bounds registered by a rendered story route.
+///
+/// `window_size` uses GPUI logical pixels; the image may use a different
+/// physical pixel size. The conversion scales each axis independently and
+/// clips the route to the window before cropping. This is the portable visual
+/// runner's built-in root and substory crop contract.
+#[cfg(feature = "capture")]
+pub fn crop_capture_region_image(
+    route_id: &str,
+    image: image::RgbaImage,
+    window_size: Size<Pixels>,
+) -> Result<image::RgbaImage, CaptureRegionImageError> {
+    let region = capture_region_bounds(route_id).ok_or_else(|| {
+        CaptureRegionImageError::RouteNotRendered {
+            route_id: route_id.to_owned(),
+        }
+    })?;
+    let window_bounds = Bounds {
+        origin: point(px(0.), px(0.)),
+        size: window_size,
+    };
+    let bounds = region.bounds.intersect(&window_bounds);
+    let window_width = f32::from(window_size.width);
+    let window_height = f32::from(window_size.height);
+    if window_width <= 0. || window_height <= 0. || image.width() == 0 || image.height() == 0 {
+        return Err(CaptureRegionImageError::RouteOutsideImage {
+            route_id: route_id.to_owned(),
+        });
+    }
+
+    let x_scale = image.width() as f32 / window_width;
+    let y_scale = image.height() as f32 / window_height;
+    let left = (f32::from(bounds.origin.x) * x_scale)
+        .floor()
+        .clamp(0., image.width() as f32) as u32;
+    let top = (f32::from(bounds.origin.y) * y_scale)
+        .floor()
+        .clamp(0., image.height() as f32) as u32;
+    let right = ((f32::from(bounds.origin.x) + f32::from(bounds.size.width)) * x_scale)
+        .ceil()
+        .clamp(0., image.width() as f32) as u32;
+    let bottom = ((f32::from(bounds.origin.y) + f32::from(bounds.size.height)) * y_scale)
+        .ceil()
+        .clamp(0., image.height() as f32) as u32;
+    let Some(width) = right.checked_sub(left) else {
+        return Err(CaptureRegionImageError::RouteOutsideImage {
+            route_id: route_id.to_owned(),
+        });
+    };
+    let Some(height) = bottom.checked_sub(top) else {
+        return Err(CaptureRegionImageError::RouteOutsideImage {
+            route_id: route_id.to_owned(),
+        });
+    };
+    if width == 0 || height == 0 {
+        return Err(CaptureRegionImageError::RouteOutsideImage {
+            route_id: route_id.to_owned(),
+        });
+    }
+
+    Ok(image::imageops::crop_imm(&image, left, top, width, height).to_image())
+}
+
 #[derive(Debug)]
 pub(crate) enum InteractionTargetLookupError {
     RouteNotRendered,
@@ -414,7 +532,12 @@ pub(crate) fn current_capture_scroll_handle() -> Option<ScrollHandle> {
     current_scope().and_then(|scope| scope.scroll_handle)
 }
 
-pub(crate) fn scroll_capture_region_into_view(route_id: &str) -> bool {
+/// Scrolls the nearest registered story viewport so `route_id` becomes visible.
+///
+/// Returns `false` when the route has not registered bounds during the latest
+/// frame. Portable and live capture runners should request another frame after
+/// this returns `true` before cropping the route image.
+pub fn scroll_capture_region_into_view(route_id: &str) -> bool {
     let Some(region) = capture_region_bounds(route_id) else {
         return false;
     };
@@ -604,7 +727,7 @@ impl Element for CaptureScopeElement {
         };
 
         if let Some(story_key) = self.story_key.clone() {
-            clear_route_automation_values(&story_key);
+            reset_capture_regions_for_story(&story_key);
             record_region(story_key, bounds, &scope);
         }
 
@@ -897,11 +1020,63 @@ impl Element for SemanticValueElement {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use gpui::{ScrollHandle, div, point, px};
+    use gpui::{ScrollHandle, div, point, px, size};
     use gpui_component::button::Button;
 
     fn clear_registry() {
         CAPTURE_REGIONS.with_borrow_mut(|registry| *registry = CaptureRegionRegistry::default());
+    }
+
+    #[test]
+    fn resetting_one_story_drops_its_stale_routes_and_keeps_other_stories() {
+        clear_registry();
+        let bounds = Bounds {
+            origin: point(px(0.), px(0.)),
+            size: size(px(100.), px(50.)),
+        };
+        let story_a_scope = CaptureScope {
+            story_key: Some("story-a".to_owned()),
+            route_id: Some("story-a".to_owned()),
+            viewport_bounds: Some(bounds),
+            scroll_handle: None,
+        };
+        let story_b_scope = CaptureScope {
+            story_key: Some("story-b".to_owned()),
+            route_id: Some("story-b".to_owned()),
+            viewport_bounds: Some(bounds),
+            scroll_handle: None,
+        };
+        record_region("story-a".to_owned(), bounds, &story_a_scope);
+        record_region("story-a/old".to_owned(), bounds, &story_a_scope);
+        record_semantic_value(
+            "story-a/old".to_owned(),
+            "status".to_owned(),
+            "Status".to_owned(),
+            serde_json::json!("stale"),
+        );
+        record_region("story-b".to_owned(), bounds, &story_b_scope);
+        record_semantic_value(
+            "story-b".to_owned(),
+            "status".to_owned(),
+            "Status".to_owned(),
+            serde_json::json!("current"),
+        );
+
+        reset_capture_regions_for_story("story-a");
+
+        assert!(capture_region_bounds("story-a").is_none());
+        assert!(capture_region_bounds("story-a/old").is_none());
+        assert!(matches!(
+            semantic_values("story-a/old"),
+            Err(SemanticValueLookupError::RouteNotRendered)
+        ));
+        assert!(capture_region_bounds("story-b").is_some());
+        assert_eq!(
+            semantic_values("story-b")
+                .expect("unrelated story values remain")
+                .len(),
+            1
+        );
     }
 
     #[test]
@@ -1187,5 +1362,51 @@ mod tests {
             semantic_values("story-key"),
             Err(SemanticValueLookupError::DuplicateKey(key)) if key == "response"
         ));
+    }
+
+    #[cfg(feature = "capture")]
+    #[test]
+    fn route_image_crop_scales_logical_bounds_to_physical_pixels() {
+        clear_registry();
+        let scope = CaptureScope {
+            story_key: Some("story-key".to_owned()),
+            route_id: Some("story-key/details".to_owned()),
+            viewport_bounds: None,
+            scroll_handle: None,
+        };
+        record_region(
+            "story-key/details".to_owned(),
+            Bounds {
+                origin: point(px(10.), px(5.)),
+                size: gpui::size(px(20.), px(10.)),
+            },
+            &scope,
+        );
+        let image = image::RgbaImage::from_pixel(200, 100, image::Rgba([1, 2, 3, 255]));
+
+        let cropped =
+            crop_capture_region_image("story-key/details", image, gpui::size(px(100.), px(50.)))
+                .expect("registered route should crop");
+
+        assert_eq!(cropped.dimensions(), (40, 20));
+    }
+
+    #[cfg(feature = "capture")]
+    #[test]
+    fn route_image_crop_rejects_an_unrendered_route() {
+        clear_registry();
+        let error = crop_capture_region_image(
+            "story-key/missing",
+            image::RgbaImage::new(10, 10),
+            gpui::size(px(10.), px(10.)),
+        )
+        .expect_err("missing route should fail");
+
+        assert_eq!(
+            error,
+            CaptureRegionImageError::RouteNotRendered {
+                route_id: "story-key/missing".to_owned(),
+            }
+        );
     }
 }

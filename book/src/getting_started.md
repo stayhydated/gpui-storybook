@@ -14,7 +14,7 @@ You need:
 - compatible revisions of GPUI, GPUI Component, and the Fluent integration
   crates.
 
-GPUI Storybook version 0.5 targets Rust 1.96 and edition 2024.
+GPUI Storybook version 0.5 targets Rust 1.98 and edition 2024.
 
 ## Add the Storybook package dependencies
 
@@ -54,6 +54,17 @@ inspector = ["gpui-storybook/inspector"]
 Launch that package with `--features inspector` to add the GPUI Inspector button
 and Storybook story-root metadata to GPUI Component's Inspector. The Inspect
 workbench tab remains available without this feature.
+
+Forward GPUI profiler instrumentation when the Storybook binary should expose
+the Perf workbench tab:
+
+```toml
+[features]
+performance = ["gpui-storybook/performance"]
+```
+
+Launch with `--features performance` to inspect frame and input-latency
+percentiles and control GPUI's debug frame overlay.
 
 ## Wire the locale adapter
 

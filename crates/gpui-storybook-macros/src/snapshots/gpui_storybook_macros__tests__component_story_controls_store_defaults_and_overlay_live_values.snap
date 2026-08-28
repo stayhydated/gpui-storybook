@@ -152,4 +152,11 @@ gpui_storybook::__inventory::submit! {
     (window, cx) },
     ::gpui_storybook::__registry::StoryRegistrationSource::new(::std::env!("CARGO_PKG_NAME"),
     ::std::env!("CARGO_MANIFEST_DIR"), ::std::file!(), ::std::line!(),),)
+    .with_autodoc(::gpui_storybook::__registry::StoryAutodoc::new("", &
+    [::gpui_storybook::StaticControlSpec::new("headline", "Headline", "", "Content",
+    ::gpui_storybook::StaticControlKind::Text, ::gpui_storybook::ControlBounds { min :
+    None, max : None, step : None, }, & [],),
+    ::gpui_storybook::StaticControlSpec::new("selected", "Selected", "", "Properties",
+    ::gpui_storybook::StaticControlKind::Checkbox, ::gpui_storybook::ControlBounds { min
+    : None, max : None, step : None, }, & [],)]))
 }

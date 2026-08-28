@@ -116,6 +116,10 @@ impl gpui_storybook::Story for ButtonStory {
     fn new_view(window: &mut Window, cx: &mut App) -> Entity<Self> {
         Self::view(window, cx)
     }
+
+    fn action_scope_focus_handle(&self, _: &App) -> Option<gpui::FocusHandle> {
+        Some(self.focus_handle.clone())
+    }
 }
 
 impl Focusable for ButtonStory {
@@ -141,6 +145,7 @@ impl Render for ButtonStory {
 
         v_flex()
             .p(px(padding))
+            .track_focus(&self.focus_handle)
             .on_action(
                 cx.listener(|this, action: &ButtonAction, _, _| match action {
                     ButtonAction::Disabled => this.disabled = !this.disabled,

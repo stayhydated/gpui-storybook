@@ -25,6 +25,7 @@ pub(crate) mod interaction;
 pub use crate::capture_region::{
     StoryInteractionTargetBounds, StoryInteractionTargetSnapshot, StorySemanticValueSnapshot,
 };
+pub use crate::story::{StoryScenario, StoryScenarioSnapshot, StoryScenarioStep};
 use crate::{
     capture_region::{
         InteractionTargetLookupError, SemanticValueLookupError, capture_region_bounds,
@@ -39,9 +40,11 @@ use gpui::{App, Entity, Global, Window, px};
 #[cfg(feature = "capture")]
 use gpui::{Bounds, Pixels, point};
 pub use interaction::{
+    DEFAULT_INTERACTION_POSTCONDITION_FRAMES, MAX_INTERACTION_POSTCONDITIONS,
     MAX_INTERACTION_STEPS, MAX_INTERACTION_TEXT_BYTES, MAX_INTERACTION_WAITED_FRAMES,
     StoryActionSnapshot, StoryInteractionCaptureRequest, StoryInteractionDispatch,
-    StoryInteractionObservation, StoryInteractionRequest, StoryInteractionSnapshot,
+    StoryInteractionObservation, StoryInteractionPostcondition,
+    StoryInteractionPostconditionSnapshot, StoryInteractionRequest, StoryInteractionSnapshot,
     StoryInteractionStep, StoryModifier, StoryModifiers, StoryMouseButton, StoryPoint,
     StoryPointSpace,
 };
@@ -122,7 +125,7 @@ impl Default for StoryDefaultSize {
 }
 
 /// Machine-readable story metadata used by automation and capture tools.
-#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[schemars(deny_unknown_fields)]
 pub struct StorySnapshot {
     pub key: String,
@@ -136,9 +139,32 @@ pub struct StorySnapshot {
     pub source_line: u32,
     pub capture_route_id: String,
     pub default_size: StoryDefaultSize,
+    /// Reusable interaction scenarios declared by this story.
+    #[serde(default)]
+    pub scenarios: Vec<StoryScenarioSnapshot>,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+/// Scenario descriptors available for one selected story.
+#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
+#[schemars(deny_unknown_fields)]
+pub struct StoryScenariosSnapshot {
+    /// Story that owns the listed scenarios.
+    pub story: StorySnapshot,
+    /// Stable scenario descriptors in declaration order.
+    pub scenarios: Vec<StoryScenarioSnapshot>,
+}
+
+/// Completed result for one story-owned interaction scenario.
+#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
+#[schemars(deny_unknown_fields)]
+pub struct StoryScenarioRunSnapshot {
+    /// Scenario descriptor used to create the fresh interaction request.
+    pub scenario: StoryScenarioSnapshot,
+    /// Shared interaction executor result, including observations and capture.
+    pub interaction: StoryInteractionSnapshot,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[schemars(deny_unknown_fields)]
 pub struct StoryCurrentSnapshot {
     pub story: Option<StorySnapshot>,
@@ -182,7 +208,7 @@ pub struct StoryInteractionTargetsSnapshot {
 }
 
 /// Machine-readable values currently rendered by the selected story route.
-#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[schemars(deny_unknown_fields)]
 pub struct StorySemanticValuesSnapshot {
     /// Story or substory route whose values were read.
@@ -191,7 +217,7 @@ pub struct StorySemanticValuesSnapshot {
     pub values: Vec<StorySemanticValueSnapshot>,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[schemars(deny_unknown_fields)]
 pub struct StoryCaptureSnapshot {
     pub request_id: u64,
@@ -256,6 +282,14 @@ pub enum StorybookAutomationError {
     InvalidInteractionStep {
         /// Zero-based request step index.
         step_index: usize,
+        /// Validation detail.
+        message: String,
+    },
+    /// One indexed semantic postcondition is invalid before dispatch.
+    #[error("interaction postcondition {postcondition_index} is invalid: {message}")]
+    InvalidInteractionPostcondition {
+        /// Zero-based postcondition index.
+        postcondition_index: usize,
         /// Validation detail.
         message: String,
     },
@@ -341,6 +375,22 @@ pub enum StorybookAutomationError {
         /// Duplicated stable value key.
         key: String,
     },
+    /// A requested story scenario is not declared by that story.
+    #[error("scenario `{scenario_key}` was not found in story `{story_key}`")]
+    ScenarioNotFound {
+        /// Story owning the requested scenario.
+        story_key: String,
+        /// Requested stable scenario key.
+        scenario_key: String,
+    },
+    /// A story declared the same scenario key more than once.
+    #[error("scenario `{scenario_key}` is duplicated in story `{story_key}`")]
+    DuplicateScenarioKey {
+        /// Story owning the duplicate key.
+        story_key: String,
+        /// Duplicated stable scenario key.
+        scenario_key: String,
+    },
 }
 
 pub(crate) enum StorybookAutomationCommand {
@@ -382,6 +432,11 @@ pub(crate) enum StorybookAutomationCommand {
     RunSteps {
         request_id: u64,
         request: StoryInteractionRequest,
+        /// Recreate the concrete story entity before preparing this batch.
+        /// Scenario runs set this so every invocation starts at constructor
+        /// defaults; ordinary ad-hoc interaction batches preserve their
+        /// existing state.
+        fresh_story: bool,
         response: oneshot::Sender<Result<StoryInteractionSnapshot, StorybookAutomationError>>,
         progress: Arc<std::sync::atomic::AtomicUsize>,
         operation: AutomationOperationGuard,
@@ -453,6 +508,7 @@ impl StorySnapshot {
             source_file: story.source_file_label().unwrap_or_default().to_string(),
             source_line: story.source_line().unwrap_or_default(),
             default_size: StoryDefaultSize::default(),
+            scenarios: story.scenarios().to_vec(),
         })
     }
 }
@@ -571,6 +627,63 @@ impl StorybookAutomation {
             story,
             revision: state.revision,
         }
+    }
+
+    /// Lists scenarios declared by the currently selected story.
+    pub fn list_scenarios(&self) -> Result<StoryScenariosSnapshot, StorybookAutomationError> {
+        let story = self
+            .current_story()
+            .story
+            .ok_or(StorybookAutomationError::NoActiveStory)?;
+        Ok(StoryScenariosSnapshot {
+            scenarios: story.scenarios.clone(),
+            story,
+        })
+    }
+
+    /// Lists scenarios declared by a registered story or sub-story route.
+    pub fn list_scenarios_for(
+        &self,
+        key: &str,
+    ) -> Result<StoryScenariosSnapshot, StorybookAutomationError> {
+        let story = self.get_story(key)?;
+        Ok(StoryScenariosSnapshot {
+            scenarios: story.scenarios.clone(),
+            story,
+        })
+    }
+
+    /// Runs one declared scenario as a fresh, exclusive interaction request.
+    ///
+    /// The scenario is converted to [`StoryInteractionRequest`] and delegated
+    /// to the same executor as [`Self::run_steps`]. The live command marks this
+    /// request for concrete story recreation before controls and dispatch. A
+    /// failed request reports dispatched progress and is never resumed or
+    /// retried by this method.
+    pub async fn run_scenario(
+        &self,
+        story_key: Option<String>,
+        scenario_key: impl Into<String>,
+    ) -> Result<StoryScenarioRunSnapshot, StorybookAutomationError> {
+        let scenario_key = scenario_key.into();
+        let story = match story_key {
+            Some(key) => self.get_story(&key)?,
+            None => self
+                .current_story()
+                .story
+                .ok_or(StorybookAutomationError::NoActiveStory)?,
+        };
+        let scenario = find_scenario(&story, &scenario_key)?;
+        let interaction = self
+            .run_steps_with_options(
+                scenario.interaction_request(story.capture_route_id.clone()),
+                true,
+            )
+            .await?;
+        Ok(StoryScenarioRunSnapshot {
+            scenario,
+            interaction,
+        })
     }
 
     pub async fn open_story(
@@ -719,6 +832,14 @@ impl StorybookAutomation {
         &self,
         request: StoryInteractionRequest,
     ) -> Result<StoryInteractionSnapshot, StorybookAutomationError> {
+        self.run_steps_with_options(request, false).await
+    }
+
+    async fn run_steps_with_options(
+        &self,
+        request: StoryInteractionRequest,
+        fresh_story: bool,
+    ) -> Result<StoryInteractionSnapshot, StorybookAutomationError> {
         interaction::validate_interaction_request(&request)?;
         let (response, receiver) = self.live_command_channel()?;
         let operation = self.begin_operation()?;
@@ -728,6 +849,7 @@ impl StorybookAutomation {
             .send(StorybookAutomationCommand::RunSteps {
                 request_id,
                 request,
+                fresh_story,
                 response,
                 progress: progress.clone(),
                 operation,
@@ -877,6 +999,29 @@ fn resolve_story_route(stories: &[StorySnapshot], route_id: &str) -> Option<Stor
         .find(|story| story.key == story_key || story.capture_route_id == story_key)?;
 
     Some(story_snapshot_for_route(story.clone(), route_id))
+}
+
+fn find_scenario(
+    story: &StorySnapshot,
+    scenario_key: &str,
+) -> Result<StoryScenarioSnapshot, StorybookAutomationError> {
+    let mut matches = story
+        .scenarios
+        .iter()
+        .filter(|scenario| scenario.key == scenario_key);
+    let Some(scenario) = matches.next() else {
+        return Err(StorybookAutomationError::ScenarioNotFound {
+            story_key: story.key.clone(),
+            scenario_key: scenario_key.to_owned(),
+        });
+    };
+    if matches.next().is_some() {
+        return Err(StorybookAutomationError::DuplicateScenarioKey {
+            story_key: story.key.clone(),
+            scenario_key: scenario_key.to_owned(),
+        });
+    }
+    Ok(scenario.clone())
 }
 
 fn story_snapshot_for_route(mut story: StorySnapshot, route_id: &str) -> StorySnapshot {
@@ -1275,6 +1420,7 @@ mod tests {
             source_line: 7,
             capture_route_id: key.to_string(),
             default_size: StoryDefaultSize::default(),
+            scenarios: Vec::new(),
         }
     }
 
@@ -1342,6 +1488,77 @@ mod tests {
                 key: "missing".to_string(),
             })
         );
+    }
+
+    #[test]
+    fn scenario_catalog_lists_stable_descriptors_and_reports_missing_keys() {
+        let mut story = sample_story("crate-ButtonStory", "Button");
+        story.scenarios = vec![
+            StoryScenario::new("press", "Press button")
+                .description("Presses the primary button.")
+                .step(StoryScenarioStep::new(
+                    "focus button",
+                    StoryInteractionStep::FocusNext,
+                )),
+        ];
+        let automation = StorybookAutomation::with_stories(vec![story.clone()]);
+
+        let listed = automation
+            .list_scenarios()
+            .expect("current story scenarios should be listed");
+        assert_eq!(listed.story, story);
+        assert_eq!(listed.scenarios.len(), 1);
+        assert_eq!(listed.scenarios[0].key, "press");
+        let route_listing = automation
+            .list_scenarios_for("crate-ButtonStory/section")
+            .expect("substory scenarios should be listed");
+        assert_eq!(
+            route_listing.story.capture_route_id,
+            "crate-ButtonStory/section"
+        );
+        assert_eq!(route_listing.story.title, "Button / Section");
+        assert_eq!(route_listing.scenarios, listed.scenarios);
+
+        assert_eq!(
+            automation.list_scenarios_for("missing"),
+            Err(StorybookAutomationError::StoryNotFound {
+                key: "missing".to_owned(),
+            })
+        );
+    }
+
+    #[test]
+    fn run_scenario_resolves_descriptor_before_requiring_live_host() {
+        let mut story = sample_story("crate-ButtonStory", "Button");
+        story.scenarios =
+            vec![
+                StoryScenario::new("press", "Press button").step(StoryScenarioStep::new(
+                    "focus button",
+                    StoryInteractionStep::FocusNext,
+                )),
+            ];
+        let automation = StorybookAutomation::with_stories(vec![story]);
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .expect("test runtime should build");
+
+        runtime.block_on(async {
+            assert_eq!(
+                automation
+                    .run_scenario(Some("crate-ButtonStory".to_owned()), "missing")
+                    .await,
+                Err(StorybookAutomationError::ScenarioNotFound {
+                    story_key: "crate-ButtonStory".to_owned(),
+                    scenario_key: "missing".to_owned(),
+                })
+            );
+            assert_eq!(
+                automation
+                    .run_scenario(Some("crate-ButtonStory".to_owned()), "press")
+                    .await,
+                Err(StorybookAutomationError::NoLiveHost)
+            );
+        });
     }
 
     #[test]

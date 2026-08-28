@@ -33,6 +33,26 @@ The same field attributes work directly on a `ComponentStory`. An explicitly
 controlled unsupported type produces a compile error. Only marked fields are
 registered, so leave other fields unmarked.
 
+`ComponentStory` accepts `scenarios = expression` when the component owns a
+`Vec<gpui_storybook::StoryScenario>` declaration. The generated wrapper exposes
+that vector through `Story::scenarios()`, matching explicit stateful stories:
+
+```rust
+#[derive(gpui::IntoElement, gpui_storybook::ComponentStory)]
+#[storybook(
+    example = WelcomeCard::example(),
+    scenarios = WelcomeCard::scenarios(),
+)]
+struct WelcomeCard {
+    // ...
+}
+```
+
+Both registration macros attach declaration Rustdocs and static marked-control
+metadata to the inventory entry. `gpui_storybook::static_story_catalog()` can
+export those keys, source locations, docs, editor kinds, bounds, and options
+without constructing the generated or explicit story.
+
 See [Write stories](../../book/src/stories.md) for supported patterns and
 [Use the workbench](../../book/src/workbench.md) for runtime behavior, and
 [docs.rs](https://docs.rs/gpui-storybook-macros/) for the macro API.

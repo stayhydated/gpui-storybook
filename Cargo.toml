@@ -8,6 +8,7 @@ members = [
   "crates/gpui-storybook-mcp",
   "crates/gpui-storybook-launch",
   "crates/gpui-storybook-preferences",
+  "crates/gpui-storybook-test",
   "crates/gpui-storybook-toml",
   "examples/story",
   "examples/component",
@@ -50,6 +51,7 @@ gpui-storybook-launch = { path = "crates/gpui-storybook-launch", version = "0.5.
 gpui-storybook-macros = { path = "crates/gpui-storybook-macros", version = "0.5.0" }
 gpui-storybook-mcp = { path = "crates/gpui-storybook-mcp", version = "0.5.0" }
 gpui-storybook-preferences = { path = "crates/gpui-storybook-preferences", version = "0.5.0" }
+gpui-storybook-test = { path = "crates/gpui-storybook-test", version = "0.5.0" }
 gpui-storybook-toml = { path = "crates/gpui-storybook-toml", version = "0.5.0" }
 gpui_platform = { branch = "linux-headless-renderer", features = [
   "font-kit",
@@ -58,6 +60,10 @@ gpui_platform = { branch = "linux-headless-renderer", features = [
   "runtime_shaders",
 ], git = "https://github.com/stayhydated/zed" }
 gpui_tokio = { branch = "linux-headless-renderer", git = "https://github.com/stayhydated/zed" }
+gpui_wgpu = { branch = "linux-headless-renderer", features = [
+  "font-kit",
+  "test-support",
+], git = "https://github.com/stayhydated/zed", version = "0.1.0" }
 heck = "0.5"
 image = { default-features = false, features = [ "png" ], version = "0.25" }
 insta = "1.48"

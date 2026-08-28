@@ -17,8 +17,8 @@
 //! - `gallery`: searchable sidebar plus active-story display
 //! - `controls`, `workbench`, and `presentation`: typed live field editing,
 //!   per-window selection and preview state, theme editing, story source
-//!   details, optional GPUI Inspector integration, viewport presets, and canvas
-//!   settings
+//!   details, focus-scoped actions and key bindings, optional GPUI profiler
+//!   telemetry and Inspector integration, viewport presets, and canvas settings
 //! - `theme_workbench`: deterministic session drafts layered over the selected
 //!   base theme, including token rebuilding and external-reload rebasing
 //! - `dock_gallery`: feature-gated dock workspace, sidebar panel, story panel
@@ -41,6 +41,8 @@
 //! - `registry`: typed `inventory` entry definitions shared with the facade
 //!   and macro crates, plus registration metadata copied into runtime story
 //!   containers
+//! - `catalog`: static story registration autodocs and deterministic JSON export
+//!   for tooling that must inspect stories without constructing a GPUI window
 //!
 //! The preference runtime treats saved intent and resolved presentation as
 //! separate state. Standard windows feed appearance and activation events into
@@ -57,6 +59,7 @@ pub mod automation;
 #[cfg(feature = "capture")]
 mod capture_output;
 pub mod capture_region;
+pub mod catalog;
 pub mod controls;
 #[cfg(feature = "dock")]
 pub mod dock_gallery;

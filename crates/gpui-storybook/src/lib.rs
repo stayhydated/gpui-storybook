@@ -22,6 +22,10 @@
 //! automation. Only marked fields are registered. `#[derive(ComponentStory)]`
 //! accepts the same field metadata and derives reset defaults from its
 //! configured example.
+//! Explicit stories declare reusable workflows with [`Story::scenarios`]; a
+//! component derive accepts `scenarios = ...`. Workbench and automation runs
+//! recreate the concrete story before applying scenario controls,
+//! presentation, named steps, exact postconditions, and optional capture.
 //! [`StorybookElementExt`] associates route-local automation targets and JSON
 //! state with rendered children. MCP clients can read semantic values after a
 //! fresh frame without requiring a screenshot; capture remains the
@@ -40,6 +44,11 @@
 //! generated [`StoryContainer`] values as typed [`RegisteredStoryMetadata`] for
 //! automation and capture routes.
 //!
+//! [`static_story_catalog`] and [`static_story_catalog_json`] expose the
+//! registration catalog without opening a window or constructing live stories.
+//! The static records include Rustdoc and control shape metadata; localized
+//! titles, descriptions, and control defaults remain runtime values.
+//!
 //! Feature boundaries:
 //!
 //! - `macros`: re-exports proc macros from `gpui-storybook-macros`
@@ -51,6 +60,8 @@
 //!   tools are advertised only when
 //!   `GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1`; typed controls remain available
 //!   without that capability.
+//! - `performance`: enables GPUI window profiler histograms and the debug frame
+//!   overlay in the Perf workbench tab
 //!
 //! Applications with embedded locale assets should call
 //! `es_fluent_build::track_i18n_assets()` from `build.rs`. Define the embedded
@@ -91,12 +102,18 @@ pub use preferences::{
 };
 
 pub use gpui_es_fluent::try_localize_message as localize_message;
+pub use gpui_storybook_core::catalog::{
+    StaticControlKind, StaticControlSpec, StoryCatalog, StoryCatalogEntry, StoryCatalogExportError,
+    StoryCatalogSource, export_static_catalog_json, export_static_catalog_json_pretty,
+    static_story_catalog, static_story_catalog_json, static_story_catalog_json_pretty,
+    write_static_catalog_json, write_static_catalog_json_pretty,
+};
 #[cfg(feature = "dock")]
 pub use gpui_storybook_core::dock_gallery::{
     StoryWorkspace, create_dock_window, register_story_panels,
 };
 pub use gpui_storybook_core::registry::{
-    RegisteredStoryMetadata, StoryKey, StoryName, StorySectionName,
+    RegisteredStoryMetadata, StoryAutodoc, StoryKey, StoryName, StorySectionName,
 };
 #[cfg(feature = "inspector")]
 pub use gpui_storybook_core::story_inspector::StoryInspectorState;
@@ -104,6 +121,15 @@ pub use gpui_storybook_core::story_inspector::StoryInspectorState;
 pub use gpui_storybook_core::window_view::DockWindowView;
 pub use gpui_storybook_core::{
     assets::Assets,
+    automation::{
+        StoryActionSnapshot, StoryCaptureSnapshot, StoryInteractionCaptureRequest,
+        StoryInteractionDispatch, StoryInteractionObservation, StoryInteractionPostcondition,
+        StoryInteractionPostconditionSnapshot, StoryInteractionRequest, StoryInteractionSnapshot,
+        StoryInteractionStep, StoryInteractionTargetBounds, StoryInteractionTargetSnapshot,
+        StoryInteractionTargetsSnapshot, StoryModifier, StoryModifiers, StoryMouseButton,
+        StoryPoint, StoryPointSpace, StoryScenarioRunSnapshot, StoryScenariosSnapshot,
+        StorySemanticValueSnapshot, StorySemanticValuesSnapshot, StorybookAutomationError,
+    },
     capture_region::{
         StorybookElementExt, capture_route_slug, capture_substory, capture_substory_route_id,
         capture_substory_route_id_with_key, capture_substory_with_key,
@@ -118,8 +144,9 @@ pub use gpui_storybook_core::{
     presentation::{StoryCanvasBackground, StoryPresentation, StoryViewportPreset},
     story::themes::STORYBOOK_THEME_DIR_ENV,
     story::{
-        Story, StoryContainer, StorySection, StorySectionBase, StorySectionTitle, Substory,
-        create_new_window, create_new_window_with_ui, section,
+        Story, StoryContainer, StoryScenario, StoryScenarioSnapshot, StoryScenarioStep,
+        StorySection, StorySectionBase, StorySectionTitle, Substory, create_new_window,
+        create_new_window_with_ui, section,
     },
     storybook_window_ui::{StorybookWindow, StorybookWindowUi},
     theme_workbench::{ThemeColorRow, ThemeDraft, ThemeDraftError, theme_color_rows},

@@ -9,6 +9,16 @@ use gpui::{
 use serde::{Deserialize, Serialize};
 use std::{borrow::Borrow, rc::Rc};
 
+type StoryRecreateFn = fn(
+    &mut Window,
+    &mut App,
+) -> (
+    AnyView,
+    Option<Rc<dyn ControlTarget>>,
+    gpui::FocusHandle,
+    Option<gpui::FocusHandle>,
+);
+
 use gpui_component::{
     ActiveTheme as _, ElementExt as _, IconName, Sizable as _,
     button::{Button, ButtonVariants as _},
@@ -32,6 +42,7 @@ use crate::{
     controls::{ControlTarget, EntityControlTarget, StoryControls},
     presentation::{StoryCanvasBackground, StoryPresentation},
     registry::{RegisteredStoryMetadata, StoryKey, StoryName},
+    story::StoryScenario,
 };
 
 pub const STORY_LIST_KLASS_PREFIX: &str = "__gpui_storybook_list__:";
@@ -277,6 +288,7 @@ pub fn section(title: impl Into<StorySectionTitle>) -> StorySection {
 
 pub struct StoryContainer {
     focus_handle: gpui::FocusHandle,
+    action_scope_focus_handle: Option<gpui::FocusHandle>,
     pub name: SharedString,
     pub group: Option<SharedString>,
     pub section: Option<SharedString>,
@@ -310,6 +322,8 @@ pub struct StoryContainer {
     on_active: Option<fn(AnyView, bool, &mut Window, &mut App)>,
     pub title_fn: Option<Box<dyn Fn(&App) -> String>>,
     pub description_fn: Option<Box<dyn Fn(&App) -> String>>,
+    scenarios: Vec<StoryScenario>,
+    recreate: Option<StoryRecreateFn>,
 }
 
 pub fn story_list_klass(stories: &[Entity<StoryContainer>], cx: &App) -> SharedString {
@@ -468,6 +482,28 @@ pub trait Story: Focusable + Render + StoryControls + Sized {
     }
     fn new_view(window: &mut Window, cx: &mut App) -> Entity<Self>;
 
+    /// Returns the story-root focus handle whose GPUI actions are exposed in
+    /// the workbench.
+    ///
+    /// Track this handle on the element that installs the page or component
+    /// action handlers. Keep it separate from [`Focusable::focus_handle`] when
+    /// the story's primary interaction focus belongs to a nested control such
+    /// as an input. Stories opt in explicitly so actions owned by child
+    /// controls or the surrounding Storybook shell are never inferred as
+    /// story actions.
+    fn action_scope_focus_handle(&self, _cx: &App) -> Option<gpui::FocusHandle> {
+        None
+    }
+
+    /// Returns reusable, story-owned interaction scenarios.
+    ///
+    /// Each invocation is copied into the runtime story container and can be
+    /// listed or run by the Storybook UI and automation integrations. The
+    /// default implementation keeps existing stories scenario-free.
+    fn scenarios() -> Vec<StoryScenario> {
+        Vec::new()
+    }
+
     fn on_active(&mut self, active: bool, window: &mut Window, cx: &mut App) {
         let _ = active;
         let _ = window;
@@ -493,6 +529,7 @@ impl StoryContainer {
 
         Self {
             focus_handle,
+            action_scope_focus_handle: None,
             name: "".into(),
             group: None,
             section: None,
@@ -526,6 +563,8 @@ impl StoryContainer {
             on_active: None,
             title_fn: None,
             description_fn: None,
+            scenarios: Vec::new(),
+            recreate: None,
         }
     }
 
@@ -553,17 +592,18 @@ impl StoryContainer {
     pub fn panel<S: Story>(window: &mut Window, cx: &mut App) -> Entity<Self> {
         let name = S::title(cx);
         let description = S::description(cx);
-        let story = S::new_view(window, cx);
-        let control_target = EntityControlTarget::optional(story.clone(), cx);
+        let (story, control_target, focus_handle, action_scope_focus_handle) =
+            recreate_story::<S>(window, cx);
         let story_klass = S::klass();
-        let focus_handle = story.focus_handle(cx);
+        let scenarios = S::scenarios();
 
         cx.new(|cx| {
             let mut story = Self::new(window, cx)
-                .story(story.into(), story_klass)
+                .story(story, story_klass)
                 .on_active(S::on_active_any);
             story.control_target = control_target;
             story.focus_handle = focus_handle;
+            story.action_scope_focus_handle = action_scope_focus_handle;
             story.closable = S::closable();
             story.zoomable = S::zoomable();
             story.name = name.into();
@@ -571,6 +611,8 @@ impl StoryContainer {
             story.title_bg = S::title_bg();
             story.title_fn = Some(Box::new(S::title));
             story.description_fn = Some(Box::new(S::description));
+            story.scenarios = scenarios;
+            story.recreate = Some(recreate_story::<S>);
             story
         })
     }
@@ -626,7 +668,66 @@ impl StoryContainer {
         self.control_target.clone()
     }
 
-    pub(crate) fn set_presentation(&mut self, presentation: StoryPresentation) {
+    /// Returns the explicit story-root focus handle used by the Actions
+    /// workbench, when the story exposes one.
+    pub fn action_scope_focus_handle(&self) -> Option<gpui::FocusHandle> {
+        self.action_scope_focus_handle.clone()
+    }
+
+    /// Returns the immutable scenarios declared by this story type.
+    pub fn scenarios(&self) -> &[StoryScenario] {
+        &self.scenarios
+    }
+
+    /// Recreates the concrete story entity and all runtime adapters used by it.
+    ///
+    /// Scenario runs use this seam before applying their initial controls and
+    /// dispatching their first step. Recreating the entity is stronger than
+    /// resetting controls: story-owned counters, input buffers, subscriptions,
+    /// and other transient state return to the type's constructor defaults.
+    /// Active stories receive an `on_active(false)` callback for the old entity
+    /// and an `on_active(true)` callback for the replacement. The replacement
+    /// primary focus handle, optional action-scope focus handle, and control
+    /// target are installed atomically from the container's perspective.
+    pub fn recreate_for_scenario(
+        &mut self,
+        window: &mut Window,
+        cx: &mut gpui::Context<Self>,
+    ) -> bool {
+        let Some(recreate) = self.recreate else {
+            return false;
+        };
+
+        let on_active = self.on_active;
+        if self.is_active
+            && let Some(on_active) = on_active
+            && let Some(story) = self.story.clone()
+        {
+            on_active(story, false, window, cx);
+        }
+
+        let (story, control_target, focus_handle, action_scope_focus_handle) = recreate(window, cx);
+        self.story = Some(story.clone());
+        self.control_target = control_target;
+        self.focus_handle = focus_handle;
+        self.action_scope_focus_handle = action_scope_focus_handle;
+        self.story_scroll_handle = ScrollHandle::new();
+        self.canvas_resize_drag = None;
+
+        if self.is_active
+            && let Some(on_active) = on_active
+        {
+            on_active(story, true, window, cx);
+        }
+        cx.notify();
+        true
+    }
+
+    /// Applies viewport and canvas-background presentation to this story.
+    ///
+    /// Portable runners use this before the first draw so every matrix case
+    /// renders the requested presentation rather than merely labeling it.
+    pub fn set_presentation(&mut self, presentation: StoryPresentation) {
         self.presentation = presentation;
     }
 
@@ -882,6 +983,27 @@ impl StoryContainer {
             self.description.to_string()
         }
     }
+}
+
+fn recreate_story<S: Story>(
+    window: &mut Window,
+    cx: &mut App,
+) -> (
+    AnyView,
+    Option<Rc<dyn ControlTarget>>,
+    gpui::FocusHandle,
+    Option<gpui::FocusHandle>,
+) {
+    let story = S::new_view(window, cx);
+    let control_target = EntityControlTarget::optional(story.clone(), cx);
+    let focus_handle = story.focus_handle(cx);
+    let action_scope_focus_handle = story.read(cx).action_scope_focus_handle(cx);
+    (
+        story.into(),
+        control_target,
+        focus_handle,
+        action_scope_focus_handle,
+    )
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -1261,6 +1383,38 @@ mod tests {
         }
     }
 
+    struct RecreatedStory {
+        focus_handle: gpui::FocusHandle,
+        count: usize,
+    }
+
+    impl StoryControls for RecreatedStory {}
+
+    impl Focusable for RecreatedStory {
+        fn focus_handle(&self, _: &App) -> gpui::FocusHandle {
+            self.focus_handle.clone()
+        }
+    }
+
+    impl Render for RecreatedStory {
+        fn render(&mut self, _: &mut Window, _: &mut gpui::Context<Self>) -> impl IntoElement {
+            div()
+        }
+    }
+
+    impl Story for RecreatedStory {
+        fn title(_: &App) -> String {
+            "Recreated Story".to_string()
+        }
+
+        fn new_view(_: &mut Window, cx: &mut App) -> Entity<Self> {
+            cx.new(|cx| Self {
+                focus_handle: cx.focus_handle(),
+                count: 0,
+            })
+        }
+    }
+
     impl Render for TallStoryContent {
         fn render(&mut self, _: &mut Window, _: &mut gpui::Context<Self>) -> impl IntoElement {
             v_flex().w_full().child(div().h(px(1200.))).child(
@@ -1339,6 +1493,52 @@ mod tests {
         assert!(DefaultStoryContract::closable());
         assert!(DefaultStoryContract::zoomable().is_some());
         assert_eq!(DefaultStoryContract::title_bg(), None);
+        let story = DefaultStoryContract;
+        assert_eq!(story.action_scope_focus_handle(cx), None);
+        assert!(DefaultStoryContract::scenarios().is_empty());
+    }
+
+    #[gpui::test]
+    fn scenario_recreation_starts_each_run_from_constructor_defaults(cx: &mut App) {
+        gpui_component::init(cx);
+        let window: gpui::WindowHandle<StoryContainer> = cx
+            .open_window(Default::default(), |window, cx| {
+                StoryContainer::panel::<RecreatedStory>(window, cx)
+            })
+            .expect("test window should open");
+
+        window
+            .update(cx, |container, window, cx| {
+                let story = container
+                    .story
+                    .clone()
+                    .expect("panel should contain the concrete story")
+                    .downcast::<RecreatedStory>()
+                    .expect("panel should contain RecreatedStory");
+                story.update(cx, |story, _| story.count = 7);
+                assert_eq!(story.read(cx).count, 7);
+
+                assert!(container.recreate_for_scenario(window, cx));
+                let story = container
+                    .story
+                    .clone()
+                    .expect("recreated panel should contain the concrete story")
+                    .downcast::<RecreatedStory>()
+                    .expect("recreated panel should contain RecreatedStory");
+                assert_eq!(story.read(cx).count, 0);
+
+                story.update(cx, |story, _| story.count = 11);
+                assert_eq!(story.read(cx).count, 11);
+                assert!(container.recreate_for_scenario(window, cx));
+                let story = container
+                    .story
+                    .clone()
+                    .expect("second recreation should contain the concrete story")
+                    .downcast::<RecreatedStory>()
+                    .expect("second recreation should contain RecreatedStory");
+                assert_eq!(story.read(cx).count, 0);
+            })
+            .expect("story should recreate successfully");
     }
 
     #[gpui::test]

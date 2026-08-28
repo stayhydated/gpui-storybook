@@ -71,4 +71,5 @@ gpui_storybook::__inventory::submit! {
     cx) },
     ::gpui_storybook::__registry::StoryRegistrationSource::new(::std::env!("CARGO_PKG_NAME"),
     ::std::env!("CARGO_MANIFEST_DIR"), ::std::file!(), ::std::line!(),),)
+    .with_autodoc(::gpui_storybook::__registry::StoryAutodoc::new("", & []))
 }

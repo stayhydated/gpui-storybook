@@ -21,22 +21,55 @@ Run the gallery with the opt-in GPUI Inspector integration:
 cargo run -p gpui-storybook-example-story --features inspector
 ```
 
-The registrations live under `src/stories`; `ButtonStory` also demonstrates
-boolean, numeric, and enum-select `StoryControls`, reset behavior, preview
-viewport presentation, and stable `Substory` capture routes.
+Inspect explicitly scoped story-root actions in every build, or add GPUI timing
+telemetry:
+
+```bash
+cargo run -p gpui-storybook-example-story --features performance
+```
+
+The registrations live under `src/stories`.
+`ActionsAndScenariosStory` is the focused command-workflow example: three
+documented unit actions share one root action scope, visible Buttons dispatch
+those same actions, contextual key bindings appear in the Actions tab, and two
+scenarios recreate the story before dispatching ordered commands and checking
+the rendered `actions-scenarios-state` value.
+
+`ButtonStory` also demonstrates an opt-in root action scope, boolean, numeric,
+and enum-select `StoryControls`, reset behavior, preview viewport presentation,
+and stable `Substory` capture routes. `InteractionStory` keeps its root
+action-scope handle separate from its nested input interaction focus, so input
+editing actions do not leak into the Actions tab.
 Controls are opt-in; fields without `#[storybook(control...)]` remain story-only
 state. See [Write stories](../../book/src/stories.md) for the registration
 contract and [Use the workbench](../../book/src/workbench.md) for controls,
-theme editing, and optional inspection, and [Automation and
+theme editing, action/keymap diagnostics, performance telemetry, and optional
+inspection, and [Automation and
 capture](../../book/src/automation.md) for MCP usage.
 
-`InteractionStory` is the inert automation fixture. It provides a text input,
+Export the linked static registration catalog without starting GPUI:
+
+```bash
+cargo run -p gpui-storybook-example-story --example catalog
+```
+
+The deterministic JSON includes stable identity, source provenance, story
+Rustdocs, and static control shapes for documentation or CI tooling.
+
+`InteractionStory` is the broader automation fixture. It provides a text input,
 keyboard-operated select, semantic `pointer-target`, schema-backed
 `interaction_story::SetAutomationStatus` action, viewport readout, typed
 `prefix` control, a one-frame `pressed` state, and a structured
 `fixture-state` semantic value. Use `storybook_click_target` for one semantic
 click and `storybook_wait_for_value` to establish a bounded JSON postcondition
-without a screenshot. Exercise the same route in gallery or dock mode:
+without a screenshot.
+
+Its `type-click-and-dispatch` scenario demonstrates the explicit
+`Story::scenarios()` workflow: each run recreates the fixture, applies the
+`prefix` control, executes four named steps, checks three exact JSON
+postconditions, and reports the result in the Scenarios tab or MCP.
+
+Exercise the examples in gallery or dock mode:
 
 ```bash
 GPUI_STORYBOOK_MCP_STDIO=1 \

@@ -9,7 +9,10 @@ use gpui_component::{
     select::{Select, SelectEvent, SelectState},
     v_flex,
 };
-use gpui_storybook::StorybookElementExt as _;
+use gpui_storybook::{
+    ControlValue, StoryInteractionPostcondition, StoryInteractionStep, StoryModifiers,
+    StoryMouseButton, StoryScenario, StoryScenarioStep, StorybookElementExt as _,
+};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -34,6 +37,7 @@ struct AutomationFixtureState<'a> {
 #[derive(gpui_storybook::StoryControls)]
 #[gpui_storybook::story(crate::StorySection::Automation)]
 pub struct InteractionStory {
+    action_scope_focus_handle: gpui::FocusHandle,
     input: Entity<InputState>,
     select: Entity<SelectState<Vec<&'static str>>>,
     #[storybook(control(category = "Fixture"))]
@@ -52,6 +56,62 @@ impl gpui_storybook::Story for InteractionStory {
     fn description(_: &App) -> String {
         "Inert focus, text, select, pointer, action, viewport, and next-frame capture targets."
             .to_owned()
+    }
+
+    fn scenarios() -> Vec<StoryScenario> {
+        vec![
+            StoryScenario::new("type-click-and-dispatch", "Type, click, and dispatch")
+                .description(
+                    "Recreates the fixture, types into its focused input, clicks a semantic target, and dispatches a typed action.",
+                )
+                .control("prefix", ControlValue::Text("scenario".to_owned()))
+                .step(StoryScenarioStep::new(
+                    "Type into the focused input",
+                    StoryInteractionStep::Text {
+                        value: "portable".to_owned(),
+                    },
+                ))
+                .step(StoryScenarioStep::new(
+                    "Click the semantic pointer target",
+                    StoryInteractionStep::ClickTarget {
+                        target_key: "pointer-target".to_owned(),
+                        button: StoryMouseButton::Left,
+                        click_count: 1,
+                        modifiers: StoryModifiers::default(),
+                    },
+                ))
+                .step(StoryScenarioStep::new(
+                    "Wait for the pressed state to settle",
+                    StoryInteractionStep::WaitFrames { count: 1 },
+                ))
+                .step(StoryScenarioStep::new(
+                    "Set the final status action",
+                    StoryInteractionStep::DispatchAction {
+                        name: "interaction_story::SetAutomationStatus".to_owned(),
+                        args: Some(serde_json::json!({
+                            "value": "scenario-complete"
+                        })),
+                    },
+                ))
+                .postcondition(
+                    StoryInteractionPostcondition::new("fixture-state", serde_json::json!(1))
+                        .json_pointer("/clicks"),
+                )
+                .postcondition(
+                    StoryInteractionPostcondition::new(
+                        "fixture-state",
+                        serde_json::json!("portable"),
+                    )
+                    .json_pointer("/input"),
+                )
+                .postcondition(
+                    StoryInteractionPostcondition::new(
+                        "fixture-state",
+                        serde_json::json!("scenario-complete"),
+                    )
+                    .json_pointer("/status"),
+                ),
+        ]
     }
 
     fn new_view(window: &mut Window, cx: &mut App) -> Entity<Self> {
@@ -76,6 +136,7 @@ impl gpui_storybook::Story for InteractionStory {
                 },
             );
             Self {
+                action_scope_focus_handle: cx.focus_handle(),
                 input,
                 select,
                 prefix: "fixture".to_owned(),
@@ -85,6 +146,10 @@ impl gpui_storybook::Story for InteractionStory {
                 _subscriptions: vec![selection_subscription],
             }
         })
+    }
+
+    fn action_scope_focus_handle(&self, _: &App) -> Option<gpui::FocusHandle> {
+        Some(self.action_scope_focus_handle.clone())
     }
 }
 
@@ -107,6 +172,7 @@ impl Render for InteractionStory {
 
         v_flex()
             .id("interaction-automation-fixture")
+            .track_focus(&self.action_scope_focus_handle)
             .w_full()
             .max_w(px(720.0))
             .gap_4()

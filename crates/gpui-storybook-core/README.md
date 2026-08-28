@@ -1,7 +1,7 @@
 # gpui-storybook-core
 
 `gpui-storybook-core` provides the gallery, dock workspace, story containers,
-window-scoped controls/theme/inspect workbench, optional GPUI Inspector
+window-scoped controls/theme/inspect/actions workbench, optional GPUI Inspector
 integration, preview presentation state, localization bridge, preference UI,
 and automation controller used by GPUI Storybook.
 
@@ -26,7 +26,20 @@ Its public integration APIs include `ControlValue`, `ControlSpec`,
 `ControlTarget`, `StoryPresentation`, `WorkbenchState`, `ThemeDraft`, and the
 shared automation controller. The `inspector` feature adds
 `StoryInspectorState`, the Inspector button, and GPUI Component's Inspector
-integration. The facade re-exports the application-facing parts.
+integration. The `performance` feature adds window profiler histograms and
+debug frame-overlay controls. The Actions tab evaluates the selected story's
+explicit `Story::action_scope_focus_handle`, not its primary interaction focus,
+and removes actions also exposed through the workbench/root path. Nested input,
+Storybook shell, and unrelated component actions therefore stay outside the
+story catalog. Bindings and dispatch use that same action scope; a story without
+one exposes no inferred actions. The facade re-exports the application-facing
+parts.
+
+`StoryScenario` keeps named steps, initial controls and presentation, exact
+semantic postconditions, and optional capture with its owning story. Scenario
+runs recreate the concrete story and rebind its focus and control target before
+delegating to the shared interaction executor; gallery, dock, workbench, and MCP
+therefore observe one fresh-run contract.
 
 The automation module also owns the MCP-independent interaction request and
 result types, runtime action and semantic-target discovery, structured
@@ -39,6 +52,10 @@ Custom integrations should use `StorybookAutomation` instead of dispatching
 window input independently so validation, cancellation boundaries, and capture
 ordering remain consistent. Capture sizing preserves the surrounding shell and
 targets the rendered story region used for pointer bounds and PNG output.
+Each story root replaces its complete route registry on every frame so removed
+substories, semantic targets, and values cannot leak into later capture reads;
+isolated runners can call `reset_capture_regions_for_story` before constructing
+a fresh same-key context.
 Facade-created controllers expose a readiness future that completes after the
 standard gallery or dock publishes its catalog and attaches the live command
 receiver. Application bootstrap remains the embedding application's responsibility.

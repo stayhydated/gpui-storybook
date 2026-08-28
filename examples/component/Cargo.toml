@@ -11,6 +11,7 @@ default = [  ]
 dock = [ "gpui-storybook/dock" ]
 inspector = [ "gpui-storybook/inspector" ]
 mcp = [ "gpui-storybook/mcp" ]
+performance = [ "gpui-storybook/performance" ]
 
 [dependencies]
 es-fluent = { workspace = true }

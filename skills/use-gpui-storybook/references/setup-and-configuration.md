@@ -56,6 +56,18 @@ Both modes include the right workbench. Gallery uses a third resizable region.
 Dock mode persists the right dock's width, visibility, and selected tab; use
 **Reset layout** in the title bar to restore the current default layout.
 
+The Actions tab reads the selected story's opt-in
+`Story::action_scope_focus_handle`, excludes nested-control and Storybook
+shell/root actions, and resolves effective bindings for that explicit scope. A
+story without an action scope exposes no inferred actions. Forward the
+performance feature when the binary should add native window timing histograms
+and GPUI's debug frame overlay:
+
+```toml
+[features]
+performance = ["gpui-storybook/performance"]
+```
+
 Forward the Inspector feature when the Storybook package should expose the GPUI
 Inspector button and story-root metadata:
 
@@ -65,7 +77,8 @@ inspector = ["gpui-storybook/inspector"]
 ```
 
 The workbench edits controls on the active concrete variant. Viewport,
-selection, and action-log state belong to that Storybook window.
+selection, and action/performance inspection state belong to that Storybook
+window.
 Theme edits are session overrides on the process-global GPUI Component
 theme: they rebuild derived tokens and refresh open windows without changing
 saved preference intent. **Copy export** and **Import clipboard** exchange a

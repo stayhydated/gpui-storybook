@@ -541,6 +541,7 @@ impl Gallery {
             StorybookAutomationCommand::RunSteps {
                 request_id,
                 request,
+                fresh_story,
                 response,
                 progress,
                 operation,
@@ -556,6 +557,22 @@ impl Gallery {
                     )?;
                     if let Some(route) = &request.story_key {
                         self.set_active_story_by_key(route, cx)?;
+                    }
+                    if fresh_story {
+                        let story_entity = self
+                            .workbench_state
+                            .read(cx)
+                            .active_story()
+                            .ok_or(StorybookAutomationError::NoActiveStory)?;
+                        story_entity.update(cx, |story, cx| {
+                            story.recreate_for_scenario(window, cx);
+                        });
+                    }
+                    if let Some(presentation) = request.presentation {
+                        self.workbench_state.update(cx, |state, cx| {
+                            state.set_viewport(presentation.viewport, cx);
+                            state.set_background(presentation.background, cx);
+                        });
                     }
                     self.workbench_state
                         .update(cx, |state, cx| state.apply_controls(&request.controls, cx))?;
@@ -578,11 +595,11 @@ impl Gallery {
                     }
                     cx.notify();
                     window.refresh();
-                    Ok((story, steps, request.capture))
+                    Ok((story, steps, request.postconditions, request.capture))
                 })();
 
                 match prepared {
-                    Ok((story, steps, capture)) => {
+                    Ok((story, steps, postconditions, capture)) => {
                         if response.is_closed() {
                             return;
                         }
@@ -591,6 +608,7 @@ impl Gallery {
                                 request_id,
                                 story,
                                 steps,
+                                postconditions,
                                 capture,
                                 response,
                                 progress,
@@ -1012,12 +1030,15 @@ mod tests {
                             width: None,
                             height: None,
                             viewport: None,
+                            presentation: None,
                             steps: vec![crate::automation::StoryInteractionStep::DispatchAction {
                                 name: "storybook_test::MissingAction".to_owned(),
                                 args: None,
                             }],
+                            postconditions: Vec::new(),
                             capture: None,
                         },
+                        fresh_story: false,
                         response,
                         progress: std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0)),
                         operation: automation
@@ -1050,9 +1071,12 @@ mod tests {
                             width: None,
                             height: None,
                             viewport: None,
+                            presentation: None,
                             steps: vec![crate::automation::StoryInteractionStep::FocusNext],
+                            postconditions: Vec::new(),
                             capture: None,
                         },
+                        fresh_story: false,
                         response,
                         progress: std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0)),
                         operation: automation

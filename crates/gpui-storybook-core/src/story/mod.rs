@@ -1,5 +1,6 @@
 mod components;
 mod init;
+mod scenarios;
 mod state;
 pub mod themes;
 mod window;
@@ -15,3 +16,4 @@ pub use components::{
     StoryState, Substory, reveal_story_panel, section,
 };
 pub use init::init;
+pub use scenarios::{StoryScenario, StoryScenarioSnapshot, StoryScenarioStep};

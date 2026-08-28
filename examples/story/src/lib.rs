@@ -147,6 +147,7 @@ mod tests {
         assert_eq!(
             story_keys,
             [
+                "gpui-storybook-example-story-ActionsAndScenariosStory",
                 "gpui-storybook-example-story-ButtonStory",
                 "gpui-storybook-example-story-CustomSectionStory",
                 "gpui-storybook-example-story-GroupedDetailsStory",

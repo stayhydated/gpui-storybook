@@ -21,14 +21,25 @@ Run the gallery with the opt-in GPUI Inspector integration:
 cargo run -p gpui-storybook-example-component --features inspector
 ```
 
+Inspect focus-scoped actions in every build, or add GPUI timing telemetry:
+
+```bash
+cargo run -p gpui-storybook-example-component --features performance
+```
+
 The registrations live under `src/components` and show literal, computed, and
 localized metadata. `WelcomeCard`, `SignalBoard`, and `FieldNotes` also show
 how `#[storybook(control)]` stores defaults from `example = ...` and overlays
 live values on each render while leaving unmarked component fields out of the
 control registry. See [Write stories](../../book/src/stories.md) for
 the derive contract, [Use the workbench](../../book/src/workbench.md) for live
-editing and viewport settings, and [Getting
+editing, viewport settings, action/keymap diagnostics, and performance
+telemetry, and [Getting
 started](../../book/src/getting_started.md) for setup.
+
+`WelcomeCard` also passes `scenarios = WelcomeCard::scenarios()` to the derive.
+Its named scenario proves that component-generated wrappers use the same fresh
+story, typed-control, workbench, and automation contract as explicit stories.
 
 The standard gallery and dock constructors attach the same optional automation
 host for component-derived stories. Launch with `--features mcp` for typed

@@ -113,6 +113,10 @@ Keep `crates/gpui-storybook-mcp/README.md`, root `README.md`,
 and the skill aligned when MCP tools, capture environment variables, route keys,
 or screenshot behavior changes.
 
+Keep `crates/gpui-storybook-test/README.md`, root `README.md`, the test and
+automation book chapters, examples, and the skill aligned when portable-story
+setup, visual baselines, capture matrices, or performance budgets change.
+
 Keep `crates/gpui-storybook-core/i18n.toml`, `examples/*/i18n.toml`,
 `examples/*/i18n/*/*.ftl`, Rust locale code, examples, and docs aligned when
 locale setup or message keys change.
@@ -174,6 +178,13 @@ Build `web/public/book`, `web/public/llms*`, `web/public/gpui-demo`, and
   Docs: [README](crates/gpui-storybook-launch/README.md), crate Rustdocs
   Role: standalone Linux headless Sway lifecycle wrapper used by MCP and startup-capture hosts; non-Linux targets execute the child directly.
 
+- `crates/gpui-storybook-test`
+  Audience: **Public integration**
+  Docs: [README](crates/gpui-storybook-test/README.md), crate Rustdocs
+  Role: fresh-context portable story execution, headless PNG capture, visual
+  baselines, capture matrices, and opt-in GPUI performance budgets for tests
+  and CI. Applications use it as a development dependency.
+
 ### Internal Crates
 
 - `crates/gpui-storybook-components`
@@ -232,6 +243,9 @@ Build `web/public/book`, `web/public/llms*`, `web/public/gpui-demo`, and
 - Use `cargo test -p gpui-storybook-preferences --locked` for focused changes
   to typed preference values, JSON/schema repository behavior, invalid-file
   recovery, system detectors, or theme/language resolution.
+- Use `cargo test -p gpui-storybook-test --all-features --locked` for focused
+  changes to portable story execution, visual comparison, capture matrices, or
+  performance budgets.
 - If validation cannot be run, state why and what remains unvalidated.
 - Do not claim a change works unless it was validated or the remaining risk is
   explicitly documented.

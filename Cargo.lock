@@ -4157,6 +4157,7 @@ dependencies = [
  "gpui_macros",
  "gpui_shared_string",
  "gpui_util",
+ "hdrhistogram",
  "heapless",
  "http_client",
  "image",
@@ -4419,6 +4420,7 @@ dependencies = [
  "rust-embed",
  "schemars",
  "serde",
+ "serde_json",
  "strum",
  "tracing",
  "tracing-subscriber",
@@ -4477,6 +4479,24 @@ dependencies = [
  "tokio",
  "tracing",
  "unic-langid",
+]
+
+[[package]]
+name = "gpui-storybook-test"
+version = "0.5.0"
+dependencies = [
+ "anyhow",
+ "gpui",
+ "gpui-component",
+ "gpui-storybook-core",
+ "gpui_platform",
+ "gpui_wgpu",
+ "image",
+ "inventory",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.20",
 ]
 
 [[package]]
@@ -4902,6 +4922,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
 dependencies = [
  "foldhash 0.2.0",
+]
+
+[[package]]
+name = "hdrhistogram"
+version = "7.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f49d1053f4708f0af3cf9fc5bffc7e68a914a3c45becb231c80068c9c3f78bea"
+dependencies = [
+ "byteorder",
+ "num-traits",
 ]
 
 [[package]]

@@ -1,20 +1,23 @@
 //! Window-scoped Storybook workbench state and UI.
 
 use crate::{
-    automation::{StoryControlsSnapshot, StorySnapshot, StorybookAutomationError},
+    automation::{
+        StoryControlsSnapshot, StoryScenarioRunSnapshot, StorySnapshot, StorybookAutomationError,
+        default_storybook_automation,
+    },
     controls::{ControlKind, ControlSpec, ControlTarget, ControlValue},
     presentation::{StoryCanvasBackground, StoryPresentation, StoryViewportPreset},
-    story::StoryContainer,
+    story::{StoryContainer, StoryScenario},
     theme_workbench::ThemeDraft,
 };
 use gpui::{
     Action, AnyElement, App, AppContext as _, ClipboardItem, Context, Entity, EntityId,
-    EventEmitter, FocusHandle, Focusable, InteractiveElement as _, IntoElement, ParentElement as _,
-    Pixels, Render, SharedString, Size, Styled as _, Subscription, Window, div,
+    EventEmitter, FocusHandle, Focusable, InteractiveElement as _, IntoElement, KeyBinding,
+    ParentElement as _, Pixels, Render, SharedString, Size, Styled as _, Subscription, Window, div,
     prelude::FluentBuilder as _, px, size,
 };
 use gpui_component::{
-    ActiveTheme as _, Selectable as _, Sizable as _,
+    ActiveTheme as _, Disableable as _, Selectable as _, Sizable as _,
     button::{Button, ButtonVariants as _},
     checkbox::Checkbox,
     clipboard::Clipboard,
@@ -30,7 +33,9 @@ use gpui_component::{
     v_flex,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, path::Path, rc::Rc};
+#[cfg(not(target_family = "wasm"))]
+use std::path::Path;
+use std::{collections::BTreeMap, rc::Rc};
 
 /// Tabs available in the Storybook workbench.
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
@@ -40,6 +45,10 @@ pub enum WorkbenchTab {
     Controls,
     Theme,
     Inspect,
+    Actions,
+    Scenarios,
+    #[cfg(feature = "performance")]
+    Performance,
 }
 
 impl WorkbenchTab {
@@ -48,6 +57,10 @@ impl WorkbenchTab {
             Self::Controls => 0,
             Self::Theme => 1,
             Self::Inspect => 2,
+            Self::Actions => 3,
+            Self::Scenarios => 4,
+            #[cfg(feature = "performance")]
+            Self::Performance => 5,
         }
     }
 
@@ -55,6 +68,10 @@ impl WorkbenchTab {
         match index {
             1 => Self::Theme,
             2 => Self::Inspect,
+            3 => Self::Actions,
+            4 => Self::Scenarios,
+            #[cfg(feature = "performance")]
+            5 => Self::Performance,
             _ => Self::Controls,
         }
     }
@@ -334,6 +351,7 @@ enum ControlEditor {
     Color(Entity<ColorPickerState>),
 }
 
+#[cfg(not(target_family = "wasm"))]
 fn story_source_url(crate_dir: &str, source_file: &str) -> Option<String> {
     let source_file = Path::new(source_file);
     let source_path = if source_file.is_absolute() {
@@ -348,12 +366,70 @@ fn story_source_url(crate_dir: &str, source_file: &str) -> Option<String> {
     url::Url::from_file_path(source_path).ok().map(Into::into)
 }
 
+#[cfg(target_family = "wasm")]
+fn story_source_url(_: &str, _: &str) -> Option<String> {
+    None
+}
+
+fn format_key_binding(binding: &KeyBinding) -> String {
+    binding
+        .keystrokes()
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn is_story_scoped_action(
+    action: &dyn Action,
+    action_scope_focus: &FocusHandle,
+    storybook_focus: &FocusHandle,
+    window: &Window,
+) -> bool {
+    // Both handles share the Storybook shell path. The story scope handle is an
+    // explicit root scope rather than the story's primary (possibly nested)
+    // interaction focus, so child-control actions never enter this set.
+    window.is_action_available_in(action, action_scope_focus)
+        && !window.is_action_available_in(action, storybook_focus)
+}
+
+fn story_scoped_actions(
+    action_scope_focus: &FocusHandle,
+    storybook_focus: &FocusHandle,
+    window: &Window,
+    cx: &App,
+) -> Vec<Box<dyn Action>> {
+    let mut actions = cx
+        .all_action_names()
+        .iter()
+        .filter_map(|name| cx.build_action(name, None).ok())
+        .filter(|action| {
+            is_story_scoped_action(action.as_ref(), action_scope_focus, storybook_focus, window)
+        })
+        .collect::<Vec<_>>();
+    actions.sort_by_key(|action| action.name());
+    actions
+}
+
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 struct StoryWorkbenchPanelState {
     selected_tab: WorkbenchTab,
 }
 
-/// Three-tab right-side workbench for controls, themes, and inspection.
+enum ScenarioRunState {
+    Running {
+        story_key: String,
+        scenario: StoryScenario,
+    },
+    Finished {
+        story_key: String,
+        scenario: StoryScenario,
+        result: Box<Result<StoryScenarioRunSnapshot, StorybookAutomationError>>,
+    },
+}
+
+/// Right-side developer workbench for controls, themes, inspection, actions,
+/// fresh story scenarios, and opt-in performance telemetry.
 pub struct StoryWorkbench {
     focus_handle: FocusHandle,
     state: Entity<WorkbenchState>,
@@ -366,6 +442,7 @@ pub struct StoryWorkbench {
     theme_search: Entity<InputState>,
     theme_editors: BTreeMap<String, Entity<ColorPickerState>>,
     theme_subscriptions: Vec<Subscription>,
+    scenario_run: Option<ScenarioRunState>,
     last_error: Option<SharedString>,
 }
 
@@ -395,6 +472,7 @@ impl StoryWorkbench {
             theme_search,
             theme_editors: BTreeMap::new(),
             theme_subscriptions: vec![theme_search_subscription],
+            scenario_run: None,
             last_error: None,
         };
         this.rebuild_control_editors(window, cx);
@@ -1096,6 +1174,465 @@ impl StoryWorkbench {
             .child(v_flex().gap_1().child("Source").child(source))
             .into_any_element()
     }
+
+    fn run_scenario(
+        &mut self,
+        story_key: String,
+        scenario: StoryScenario,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(automation) = default_storybook_automation(cx) else {
+            self.scenario_run = Some(ScenarioRunState::Finished {
+                story_key,
+                scenario,
+                result: Box::new(Err(StorybookAutomationError::NoLiveHost)),
+            });
+            cx.notify();
+            return;
+        };
+
+        let scenario_key = scenario.key.clone();
+        self.scenario_run = Some(ScenarioRunState::Running {
+            story_key: story_key.clone(),
+            scenario,
+        });
+        cx.notify();
+
+        cx.spawn_in(window, async move |this, cx| {
+            let result = automation
+                .run_scenario(Some(story_key.clone()), scenario_key)
+                .await;
+            _ = this.update_in(cx, |this, window, cx| {
+                let scenario = match &this.scenario_run {
+                    Some(ScenarioRunState::Running { scenario, .. }) => scenario.clone(),
+                    Some(ScenarioRunState::Finished { scenario, .. }) => scenario.clone(),
+                    None => return,
+                };
+                this.scenario_run = Some(ScenarioRunState::Finished {
+                    story_key,
+                    scenario,
+                    result: Box::new(result),
+                });
+                this.rebuild_control_editors(window, cx);
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
+    fn scenario_progress(error: &StorybookAutomationError) -> usize {
+        match error {
+            StorybookAutomationError::HostDisconnected {
+                steps_dispatched, ..
+            }
+            | StorybookAutomationError::InteractionFailed {
+                steps_dispatched, ..
+            } => *steps_dispatched,
+            _ => 0,
+        }
+    }
+
+    fn render_scenarios(&self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        let Some(story) = self.active_story(cx) else {
+            return v_flex()
+                .p_4()
+                .text_color(cx.theme().muted_foreground)
+                .child("Select a story to inspect its scenarios.")
+                .into_any_element();
+        };
+        let story = story.read(cx);
+        let story_key = story.story_key_label().unwrap_or_default().to_owned();
+        let scenarios = story.scenarios().to_vec();
+
+        if scenarios.is_empty() {
+            return v_flex()
+                .p_4()
+                .text_color(cx.theme().muted_foreground)
+                .child("This story has no declared scenarios.")
+                .into_any_element();
+        }
+
+        let any_scenario_running =
+            matches!(&self.scenario_run, Some(ScenarioRunState::Running { .. }));
+
+        let scenario_rows = scenarios.into_iter().map(|scenario| {
+            let run = self.scenario_run.as_ref().filter(|run| match run {
+                ScenarioRunState::Running {
+                    story_key: run_story_key,
+                    scenario: run_scenario,
+                }
+                | ScenarioRunState::Finished {
+                    story_key: run_story_key,
+                    scenario: run_scenario,
+                    ..
+                } => run_story_key == &story_key && run_scenario.key == scenario.key,
+            });
+            let running = matches!(run, Some(ScenarioRunState::Running { .. }));
+            let scenario_for_run = scenario.clone();
+            let story_key_for_run = story_key.clone();
+
+            let step_rows = scenario.steps.iter().enumerate().map(|(index, step)| {
+                let status = match run {
+                    Some(ScenarioRunState::Running { .. }) => {
+                        if index == 0 {
+                            "Running"
+                        } else {
+                            "Queued"
+                        }
+                    },
+                    Some(ScenarioRunState::Finished { result, .. }) => match result.as_ref() {
+                        Ok(result) if index < result.interaction.steps_dispatched => "Passed",
+                        Ok(_) => "Not run",
+                        Err(error) => {
+                            let completed = Self::scenario_progress(error);
+                            if index < completed {
+                                "Passed"
+                            } else if index == completed {
+                                "Failed"
+                            } else {
+                                "Not run"
+                            }
+                        },
+                    },
+                    None => "Ready",
+                };
+
+                h_flex()
+                    .justify_between()
+                    .gap_2()
+                    .child(
+                        div()
+                            .text_xs()
+                            .child(format!("{}. {}", index + 1, step.name)),
+                    )
+                    .child(
+                        div()
+                            .text_xs()
+                            .text_color(cx.theme().muted_foreground)
+                            .child(status),
+                    )
+            });
+
+            v_flex()
+                .id(format!("workbench-scenario-{}", scenario.key))
+                .gap_2()
+                .py_3()
+                .border_b_1()
+                .border_color(cx.theme().border)
+                .child(
+                    h_flex()
+                        .justify_between()
+                        .gap_2()
+                        .child(
+                            v_flex()
+                                .gap_0p5()
+                                .child(div().text_sm().child(scenario.title.clone()))
+                                .child(
+                                    div()
+                                        .text_xs()
+                                        .text_color(cx.theme().muted_foreground)
+                                        .child(scenario.key.clone()),
+                                ),
+                        )
+                        .child(
+                            Button::new(format!("run-scenario-{}", scenario.key))
+                                .label(if running { "Running…" } else { "Run fresh" })
+                                .xsmall()
+                                .disabled(any_scenario_running)
+                                .on_click(cx.listener(move |this, _, window, cx| {
+                                    this.run_scenario(
+                                        story_key_for_run.clone(),
+                                        scenario_for_run.clone(),
+                                        window,
+                                        cx,
+                                    );
+                                })),
+                        ),
+                )
+                .when(!scenario.description.is_empty(), |this| {
+                    this.child(
+                        div()
+                            .text_xs()
+                            .text_color(cx.theme().muted_foreground)
+                            .child(scenario.description.clone()),
+                    )
+                })
+                .child(v_flex().gap_1().children(step_rows))
+                .when_some(run, |this, run| match run {
+                    ScenarioRunState::Running { .. } => this.child(
+                        div()
+                            .text_xs()
+                            .text_color(cx.theme().muted_foreground)
+                            .child("Recreated the story and started a fresh run."),
+                    ),
+                    ScenarioRunState::Finished { result, .. } => match result.as_ref() {
+                        Ok(result) => this.child(div().text_xs().child(format!(
+                            "Passed · {} postconditions · {}",
+                            result.interaction.postconditions.len(),
+                            result
+                                .interaction
+                                .capture
+                                .as_ref()
+                                .map(|capture| capture.path.display().to_string())
+                                .unwrap_or_else(|| "no capture".to_owned())
+                        ))),
+                        Err(error) => this.child(
+                            div()
+                                .text_xs()
+                                .text_color(cx.theme().danger)
+                                .child(error.to_string()),
+                        ),
+                    },
+                })
+        });
+
+        v_flex()
+            .id("workbench-scenarios")
+            .p_4()
+            .gap_2()
+            .child("Story scenarios")
+            .child(
+                div()
+                    .text_xs()
+                    .text_color(cx.theme().muted_foreground)
+                    .child("Every run recreates the story before controls, steps, postconditions, and capture."),
+            )
+            .children(scenario_rows)
+            .into_any_element()
+    }
+
+    fn render_actions(&self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        let Some(story) = self.state.read(cx).active_story() else {
+            return v_flex()
+                .id("workbench-actions")
+                .p_4()
+                .gap_2()
+                .child("Story actions")
+                .child(
+                    div()
+                        .text_color(cx.theme().muted_foreground)
+                        .child("Select a story to inspect its actions."),
+                )
+                .into_any_element();
+        };
+        let (story_key, action_scope_focus) = {
+            let story = story.read(cx);
+            (
+                story
+                    .story_key_label()
+                    .unwrap_or("unregistered story")
+                    .to_owned(),
+                story.action_scope_focus_handle(),
+            )
+        };
+        let Some(action_scope_focus) = action_scope_focus else {
+            return v_flex()
+                .id("workbench-actions")
+                .p_4()
+                .gap_2()
+                .child("Story actions")
+                .child(
+                    div()
+                        .text_color(cx.theme().muted_foreground)
+                        .child("This story does not expose an action scope."),
+                )
+                .into_any_element();
+        };
+        let documentation = cx.action_documentation();
+        let mut schema_generator = schemars::generate::SchemaSettings::draft2020_12()
+            .with(|settings| settings.inline_subschemas = true)
+            .into_generator();
+        let actions = story_scoped_actions(&action_scope_focus, &self.focus_handle, window, cx);
+
+        let action_rows = actions.into_iter().map(|action| {
+            let name = action.name();
+            let documentation = documentation.get(name).copied();
+            let argument_schema = cx
+                .action_schema_by_name(name, &mut schema_generator)
+                .flatten()
+                .and_then(|schema| serde_json::to_string(&schema).ok());
+            let bindings = window
+                .bindings_for_action_in(action.as_ref(), &action_scope_focus)
+                .into_iter()
+                .map(|binding| format_key_binding(&binding))
+                .collect::<Vec<_>>();
+            let dispatch_focus = action_scope_focus.clone();
+
+            v_flex()
+                .id(format!("workbench-action-{name}"))
+                .gap_1()
+                .py_3()
+                .border_b_1()
+                .border_color(cx.theme().border)
+                .child(
+                    h_flex()
+                        .justify_between()
+                        .gap_2()
+                        .child(div().text_sm().child(name))
+                        .child(
+                            Button::new(format!("dispatch-action-{name}"))
+                                .label("Dispatch")
+                                .xsmall()
+                                .on_click(move |_, window, cx| {
+                                    dispatch_focus.dispatch_action(action.as_ref(), window, cx);
+                                }),
+                        ),
+                )
+                .when_some(documentation, |this, documentation| {
+                    this.child(
+                        div()
+                            .text_xs()
+                            .text_color(cx.theme().muted_foreground)
+                            .child(documentation),
+                    )
+                })
+                .when_some(argument_schema, |this, schema| {
+                    this.child(
+                        div()
+                            .text_xs()
+                            .text_color(cx.theme().muted_foreground)
+                            .child(format!("Arguments: {schema}")),
+                    )
+                })
+                .when(!bindings.is_empty(), |this| {
+                    this.child(
+                        div()
+                            .text_xs()
+                            .text_color(cx.theme().muted_foreground)
+                            .child(format!("Bindings: {}", bindings.join(", "))),
+                    )
+                })
+        });
+
+        v_flex()
+            .id("workbench-actions")
+            .p_4()
+            .gap_2()
+            .child("Story actions")
+            .child(
+                div()
+                    .text_xs()
+                    .text_color(cx.theme().muted_foreground)
+                    .child(format!("Scope: {story_key}")),
+            )
+            .child(
+                div()
+                    .text_xs()
+                    .text_color(cx.theme().muted_foreground)
+                    .child(
+                        "Only actions exposed at the selected story's explicit root scope are shown. Nested controls and Storybook shell actions are excluded.",
+                    ),
+            )
+            .when(action_rows.len() == 0, |this| {
+                this.child(
+                    div()
+                        .text_color(cx.theme().muted_foreground)
+                        .child("The selected story exposes no default-buildable actions."),
+                )
+            })
+            .children(action_rows)
+            .into_any_element()
+    }
+
+    #[cfg(feature = "performance")]
+    fn render_performance(&self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        struct Metric {
+            label: &'static str,
+            samples: u64,
+            p50_ms: f64,
+            p95_ms: f64,
+            p99_ms: f64,
+            max_ms: f64,
+        }
+
+        macro_rules! duration_metric {
+            ($label:literal, $histogram:expr) => {{
+                let histogram = &$histogram;
+                Metric {
+                    label: $label,
+                    samples: histogram.len(),
+                    p50_ms: histogram.value_at_quantile(0.50) as f64 / 1_000_000.0,
+                    p95_ms: histogram.value_at_quantile(0.95) as f64 / 1_000_000.0,
+                    p99_ms: histogram.value_at_quantile(0.99) as f64 / 1_000_000.0,
+                    max_ms: histogram.max() as f64 / 1_000_000.0,
+                }
+            }};
+        }
+
+        let frames = window.frame_duration_snapshot();
+        let input = window.input_latency_snapshot();
+        let metrics = [
+            duration_metric!("Draw duration", frames.draw_duration_histogram),
+            duration_metric!("Dirty to present", frames.dirty_to_present_histogram),
+            duration_metric!("Present interval", frames.present_interval_histogram),
+            duration_metric!("Input to frame", input.latency_histogram),
+        ];
+        let overlay_mode = format!("{:?}", window.debug_frame_overlay_mode());
+
+        v_flex()
+            .id("workbench-performance")
+            .p_4()
+            .gap_3()
+            .child(
+                h_flex()
+                    .justify_between()
+                    .gap_2()
+                    .child("Window performance")
+                    .child(
+                        h_flex()
+                            .gap_1()
+                            .child(
+                                Button::new("performance-refresh")
+                                    .label("Refresh")
+                                    .xsmall()
+                                    .on_click(|_, window, _| {
+                                        window.refresh();
+                                    }),
+                            )
+                            .child(
+                                Button::new("performance-cycle-overlay")
+                                    .label(format!("Overlay: {overlay_mode}"))
+                                    .xsmall()
+                                    .on_click(|_, window, _| {
+                                        window.cycle_debug_frame_overlay_mode();
+                                    }),
+                            ),
+                    ),
+            )
+            .child(
+                div()
+                    .text_xs()
+                    .text_color(cx.theme().muted_foreground)
+                    .child(format!(
+                        "Input events dropped during draw: {}",
+                        input.mid_draw_events_dropped
+                    )),
+            )
+            .children(metrics.into_iter().map(|metric| {
+                v_flex()
+                    .gap_1()
+                    .py_3()
+                    .border_b_1()
+                    .border_color(cx.theme().border)
+                    .child(
+                        h_flex()
+                            .justify_between()
+                            .child(metric.label)
+                            .child(format!("{} samples", metric.samples)),
+                    )
+                    .child(
+                        div()
+                            .text_xs()
+                            .text_color(cx.theme().muted_foreground)
+                            .child(format!(
+                                "p50 {:.2} ms  ·  p95 {:.2} ms  ·  p99 {:.2} ms  ·  max {:.2} ms",
+                                metric.p50_ms, metric.p95_ms, metric.p99_ms, metric.max_ms
+                            )),
+                    )
+            }))
+            .into_any_element()
+    }
 }
 
 impl EventEmitter<PanelEvent> for StoryWorkbench {}
@@ -1245,7 +1782,14 @@ impl Render for StoryWorkbench {
                     }))
                     .child(Tab::new().label("Controls"))
                     .child(Tab::new().label("Theme"))
-                    .child(Tab::new().label("Inspect")),
+                    .child(Tab::new().label("Inspect"))
+                    .child(Tab::new().label("Actions"))
+                    .child(Tab::new().label("Scenarios"))
+                    .when(cfg!(feature = "performance"), |this| {
+                        #[cfg(feature = "performance")]
+                        let this = this.child(Tab::new().label("Perf"));
+                        this
+                    }),
             )
             .when_some(self.last_error.clone(), |this, error| {
                 this.child(
@@ -1276,6 +1820,25 @@ impl Render for StoryWorkbench {
                     .overflow_y_scrollbar()
                     .child(self.render_inspect(cx))
                     .into_any_element(),
+                WorkbenchTab::Actions => div()
+                    .flex_1()
+                    .min_h_0()
+                    .overflow_y_scrollbar()
+                    .child(self.render_actions(window, cx))
+                    .into_any_element(),
+                WorkbenchTab::Scenarios => div()
+                    .flex_1()
+                    .min_h_0()
+                    .overflow_y_scrollbar()
+                    .child(self.render_scenarios(window, cx))
+                    .into_any_element(),
+                #[cfg(feature = "performance")]
+                WorkbenchTab::Performance => div()
+                    .flex_1()
+                    .min_h_0()
+                    .overflow_y_scrollbar()
+                    .child(self.render_performance(window, cx))
+                    .into_any_element(),
             })
     }
 }
@@ -1285,16 +1848,305 @@ mod tests {
     use super::*;
     use gpui::{ScrollDelta, ScrollWheelEvent, TestAppContext, VisualTestContext, point};
 
+    #[derive(Action, Clone, Default, Eq, PartialEq)]
+    #[action(namespace = storybook_action_scope_test)]
+    struct ShellAction;
+
+    #[derive(Action, Clone, Default, Eq, PartialEq)]
+    #[action(namespace = storybook_action_scope_test)]
+    struct StoryAction;
+
+    #[derive(Action, Clone, Default, Eq, PartialEq)]
+    #[action(namespace = storybook_action_scope_test)]
+    struct NestedInputAction;
+
+    struct ActionScopeFixture {
+        shell_focus: FocusHandle,
+        story_focus: FocusHandle,
+        nested_input_focus: FocusHandle,
+    }
+
+    impl ActionScopeFixture {
+        fn new(cx: &mut Context<Self>) -> Self {
+            Self {
+                shell_focus: cx.focus_handle(),
+                story_focus: cx.focus_handle(),
+                nested_input_focus: cx.focus_handle(),
+            }
+        }
+
+        fn ignore_shell_action(&mut self, _: &ShellAction, _: &mut Window, _: &mut Context<Self>) {}
+
+        fn ignore_story_action(&mut self, _: &StoryAction, _: &mut Window, _: &mut Context<Self>) {}
+
+        fn ignore_nested_input_action(
+            &mut self,
+            _: &NestedInputAction,
+            _: &mut Window,
+            _: &mut Context<Self>,
+        ) {
+        }
+    }
+
+    impl Render for ActionScopeFixture {
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            div()
+                .on_action(cx.listener(Self::ignore_shell_action))
+                .child(div().track_focus(&self.shell_focus))
+                .child(
+                    div()
+                        .track_focus(&self.story_focus)
+                        .on_action(cx.listener(Self::ignore_story_action))
+                        .child(
+                            div()
+                                .track_focus(&self.nested_input_focus)
+                                .on_action(cx.listener(Self::ignore_nested_input_action)),
+                        ),
+                )
+        }
+    }
+
+    struct ScopedStory {
+        interaction_focus: FocusHandle,
+        action_scope_focus: FocusHandle,
+    }
+
+    impl crate::controls::StoryControls for ScopedStory {}
+
+    impl Focusable for ScopedStory {
+        fn focus_handle(&self, _: &App) -> FocusHandle {
+            self.interaction_focus.clone()
+        }
+    }
+
+    impl crate::story::Story for ScopedStory {
+        fn title(_: &App) -> String {
+            "Scoped story".to_owned()
+        }
+
+        fn new_view(_: &mut Window, cx: &mut App) -> Entity<Self> {
+            cx.new(|cx| Self {
+                interaction_focus: cx.focus_handle(),
+                action_scope_focus: cx.focus_handle(),
+            })
+        }
+
+        fn action_scope_focus_handle(&self, _: &App) -> Option<FocusHandle> {
+            Some(self.action_scope_focus.clone())
+        }
+    }
+
+    impl ScopedStory {
+        fn ignore_story_action(&mut self, _: &StoryAction, _: &mut Window, _: &mut Context<Self>) {}
+
+        fn ignore_nested_input_action(
+            &mut self,
+            _: &NestedInputAction,
+            _: &mut Window,
+            _: &mut Context<Self>,
+        ) {
+        }
+    }
+
+    impl Render for ScopedStory {
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            div()
+                .track_focus(&self.action_scope_focus)
+                .on_action(cx.listener(Self::ignore_story_action))
+                .child(
+                    div()
+                        .track_focus(&self.interaction_focus)
+                        .on_action(cx.listener(Self::ignore_nested_input_action)),
+                )
+        }
+    }
+
+    struct StoryContainerActionFixture {
+        shell_focus: FocusHandle,
+        story: Entity<StoryContainer>,
+    }
+
+    impl StoryContainerActionFixture {
+        fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
+            Self {
+                shell_focus: cx.focus_handle(),
+                story: StoryContainer::panel::<ScopedStory>(window, cx),
+            }
+        }
+
+        fn ignore_shell_action(&mut self, _: &ShellAction, _: &mut Window, _: &mut Context<Self>) {}
+    }
+
+    impl Render for StoryContainerActionFixture {
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            div()
+                .on_action(cx.listener(Self::ignore_shell_action))
+                .child(div().track_focus(&self.shell_focus))
+                .child(self.story.clone())
+        }
+    }
+
     #[test]
     fn workbench_tabs_have_stable_persisted_indices() {
         for (tab, index) in [
             (WorkbenchTab::Controls, 0),
             (WorkbenchTab::Theme, 1),
             (WorkbenchTab::Inspect, 2),
+            (WorkbenchTab::Actions, 3),
+            (WorkbenchTab::Scenarios, 4),
+            #[cfg(feature = "performance")]
+            (WorkbenchTab::Performance, 5),
         ] {
             assert_eq!(tab.index(), index);
             assert_eq!(WorkbenchTab::from_index(index), tab);
         }
+    }
+
+    #[test]
+    fn action_debugger_formats_multi_stroke_bindings() {
+        let binding = KeyBinding::new(
+            "ctrl-k enter",
+            SelectViewport {
+                viewport: StoryViewportPreset::Mobile,
+            },
+            None,
+        );
+        assert_eq!(format_key_binding(&binding), "ctrl-K enter");
+    }
+
+    #[gpui::test]
+    fn action_debugger_keeps_only_selected_story_actions(cx: &mut TestAppContext) {
+        let window = cx.update(|cx| {
+            cx.open_window(Default::default(), |_, cx| cx.new(ActionScopeFixture::new))
+                .expect("action scope test window")
+        });
+        let mut visual_cx = VisualTestContext::from_window(window.into(), cx);
+        let fixture = window
+            .root(&mut visual_cx)
+            .expect("action scope fixture should be the window root");
+        visual_cx.update(|window, cx| {
+            _ = window.draw(cx);
+        });
+        let (shell_focus, story_focus) = fixture.read_with(&visual_cx, |fixture, _| {
+            (fixture.shell_focus.clone(), fixture.story_focus.clone())
+        });
+
+        visual_cx.update(|window, _| {
+            assert!(!is_story_scoped_action(
+                &ShellAction,
+                &story_focus,
+                &shell_focus,
+                window,
+            ));
+            assert!(is_story_scoped_action(
+                &StoryAction,
+                &story_focus,
+                &shell_focus,
+                window,
+            ));
+            assert!(!is_story_scoped_action(
+                &NestedInputAction,
+                &story_focus,
+                &shell_focus,
+                window,
+            ));
+        });
+        let action_names = visual_cx.update(|window, cx| {
+            story_scoped_actions(&story_focus, &shell_focus, window, cx)
+                .into_iter()
+                .map(|action| action.name())
+                .filter(|name| {
+                    [
+                        ShellAction.name(),
+                        StoryAction.name(),
+                        NestedInputAction.name(),
+                    ]
+                    .contains(name)
+                })
+                .collect::<Vec<_>>()
+        });
+        assert_eq!(action_names, vec![StoryAction.name()]);
+    }
+
+    #[gpui::test]
+    fn action_debugger_uses_the_story_root_instead_of_its_nested_interaction_focus(
+        cx: &mut TestAppContext,
+    ) {
+        let window = cx.update(|cx| {
+            gpui_component::init(cx);
+            cx.open_window(Default::default(), |window, cx| {
+                cx.new(|cx| StoryContainerActionFixture::new(window, cx))
+            })
+            .expect("story container action fixture window")
+        });
+        let mut visual_cx = VisualTestContext::from_window(window.into(), cx);
+        let fixture = window
+            .root(&mut visual_cx)
+            .expect("story container action fixture should be the window root");
+        visual_cx.update(|window, cx| {
+            _ = window.draw(cx);
+        });
+        let (shell_focus, story) = fixture.read_with(&visual_cx, |fixture, _| {
+            (fixture.shell_focus.clone(), fixture.story.clone())
+        });
+        let (interaction_focus, action_scope_focus) = visual_cx.update(|_, cx| {
+            (
+                story.focus_handle(cx),
+                story
+                    .read(cx)
+                    .action_scope_focus_handle()
+                    .expect("scoped story should expose an action focus handle"),
+            )
+        });
+
+        visual_cx.update(|window, _| {
+            assert!(window.is_action_available_in(&NestedInputAction, &interaction_focus));
+            assert!(!window.is_action_available_in(&NestedInputAction, &action_scope_focus));
+            assert!(is_story_scoped_action(
+                &StoryAction,
+                &action_scope_focus,
+                &shell_focus,
+                window,
+            ));
+            assert!(!is_story_scoped_action(
+                &ShellAction,
+                &action_scope_focus,
+                &shell_focus,
+                window,
+            ));
+        });
+
+        let action_names = visual_cx.update(|window, cx| {
+            story_scoped_actions(&action_scope_focus, &shell_focus, window, cx)
+                .into_iter()
+                .map(|action| action.name())
+                .filter(|name| {
+                    [
+                        ShellAction.name(),
+                        StoryAction.name(),
+                        NestedInputAction.name(),
+                    ]
+                    .contains(name)
+                })
+                .collect::<Vec<_>>()
+        });
+        assert_eq!(action_names, vec![StoryAction.name()]);
+    }
+
+    #[test]
+    fn scenario_progress_reports_only_completed_steps() {
+        assert_eq!(
+            StoryWorkbench::scenario_progress(&StorybookAutomationError::InteractionFailed {
+                request_id: 7,
+                steps_dispatched: 2,
+                message: "postcondition failed".to_owned(),
+            }),
+            2
+        );
+        assert_eq!(
+            StoryWorkbench::scenario_progress(&StorybookAutomationError::AutomationBusy),
+            0
+        );
     }
 
     #[cfg(feature = "dock")]
