@@ -7,7 +7,7 @@ use crate::{
     },
     controls::{ControlKind, ControlSpec, ControlTarget, ControlValue},
     presentation::{StoryCanvasBackground, StoryPresentation, StoryViewportPreset},
-    story::{StoryContainer, StoryScenario},
+    story::{ContainerEvent, StoryContainer, StoryScenario},
     theme_workbench::ThemeDraft,
 };
 use gpui::{
@@ -514,9 +514,10 @@ pub struct StoryWorkbench {
     variant_select: Entity<SelectState<Vec<StoryVariantOption>>>,
     variant_options: Vec<StoryVariantOption>,
     selected_tab: WorkbenchTab,
-    editor_story: Option<EntityId>,
+    editor_story: Option<(EntityId, u64)>,
     editors: BTreeMap<String, ControlEditor>,
     editor_subscriptions: Vec<Subscription>,
+    story_subscription: Option<Subscription>,
     _variant_subscription: Subscription,
     _state_subscription: Subscription,
     theme_draft: ThemeDraft,
@@ -574,6 +575,7 @@ impl StoryWorkbench {
             editor_story: None,
             editors: BTreeMap::new(),
             editor_subscriptions: Vec::new(),
+            story_subscription: None,
             _variant_subscription: variant_subscription,
             _state_subscription: state_subscription,
             theme_draft,
@@ -665,9 +667,23 @@ impl StoryWorkbench {
 
         let Some(story) = self.active_story(cx) else {
             self.editor_story = None;
+            self.story_subscription = None;
             return;
         };
-        self.editor_story = Some(story.entity_id());
+        let story_id = story.entity_id();
+        if self.editor_story.map(|(entity_id, _)| entity_id) != Some(story_id) {
+            self.story_subscription = Some(cx.subscribe_in(
+                &story,
+                window,
+                |this, _, event: &ContainerEvent, window, cx| {
+                    if matches!(event, ContainerEvent::Recreated { .. }) {
+                        this.rebuild_control_editors(window, cx);
+                        cx.notify();
+                    }
+                },
+            ));
+        }
+        self.editor_story = Some((story_id, story.read(cx).recreation_generation()));
         let Some(target) = story.read(cx).control_target() else {
             return;
         };
@@ -828,7 +844,10 @@ impl StoryWorkbench {
     }
 
     fn sync_editor_values(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let active_story = self.active_story(cx).map(|story| story.entity_id());
+        let active_story = self.active_story(cx).map(|story| {
+            let story_data = story.read(cx);
+            (story.entity_id(), story_data.recreation_generation())
+        });
         if active_story != self.editor_story {
             self.rebuild_control_editors(window, cx);
             return;
@@ -2287,6 +2306,152 @@ mod tests {
         }
     }
 
+    struct RecreatedControlStory {
+        focus_handle: FocusHandle,
+        values: BTreeMap<String, ControlValue>,
+    }
+
+    impl crate::controls::StoryControls for RecreatedControlStory {
+        fn control_specs(&self) -> Vec<ControlSpec> {
+            vec![
+                ControlSpec {
+                    key: "label".to_owned(),
+                    label: "Label".to_owned(),
+                    description: String::new(),
+                    category: String::new(),
+                    kind: ControlKind::Text,
+                    default: self.values["label"].clone(),
+                    bounds: crate::controls::ControlBounds::default(),
+                    options: Vec::new(),
+                },
+                ControlSpec {
+                    key: "count".to_owned(),
+                    label: "Count".to_owned(),
+                    description: String::new(),
+                    category: String::new(),
+                    kind: ControlKind::Number,
+                    default: self.values["count"].clone(),
+                    bounds: crate::controls::ControlBounds::default(),
+                    options: Vec::new(),
+                },
+                ControlSpec {
+                    key: "ratio".to_owned(),
+                    label: "Ratio".to_owned(),
+                    description: String::new(),
+                    category: String::new(),
+                    kind: ControlKind::Range,
+                    default: self.values["ratio"].clone(),
+                    bounds: crate::controls::ControlBounds {
+                        min: Some(0.0),
+                        max: Some(1.0),
+                        step: Some(0.1),
+                    },
+                    options: Vec::new(),
+                },
+                ControlSpec {
+                    key: "tint".to_owned(),
+                    label: "Tint".to_owned(),
+                    description: String::new(),
+                    category: String::new(),
+                    kind: ControlKind::ColorPicker,
+                    default: self.values["tint"].clone(),
+                    bounds: crate::controls::ControlBounds::default(),
+                    options: Vec::new(),
+                },
+            ]
+        }
+
+        fn control_value(&self, key: &str) -> Result<ControlValue, crate::controls::ControlError> {
+            self.values.get(key).cloned().ok_or_else(|| {
+                crate::controls::ControlError::UnknownControl {
+                    key: key.to_owned(),
+                }
+            })
+        }
+
+        fn set_control_value(
+            &mut self,
+            key: &str,
+            value: ControlValue,
+        ) -> Result<(), crate::controls::ControlError> {
+            let Some(current) = self.values.get_mut(key) else {
+                return Err(crate::controls::ControlError::UnknownControl {
+                    key: key.to_owned(),
+                });
+            };
+            *current = value;
+            Ok(())
+        }
+    }
+
+    impl Focusable for RecreatedControlStory {
+        fn focus_handle(&self, _: &App) -> FocusHandle {
+            self.focus_handle.clone()
+        }
+    }
+
+    impl crate::story::Story for RecreatedControlStory {
+        fn title(_: &App) -> String {
+            "Recreated control story".to_owned()
+        }
+
+        fn new_view(_: &mut Window, cx: &mut App) -> Entity<Self> {
+            cx.new(|cx| Self {
+                focus_handle: cx.focus_handle(),
+                values: BTreeMap::from([
+                    ("label".to_owned(), ControlValue::Text("default".to_owned())),
+                    ("count".to_owned(), ControlValue::Integer(1)),
+                    ("ratio".to_owned(), ControlValue::Float(0.25)),
+                    (
+                        "tint".to_owned(),
+                        ControlValue::Color(crate::controls::ControlColor {
+                            h: 0.0,
+                            s: 0.5,
+                            l: 0.5,
+                            a: 1.0,
+                        }),
+                    ),
+                ]),
+            })
+        }
+    }
+
+    impl Render for RecreatedControlStory {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            div()
+        }
+    }
+
+    struct RecreatedControlWorkbenchFixture {
+        story: Entity<StoryContainer>,
+        workbench: Entity<StoryWorkbench>,
+    }
+
+    impl RecreatedControlWorkbenchFixture {
+        fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
+            let story = StoryContainer::panel::<RecreatedControlStory>(window, cx);
+            let state = cx.new(|cx| WorkbenchState::new(Some(story.clone()), cx));
+            let workbench =
+                cx.new(|cx| StoryWorkbench::new(state, WorkbenchTab::Controls, window, cx));
+            Self { story, workbench }
+        }
+    }
+
+    impl Render for RecreatedControlWorkbenchFixture {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            h_flex()
+                .size_full()
+                .child(div().flex_1().min_w_0().h_full().child(self.story.clone()))
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .h_full()
+                        .child(self.workbench.clone()),
+                )
+        }
+    }
+
     struct StoryContainerActionFixture {
         shell_focus: FocusHandle,
         story: Entity<StoryContainer>,
@@ -2521,6 +2686,148 @@ mod tests {
                 .collect::<Vec<_>>()
         });
         assert_eq!(action_names, vec![StoryAction.name()]);
+    }
+
+    #[gpui::test]
+    fn external_story_recreation_rebinds_control_editor_subscriptions(cx: &mut TestAppContext) {
+        let window = cx.update(|cx| {
+            gpui_component::init(cx);
+            cx.open_window(Default::default(), |window, cx| {
+                cx.new(|cx| RecreatedControlWorkbenchFixture::new(window, cx))
+            })
+            .expect("recreated control fixture window")
+        });
+        let mut visual_cx = VisualTestContext::from_window(window.into(), cx);
+        let fixture = window
+            .root(&mut visual_cx)
+            .expect("recreated control fixture should be the window root");
+        let (story, workbench) = fixture.read_with(&visual_cx, |fixture, _| {
+            (fixture.story.clone(), fixture.workbench.clone())
+        });
+        visual_cx.update(|window, cx| {
+            _ = window.draw(cx);
+        });
+        let original_editor_ids = workbench.read_with(&visual_cx, |workbench, _| {
+            workbench
+                .editors
+                .iter()
+                .map(|(key, editor)| {
+                    let id = match editor {
+                        ControlEditor::Text(state) | ControlEditor::Number { state, .. } => {
+                            state.entity_id()
+                        },
+                        ControlEditor::Range { state, .. } => state.entity_id(),
+                        ControlEditor::Color(state) => state.entity_id(),
+                    };
+                    (key.clone(), id)
+                })
+                .collect::<BTreeMap<_, _>>()
+        });
+
+        visual_cx.update(|window, cx| {
+            story.update(cx, |story, cx| {
+                assert!(story.recreate_for_scenario(window, cx));
+            });
+        });
+        visual_cx.run_until_parked();
+        visual_cx.update(|window, cx| {
+            _ = window.draw(cx);
+        });
+
+        let (recreated_editor_ids, text, number, range, color) =
+            workbench.read_with(&visual_cx, |workbench, _| {
+                let ids = workbench
+                    .editors
+                    .iter()
+                    .map(|(key, editor)| {
+                        let id = match editor {
+                            ControlEditor::Text(state) | ControlEditor::Number { state, .. } => {
+                                state.entity_id()
+                            },
+                            ControlEditor::Range { state, .. } => state.entity_id(),
+                            ControlEditor::Color(state) => state.entity_id(),
+                        };
+                        (key.clone(), id)
+                    })
+                    .collect::<BTreeMap<_, _>>();
+                let Some(ControlEditor::Text(text)) = workbench.editors.get("label") else {
+                    panic!("recreated text control editor should exist");
+                };
+                let Some(ControlEditor::Number { state: number, .. }) =
+                    workbench.editors.get("count")
+                else {
+                    panic!("recreated number control editor should exist");
+                };
+                let Some(ControlEditor::Range { state: range, .. }) =
+                    workbench.editors.get("ratio")
+                else {
+                    panic!("recreated range control editor should exist");
+                };
+                let Some(ControlEditor::Color(color)) = workbench.editors.get("tint") else {
+                    panic!("recreated color control editor should exist");
+                };
+                (
+                    ids,
+                    text.clone(),
+                    number.clone(),
+                    range.clone(),
+                    color.clone(),
+                )
+            });
+        assert_eq!(original_editor_ids.len(), 4);
+        assert_eq!(recreated_editor_ids.len(), 4);
+        for (key, original_id) in original_editor_ids {
+            assert_ne!(recreated_editor_ids.get(&key), Some(&original_id), "{key}");
+        }
+        assert_eq!(
+            story.read_with(&visual_cx, |story, _| story.recreation_generation()),
+            1
+        );
+
+        let tint = gpui::Hsla {
+            h: 0.5,
+            s: 0.6,
+            l: 0.4,
+            a: 0.8,
+        };
+        visual_cx.update(|window, cx| {
+            text.update(cx, |editor, cx| {
+                editor.set_value("rebound", window, cx);
+                cx.emit(InputEvent::Change);
+            });
+            number.update(cx, |editor, cx| {
+                editor.set_value("9", window, cx);
+                cx.emit(InputEvent::Change);
+            });
+            range.update(cx, |_, cx| {
+                cx.emit(SliderEvent::Change(0.75.into()));
+            });
+            color.update(cx, |_, cx| {
+                cx.emit(ColorPickerEvent::Change(Some(tint)));
+            });
+        });
+        visual_cx.run_until_parked();
+
+        let values = visual_cx.update(|_, cx| {
+            let target = story
+                .read(cx)
+                .control_target()
+                .expect("recreated story should expose controls");
+            ["label", "count", "ratio", "tint"].map(|key| {
+                target
+                    .value(key, cx)
+                    .expect("control should remain readable")
+            })
+        });
+        assert_eq!(
+            values,
+            [
+                ControlValue::Text("rebound".to_owned()),
+                ControlValue::Integer(9),
+                ControlValue::Float(0.75),
+                ControlValue::Color(tint.into()),
+            ]
+        );
     }
 
     #[gpui::test]

@@ -324,6 +324,7 @@ pub struct StoryContainer {
     pub description_fn: Option<Box<dyn Fn(&App) -> String>>,
     scenarios: Vec<StoryScenario>,
     recreate: Option<StoryRecreateFn>,
+    recreation_generation: u64,
 }
 
 pub fn story_group_klass(stories: &[Entity<StoryContainer>], cx: &App) -> SharedString {
@@ -351,6 +352,11 @@ pub fn parse_story_group_klass(story_klass: &str) -> Option<Vec<String>> {
 #[derive(Debug)]
 pub enum ContainerEvent {
     Close,
+    /// The concrete story entity and its runtime adapters were replaced.
+    Recreated {
+        /// Monotonic identity for the newly installed story instance.
+        generation: u64,
+    },
 }
 
 pub trait Story: Focusable + Render + StoryControls + Sized {
@@ -459,6 +465,7 @@ impl StoryContainer {
             description_fn: None,
             scenarios: Vec::new(),
             recreate: None,
+            recreation_generation: 0,
         }
     }
 
@@ -591,6 +598,10 @@ impl StoryContainer {
         &self.scenarios
     }
 
+    pub(crate) const fn recreation_generation(&self) -> u64 {
+        self.recreation_generation
+    }
+
     /// Recreates the concrete story entity and all runtime adapters used by it.
     ///
     /// Scenario runs use this seam before applying their initial controls and
@@ -602,7 +613,9 @@ impl StoryContainer {
     /// callback for the old entity and an `on_active(true)` callback for the
     /// replacement. The replacement primary focus handle, optional action-scope
     /// focus handle, and control target are installed atomically from the
-    /// container's perspective.
+    /// container's perspective. A successful replacement emits
+    /// [`ContainerEvent::Recreated`] with a new generation after every runtime
+    /// adapter points at the fresh instance.
     pub fn recreate_for_scenario(
         &mut self,
         window: &mut Window,
@@ -627,12 +640,19 @@ impl StoryContainer {
         self.action_scope_focus_handle = action_scope_focus_handle;
         self.story_scroll_handle = ScrollHandle::new();
         self.canvas_resize_drag = None;
+        self.recreation_generation = self
+            .recreation_generation
+            .checked_add(1)
+            .expect("story recreation generation exhausted");
 
         if self.is_active
             && let Some(on_active) = on_active
         {
             on_active(story, true, window, cx);
         }
+        cx.emit(ContainerEvent::Recreated {
+            generation: self.recreation_generation,
+        });
         cx.notify();
         true
     }

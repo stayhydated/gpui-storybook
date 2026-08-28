@@ -764,10 +764,10 @@ impl HeadlessStoryRunner {
         baseline_policy: BaselinePolicy,
     ) -> Result<CaptureReport, StorybookTestError> {
         let performance_options = case.performance.clone();
-        let settle_frames = case.settle_frames.max(self.config.settle_frames).max(
-            performance_options
-                .as_ref()
-                .map_or(0, |options| options.measured_frames),
+        let settle_frames = effective_settle_frames(
+            case.settle_frames,
+            self.config.settle_frames,
+            performance_options.as_ref(),
         );
         let mut story = self.open_case(case.clone())?;
         story.settle(settle_frames)?;
@@ -985,6 +985,19 @@ impl StorybookTestError {
     }
 }
 
+fn effective_settle_frames(
+    requested: u32,
+    configured: u32,
+    performance: Option<&PerformanceOptions>,
+) -> u32 {
+    let settled = if requested == 0 {
+        configured
+    } else {
+        requested
+    };
+    settled.max(performance.map_or(0, |options| options.measured_frames))
+}
+
 fn headless_error(error: anyhow::Error) -> StorybookTestError {
     StorybookTestError::Headless {
         message: error.to_string(),
@@ -1146,6 +1159,25 @@ mod tests {
     fn case_file_name_is_stable_and_safe() {
         assert_eq!(case_file_name("crate/Button root"), "crate_Button_root");
         assert_eq!(case_file_name(""), "case");
+    }
+
+    #[test]
+    fn explicit_settle_frames_override_the_runner_default() {
+        let runner = HeadlessStoryRunner::new(RunnerConfig::default().settle_frames(5));
+        let mut request = CaptureRequest::new("crate-Button");
+        request.settle_frames = 2;
+        let case = runner.request_case(request).unwrap();
+
+        assert_eq!(effective_settle_frames(case.settle_frames, 5, None), 2);
+        assert_eq!(effective_settle_frames(0, 5, None), 5);
+    }
+
+    #[test]
+    fn performance_frames_remain_a_minimum_after_settle_resolution() {
+        let performance = PerformanceOptions::new().measured_frames(4);
+
+        assert_eq!(effective_settle_frames(2, 5, Some(&performance)), 4);
+        assert_eq!(effective_settle_frames(6, 5, Some(&performance)), 6);
     }
 
     #[test]

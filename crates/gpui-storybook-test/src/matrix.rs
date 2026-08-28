@@ -864,4 +864,19 @@ mod tests {
             "crate-Button/with-icon"
         );
     }
+
+    #[test]
+    fn matrix_settle_override_wins_over_a_larger_runner_default() {
+        let cases = CaptureMatrix::new()
+            .story("crate-Button")
+            .settle_frames(2)
+            .expand(&descriptors())
+            .unwrap();
+
+        assert_eq!(cases[0].settle_frames, 2);
+        assert_eq!(
+            crate::effective_settle_frames(cases[0].settle_frames, 5, None),
+            2
+        );
+    }
 }

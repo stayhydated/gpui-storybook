@@ -149,26 +149,27 @@ impl BaselineStore {
 
     /// Returns the deterministic PNG path for a case ID.
     ///
-    /// Each slash-separated case-ID component is sanitized before being joined
+    /// Each slash-separated case-ID component is encoded before being joined
     /// below the store root. This keeps generated IDs useful as directories
     /// while preventing absolute paths or parent traversal from escaping the
-    /// store.
+    /// store. The `.png` suffix is appended to the final encoded component so
+    /// dots already present in a case ID remain part of its one-to-one path.
     pub fn path_for(&self, case_id: &str) -> PathBuf {
         let mut path = self.root.clone();
-        let mut components = case_id
+        let components = case_id
             .split('/')
             .filter(|component| !component.is_empty())
-            .map(sanitize_component)
-            .peekable();
+            .map(encode_component)
+            .collect::<Vec<_>>();
 
-        if components.peek().is_none() {
-            path.push("unnamed");
-        } else {
-            for component in components {
+        if let Some((file_name, directories)) = components.split_last() {
+            for component in directories {
                 path.push(component);
             }
+            path.push(format!("{file_name}.png"));
+        } else {
+            path.push("unnamed.png");
         }
-        path.set_extension("png");
         path
     }
 
@@ -348,21 +349,23 @@ fn image_metrics(actual: &RgbaImage, expected: &RgbaImage, channel_tolerance: u8
     metrics
 }
 
-fn sanitize_component(component: &str) -> String {
-    let mut sanitized = component
-        .chars()
-        .map(|character| {
-            if character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '.') {
-                character
-            } else {
-                '_'
-            }
-        })
-        .collect::<String>();
-    if sanitized.is_empty() || matches!(sanitized.as_str(), "." | "..") {
-        sanitized = "_".to_owned();
+fn encode_component(component: &str) -> String {
+    const HEX: &[u8; 16] = b"0123456789ABCDEF";
+
+    let escape_dots = matches!(component, "." | "..");
+    let mut encoded = String::with_capacity(component.len());
+    for byte in component.bytes() {
+        if (byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
+            && !(escape_dots && byte == b'.')
+        {
+            encoded.push(char::from(byte));
+        } else {
+            encoded.push('%');
+            encoded.push(char::from(HEX[usize::from(byte >> 4)]));
+            encoded.push(char::from(HEX[usize::from(byte & 0x0f)]));
+        }
     }
-    sanitized
+    encoded
 }
 
 #[cfg(test)]
@@ -371,14 +374,29 @@ mod tests {
     use image::Rgba;
 
     #[test]
-    fn baseline_paths_are_sanitized_below_store_root() {
+    fn baseline_paths_are_encoded_below_store_root() {
         let store = BaselineStore::new("target/baselines");
         let path = store.path_for("../outside//story key");
         assert_eq!(
             path,
-            PathBuf::from("target/baselines/_/outside/story_key.png")
+            PathBuf::from("target/baselines/%2E%2E/outside/story%20key.png")
         );
         assert!(path.starts_with(store.root()));
+    }
+
+    #[test]
+    fn dotted_case_ids_keep_distinct_png_paths() {
+        let store = BaselineStore::new("target/baselines");
+        let first = store.path_for("controls/v1.0");
+        let second = store.path_for("controls/v1.1");
+
+        assert_eq!(first, PathBuf::from("target/baselines/controls/v1.0.png"));
+        assert_eq!(second, PathBuf::from("target/baselines/controls/v1.1.png"));
+        assert_ne!(first, second);
+        assert_ne!(
+            store.path_for("controls/a b"),
+            store.path_for("controls/a?b")
+        );
     }
 
     #[test]

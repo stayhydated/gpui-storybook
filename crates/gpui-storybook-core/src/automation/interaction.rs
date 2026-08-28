@@ -796,30 +796,9 @@ fn start_interaction_runner(
         return;
     };
 
-    let targets = if interaction
-        .steps
-        .iter()
-        .any(|step| matches!(step, PreparedInteractionStep::ClickTarget { .. }))
-    {
-        match rendered_interaction_targets(interaction.story.clone()) {
-            Ok(snapshot) => Some(snapshot.targets),
-            Err(error) => {
-                let _ = interaction.response.send(Err(error));
-                return;
-            },
-        }
-    } else {
-        None
-    };
     let mut steps = VecDeque::with_capacity(interaction.steps.len());
     for (step_index, step) in interaction.steps.into_iter().enumerate() {
-        match resolve_step_point(
-            step,
-            step_index,
-            &interaction.story.capture_route_id,
-            &region.bounds,
-            targets.as_deref().unwrap_or_default(),
-        ) {
+        match resolve_step_point(step, step_index, &region.bounds) {
             Ok(step) => steps.push_back((step_index, step)),
             Err(error) => {
                 let _ = interaction.response.send(Err(error));
@@ -851,9 +830,7 @@ fn start_interaction_runner(
 fn resolve_step_point(
     step: PreparedInteractionStep,
     step_index: usize,
-    route: &str,
     bounds: &gpui::Bounds<gpui::Pixels>,
-    targets: &[crate::capture_region::StoryInteractionTargetSnapshot],
 ) -> Result<PreparedInteractionStep, StorybookAutomationError> {
     let resolve = |point: StoryPoint| {
         resolve_story_point(point, bounds).map_err(|message| {
@@ -878,44 +855,6 @@ fn resolve_step_point(
             click_count,
             modifiers,
         }),
-        PreparedInteractionStep::ClickTarget {
-            key,
-            button,
-            click_count,
-            modifiers,
-        } => {
-            let target = targets
-                .iter()
-                .find(|target| target.key == key)
-                .ok_or_else(|| StorybookAutomationError::InteractionTargetNotFound {
-                    route: route.to_owned(),
-                    key: key.clone(),
-                })?;
-            let target_bounds = target.bounds;
-            if !target_bounds.x.is_finite()
-                || !target_bounds.y.is_finite()
-                || !target_bounds.width.is_finite()
-                || !target_bounds.height.is_finite()
-                || target_bounds.width <= 0.0
-                || target_bounds.height <= 0.0
-            {
-                return Err(StorybookAutomationError::InvalidInteractionStep {
-                    step_index,
-                    message: format!("interaction target `{key}` has no usable area"),
-                });
-            }
-            resolve(StoryPoint {
-                space: StoryPointSpace::LogicalPixels,
-                x: target_bounds.x + target_bounds.width / 2.0,
-                y: target_bounds.y + target_bounds.height / 2.0,
-            })
-            .map(|point| PreparedInteractionStep::PointerClick {
-                point,
-                button,
-                click_count,
-                modifiers,
-            })
-        },
         PreparedInteractionStep::Scroll {
             point,
             delta_x,
@@ -927,6 +866,72 @@ fn resolve_step_point(
         }),
         step => Ok(step),
     }
+}
+
+fn resolve_target_click(
+    step: PreparedInteractionStep,
+    step_index: usize,
+    story: &StorySnapshot,
+) -> Result<PreparedInteractionStep, StorybookAutomationError> {
+    let PreparedInteractionStep::ClickTarget {
+        key,
+        button,
+        click_count,
+        modifiers,
+    } = step
+    else {
+        return Ok(step);
+    };
+
+    let targets = rendered_interaction_targets(story.clone())?.targets;
+    let target = targets
+        .iter()
+        .find(|target| target.key == key)
+        .ok_or_else(|| StorybookAutomationError::InteractionTargetNotFound {
+            route: story.capture_route_id.clone(),
+            key: key.clone(),
+        })?;
+    let target_bounds = target.bounds;
+    if !target_bounds.x.is_finite()
+        || !target_bounds.y.is_finite()
+        || !target_bounds.width.is_finite()
+        || !target_bounds.height.is_finite()
+        || target_bounds.width <= 0.0
+        || target_bounds.height <= 0.0
+    {
+        return Err(StorybookAutomationError::InvalidInteractionStep {
+            step_index,
+            message: format!("interaction target `{key}` has no usable area"),
+        });
+    }
+
+    let region = capture_region_bounds(&story.capture_route_id).ok_or_else(|| {
+        StorybookAutomationError::CaptureUnavailable {
+            message: format!(
+                "capture route `{}` was not rendered by the current story view",
+                story.capture_route_id
+            ),
+        }
+    })?;
+    let point = resolve_story_point(
+        StoryPoint {
+            space: StoryPointSpace::LogicalPixels,
+            x: target_bounds.x + target_bounds.width / 2.0,
+            y: target_bounds.y + target_bounds.height / 2.0,
+        },
+        &region.bounds,
+    )
+    .map_err(|message| StorybookAutomationError::InvalidInteractionStep {
+        step_index,
+        message,
+    })?;
+
+    Ok(PreparedInteractionStep::PointerClick {
+        point,
+        button,
+        click_count,
+        modifiers,
+    })
 }
 
 fn resolve_story_point(
@@ -988,6 +993,14 @@ fn run_interaction(mut runner: InteractionRunner, window: &mut Window, cx: &mut 
             schedule_wait_frames(runner, step_index, count, window);
             return;
         }
+
+        let step = match resolve_target_click(step, step_index, &runner.story) {
+            Ok(step) => step,
+            Err(error) => {
+                send_interaction_failure(runner, error);
+                return;
+            },
+        };
 
         let defer_continuation = matches!(&step, PreparedInteractionStep::DispatchAction(_));
         let dispatches = dispatch_step(step, window, cx);
@@ -1133,7 +1146,7 @@ fn dispatch_step(
             cx,
         )],
         PreparedInteractionStep::ClickTarget { .. } => {
-            unreachable!("semantic target clicks are resolved before dispatch")
+            unreachable!("semantic target clicks are resolved at dispatch")
         },
         PreparedInteractionStep::WaitFrames(_) => unreachable!("wait steps are scheduled"),
     }
@@ -1323,8 +1336,9 @@ mod tests {
     use crate::capture_region::{StorybookElementExt as _, capture_story_view_with_scroll};
     use gpui::{
         AppContext as _, Context, Focusable, InteractiveElement as _, IntoElement, KeyDownEvent,
-        Render, StatefulInteractiveElement as _, Styled as _, div,
+        ParentElement as _, Render, StatefulInteractiveElement as _, Styled as _, div,
     };
+    use gpui_component::h_flex;
     use std::sync::atomic::AtomicBool;
 
     /// Sets the harness counter to a caller-provided value.
@@ -1389,6 +1403,59 @@ mod tests {
         }
     }
 
+    struct DynamicTargetHarness {
+        focus_handle: gpui::FocusHandle,
+        target_visible: bool,
+        target_on_right: bool,
+        target_clicks: usize,
+        decoy_clicks: usize,
+    }
+
+    impl Focusable for DynamicTargetHarness {
+        fn focus_handle(&self, _: &App) -> gpui::FocusHandle {
+            self.focus_handle.clone()
+        }
+    }
+
+    impl Render for DynamicTargetHarness {
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            let target = div()
+                .id("dynamic-target")
+                .w(px(80.))
+                .h(px(80.))
+                .on_click(cx.listener(|this, _, _, cx| {
+                    this.target_clicks += 1;
+                    cx.notify();
+                }))
+                .storybook_target_as("dynamic-target", "Dynamic target");
+            let decoy = div()
+                .id("dynamic-target-decoy")
+                .w(px(80.))
+                .h(px(80.))
+                .on_click(cx.listener(|this, _, _, cx| {
+                    this.decoy_clicks += 1;
+                    cx.notify();
+                }));
+            let row = h_flex().size_full();
+            let row = if !self.target_visible {
+                row.child(decoy)
+            } else if self.target_on_right {
+                row.child(decoy).child(target)
+            } else {
+                row.child(target).child(decoy)
+            };
+            let content = row.track_focus(&self.focus_handle).on_action(cx.listener(
+                |this, action: &SetCounter, _, cx| {
+                    this.target_visible = action.value > 0;
+                    this.target_on_right = action.value > 0;
+                    cx.notify();
+                },
+            ));
+
+            capture_story_view_with_scroll("dynamic-target-test", None, content)
+        }
+    }
+
     fn interaction_story_snapshot() -> StorySnapshot {
         StorySnapshot {
             key: "interaction-test".to_owned(),
@@ -1404,6 +1471,106 @@ mod tests {
             default_size: super::super::StoryDefaultSize::default(),
             scenarios: Vec::new(),
         }
+    }
+
+    fn dynamic_target_story_snapshot() -> StorySnapshot {
+        StorySnapshot {
+            capture_route_id: "dynamic-target-test".to_owned(),
+            key: "dynamic-target-test".to_owned(),
+            story_name: "DynamicTargetHarness".to_owned(),
+            title: "Dynamic target".to_owned(),
+            ..interaction_story_snapshot()
+        }
+    }
+
+    async fn run_dynamic_target_interaction(
+        target_visible: bool,
+        request_id: u64,
+        cx: &mut gpui::TestAppContext,
+    ) -> (StoryInteractionSnapshot, usize, usize, bool) {
+        let (window, harness, receiver, pending) = cx.update(|cx| {
+            let mut harness = None;
+            let window = cx
+                .open_window(Default::default(), |_, cx| {
+                    let entity = cx.new(|cx| DynamicTargetHarness {
+                        focus_handle: cx.focus_handle().tab_stop(true),
+                        target_visible,
+                        target_on_right: false,
+                        target_clicks: 0,
+                        decoy_clicks: 0,
+                    });
+                    harness = Some(entity.clone());
+                    entity
+                })
+                .expect("dynamic target test window should open");
+            let harness = harness.expect("dynamic target harness should be created");
+            let (response, receiver) = oneshot::channel();
+            let pending = cx
+                .update_window(window.into(), |_, window, cx| {
+                    let steps = prepare_interaction_steps(
+                        &[
+                            StoryInteractionStep::FocusNext,
+                            StoryInteractionStep::DispatchAction {
+                                name: "storybook_interaction_test::SetCounter".to_owned(),
+                                args: Some(serde_json::json!({ "value": 1 })),
+                            },
+                            StoryInteractionStep::WaitFrames { count: 1 },
+                            StoryInteractionStep::ClickTarget {
+                                target_key: "dynamic-target".to_owned(),
+                                button: StoryMouseButton::Left,
+                                click_count: 1,
+                                modifiers: StoryModifiers::default(),
+                            },
+                        ],
+                        cx,
+                    )
+                    .expect("dynamic target steps should prepare");
+                    let pending = Arc::new(AtomicBool::new(true));
+                    schedule_story_interaction(
+                        PreparedStoryInteraction {
+                            request_id,
+                            story: dynamic_target_story_snapshot(),
+                            steps,
+                            postconditions: Vec::new(),
+                            capture: None,
+                            response,
+                            progress: Arc::new(AtomicUsize::new(0)),
+                            operation: AutomationOperationGuard {
+                                pending: pending.clone(),
+                            },
+                        },
+                        window,
+                    );
+                    window.refresh();
+                    pending
+                })
+                .expect("dynamic target runner should schedule");
+            (window, harness, receiver, pending)
+        });
+
+        for _ in 0..8 {
+            cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
+                .expect("dynamic target harness should draw");
+            cx.update_window(window.into(), |_, window, cx| {
+                window.simulate_next_frame(cx)
+            })
+            .expect("dynamic target next-frame callback should run");
+        }
+
+        let snapshot = receiver
+            .await
+            .expect("dynamic target runner should respond")
+            .expect("dynamic target runner should complete");
+        let (target_clicks, decoy_clicks) = cx.update(|cx| {
+            let harness = harness.read(cx);
+            (harness.target_clicks, harness.decoy_clicks)
+        });
+        (
+            snapshot,
+            target_clicks,
+            decoy_clicks,
+            pending.load(Ordering::SeqCst),
+        )
     }
 
     fn request(steps: Vec<StoryInteractionStep>) -> StoryInteractionRequest {
@@ -1949,6 +2116,30 @@ mod tests {
             assert!(harness.hovered);
             assert_eq!(harness.text, "héllo 世界");
         });
+    }
+
+    #[gpui::test]
+    async fn semantic_target_can_be_revealed_before_its_step_is_dispatched(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let (snapshot, target_clicks, decoy_clicks, pending) =
+            run_dynamic_target_interaction(false, 14, cx).await;
+
+        assert_eq!(snapshot.steps_dispatched, 4);
+        assert_eq!(target_clicks, 1);
+        assert_eq!(decoy_clicks, 0);
+        assert!(!pending);
+    }
+
+    #[gpui::test]
+    async fn semantic_target_uses_its_latest_bounds_at_dispatch(cx: &mut gpui::TestAppContext) {
+        let (snapshot, target_clicks, decoy_clicks, pending) =
+            run_dynamic_target_interaction(true, 15, cx).await;
+
+        assert_eq!(snapshot.steps_dispatched, 4);
+        assert_eq!(target_clicks, 1);
+        assert_eq!(decoy_clicks, 0);
+        assert!(!pending);
     }
 
     #[gpui::test]
