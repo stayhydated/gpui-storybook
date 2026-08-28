@@ -105,7 +105,10 @@ description: >-
 - Use `gpui-storybook-test` for isolated test and CI cases. Keep story
   registrations linked, pass the application's assets and initialization, make
   baseline check versus update policy explicit, and require a case configurator
-  for non-built-in named themes or named language axes.
+  for non-built-in named themes or named language axes. Treat a missing control
+  target as an empty snapshot unless the case supplies controls. Let a custom
+  `RunnerConfig::route_capture` callback own verification and cropping for an
+  application-defined substory surface.
 - Keep fixed viewport frames centered and locked. Responsive mode alone is
   resizable and inherits the immediately previous fixed preset's dimensions.
 - Keep viewport state scoped to each Storybook window.

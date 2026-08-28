@@ -474,9 +474,10 @@ PNG size.
 
 An interaction capture is part of the same exclusive UI-thread operation. It
 captures the first requested rendered frame after the final step; explicit
-`wait_frames` steps delay that frame. If capture fails after input was
-dispatched, the structured error includes the partial dispatched-step count.
-Do not retry an interaction batch automatically.
+`wait_frames` steps delay that frame. If a semantic postcondition or capture
+fails after input was dispatched, the structured error includes the request ID
+and partial dispatched-step count. Do not retry an interaction batch
+automatically.
 
 ## Troubleshoot automation
 

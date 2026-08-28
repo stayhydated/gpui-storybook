@@ -88,6 +88,8 @@ story action or input handler, so use an inert fixture or a safe backend.
 
 The standard `Gallery::view` and `StoryWorkspace::view` constructors attach
 the controller installed by `gpui_storybook::init`.
+Their `view_with_automation` variants carry the supplied controller into the
+Scenarios workbench even when it is not installed as the default global.
 Retain the MCP automation state across calls until the transport or
 application host is explicitly stopped.
 
@@ -241,6 +243,10 @@ story-bearing crate linked so inventory discovery retains its registrations.
 Each request creates a fresh `HeadlessAppContext`, initializes the core runtime
 and linked `story_init` hooks, constructs one registered story, applies typed
 controls and presentation, and captures the rendered root or substory region.
+Stories without typed controls report an empty control snapshot; a non-empty
+control map still fails. For an application-owned substory surface, install
+`RunnerConfig::route_capture` and let the callback own route verification and
+cropping without registering that route with the core capture helpers.
 
 Pass consumer assets through `RunnerConfig::asset_source` and install any
 application-owned globals with its initializer. Built-in light and dark theme

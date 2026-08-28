@@ -671,7 +671,8 @@ impl StoryWorkspace {
         let (dock_area, dock_skin) =
             DockSkin::dock_area(MAIN_DOCK_AREA.id, Some(MAIN_DOCK_AREA.version), window, cx);
         let weak_dock_area = dock_area.downgrade();
-        let workbench_state = cx.new(|cx| WorkbenchState::new(None, cx));
+        let workbench_state =
+            cx.new(|cx| WorkbenchState::new_with_automation(None, automation.clone(), cx));
         workbench_state.update(cx, |state, cx| {
             state.set_active_story(stories.first().cloned(), cx);
         });
@@ -1467,6 +1468,7 @@ mod tests {
 
         window
             .update(cx, |workspace, window, cx| {
+                assert!(workspace.workbench_state.read(cx).automation().is_some());
                 let (response, mut result) = oneshot::channel();
                 workspace.handle_automation_command(
                     StorybookAutomationCommand::RunSteps {

@@ -436,11 +436,15 @@ impl PortableStory {
     }
 
     /// Reads current control metadata and values from the live story.
+    ///
+    /// Stories without a typed control target return an empty snapshot. Applying
+    /// a non-empty control map to such a story still returns
+    /// [`StorybookTestError::ControlsUnavailable`].
     pub fn control_snapshots(&mut self) -> Result<Vec<ControlSnapshot>, StorybookTestError> {
-        let target = self.control_target()?;
-        self.context
-            .update(|app| target.snapshots(app))
-            .map_err(StorybookTestError::from)
+        self.context.update(|app| {
+            let target = self.story.read(app).control_target();
+            read_control_snapshots(target, app)
+        })
     }
 
     /// Reads the live story metadata after the first frame has rendered.
@@ -462,7 +466,7 @@ impl PortableStory {
     pub fn settle(&mut self, frames: u32) -> Result<(), StorybookTestError> {
         let frames = frames.max(1);
         let window: AnyWindowHandle = self.window.into();
-        if matches!(&self.case.route, RouteCase::Substory { .. }) {
+        if uses_core_route_registry(&self.case.route, self.route_capture.is_some()) {
             let route_id = self.case.route_id.clone();
             let rendered = self
                 .context
@@ -1075,6 +1079,20 @@ fn apply_controls_to_story(
     Ok(())
 }
 
+fn read_control_snapshots(
+    target: Option<Rc<dyn ControlTarget>>,
+    app: &mut App,
+) -> Result<Vec<ControlSnapshot>, StorybookTestError> {
+    match target {
+        Some(target) => target.snapshots(app).map_err(StorybookTestError::from),
+        None => Ok(Vec::new()),
+    }
+}
+
+fn uses_core_route_registry(route: &RouteCase, has_custom_route_capture: bool) -> bool {
+    matches!(route, RouteCase::Substory { .. }) && !has_custom_route_capture
+}
+
 fn viewport_preset(viewport: &ViewportCase) -> StoryViewportPreset {
     match (viewport.width, viewport.height) {
         (390, 844) => StoryViewportPreset::Mobile,
@@ -1105,6 +1123,24 @@ pub(crate) fn case_file_name(id: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[gpui::test]
+    fn story_without_control_target_has_an_empty_snapshot(cx: &mut App) {
+        let snapshots = read_control_snapshots(None, cx).expect("missing controls should be empty");
+
+        assert!(snapshots.is_empty());
+    }
+
+    #[test]
+    fn custom_substory_capture_owns_route_verification() {
+        let route = RouteCase::Substory {
+            key: "application-surface".to_owned(),
+        };
+
+        assert!(!uses_core_route_registry(&route, true));
+        assert!(uses_core_route_registry(&route, false));
+        assert!(!uses_core_route_registry(&RouteCase::Root, false));
+    }
 
     #[test]
     fn case_file_name_is_stable_and_safe() {

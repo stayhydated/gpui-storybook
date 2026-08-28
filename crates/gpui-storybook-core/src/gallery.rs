@@ -95,7 +95,8 @@ impl Gallery {
     ) -> Self {
         let search_input =
             cx.new(|cx_input| InputState::new(window, cx_input).placeholder("Search..."));
-        let workbench_state = cx.new(|cx| WorkbenchState::new(None, cx));
+        let workbench_state =
+            cx.new(|cx| WorkbenchState::new_with_automation(None, automation.clone(), cx));
         let workbench = cx.new(|cx| {
             StoryWorkbench::new(workbench_state.clone(), WorkbenchTab::Controls, window, cx)
         });
@@ -1008,6 +1009,7 @@ mod tests {
                 assert_eq!(gallery.active_index, Some(1));
                 assert!(gallery.left_sidebar_visible);
                 assert!(gallery.right_sidebar_visible);
+                assert!(gallery.workbench_state.read(cx).automation().is_some());
                 assert_eq!(
                     gallery
                         .active_story_snapshot(cx)

@@ -2,8 +2,8 @@
 
 use crate::{
     automation::{
-        StoryControlsSnapshot, StoryScenarioRunSnapshot, StorySnapshot, StorybookAutomationError,
-        default_storybook_automation,
+        SharedStorybookAutomation, StoryControlsSnapshot, StoryScenarioRunSnapshot, StorySnapshot,
+        StorybookAutomationError, default_storybook_automation,
     },
     controls::{ControlKind, ControlSpec, ControlTarget, ControlValue},
     presentation::{StoryCanvasBackground, StoryPresentation, StoryViewportPreset},
@@ -87,6 +87,7 @@ impl WorkbenchTab {
 pub struct WorkbenchState {
     active_group: Option<Entity<StoryContainer>>,
     active_story: Option<Entity<StoryContainer>>,
+    automation: Option<SharedStorybookAutomation>,
     presentation: StoryPresentation,
     responsive_size: Option<Size<Pixels>>,
 }
@@ -95,10 +96,19 @@ impl WorkbenchState {
     /// Creates window-scoped workbench state and resolves a variant group to its
     /// first concrete member.
     pub fn new(initial_story: Option<Entity<StoryContainer>>, cx: &App) -> Self {
+        Self::new_with_automation(initial_story, None, cx)
+    }
+
+    pub(crate) fn new_with_automation(
+        initial_story: Option<Entity<StoryContainer>>,
+        automation: Option<SharedStorybookAutomation>,
+        cx: &App,
+    ) -> Self {
         let (active_group, active_story) = Self::resolve_story(initial_story, cx);
         Self {
             active_group,
             active_story,
+            automation,
             presentation: StoryPresentation::default(),
             responsive_size: None,
         }
@@ -209,6 +219,10 @@ impl WorkbenchState {
 
     pub fn active_story(&self) -> Option<Entity<StoryContainer>> {
         self.active_story.clone()
+    }
+
+    pub(crate) fn automation(&self) -> Option<SharedStorybookAutomation> {
+        self.automation.clone()
     }
 
     pub fn active_group(&self) -> Option<Entity<StoryContainer>> {
@@ -1321,7 +1335,12 @@ impl StoryWorkbench {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let Some(automation) = default_storybook_automation(cx) else {
+        let automation = self
+            .state
+            .read(cx)
+            .automation()
+            .or_else(|| default_storybook_automation(cx));
+        let Some(automation) = automation else {
             self.scenario_run = Some(ScenarioRunState::Finished {
                 story_key,
                 scenario,
@@ -2633,6 +2652,47 @@ mod tests {
             StoryWorkbench::scenario_progress(&StorybookAutomationError::AutomationBusy),
             0
         );
+    }
+
+    #[test]
+    fn scenario_runner_uses_the_controller_attached_to_its_host() {
+        let mut app = TestAppContext::single();
+        app.update(gpui_component::init);
+        let automation = crate::automation::StorybookAutomation::new();
+        let automation_for_view = automation.clone();
+        let window = app.open_window(size(px(400.), px(600.)), move |window, cx| {
+            let state = cx
+                .new(|cx| WorkbenchState::new_with_automation(None, Some(automation_for_view), cx));
+            StoryWorkbench::new(state, WorkbenchTab::Scenarios, window, cx)
+        });
+        let mut visual_cx = VisualTestContext::from_window(*window, &app);
+        let workbench = window
+            .root(&mut visual_cx)
+            .expect("workbench should be the window root");
+
+        visual_cx.update(|window, cx| {
+            workbench.update(cx, |workbench, cx| {
+                workbench.run_scenario(
+                    "attached-story".to_owned(),
+                    StoryScenario::new("attached-scenario", "Attached scenario"),
+                    window,
+                    cx,
+                );
+            });
+        });
+        visual_cx.run_until_parked();
+
+        assert!(workbench.read_with(&visual_cx, |workbench, _| {
+            matches!(
+                &workbench.scenario_run,
+                Some(ScenarioRunState::Finished { result, .. })
+                    if matches!(
+                        result.as_ref(),
+                        Err(StorybookAutomationError::StoryNotFound { key })
+                            if key == "attached-story"
+                    )
+            )
+        }));
     }
 
     #[gpui::test]

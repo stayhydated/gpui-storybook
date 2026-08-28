@@ -1212,53 +1212,45 @@ fn schedule_postcondition_check(mut runner: InteractionRunner, window: &mut Wind
         let values = match rendered_semantic_values(runner.story.clone()) {
             Ok(snapshot) => snapshot.values,
             Err(error) => {
-                let _ = runner.response.send(Err(error));
+                send_interaction_failure(runner, error);
                 return;
             },
         };
-        let Some(actual) = values.into_iter().find(|value| value.key == value_key) else {
-            let _ = runner
-                .response
-                .send(Err(StorybookAutomationError::SemanticValueNotFound {
-                    route,
-                    key: value_key,
-                }));
-            return;
-        };
+        if let Some(actual) = values.into_iter().find(|value| value.key == value_key) {
+            let actual_value = json_pointer
+                .as_deref()
+                .map_or(Some(&actual.value), |pointer| actual.value.pointer(pointer));
+            if actual_value == Some(&expected) {
+                runner
+                    .postcondition_results
+                    .push(StoryInteractionPostconditionSnapshot {
+                        value_key,
+                        json_pointer,
+                        expected,
+                        actual,
+                        frames_waited: runner.postcondition_frames_waited,
+                    });
+                runner.postcondition_index += 1;
+                runner.postcondition_frames_waited = 0;
 
-        let actual_value = json_pointer
-            .as_deref()
-            .map_or(Some(&actual.value), |pointer| actual.value.pointer(pointer));
-        if actual_value == Some(&expected) {
-            runner
-                .postcondition_results
-                .push(StoryInteractionPostconditionSnapshot {
-                    value_key,
-                    json_pointer,
-                    expected,
-                    actual,
-                    frames_waited: runner.postcondition_frames_waited,
-                });
-            runner.postcondition_index += 1;
-            runner.postcondition_frames_waited = 0;
-
-            if runner.postcondition_index == runner.postconditions.len() {
-                finish_interaction_capture(runner, window, cx);
-            } else {
-                schedule_postcondition_check(runner, window);
+                if runner.postcondition_index == runner.postconditions.len() {
+                    finish_interaction_capture(runner, window, cx);
+                } else {
+                    schedule_postcondition_check(runner, window);
+                }
+                return;
             }
-            return;
         }
 
         if runner.postcondition_frames_waited >= frame_limit {
-            let _ =
-                runner
-                    .response
-                    .send(Err(StorybookAutomationError::SemanticValueWaitTimedOut {
-                        route,
-                        key: value_key,
-                        max_frames: frame_limit,
-                    }));
+            send_interaction_failure(
+                runner,
+                StorybookAutomationError::SemanticValueWaitTimedOut {
+                    route,
+                    key: value_key,
+                    max_frames: frame_limit,
+                },
+            );
             return;
         }
 
@@ -1288,22 +1280,23 @@ fn finish_interaction_capture(runner: InteractionRunner, window: &mut Window, cx
             );
             match capture_result {
                 Ok(capture) => send_interaction_snapshot(runner, Some(capture), window, cx),
-                Err(error) => {
-                    let steps_dispatched = runner.progress.load(Ordering::SeqCst);
-                    let _ =
-                        runner
-                            .response
-                            .send(Err(StorybookAutomationError::InteractionFailed {
-                                request_id: runner.request_id,
-                                steps_dispatched,
-                                message: error.to_string(),
-                            }));
-                },
+                Err(error) => send_interaction_failure(runner, error),
             }
         });
     } else {
         send_interaction_snapshot(runner, None, window, cx);
     }
+}
+
+fn send_interaction_failure(runner: InteractionRunner, error: StorybookAutomationError) {
+    let steps_dispatched = runner.progress.load(Ordering::SeqCst);
+    let _ = runner
+        .response
+        .send(Err(StorybookAutomationError::InteractionFailed {
+            request_id: runner.request_id,
+            steps_dispatched,
+            message: error.to_string(),
+        }));
 }
 
 fn send_interaction_snapshot(
@@ -1348,6 +1341,7 @@ mod tests {
         hovered: bool,
         action_value: usize,
         events: Vec<&'static str>,
+        semantic_value: Option<usize>,
     }
 
     impl Focusable for InteractionHarness {
@@ -1358,36 +1352,57 @@ mod tests {
 
     impl Render for InteractionHarness {
         fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-            capture_story_view_with_scroll(
-                "interaction-test",
-                None,
-                div()
-                    .id("interaction-harness")
-                    .size_full()
-                    .track_focus(&self.focus_handle)
-                    .on_action(cx.listener(|this, action: &SetCounter, _, cx| {
-                        this.action_value = action.value;
-                        this.events.push("action");
+            let harness = div()
+                .id("interaction-harness")
+                .size_full()
+                .track_focus(&self.focus_handle)
+                .on_action(cx.listener(|this, action: &SetCounter, _, cx| {
+                    this.action_value = action.value;
+                    this.events.push("action");
+                    cx.notify();
+                }))
+                .on_key_down(cx.listener(|this, event: &KeyDownEvent, _, cx| {
+                    if let Some(text) = event.keystroke.key_char.as_deref() {
+                        this.text.push_str(text);
+                        cx.stop_propagation();
                         cx.notify();
-                    }))
-                    .on_key_down(cx.listener(|this, event: &KeyDownEvent, _, cx| {
-                        if let Some(text) = event.keystroke.key_char.as_deref() {
-                            this.text.push_str(text);
-                            cx.stop_propagation();
-                            cx.notify();
-                        }
-                    }))
-                    .on_hover(cx.listener(|this, hovered, _, cx| {
-                        this.hovered = *hovered;
-                        cx.notify();
-                    }))
-                    .on_click(cx.listener(|this, _, _, cx| {
-                        this.clicks += 1;
-                        this.events.push("click");
-                        cx.notify();
-                    }))
-                    .storybook_target_as("harness", "Interaction harness"),
-            )
+                    }
+                }))
+                .on_hover(cx.listener(|this, hovered, _, cx| {
+                    this.hovered = *hovered;
+                    cx.notify();
+                }))
+                .on_click(cx.listener(|this, _, _, cx| {
+                    this.clicks += 1;
+                    this.events.push("click");
+                    cx.notify();
+                }))
+                .storybook_target_as("harness", "Interaction harness");
+            let harness = match self.semantic_value {
+                Some(value) => harness
+                    .storybook_value_as("late-value", "Late value", value)
+                    .into_any_element(),
+                None => harness.into_any_element(),
+            };
+
+            capture_story_view_with_scroll("interaction-test", None, harness)
+        }
+    }
+
+    fn interaction_story_snapshot() -> StorySnapshot {
+        StorySnapshot {
+            key: "interaction-test".to_owned(),
+            crate_name: "test".to_owned(),
+            story_name: "InteractionHarness".to_owned(),
+            title: "Interaction".to_owned(),
+            description: String::new(),
+            group: None,
+            section: None,
+            source_file: file!().to_owned(),
+            source_line: line!(),
+            capture_route_id: "interaction-test".to_owned(),
+            default_size: super::super::StoryDefaultSize::default(),
+            scenarios: Vec::new(),
         }
     }
 
@@ -1658,6 +1673,161 @@ mod tests {
     }
 
     #[gpui::test]
+    async fn postcondition_retries_a_missing_value_until_it_is_rendered(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let (window, harness, receiver, progress, pending) = cx.update(|cx| {
+            let mut harness = None;
+            let window = cx
+                .open_window(Default::default(), |_, cx| {
+                    let entity = cx.new(|cx| InteractionHarness {
+                        focus_handle: cx.focus_handle().tab_stop(true),
+                        text: String::new(),
+                        clicks: 0,
+                        hovered: false,
+                        action_value: 0,
+                        events: Vec::new(),
+                        semantic_value: None,
+                    });
+                    harness = Some(entity.clone());
+                    entity
+                })
+                .expect("postcondition test window should open");
+            let harness = harness.expect("harness should be created");
+            let (response, receiver) = oneshot::channel();
+            let progress = Arc::new(AtomicUsize::new(1));
+            let pending = Arc::new(AtomicBool::new(true));
+            cx.update_window(window.into(), |_, window, _| {
+                schedule_postcondition_check(
+                    InteractionRunner {
+                        request_id: 12,
+                        story: interaction_story_snapshot(),
+                        steps: VecDeque::new(),
+                        postconditions: vec![
+                            StoryInteractionPostcondition::new("late-value", serde_json::json!(42))
+                                .max_frames(3),
+                        ],
+                        postcondition_index: 0,
+                        postcondition_frames_waited: 0,
+                        postcondition_results: Vec::new(),
+                        capture: None,
+                        response,
+                        progress: progress.clone(),
+                        observations: Vec::new(),
+                        _operation: AutomationOperationGuard {
+                            pending: pending.clone(),
+                        },
+                    },
+                    window,
+                );
+            })
+            .expect("postcondition runner should schedule");
+            (window, harness, receiver, progress, pending)
+        });
+
+        cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
+            .expect("first postcondition frame should draw");
+        cx.update_window(window.into(), |_, window, cx| {
+            window.simulate_next_frame(cx)
+        })
+        .expect("first postcondition check should run");
+
+        cx.update(|cx| {
+            harness.update(cx, |harness, cx| {
+                harness.semantic_value = Some(42);
+                cx.notify();
+            });
+        });
+        cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
+            .expect("late-value frame should draw");
+        cx.update_window(window.into(), |_, window, cx| {
+            window.simulate_next_frame(cx)
+        })
+        .expect("second postcondition check should run");
+
+        let snapshot = receiver
+            .await
+            .expect("runner should respond")
+            .expect("late semantic value should satisfy the postcondition");
+        assert_eq!(snapshot.steps_dispatched, 1);
+        assert_eq!(snapshot.postconditions.len(), 1);
+        assert_eq!(snapshot.postconditions[0].frames_waited, 2);
+        assert_eq!(progress.load(Ordering::SeqCst), 1);
+        assert!(!pending.load(Ordering::SeqCst));
+    }
+
+    #[gpui::test]
+    async fn postcondition_timeout_preserves_dispatched_progress(cx: &mut gpui::TestAppContext) {
+        let (window, receiver, progress, pending) = cx.update(|cx| {
+            let window = cx
+                .open_window(Default::default(), |_, cx| {
+                    cx.new(|cx| InteractionHarness {
+                        focus_handle: cx.focus_handle().tab_stop(true),
+                        text: String::new(),
+                        clicks: 0,
+                        hovered: false,
+                        action_value: 0,
+                        events: Vec::new(),
+                        semantic_value: None,
+                    })
+                })
+                .expect("postcondition test window should open");
+            let (response, receiver) = oneshot::channel();
+            let progress = Arc::new(AtomicUsize::new(1));
+            let pending = Arc::new(AtomicBool::new(true));
+            cx.update_window(window.into(), |_, window, _| {
+                schedule_postcondition_check(
+                    InteractionRunner {
+                        request_id: 13,
+                        story: interaction_story_snapshot(),
+                        steps: VecDeque::new(),
+                        postconditions: vec![
+                            StoryInteractionPostcondition::new(
+                                "missing-value",
+                                serde_json::json!(42),
+                            )
+                            .max_frames(2),
+                        ],
+                        postcondition_index: 0,
+                        postcondition_frames_waited: 0,
+                        postcondition_results: Vec::new(),
+                        capture: None,
+                        response,
+                        progress: progress.clone(),
+                        observations: Vec::new(),
+                        _operation: AutomationOperationGuard {
+                            pending: pending.clone(),
+                        },
+                    },
+                    window,
+                );
+            })
+            .expect("postcondition runner should schedule");
+            (window, receiver, progress, pending)
+        });
+
+        for _ in 0..2 {
+            cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
+                .expect("postcondition frame should draw");
+            cx.update_window(window.into(), |_, window, cx| {
+                window.simulate_next_frame(cx)
+            })
+            .expect("postcondition check should run");
+        }
+
+        assert!(matches!(
+            receiver.await.expect("runner should respond"),
+            Err(StorybookAutomationError::InteractionFailed {
+                request_id: 13,
+                steps_dispatched: 1,
+                message,
+            }) if message.contains("missing-value") && message.contains("2 frame(s)")
+        ));
+        assert_eq!(progress.load(Ordering::SeqCst), 1);
+        assert!(!pending.load(Ordering::SeqCst));
+    }
+
+    #[gpui::test]
     async fn executor_dispatches_unicode_actions_pointer_and_frame_waits_in_process(
         cx: &mut gpui::TestAppContext,
     ) {
@@ -1672,6 +1842,7 @@ mod tests {
                         hovered: false,
                         action_value: 0,
                         events: Vec::new(),
+                        semantic_value: None,
                     });
                     harness = Some(entity.clone());
                     entity
@@ -1792,6 +1963,7 @@ mod tests {
                         hovered: false,
                         action_value: 0,
                         events: Vec::new(),
+                        semantic_value: None,
                     })
                 })
                 .expect("interaction test window should open");
@@ -1863,6 +2035,7 @@ mod tests {
                         hovered: false,
                         action_value: 0,
                         events: Vec::new(),
+                        semantic_value: None,
                     });
                     harness = Some(entity.clone());
                     entity

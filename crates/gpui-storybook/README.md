@@ -130,4 +130,7 @@ the [automation guide](../../book/src/automation.md), and [API
 documentation](https://docs.rs/gpui-storybook/). Use the public-integration
 [`gpui-storybook-test`](../gpui-storybook-test/README.md) crate and the
 [portable-testing guide](../../book/src/portable_testing.md) for fresh headless
-stories, capture matrices, visual baselines, and frame budgets.
+stories, capture matrices, visual baselines, and frame budgets. Stories without
+typed controls report an empty control snapshot; non-empty control maps still
+fail. A custom `RunnerConfig::route_capture` callback owns verification and
+cropping for application-defined substory surfaces.

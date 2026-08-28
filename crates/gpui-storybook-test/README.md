@@ -38,7 +38,10 @@ named control sets into stable case IDs. Every expanded case is executed in a
 fresh context and `MatrixReport` records each success or typed failure as
 structured JSON-compatible data. Root and substory routes use the core
 capture-region crop and scroll helpers; `RunnerConfig::route_capture` can
-override that crop policy when an application needs a custom route surface.
+override that policy and own route verification when an application needs a
+custom route surface. Stories without a typed control target produce an empty
+control snapshot. Supplying a non-empty control map to such a story remains a
+typed `ControlsUnavailable` failure.
 
 Built-in `light`, `dark`, `Default Light`, and `Default Dark` theme names use
 GPUI Component's `Theme::change` automatically. Other theme and language

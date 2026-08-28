@@ -175,7 +175,10 @@ For isolated test and CI execution, use `gpui-storybook-test`. It creates a
 fresh headless GPUI context per case, applies typed controls and presentation,
 captures root or substory regions, expands viewport/theme/language/control
 matrices, checks explicit visual-baseline policies, and optionally enforces GPUI
-draw and dirty-to-present budgets. See [Portable testing and visual
+draw and dirty-to-present budgets. Stories without typed controls report an
+empty control snapshot; non-empty control maps still fail. A custom
+`RunnerConfig::route_capture` callback owns verification and cropping for
+application-defined substory surfaces. See [Portable testing and visual
 baselines](book/src/portable_testing.md).
 
 ## Start using Storybook

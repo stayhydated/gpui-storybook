@@ -36,7 +36,9 @@ assert_eq!(report.story.key, "my-stories-ButtonStory");
 Every request gets a new app, window, story entity, and set of GPUI globals.
 Use `runner.open(request)` when a test needs to update the live app, set a
 control, advance the test clock, or inspect a runtime story snapshot before
-capturing.
+capturing. A story without a typed control target reports an empty control
+snapshot; applying a non-empty control map still fails with
+`ControlsUnavailable`.
 
 Pass the application's normal `AssetSource` through `RunnerConfig` when stories
 load embedded fonts, icons, or images. Use the application initializer for
@@ -80,7 +82,9 @@ assert!(report.passed, "{report:#?}");
 Root and substory captures use Storybook's rendered capture-region registry, so
 the saved image excludes any surrounding Storybook shell. A requested substory
 must have rendered through `capture_substory` or `capture_substory_with_key`;
-missing routes are explicit failures.
+missing routes are explicit failures. For an application-owned route surface,
+install `RunnerConfig::route_capture`; that callback owns route verification and
+cropping without requiring a matching core capture-region entry.
 
 ## Keep baseline updates intentional
 

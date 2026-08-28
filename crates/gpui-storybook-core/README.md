@@ -52,7 +52,10 @@ parts.
 semantic postconditions, and optional capture with its owning story. Scenario
 runs recreate the concrete story and rebind its focus and control target before
 delegating to the shared interaction executor; gallery, dock, workbench, and MCP
-therefore observe one fresh-run contract.
+therefore observe one fresh-run contract. `Gallery::view_with_automation` and
+`StoryWorkspace::view_with_automation` carry their supplied controller into the
+Scenarios workbench without requiring a default global. Postcondition and
+capture failures after dispatch report the request ID and completed-step count.
 
 The automation module also owns the MCP-independent interaction request and
 result types, runtime action and semantic-target discovery, structured
