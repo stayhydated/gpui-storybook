@@ -47,8 +47,8 @@ The standard `gpui_storybook::init`, gallery, and dock paths attach the live
 in-process scenario host for component-derived stories, so workbench runs use a
 plain application launch. The sticky Scenarios toolbar's **Reset** action
 recreates the component wrapper at its example defaults and clears the last
-result without running a scenario. On Linux, add `--features mcp` for remote
-typed route, control, and capture tools; the feature is unsupported on macOS and
+result without running a scenario. On Linux or macOS, add `--features mcp` for
+remote typed route, control, and capture tools; the feature is unsupported on
 Windows. Also set
 `GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1` when generic in-process keyboard,
 action, pointer, scroll, and frame-wait tools are intentionally allowed. Use
@@ -59,7 +59,8 @@ Named and paired capture dimensions target the selected component story region;
 the gallery or dock chrome remains mounted around that region. On Linux, run
 MCP and startup-capture sessions through `gpui-storybook-launch` and Sway's
 wlroots headless backend as described in the automation guide; the normal
-application remains Wayland-backed. Component stories can import
+application remains Wayland-backed. On macOS, launch Cargo directly and use
+GPUI's native image renderer. Component stories can import
 `StorybookElementExt` and mark important children with `.storybook_target()`
 for stable MCP discovery and clicking, then attach Serde-serializable state
 with `.storybook_value(&state)` for focused value reads and bounded waits.

@@ -17,11 +17,12 @@ A Storybook binary can provide:
   source details, selected-story actions and key bindings, opt-in performance
   telemetry, and opt-in GPUI Inspector integration;
 - persistent, consumer-scoped appearance and language preferences;
-- stable story and substory routes for Linux MCP automation and PNG capture.
+- stable story and substory routes for Linux and macOS MCP automation and PNG
+  capture.
 
 The `gpui-storybook` facade is the normal application dependency. The
 `-core`, `-macros`, and `-toml` crates support deeper runtime or tooling
-integrations. The Linux-only `-mcp` crate owns remote automation and capture.
+integrations. The Linux/macOS `-mcp` crate owns remote automation and capture.
 
 ## Choose a registration style
 
@@ -52,4 +53,4 @@ for a launch-specific initial layout.
 3. [Edit controls, themes, and preview settings](workbench.md).
 4. [Configure grouping, filtering, and launch overrides](configuration.md).
 5. [Understand saved and resolved preferences](preferences.md).
-6. [Enable Linux MCP automation or PNG capture](automation.md).
+6. [Enable MCP automation or PNG capture](automation.md).

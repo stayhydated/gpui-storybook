@@ -9,8 +9,8 @@ GPUI Storybook is a searchable component preview shell for GPUI applications. It
 supports stateful stories, component-derived stories, persistent appearance and
 language and layout preferences, runtime-selectable gallery and dock workspaces,
 a live controls/theme/inspect/actions workbench, opt-in GPUI Inspector
-integration, and optional Linux MCP automation for typed controls, in-process
-interaction, and PNG capture.
+integration, and optional Linux/macOS MCP automation for typed controls,
+in-process interaction, and PNG capture.
 
 ## Try the examples
 
@@ -63,11 +63,11 @@ semantic targets, actions, postconditions, and optional capture used by live
 automation. The Scenarios tab and MCP both recreate the concrete story before
 every run, then report named step outcomes without retrying partial input.
 Normal `gpui_storybook::init` installs the in-process scenario runner, so the
-workbench's **Run fresh** button works without enabling `mcp`; on Linux, that
-feature adds remote tools and capture support to the same live controller. The
-Scenarios toolbar keeps **Reset** visible while the rows scroll; it recreates the story
-at its constructor defaults and clears the last run result without executing a
-scenario.
+workbench's **Run fresh** button works without enabling `mcp`; on Linux and
+macOS, that feature adds remote tools and capture support to the same live
+controller. The Scenarios toolbar keeps **Reset** visible while the rows scroll;
+it recreates the story at its constructor defaults and clears the last run
+result without executing a scenario.
 
 Registration macros also capture Rust documentation and static control shapes.
 Export the linked inventory as deterministic JSON without opening a window:
@@ -112,8 +112,8 @@ overlay.
 shows visible Buttons, contextual shortcuts, the Actions tab, and repeatable
 scenarios sharing one GPUI command model.
 
-On Linux, enable the `mcp` feature to discover routes, drive controls, and
-capture the story region. The feature is unsupported on macOS and Windows and
+On Linux or macOS, enable the `mcp` feature to discover routes, drive controls,
+and capture the story region. The feature is unsupported on Windows and
 produces a compile-time error there. Generic focus, keyboard, action, pointer,
 scroll, and frame-wait steps require an explicit capability gate because they
 can activate arbitrary application behavior:
@@ -162,7 +162,8 @@ assertion.
 Linux automation uses the normal Wayland-backed GPUI application under Sway's
 wlroots headless backend. Install Sway and Mesa's software graphics drivers;
 install `gpui-storybook-launch`, then run the Cargo command through it.
-`storybook_capture_launch_env` always emits this Linux launcher.
+`storybook_capture_launch_env` emits this launcher on Linux. On macOS it emits
+the direct Cargo command and capture uses GPUI's native image renderer.
 
 Interaction runs inside the live GPUI window; it does not require compositor
 or operating-system input injection. Named and paired capture dimensions target

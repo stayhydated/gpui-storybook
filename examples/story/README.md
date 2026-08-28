@@ -76,7 +76,8 @@ Its `type-click-and-dispatch` scenario demonstrates the explicit
 `prefix` control, executes four named steps, checks three exact JSON
 postconditions, and reports the result in the Scenarios tab or MCP.
 
-On Linux, exercise the examples in gallery or dock mode with the `mcp` feature:
+On Linux or macOS, exercise the examples in gallery or dock mode with the `mcp`
+feature:
 
 ```bash
 GPUI_STORYBOOK_MCP_STDIO=1 \
@@ -86,8 +87,9 @@ cargo run -p gpui-storybook-example-story --features mcp
 
 Install `gpui-storybook-launch` and place it before the Cargo command as
 documented in the automation guide. The application remains on GPUI's normal
-Wayland backend and receives compositor-driven frame callbacks. The `mcp`
-feature is unsupported on macOS and Windows.
+Wayland backend and receives compositor-driven frame callbacks. On macOS, use
+the Cargo command directly; GPUI's native image renderer supplies capture. The
+`mcp` feature is unsupported on Windows.
 
 Switch to **Dock workspace** to run the identical executor through the dock
 host. Rediscover registered actions after each launch before dispatching one.

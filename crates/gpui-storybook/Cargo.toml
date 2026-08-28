@@ -34,7 +34,7 @@ unic-langid = { workspace = true }
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 gpui_tokio = { workspace = true }
 
-[target.'cfg(target_os = "linux")'.dependencies]
+[target.'cfg(any(target_os = "linux", target_os = "macos"))'.dependencies]
 gpui-storybook-mcp = { optional = true, workspace = true }
 
 [target.'cfg(unix)'.dependencies]

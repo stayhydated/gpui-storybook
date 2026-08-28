@@ -142,11 +142,12 @@ fresh** recreates the concrete story entity, rebinds the workbench control
 target and focus handle, applies initial controls and presentation, executes the
 steps, evaluates exact semantic postconditions, and optionally captures a PNG.
 The standard `gpui_storybook::init` path installs this live in-process runner,
-so **Run fresh** works in an ordinary application launch. On Linux, the `mcp`
-feature connects remote tools and capture support to the same controller. The
-sticky toolbar keeps **Reset** available while scenario rows scroll. It recreates the
-selected story at its constructor defaults, rebinds the same runtime adapters,
-and clears the displayed run result without executing a scenario.
+so **Run fresh** works in an ordinary application launch. On Linux and macOS,
+the `mcp` feature connects remote tools and capture support to the same
+controller. The sticky toolbar keeps **Reset** available while scenario rows
+scroll. It recreates the selected story at its constructor defaults, rebinds the
+same runtime adapters, and clears the displayed run result without executing a
+scenario.
 
 During a run, the panel marks steps as running or queued. A completed run shows
 passed, failed, and unexecuted steps plus its postcondition count and capture

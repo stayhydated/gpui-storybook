@@ -1,9 +1,9 @@
 # Automation and capture
 
-On Linux, enable the `mcp` feature to inspect and open stories from another
-process or to capture the rendered story region as a PNG. The feature is
-unsupported on macOS and Windows and produces a compile-time error there. The
-standard gallery and dock views attach the automation controller installed by
+On Linux or macOS, enable the `mcp` feature to inspect and open stories from
+another process or to capture the rendered story region as a PNG. The feature
+is unsupported on Windows and produces a compile-time error there. The standard
+gallery and dock views attach the automation controller installed by
 `gpui_storybook::init`.
 
 ## Enable MCP support
@@ -22,7 +22,8 @@ GPUI_STORYBOOK_MCP_STDIO=1 \
 cargo run -p my-app-storybook --features mcp
 ```
 
-Install Sway and Mesa's software graphics drivers. For Debian or Ubuntu:
+On macOS, this direct Cargo command uses GPUI's native image renderer. On Linux,
+install Sway and Mesa's software graphics drivers. For Debian or Ubuntu:
 
 ```bash
 sudo apt-get install --no-install-recommends \
@@ -43,6 +44,9 @@ private `XDG_RUNTIME_DIR`, starts Sway with wlroots' headless backend and the
 Pixman software renderer, waits for `WAYLAND_DISPLAY`, inherits MCP stdio, and
 stops Sway after the child exits. Set `GPUI_STORYBOOK_SWAY=/path/to/sway` for a
 private package extraction.
+
+On macOS, omit `gpui-storybook-launch` from the commands below. The application
+runs through Cargo directly.
 
 This launch exposes route, control, and capture tools. Generic input can invoke
 arbitrary application behavior, so enable it separately and only against a
@@ -132,7 +136,7 @@ not need a startup polling loop.
 | `storybook_set_control` | Set one control on the active story instance |
 | `storybook_reset_control` | Reset one control, or all controls when `control_key` is omitted |
 | `storybook_capture_current_story` | Capture the active story region |
-| `storybook_capture_launch_env` | Build environment variables and a Linux launcher command |
+| `storybook_capture_launch_env` | Build environment variables and a platform launch command |
 | `storybook_list_actions` | List runtime GPUI actions, documentation, and argument schemas; interaction gate required |
 | `storybook_list_interaction_targets` | List stable semantic targets and live route-relative bounds; interaction gate required |
 | `storybook_click_target` | Click one semantic target exactly once; interaction gate required |
@@ -404,8 +408,8 @@ cargo run -p my-app-storybook --features mcp
 
 Storybook opens the route, creates missing parent directories, writes the PNG,
 and exits after capture. Capture startup disables preference persistence and
-uses the deterministic light presentation. Wrap this command with
-`gpui-storybook-launch` as shown above.
+uses the deterministic light presentation. On Linux, wrap this command with
+`gpui-storybook-launch` as shown above. On macOS, use the direct Cargo command.
 
 | Environment variable | Meaning |
 |---|---|
@@ -419,10 +423,10 @@ Set width and height together, and make both values greater than zero.
 `WGPU_CAPTURE_FRAME`, when present, must also be greater than zero.
 `storybook_capture_launch_env` returns an `env` map and a `command` array.
 Merge every `env` entry into the child process environment before executing
-`command`. The command invokes the installed
+`command`. On Linux, the command invokes the installed
 `gpui-storybook-launch`, which creates the private Wayland runtime, waits for
-headless Sway, and then runs Cargo. It does not inline the capture or MCP
-variables.
+headless Sway, and then runs Cargo. On macOS, it invokes Cargo directly. It does
+not inline the capture or MCP variables.
 
 ## Capture a live session
 
@@ -454,10 +458,10 @@ batch and can observe intermediate rendered state. A successful capture result
 contains the request ID, actual path, rendered pixel dimensions, and story
 metadata.
 
-`storybook_capture_launch_env` can construct the environment and Linux launcher
-command for an external host. It accepts a `story_key` plus optional output
-path, frame, paired dimensions, package, binary, feature list, and stdio selection.
-It also accepts a named viewport when paired dimensions are omitted.
+`storybook_capture_launch_env` can construct the environment and platform
+launch command for an external host. It accepts a `story_key` plus optional
+output path, frame, paired dimensions, package, binary, feature list, and stdio
+selection. It also accepts a named viewport when paired dimensions are omitted.
 
 ## Understand capture bounds and size
 

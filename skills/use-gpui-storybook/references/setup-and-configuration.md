@@ -20,12 +20,12 @@ Use the facade's startup order:
 Opening the window before step 5 can render a first frame with default
 preferences.
 
-The `mcp` feature supports Linux and produces a compile-time error on macOS and
+The `mcp` feature supports Linux and macOS and produces a compile-time error on
 Windows. Run Linux MCP and startup-capture sessions through
 `gpui-storybook-launch`, which owns Sway's wlroots headless lifecycle. This
 preserves the normal Wayland-backed application path while providing an
-in-memory compositor; see the automation reference for the command and runtime
-packages.
+in-memory compositor. On macOS, launch Cargo directly and use GPUI's native
+image renderer; see the automation reference for both platform commands.
 
 ## Locale contract
 

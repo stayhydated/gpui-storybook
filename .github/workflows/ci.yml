@@ -53,14 +53,13 @@ jobs:
         if: runner.os == 'Linux'
         run: cargo test --workspace --all-features --locked
 
-      - name: Run macOS tests outside Linux-only MCP crates
+      - name: Run macOS tests with every supported feature
         if: runner.os == 'macOS'
         run: >-
-          cargo test --workspace --locked
+          cargo test --workspace --all-features --locked
           --exclude gpui-storybook-launch
-          --exclude gpui-storybook-mcp
 
-      - name: Run Windows tests outside Linux-only MCP crates
+      - name: Run Windows tests outside unsupported MCP crates
         if: runner.os == 'Windows'
         env:
           RUSTC_WRAPPER: ""

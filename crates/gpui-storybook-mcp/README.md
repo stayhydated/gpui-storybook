@@ -1,9 +1,9 @@
 # gpui-storybook-mcp
 
 `gpui-storybook-mcp` exposes typed MCP tools and frame-capture launch helpers
-for a live GPUI Storybook window on Linux. macOS and Windows are unsupported;
-building this crate or enabling the facade's `mcp` feature on either target
-produces a compile-time error.
+for a live GPUI Storybook window on Linux and macOS. Windows is unsupported;
+building this crate or enabling the facade's `mcp` feature there produces a
+compile-time error.
 
 Applications should normally enable the `mcp` feature on
 [`gpui-storybook`](../gpui-storybook/README.md). The facade installs the
@@ -28,6 +28,9 @@ The `command` returned by `storybook_capture_launch_env` invokes this launcher;
 its separate `env` map must be merged into the child process environment before
 executing that command. Set `GPUI_STORYBOOK_SWAY` when Sway comes from a private
 package extraction.
+
+On macOS, the returned command invokes Cargo directly. Capture uses GPUI's
+native image renderer and does not require the Linux Sway launcher.
 
 ```toml
 [dependencies]

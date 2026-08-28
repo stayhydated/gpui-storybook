@@ -5,16 +5,16 @@ diagnosing automation.
 
 ## Enable automation
 
-On Linux, forward the facade feature:
+On Linux or macOS, forward the facade feature:
 
 ```toml
 [features]
 mcp = ["gpui-storybook/mcp"]
 ```
 
-The `mcp` feature is unsupported on macOS and Windows and produces a
-compile-time error there. Set `GPUI_STORYBOOK_MCP_STDIO=1` to serve MCP over
-stdio. Route tracing and diagnostic logs to standard error.
+The `mcp` feature is unsupported on Windows and produces a compile-time error
+there. Set `GPUI_STORYBOOK_MCP_STDIO=1` to serve MCP over stdio. Route tracing
+and diagnostic logs to standard error.
 
 On Linux, install Sway plus `libgl1-mesa-dri` and `mesa-vulkan-drivers`, then
 install the reusable launcher and run stdio and startup-capture sessions
@@ -30,8 +30,9 @@ The launcher provides a compatibility seat, window management, bounded socket
 readiness, and frame callbacks while retaining GPUI's normal Wayland backend.
 It selects the headless backend and software Pixman renderer, inherits MCP
 stdio, and stops Sway when the child exits. Set `GPUI_STORYBOOK_SWAY` for a
-private Sway executable. The launch-env tool always emits this Linux launcher
-command.
+private Sway executable. The launch-env tool emits this launcher command on
+Linux. On macOS, it emits Cargo directly and GPUI's native image renderer owns
+capture.
 
 ### Verify raw stdio in this repository
 
@@ -228,9 +229,10 @@ Capture startup disables persistence and forces light appearance, the
 uses the same presentation with temporary storage.
 `storybook_capture_launch_env` returns an `env` map and a `command` array. Merge
 every `env` entry into the child process environment before executing
-`command`; the command invokes the installed launcher, which creates a
-private Wayland runtime, waits for headless Sway, and then runs Cargo. It does
-not inline the capture or MCP variables.
+`command`. On Linux, the command invokes the installed launcher, which creates
+a private Wayland runtime, waits for headless Sway, and then runs Cargo. On
+macOS, it invokes Cargo directly. It does not inline the capture or MCP
+variables.
 
 Captures exclude gallery or dock chrome. A substory route crops to its section.
 Paired dimensions target the story region rather than collapsing the complete
