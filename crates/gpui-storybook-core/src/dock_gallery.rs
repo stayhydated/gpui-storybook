@@ -37,7 +37,7 @@ use gpui_component::{
 };
 use gpui_storybook_components::{StoryDrag, StorySidebarItem};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     rc::Rc,
     sync::{LazyLock, Mutex},
 };
@@ -513,6 +513,12 @@ impl Render for StorySidebar {
                 }
             })
             .collect::<Vec<_>>();
+        let show_group_labels = story_metadata
+            .iter()
+            .map(|story| story.group.as_deref())
+            .collect::<BTreeSet<_>>()
+            .len()
+            > 1;
         let groups = group_matching_stories(&story_metadata, query.as_ref());
 
         Sidebar::new("story-sidebar")
@@ -589,7 +595,8 @@ impl Render for StorySidebar {
                             })
                             .collect();
 
-                        SidebarGroup::new(group.unwrap_or_default()).children(menu_items)
+                        SidebarGroup::new(group.filter(|_| show_group_labels).unwrap_or_default())
+                            .children(menu_items)
                     })
                     .collect::<Vec<_>>(),
             )

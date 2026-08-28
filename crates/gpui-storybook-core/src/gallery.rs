@@ -25,7 +25,10 @@ use gpui_component::{
     sidebar::{Sidebar, SidebarGroup, SidebarMenu, SidebarMenuItem},
     v_flex,
 };
-use std::{borrow::Borrow, collections::BTreeMap};
+use std::{
+    borrow::Borrow,
+    collections::{BTreeMap, BTreeSet},
+};
 
 /// Searchable gallery host with independently toggled navigation and workbench
 /// sidebars around a story canvas centered within the available main pane.
@@ -258,6 +261,13 @@ impl Gallery {
                 .or_default()
                 .push((filtered_index, story.clone()));
         }
+        let show_group_labels = self
+            .stories
+            .iter()
+            .map(|story| story.read(cx).sidebar_group())
+            .collect::<BTreeSet<_>>()
+            .len()
+            > 1;
 
         let groups = groups.into_iter().map(|(group, sections)| {
             let menu_items = sections.into_iter().flat_map(|(section, stories)| {
@@ -295,7 +305,7 @@ impl Gallery {
                 }
             });
 
-            SidebarGroup::new(group.unwrap_or_default())
+            SidebarGroup::new(group.filter(|_| show_group_labels).unwrap_or_default())
                 .child(SidebarMenu::new().children(menu_items))
         });
 

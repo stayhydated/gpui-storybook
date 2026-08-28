@@ -952,11 +952,18 @@ impl StoryWorkbench {
     }
 
     fn render_controls(&self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        if self.active_story(cx).is_none() {
+            return v_flex()
+                .p_4()
+                .text_color(cx.theme().muted_foreground)
+                .child("Select a story")
+                .into_any_element();
+        }
         let Some(target) = self.active_target(cx) else {
             return v_flex()
                 .p_4()
                 .text_color(cx.theme().muted_foreground)
-                .child("This story has no controls.")
+                .child("No controls")
                 .into_any_element();
         };
         let specs = target.specs().to_vec();
@@ -967,7 +974,7 @@ impl StoryWorkbench {
             .p_4()
             .gap_1()
             .child(
-                h_flex().justify_between().child("Story controls").child(
+                h_flex().justify_end().child(
                     Button::new("reset-all-controls")
                         .label("Reset all")
                         .xsmall()
@@ -1122,24 +1129,24 @@ impl StoryWorkbench {
     }
 
     fn render_inspect(&self, cx: &mut Context<Self>) -> AnyElement {
-        let story = self.active_story(cx);
-        let (key, source, source_url) = story
-            .as_ref()
-            .map(|story| {
-                let story = story.read(cx);
-                let key = story.story_key_label().unwrap_or("unregistered").to_owned();
-                let source_file = story.source_file_label().unwrap_or("unknown source");
-                let source = format!(
-                    "{}:{}",
-                    source_file,
-                    story.source_line().unwrap_or_default()
-                );
-                let source_url = story
-                    .registration_metadata()
-                    .and_then(|metadata| story_source_url(metadata.crate_dir(), source_file));
-                (key, source, source_url)
-            })
-            .unwrap_or_else(|| ("No active story".to_owned(), String::new(), None));
+        let Some(story) = self.active_story(cx) else {
+            return v_flex()
+                .p_4()
+                .text_color(cx.theme().muted_foreground)
+                .child("Select a story")
+                .into_any_element();
+        };
+        let story = story.read(cx);
+        let key = story.story_key_label().unwrap_or("unregistered").to_owned();
+        let source_file = story.source_file_label().unwrap_or("unknown source");
+        let source = format!(
+            "{}:{}",
+            source_file,
+            story.source_line().unwrap_or_default()
+        );
+        let source_url = story
+            .registration_metadata()
+            .and_then(|metadata| story_source_url(metadata.crate_dir(), source_file));
 
         let source = source_url
             .map(|url| {
@@ -1238,7 +1245,7 @@ impl StoryWorkbench {
             return v_flex()
                 .p_4()
                 .text_color(cx.theme().muted_foreground)
-                .child("Select a story to inspect its scenarios.")
+                .child("Select a story")
                 .into_any_element();
         };
         let story = story.read(cx);
@@ -1249,7 +1256,7 @@ impl StoryWorkbench {
             return v_flex()
                 .p_4()
                 .text_color(cx.theme().muted_foreground)
-                .child("This story has no declared scenarios.")
+                .child("No scenarios")
                 .into_any_element();
         }
 
@@ -1360,12 +1367,7 @@ impl StoryWorkbench {
                 })
                 .child(v_flex().gap_1().children(step_rows))
                 .when_some(run, |this, run| match run {
-                    ScenarioRunState::Running { .. } => this.child(
-                        div()
-                            .text_xs()
-                            .text_color(cx.theme().muted_foreground)
-                            .child("Recreated the story and started a fresh run."),
-                    ),
+                    ScenarioRunState::Running { .. } => this,
                     ScenarioRunState::Finished { result, .. } => match result.as_ref() {
                         Ok(result) => this.child(div().text_xs().child(format!(
                             "Passed · {} postconditions · {}",
@@ -1391,13 +1393,6 @@ impl StoryWorkbench {
             .id("workbench-scenarios")
             .p_4()
             .gap_2()
-            .child("Story scenarios")
-            .child(
-                div()
-                    .text_xs()
-                    .text_color(cx.theme().muted_foreground)
-                    .child("Every run recreates the story before controls, steps, postconditions, and capture."),
-            )
             .children(scenario_rows)
             .into_any_element()
     }
@@ -1407,36 +1402,20 @@ impl StoryWorkbench {
             return v_flex()
                 .id("workbench-actions")
                 .p_4()
-                .gap_2()
-                .child("Story actions")
-                .child(
-                    div()
-                        .text_color(cx.theme().muted_foreground)
-                        .child("Select a story to inspect its actions."),
-                )
+                .text_color(cx.theme().muted_foreground)
+                .child("Select a story")
                 .into_any_element();
         };
-        let (story_key, action_scope_focus) = {
+        let action_scope_focus = {
             let story = story.read(cx);
-            (
-                story
-                    .story_key_label()
-                    .unwrap_or("unregistered story")
-                    .to_owned(),
-                story.action_scope_focus_handle(),
-            )
+            story.action_scope_focus_handle()
         };
         let Some(action_scope_focus) = action_scope_focus else {
             return v_flex()
                 .id("workbench-actions")
                 .p_4()
-                .gap_2()
-                .child("Story actions")
-                .child(
-                    div()
-                        .text_color(cx.theme().muted_foreground)
-                        .child("This story does not expose an action scope."),
-                )
+                .text_color(cx.theme().muted_foreground)
+                .child("No action scope")
                 .into_any_element();
         };
         let documentation = cx.action_documentation();
@@ -1509,26 +1488,11 @@ impl StoryWorkbench {
             .id("workbench-actions")
             .p_4()
             .gap_2()
-            .child("Story actions")
-            .child(
-                div()
-                    .text_xs()
-                    .text_color(cx.theme().muted_foreground)
-                    .child(format!("Scope: {story_key}")),
-            )
-            .child(
-                div()
-                    .text_xs()
-                    .text_color(cx.theme().muted_foreground)
-                    .child(
-                        "Only actions exposed at the selected story's explicit root scope are shown. Nested controls and Storybook shell actions are excluded.",
-                    ),
-            )
             .when(action_rows.len() == 0, |this| {
                 this.child(
                     div()
                         .text_color(cx.theme().muted_foreground)
-                        .child("The selected story exposes no default-buildable actions."),
+                        .child("No actions"),
                 )
             })
             .children(action_rows)
@@ -1575,30 +1539,26 @@ impl StoryWorkbench {
             .p_4()
             .gap_3()
             .child(
-                h_flex()
-                    .justify_between()
-                    .gap_2()
-                    .child("Window performance")
-                    .child(
-                        h_flex()
-                            .gap_1()
-                            .child(
-                                Button::new("performance-refresh")
-                                    .label("Refresh")
-                                    .xsmall()
-                                    .on_click(|_, window, _| {
-                                        window.refresh();
-                                    }),
-                            )
-                            .child(
-                                Button::new("performance-cycle-overlay")
-                                    .label(format!("Overlay: {overlay_mode}"))
-                                    .xsmall()
-                                    .on_click(|_, window, _| {
-                                        window.cycle_debug_frame_overlay_mode();
-                                    }),
-                            ),
-                    ),
+                h_flex().justify_end().gap_2().child(
+                    h_flex()
+                        .gap_1()
+                        .child(
+                            Button::new("performance-refresh")
+                                .label("Refresh")
+                                .xsmall()
+                                .on_click(|_, window, _| {
+                                    window.refresh();
+                                }),
+                        )
+                        .child(
+                            Button::new("performance-cycle-overlay")
+                                .label(format!("Overlay: {overlay_mode}"))
+                                .xsmall()
+                                .on_click(|_, window, _| {
+                                    window.cycle_debug_frame_overlay_mode();
+                                }),
+                        ),
+                ),
             )
             .child(
                 div()
@@ -1690,19 +1650,6 @@ impl Render for StoryWorkbench {
         self.sync_theme_editors(window, cx);
 
         let active_story = self.active_story(cx);
-        let header = active_story
-            .as_ref()
-            .map(|story| {
-                let story = story.read(cx);
-                let title = story.display_title(cx);
-                let description = story.display_description(cx);
-                if description.is_empty() {
-                    title
-                } else {
-                    format!("{title} — {description}")
-                }
-            })
-            .unwrap_or_else(|| "No active story".to_owned());
         let variants = self.state.read(cx).variants(cx);
         let presentation = self.state.read(cx).presentation();
         let active_story_id = active_story.map(|story| story.entity_id());
@@ -1720,7 +1667,6 @@ impl Render for StoryWorkbench {
                     .gap_2()
                     .border_b_1()
                     .border_color(cx.theme().border)
-                    .child(div().text_sm().child(header))
                     .when(!variants.is_empty(), |this| {
                         this.child(
                             h_flex()
