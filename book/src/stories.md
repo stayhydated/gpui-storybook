@@ -226,7 +226,9 @@ request one final PNG. The Scenarios workbench tab and MCP both use the shared
 interaction executor. Every invocation recreates the concrete story entity and
 rebinds its controls and focus before applying the scenario, so repeated runs
 start from constructor defaults. A partial destructive run is reported and is
-never resumed or retried.
+never resumed or retried. Standard `gpui_storybook::init` installs the live
+runner used by the workbench; the `mcp` feature connects remote tools and
+capture support to that controller.
 
 For a component-derived story, expose an expression that returns the same
 vector:

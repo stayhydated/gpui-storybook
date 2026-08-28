@@ -51,6 +51,9 @@ Stories can also declare named scenarios made from the same typed controls,
 semantic targets, actions, postconditions, and optional capture used by live
 automation. The Scenarios tab and MCP both recreate the concrete story before
 every run, then report named step outcomes without retrying partial input.
+Normal `gpui_storybook::init` installs the in-process scenario runner, so the
+workbench's **Run fresh** button works without enabling `mcp`; that feature adds
+remote tools and capture support to the same live controller.
 
 Registration macros also capture Rust documentation and static control shapes.
 Export the linked inventory as deterministic JSON without opening a window:

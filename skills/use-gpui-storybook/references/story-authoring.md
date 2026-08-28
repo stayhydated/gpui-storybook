@@ -117,7 +117,9 @@ Keep scenario keys unique within a story and step names diagnostic. Prefer
 semantic targets and exact `storybook_value` postconditions to coordinate
 assertions. Treat runs as destructive and non-idempotent: report partial
 progress, then start a new fresh run after fixing the cause; never resume or
-automatically retry input.
+automatically retry input. The standard `gpui_storybook::init` path installs
+the live in-process runner used by the Scenarios tab. Enable `mcp` when remote
+tools or capture need to share that controller.
 
 ## Export static registration documentation
 

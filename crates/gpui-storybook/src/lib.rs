@@ -55,9 +55,9 @@
 //! - `dock`: re-exports the dock workspace helpers from `gpui-storybook-core`
 //! - `inspector`: adds GPUI Inspector activation and story-root metadata; the
 //!   Inspect tab's story key and source remain part of the base workbench
-//! - `mcp`: installs a default automation controller during [`init`] and
-//!   re-exports MCP automation and capture helpers. Generic in-process input
-//!   tools are advertised only when
+//! - `mcp`: serves the live controller installed by [`init`] over MCP and
+//!   re-exports automation and capture helpers. Generic remote input tools are
+//!   advertised only when
 //!   `GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1`; typed controls remain available
 //!   without that capability.
 //! - `performance`: enables GPUI window profiler histograms and the debug frame
@@ -526,9 +526,10 @@ where
 /// Initializes Storybook and starts loading one consumer's local preferences.
 ///
 /// The facade installs the GPUI Tokio runtime, component and Storybook state,
-/// localization, story registrations, and optional automation hooks. Await the
-/// returned task before opening the first window so saved theme and language
-/// intent is applied before the first frame.
+/// localization, story registrations, the live scenario controller, and
+/// optional external automation hooks. Await the returned task before opening
+/// the first window so saved theme and language intent is applied before the
+/// first frame.
 ///
 /// The active runtime `storybook.toml` may provide launch-only preference
 /// overrides. Values supplied through [`StorybookOptions::with_overrides`] take
@@ -693,16 +694,26 @@ where
             category: "preference_resolution".to_owned(),
         }
     })?;
+    install_live_automation(cx);
     cx.set_global(StorybookInitialized);
 
     Ok(cx.spawn(async move |_cx| {
         let ready = readiness.await;
         #[cfg(feature = "mcp")]
         {
-            _cx.update(init_mcp_automation);
+            _cx.update(start_mcp_automation);
         }
         ready
     }))
+}
+
+fn install_live_automation(cx: &mut ::gpui::App) {
+    if gpui_storybook_core::automation::default_storybook_automation(cx).is_none() {
+        gpui_storybook_core::automation::set_default_storybook_automation(
+            cx,
+            gpui_storybook_core::automation::StorybookAutomation::new(),
+        );
+    }
 }
 
 /// Returns the read-only saved and resolved preference snapshot after
@@ -716,14 +727,9 @@ pub fn try_preference_state(cx: &::gpui::App) -> Option<&PreferenceState> {
 }
 
 #[cfg(feature = "mcp")]
-fn init_mcp_automation(cx: &mut ::gpui::App) {
+fn start_mcp_automation(cx: &mut ::gpui::App) {
     let automation = gpui_storybook_core::automation::default_storybook_automation(cx)
-        .unwrap_or_else(|| {
-            gpui_storybook_core::automation::set_default_storybook_automation(
-                cx,
-                gpui_storybook_mcp::StorybookAutomation::new(),
-            )
-        });
+        .expect("gpui-storybook init should install live automation before MCP startup");
 
     if gpui_storybook_mcp::stdio_requested() {
         match gpui_storybook_mcp::start_stdio(automation.clone()) {
@@ -898,7 +904,6 @@ fn validate_unique_story_keys(
 mod tests {
     use super::*;
     use es_fluent::{FluentMessage, FluentMessageLookup};
-    use gpui::AppContext as _;
     use std::{
         convert::Infallible,
         path::Path,
@@ -1224,11 +1229,14 @@ mod tests {
     }
 
     #[gpui::test]
-    async fn readiness_completes_before_the_caller_constructs_a_window(
+    async fn readiness_installs_live_automation_before_the_caller_constructs_a_window(
         cx: &mut ::gpui::TestAppContext,
     ) {
         cx.executor().allow_parking();
         assert!(cx.windows().is_empty());
+        assert!(cx.update(|cx| {
+            gpui_storybook_core::automation::default_storybook_automation(cx).is_none()
+        }));
 
         let readiness = cx.update(|cx| {
             init(
@@ -1238,16 +1246,31 @@ mod tests {
             .expect("valid facade options should initialize")
         });
         assert!(cx.windows().is_empty());
+        let automation = cx
+            .update(|cx| gpui_storybook_core::automation::default_storybook_automation(cx))
+            .expect("baseline initialization should install live automation");
 
         let ready = readiness.await;
         assert_eq!(ready.persistence_status, PersistenceStatus::Ready);
         assert!(cx.windows().is_empty());
+        let ready_automation = cx
+            .update(|cx| gpui_storybook_core::automation::default_storybook_automation(cx))
+            .expect("readiness should retain live automation");
+        assert!(std::sync::Arc::ptr_eq(&automation, &ready_automation));
 
         cx.update(|cx| {
-            cx.open_window(Default::default(), |_, cx| cx.new(|_| ::gpui::EmptyView))
-                .expect("caller should be able to create a window after readiness")
+            cx.open_window(Default::default(), |window, cx| {
+                gpui_storybook_core::gallery::Gallery::view(Vec::new(), None, window, cx)
+            })
+            .expect("caller should be able to create a window after readiness")
         });
         assert_eq!(cx.windows().len(), 1);
+
+        let error = automation
+            .read_controls()
+            .await
+            .expect_err("the empty gallery should have no active story");
+        assert_eq!(error, StorybookAutomationError::NoActiveStory);
     }
 
     #[test]

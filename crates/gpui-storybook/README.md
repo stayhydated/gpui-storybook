@@ -40,7 +40,9 @@ Implement `Story::scenarios()` for explicit stories, or pass
 named interaction flows. The Scenarios workbench tab and MCP list/run tools use
 the same executor. Every scenario recreates its concrete story before applying
 controls, presentation, steps, exact semantic postconditions, and optional
-capture.
+capture. Normal `gpui_storybook::init` installs the live in-process runner, so
+**Run fresh** works in a standard `cargo run`; the `mcp` feature adds remote
+tools and capture support to that same controller.
 
 `static_story_catalog()` and the JSON export helpers read linked registration
 metadata without constructing a story or opening GPUI. The deterministic output

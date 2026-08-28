@@ -41,9 +41,10 @@ started](../../book/src/getting_started.md) for setup.
 Its named scenario proves that component-generated wrappers use the same fresh
 story, typed-control, workbench, and automation contract as explicit stories.
 
-The standard gallery and dock constructors attach the same optional automation
-host for component-derived stories. Launch with `--features mcp` for typed
-route, control, and capture tools; also set
+The standard `gpui_storybook::init`, gallery, and dock paths attach the live
+in-process scenario host for component-derived stories, so workbench runs use a
+plain application launch. Add `--features mcp` for remote typed route, control,
+and capture tools; also set
 `GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1` when generic in-process keyboard,
 action, pointer, scroll, and frame-wait tools are intentionally allowed. Use
 the explicit story example's inert `InteractionStory` when testing the complete
