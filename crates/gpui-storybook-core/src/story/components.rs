@@ -682,13 +682,15 @@ impl StoryContainer {
     /// Recreates the concrete story entity and all runtime adapters used by it.
     ///
     /// Scenario runs use this seam before applying their initial controls and
-    /// dispatching their first step. Recreating the entity is stronger than
-    /// resetting controls: story-owned counters, input buffers, subscriptions,
-    /// and other transient state return to the type's constructor defaults.
-    /// Active stories receive an `on_active(false)` callback for the old entity
-    /// and an `on_active(true)` callback for the replacement. The replacement
-    /// primary focus handle, optional action-scope focus handle, and control
-    /// target are installed atomically from the container's perspective.
+    /// dispatching their first step. The workbench's Actions and Scenarios reset
+    /// commands use the same seam without dispatching anything. Recreating the
+    /// entity is stronger than resetting controls: story-owned counters, input
+    /// buffers, subscriptions, and other transient state return to the type's
+    /// constructor defaults. Active stories receive an `on_active(false)`
+    /// callback for the old entity and an `on_active(true)` callback for the
+    /// replacement. The replacement primary focus handle, optional action-scope
+    /// focus handle, and control target are installed atomically from the
+    /// container's perspective.
     pub fn recreate_for_scenario(
         &mut self,
         window: &mut Window,

@@ -34,8 +34,11 @@ documented unit actions share one root action scope, visible Buttons dispatch
 those same actions, contextual key bindings appear in the Actions tab, and two
 scenarios recreate the story before dispatching ordered commands and checking
 the rendered `actions-scenarios-state` value. Launch with plain `cargo run` from
-the workspace root and use **Run fresh** in the Scenarios tab; MCP is needed
-when driving the same workflow through remote tools or requesting capture.
+the workspace root and use **Run fresh** in the Scenarios tab. The sticky
+Actions and Scenarios toolbars each keep **Reset** available; either action
+restores constructor defaults and clears the last scenario result without
+dispatching anything. MCP is needed when driving the same workflow through
+remote tools or requesting capture.
 
 `ButtonStory` also demonstrates an opt-in root action scope, boolean, numeric,
 and enum-select `StoryControls`, reset behavior, preview viewport presentation,

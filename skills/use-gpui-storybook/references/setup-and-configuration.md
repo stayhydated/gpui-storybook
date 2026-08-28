@@ -59,9 +59,10 @@ Dock mode persists the right dock's width, visibility, and selected tab; use
 The Actions tab reads the selected story's opt-in
 `Story::action_scope_focus_handle`, excludes nested-control and Storybook
 shell/root actions, and resolves effective bindings for that explicit scope. A
-story without an action scope exposes no inferred actions. Forward the
-performance feature when the binary should add native window timing histograms
-and GPUI's debug frame overlay:
+story without an action scope exposes no inferred actions. Its sticky toolbar's
+**Reset** action recreates the active story and rebinds that scope before the
+next dispatch. Forward the performance feature when the binary should add
+native window timing histograms and GPUI's debug frame overlay:
 
 ```toml
 [features]

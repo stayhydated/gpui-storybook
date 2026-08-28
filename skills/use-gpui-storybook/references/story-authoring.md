@@ -119,7 +119,10 @@ assertions. Treat runs as destructive and non-idempotent: report partial
 progress, then start a new fresh run after fixing the cause; never resume or
 automatically retry input. The standard `gpui_storybook::init` path installs
 the live in-process runner used by the Scenarios tab. Enable `mcp` when remote
-tools or capture need to share that controller.
+tools or capture need to share that controller. In the workbench, **Run fresh**
+executes from a recreated story; the Scenarios toolbar keeps **Reset** visible
+while rows scroll so users can recreate constructor defaults and clear the last
+result without executing a scenario.
 
 ## Export static registration documentation
 

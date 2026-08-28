@@ -53,7 +53,10 @@ automation. The Scenarios tab and MCP both recreate the concrete story before
 every run, then report named step outcomes without retrying partial input.
 Normal `gpui_storybook::init` installs the in-process scenario runner, so the
 workbench's **Run fresh** button works without enabling `mcp`; that feature adds
-remote tools and capture support to the same live controller.
+remote tools and capture support to the same live controller. The Scenarios
+toolbar keeps **Reset** visible while the rows scroll; it recreates the story
+at its constructor defaults and clears the last run result without executing a
+scenario.
 
 Registration macros also capture Rust documentation and static control shapes.
 Export the linked inventory as deterministic JSON without opening a window:
@@ -88,9 +91,11 @@ the page or component action handlers; keep it separate from a nested input's
 primary focus handle. The tab lists only default-buildable actions on that
 explicit root scope after excluding the Storybook shell/root path, and its
 **Dispatch** buttons target the same scope. Stories without an action scope
-show no inferred actions. With `performance` enabled, the Perf tab reports draw,
-dirty-to-present, presentation-interval, and input-latency percentiles and can
-cycle GPUI's frame overlay.
+show no inferred actions. Its sticky toolbar keeps **Reset** visible while
+actions scroll; Reset recreates the active story before the next dispatch. With
+`performance` enabled, the Perf tab reports draw, dirty-to-present,
+presentation-interval, and input-latency percentiles and can cycle GPUI's frame
+overlay.
 
 [`ActionsAndScenariosStory`](examples/story/src/stories/actions_scenarios_story.rs)
 shows visible Buttons, contextual shortcuts, the Actions tab, and repeatable

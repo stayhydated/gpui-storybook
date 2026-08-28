@@ -42,7 +42,9 @@ the same executor. Every scenario recreates its concrete story before applying
 controls, presentation, steps, exact semantic postconditions, and optional
 capture. Normal `gpui_storybook::init` installs the live in-process runner, so
 **Run fresh** works in a standard `cargo run`; the `mcp` feature adds remote
-tools and capture support to that same controller.
+tools and capture support to that same controller. The sticky Scenarios
+toolbar's **Reset** action recreates the story at its constructor defaults and
+clears the last run result without executing a scenario.
 
 `static_story_catalog()` and the JSON export helpers read linked registration
 metadata without constructing a story or opening GPUI. The deterministic output
@@ -75,9 +77,10 @@ The Actions tab follows the selected story's opt-in
 documentation, argument schemas, and effective key bindings on that explicit
 page/component root. Actions from nested inputs and the Storybook shell/root
 stay out of the list. Dispatch targets the same scope even while the workbench
-is focused; stories without a scope expose no inferred actions. With
-`performance` enabled, the Perf tab shows frame and input-latency percentiles
-and controls GPUI's debug frame overlay.
+is focused; stories without a scope expose no inferred actions. The sticky
+Actions toolbar's **Reset** action recreates the active story before the next
+dispatch. With `performance` enabled, the Perf tab shows frame and input-latency
+percentiles and controls GPUI's debug frame overlay.
 
 The explicit example's
 [`ActionsAndScenariosStory`](../../examples/story/src/stories/actions_scenarios_story.rs)

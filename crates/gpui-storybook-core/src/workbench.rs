@@ -1228,6 +1228,49 @@ impl StoryWorkbench {
         .detach();
     }
 
+    fn reset_active_story(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(story) = self.active_story(cx) else {
+            return;
+        };
+        story.update(cx, |story, cx| {
+            story.recreate_for_scenario(window, cx);
+        });
+        self.scenario_run = None;
+        self.rebuild_control_editors(window, cx);
+        cx.notify();
+    }
+
+    fn render_story_reset_toolbar(
+        &self,
+        button_id: &'static str,
+        header_selector: &'static str,
+        reset_selector: &'static str,
+        disabled: bool,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        h_flex()
+            .debug_selector(move || header_selector.to_owned())
+            .flex_shrink_0()
+            .justify_end()
+            .px_4()
+            .py_2()
+            .border_b_1()
+            .border_color(cx.theme().border)
+            .bg(cx.theme().background)
+            .child(
+                Button::new(button_id)
+                    .debug_selector(move || reset_selector.to_owned())
+                    .label("Reset")
+                    .xsmall()
+                    .ghost()
+                    .disabled(disabled)
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.reset_active_story(window, cx);
+                    })),
+            )
+            .into_any_element()
+    }
+
     fn scenario_progress(error: &StorybookAutomationError) -> usize {
         match error {
             StorybookAutomationError::HostDisconnected {
@@ -1262,6 +1305,13 @@ impl StoryWorkbench {
 
         let any_scenario_running =
             matches!(&self.scenario_run, Some(ScenarioRunState::Running { .. }));
+        let toolbar = self.render_story_reset_toolbar(
+            "reset-scenario-story",
+            "workbench-scenarios-sticky-header",
+            "workbench-scenarios-reset",
+            any_scenario_running,
+            cx,
+        );
 
         let scenario_rows = scenarios.into_iter().map(|scenario| {
             let run = self.scenario_run.as_ref().filter(|run| match run {
@@ -1344,6 +1394,10 @@ impl StoryWorkbench {
                         )
                         .child(
                             Button::new(format!("run-scenario-{}", scenario.key))
+                                .debug_selector({
+                                    let scenario_key = scenario.key.clone();
+                                    move || format!("run-scenario-{scenario_key}")
+                                })
                                 .label(if running { "Running…" } else { "Run fresh" })
                                 .xsmall()
                                 .disabled(any_scenario_running)
@@ -1391,9 +1445,26 @@ impl StoryWorkbench {
 
         v_flex()
             .id("workbench-scenarios")
-            .p_4()
-            .gap_2()
-            .children(scenario_rows)
+            .size_full()
+            .min_h_0()
+            .overflow_hidden()
+            .child(toolbar)
+            .child(
+                div()
+                    .debug_selector(|| "workbench-scenarios-items".to_owned())
+                    .flex_1()
+                    .min_h_0()
+                    .overflow_hidden()
+                    .child(
+                        v_flex()
+                            .size_full()
+                            .overflow_y_scrollbar()
+                            .px_4()
+                            .pb_4()
+                            .gap_2()
+                            .children(scenario_rows),
+                    ),
+            )
             .into_any_element()
     }
 
@@ -1418,11 +1489,21 @@ impl StoryWorkbench {
                 .child("No action scope")
                 .into_any_element();
         };
+        let actions = story_scoped_actions(&action_scope_focus, &self.focus_handle, window, cx);
+        let actions_empty = actions.is_empty();
+        let any_scenario_running =
+            matches!(&self.scenario_run, Some(ScenarioRunState::Running { .. }));
+        let toolbar = self.render_story_reset_toolbar(
+            "reset-action-story",
+            "workbench-actions-sticky-header",
+            "workbench-actions-reset",
+            any_scenario_running,
+            cx,
+        );
         let documentation = cx.action_documentation();
         let mut schema_generator = schemars::generate::SchemaSettings::draft2020_12()
             .with(|settings| settings.inline_subschemas = true)
             .into_generator();
-        let actions = story_scoped_actions(&action_scope_focus, &self.focus_handle, window, cx);
 
         let action_rows = actions.into_iter().map(|action| {
             let name = action.name();
@@ -1451,6 +1532,7 @@ impl StoryWorkbench {
                         .child(div().text_sm().child(name))
                         .child(
                             Button::new(format!("dispatch-action-{name}"))
+                                .debug_selector(move || format!("dispatch-action-{name}"))
                                 .label("Dispatch")
                                 .xsmall()
                                 .on_click(move |_, window, cx| {
@@ -1486,16 +1568,34 @@ impl StoryWorkbench {
 
         v_flex()
             .id("workbench-actions")
-            .p_4()
-            .gap_2()
-            .when(action_rows.len() == 0, |this| {
-                this.child(
-                    div()
-                        .text_color(cx.theme().muted_foreground)
-                        .child("No actions"),
-                )
-            })
-            .children(action_rows)
+            .size_full()
+            .min_h_0()
+            .overflow_hidden()
+            .child(toolbar)
+            .child(
+                div()
+                    .debug_selector(|| "workbench-actions-items".to_owned())
+                    .flex_1()
+                    .min_h_0()
+                    .overflow_hidden()
+                    .child(
+                        v_flex()
+                            .size_full()
+                            .overflow_y_scrollbar()
+                            .px_4()
+                            .pb_4()
+                            .gap_2()
+                            .when(actions_empty, |this| {
+                                this.child(
+                                    div()
+                                        .py_3()
+                                        .text_color(cx.theme().muted_foreground)
+                                        .child("No actions"),
+                                )
+                            })
+                            .children(action_rows),
+                    ),
+            )
             .into_any_element()
     }
 
@@ -1769,13 +1869,13 @@ impl Render for StoryWorkbench {
                 WorkbenchTab::Actions => div()
                     .flex_1()
                     .min_h_0()
-                    .overflow_y_scrollbar()
+                    .overflow_hidden()
                     .child(self.render_actions(window, cx))
                     .into_any_element(),
                 WorkbenchTab::Scenarios => div()
                     .flex_1()
                     .min_h_0()
-                    .overflow_y_scrollbar()
+                    .overflow_hidden()
                     .child(self.render_scenarios(window, cx))
                     .into_any_element(),
                 #[cfg(feature = "performance")]
@@ -1793,6 +1893,7 @@ impl Render for StoryWorkbench {
 mod tests {
     use super::*;
     use gpui::{ScrollDelta, ScrollWheelEvent, TestAppContext, VisualTestContext, point};
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     #[derive(Action, Clone, Default, Eq, PartialEq)]
     #[action(namespace = storybook_action_scope_test)]
@@ -1805,6 +1906,28 @@ mod tests {
     #[derive(Action, Clone, Default, Eq, PartialEq)]
     #[action(namespace = storybook_action_scope_test)]
     struct NestedInputAction;
+
+    gpui::actions!(
+        workbench_action_reset_test,
+        [
+            #[derive(Eq)]
+            ActionReset00,
+            #[derive(Eq)]
+            ActionReset01,
+            #[derive(Eq)]
+            ActionReset02,
+            #[derive(Eq)]
+            ActionReset03,
+            #[derive(Eq)]
+            ActionReset04,
+            #[derive(Eq)]
+            ActionReset05,
+            #[derive(Eq)]
+            ActionReset06,
+            #[derive(Eq)]
+            ActionReset07,
+        ]
+    );
 
     struct ActionScopeFixture {
         shell_focus: FocusHandle,
@@ -1904,6 +2027,128 @@ mod tests {
                         .track_focus(&self.interaction_focus)
                         .on_action(cx.listener(Self::ignore_nested_input_action)),
                 )
+        }
+    }
+
+    static ACTION_RESET_STORY_CREATIONS: AtomicUsize = AtomicUsize::new(0);
+
+    struct ActionResetStory {
+        focus_handle: FocusHandle,
+    }
+
+    impl crate::controls::StoryControls for ActionResetStory {}
+
+    impl Focusable for ActionResetStory {
+        fn focus_handle(&self, _: &App) -> FocusHandle {
+            self.focus_handle.clone()
+        }
+    }
+
+    impl crate::story::Story for ActionResetStory {
+        fn title(_: &App) -> String {
+            "Action reset story".to_owned()
+        }
+
+        fn new_view(_: &mut Window, cx: &mut App) -> Entity<Self> {
+            ACTION_RESET_STORY_CREATIONS.fetch_add(1, Ordering::SeqCst);
+            cx.new(|cx| Self {
+                focus_handle: cx.focus_handle(),
+            })
+        }
+
+        fn action_scope_focus_handle(&self, _: &App) -> Option<FocusHandle> {
+            Some(self.focus_handle.clone())
+        }
+    }
+
+    impl ActionResetStory {
+        fn ignore_action<A: Action>(&mut self, _: &A, _: &mut Window, _: &mut Context<Self>) {}
+    }
+
+    impl Render for ActionResetStory {
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            div()
+                .track_focus(&self.focus_handle)
+                .on_action(cx.listener(Self::ignore_action::<ActionReset00>))
+                .on_action(cx.listener(Self::ignore_action::<ActionReset01>))
+                .on_action(cx.listener(Self::ignore_action::<ActionReset02>))
+                .on_action(cx.listener(Self::ignore_action::<ActionReset03>))
+                .on_action(cx.listener(Self::ignore_action::<ActionReset04>))
+                .on_action(cx.listener(Self::ignore_action::<ActionReset05>))
+                .on_action(cx.listener(Self::ignore_action::<ActionReset06>))
+                .on_action(cx.listener(Self::ignore_action::<ActionReset07>))
+        }
+    }
+
+    struct ActionResetWorkbenchFixture {
+        story: Entity<StoryContainer>,
+        workbench: Entity<StoryWorkbench>,
+    }
+
+    impl ActionResetWorkbenchFixture {
+        fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
+            let story = StoryContainer::panel::<ActionResetStory>(window, cx);
+            let state = cx.new(|_| WorkbenchState::new(Some(story.clone())));
+            let workbench =
+                cx.new(|cx| StoryWorkbench::new(state, WorkbenchTab::Controls, window, cx));
+            Self { story, workbench }
+        }
+    }
+
+    impl Render for ActionResetWorkbenchFixture {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            h_flex()
+                .size_full()
+                .child(div().flex_1().min_w_0().h_full().child(self.story.clone()))
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .h_full()
+                        .child(self.workbench.clone()),
+                )
+        }
+    }
+
+    static SCENARIO_RESET_STORY_CREATIONS: AtomicUsize = AtomicUsize::new(0);
+
+    struct ScenarioResetStory {
+        focus_handle: FocusHandle,
+    }
+
+    impl crate::controls::StoryControls for ScenarioResetStory {}
+
+    impl Focusable for ScenarioResetStory {
+        fn focus_handle(&self, _: &App) -> FocusHandle {
+            self.focus_handle.clone()
+        }
+    }
+
+    impl crate::story::Story for ScenarioResetStory {
+        fn title(_: &App) -> String {
+            "Scenario reset story".to_owned()
+        }
+
+        fn new_view(_: &mut Window, cx: &mut App) -> Entity<Self> {
+            SCENARIO_RESET_STORY_CREATIONS.fetch_add(1, Ordering::SeqCst);
+            cx.new(|cx| Self {
+                focus_handle: cx.focus_handle(),
+            })
+        }
+
+        fn scenarios() -> Vec<StoryScenario> {
+            let mut scenarios = vec![StoryScenario::new("restore-defaults", "Restore defaults")];
+            scenarios
+                .extend((0..20).map(|ix| {
+                    StoryScenario::new(format!("example-{ix}"), format!("Example {ix}"))
+                }));
+            scenarios
+        }
+    }
+
+    impl Render for ScenarioResetStory {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            div()
         }
     }
 
@@ -2079,6 +2324,121 @@ mod tests {
         assert_eq!(action_names, vec![StoryAction.name()]);
     }
 
+    #[gpui::test]
+    fn action_reset_toolbar_stays_visible_and_recreates_the_story(cx: &mut TestAppContext) {
+        ACTION_RESET_STORY_CREATIONS.store(0, Ordering::SeqCst);
+        let window = cx.update(|cx| {
+            gpui_component::init(cx);
+            let options = gpui::WindowOptions {
+                window_bounds: Some(gpui::WindowBounds::Windowed(gpui::Bounds::centered(
+                    None,
+                    size(px(800.), px(360.)),
+                    cx,
+                ))),
+                ..Default::default()
+            };
+            cx.open_window(options, |window, cx| {
+                cx.new(|cx| ActionResetWorkbenchFixture::new(window, cx))
+            })
+            .expect("action reset test window")
+        });
+        let mut visual_cx = VisualTestContext::from_window(window.into(), cx);
+        let fixture = window
+            .root(&mut visual_cx)
+            .expect("fixture should be the window root");
+        let workbench = fixture.read_with(&visual_cx, |fixture, _| fixture.workbench.clone());
+        visual_cx.update(|window, cx| {
+            _ = window.draw(cx);
+            workbench.update(cx, |workbench, cx| {
+                workbench.selected_tab = WorkbenchTab::Actions;
+                workbench.scenario_run = Some(ScenarioRunState::Finished {
+                    story_key: String::new(),
+                    scenario: StoryScenario::new("finished", "Finished"),
+                    result: Box::new(Err(StorybookAutomationError::AutomationBusy)),
+                });
+                cx.notify();
+            });
+            _ = window.draw(cx);
+        });
+        assert_eq!(ACTION_RESET_STORY_CREATIONS.load(Ordering::SeqCst), 1);
+
+        let header_before = visual_cx
+            .debug_bounds("workbench-actions-sticky-header")
+            .expect("Actions toolbar should render");
+        let reset = visual_cx
+            .debug_bounds("workbench-actions-reset")
+            .expect("Actions toolbar Reset button should render");
+        let first_action_selector = "dispatch-action-workbench_action_reset_test::ActionReset00";
+        let dispatch = visual_cx
+            .debug_bounds(first_action_selector)
+            .expect("action Dispatch button should render");
+        assert!(
+            reset.bottom() <= dispatch.top(),
+            "Reset should render above action rows: reset={reset:?}, dispatch={dispatch:?}"
+        );
+
+        let items = visual_cx
+            .debug_bounds("workbench-actions-items")
+            .expect("action rows should render in their own scroll region");
+        visual_cx.simulate_event(ScrollWheelEvent {
+            position: items.center(),
+            delta: ScrollDelta::Pixels(point(px(0.), px(-180.))),
+            ..Default::default()
+        });
+        visual_cx.update(|window, cx| {
+            _ = window.draw(cx);
+        });
+        let header_after = visual_cx
+            .debug_bounds("workbench-actions-sticky-header")
+            .expect("Actions toolbar should remain rendered after scrolling");
+        let dispatch_after = visual_cx
+            .debug_bounds(first_action_selector)
+            .expect("action rows should remain laid out after scrolling");
+        assert_eq!(header_after.origin, header_before.origin);
+        assert!(
+            dispatch_after.origin.y < dispatch.origin.y,
+            "action rows should move beneath the fixed toolbar: before={dispatch:?}, after={dispatch_after:?}"
+        );
+
+        let reset = visual_cx
+            .debug_bounds("workbench-actions-reset")
+            .expect("Actions toolbar Reset button should remain visible");
+        visual_cx.simulate_click(reset.center(), gpui::Modifiers::none());
+        visual_cx.run_until_parked();
+        visual_cx.update(|window, cx| {
+            _ = window.draw(cx);
+        });
+        assert_eq!(ACTION_RESET_STORY_CREATIONS.load(Ordering::SeqCst), 2);
+        assert!(workbench.read_with(&visual_cx, |workbench, _| {
+            workbench.scenario_run.is_none()
+        }));
+        assert!(
+            visual_cx.debug_bounds(first_action_selector).is_some(),
+            "Actions should rebind to the recreated story scope"
+        );
+
+        visual_cx.update(|window, cx| {
+            workbench.update(cx, |workbench, cx| {
+                workbench.scenario_run = Some(ScenarioRunState::Running {
+                    story_key: String::new(),
+                    scenario: StoryScenario::new("running", "Running"),
+                });
+                cx.notify();
+            });
+            _ = window.draw(cx);
+        });
+        let reset = visual_cx
+            .debug_bounds("workbench-actions-reset")
+            .expect("disabled Actions Reset button should remain visible");
+        visual_cx.simulate_click(reset.center(), gpui::Modifiers::none());
+        visual_cx.run_until_parked();
+        assert_eq!(
+            ACTION_RESET_STORY_CREATIONS.load(Ordering::SeqCst),
+            2,
+            "Actions Reset must be inert while a scenario is running"
+        );
+    }
+
     #[test]
     fn scenario_progress_reports_only_completed_steps() {
         assert_eq!(
@@ -2092,6 +2452,115 @@ mod tests {
         assert_eq!(
             StoryWorkbench::scenario_progress(&StorybookAutomationError::AutomationBusy),
             0
+        );
+    }
+
+    #[gpui::test]
+    fn scenario_reset_toolbar_stays_visible_recreates_the_story_and_clears_the_result(
+        cx: &mut TestAppContext,
+    ) {
+        SCENARIO_RESET_STORY_CREATIONS.store(0, Ordering::SeqCst);
+        let window = cx.update(|cx| {
+            gpui_component::init(cx);
+            cx.open_window(Default::default(), |window, cx| {
+                let story = StoryContainer::panel::<ScenarioResetStory>(window, cx);
+                let state = cx.new(|_| WorkbenchState::new(Some(story)));
+                cx.new(|cx| StoryWorkbench::new(state, WorkbenchTab::Scenarios, window, cx))
+            })
+            .expect("scenario reset test window")
+        });
+        let mut visual_cx = VisualTestContext::from_window(window.into(), cx);
+        let workbench = window
+            .root(&mut visual_cx)
+            .expect("workbench should be the window root");
+        visual_cx.update(|window, cx| {
+            workbench.update(cx, |workbench, cx| {
+                workbench.scenario_run = Some(ScenarioRunState::Finished {
+                    story_key: String::new(),
+                    scenario: StoryScenario::new("restore-defaults", "Restore defaults"),
+                    result: Box::new(Err(StorybookAutomationError::AutomationBusy)),
+                });
+                cx.notify();
+            });
+            _ = window.draw(cx);
+        });
+        assert_eq!(SCENARIO_RESET_STORY_CREATIONS.load(Ordering::SeqCst), 1);
+
+        let header_before = visual_cx
+            .debug_bounds("workbench-scenarios-sticky-header")
+            .expect("scenario toolbar should render");
+        let reset = visual_cx
+            .debug_bounds("workbench-scenarios-reset")
+            .expect("scenario toolbar Reset button should render");
+        let run = visual_cx
+            .debug_bounds("run-scenario-restore-defaults")
+            .expect("scenario Run fresh button should render");
+        assert!(
+            reset.bottom() <= run.top(),
+            "Reset should render above scenario actions: reset={reset:?}, run={run:?}"
+        );
+        assert_eq!(
+            visual_cx.debug_bounds("reset-scenario-restore-defaults"),
+            None,
+            "scenario rows should not repeat Reset"
+        );
+
+        let items = visual_cx
+            .debug_bounds("workbench-scenarios-items")
+            .expect("scenario rows should render in their own scroll region");
+        visual_cx.simulate_event(ScrollWheelEvent {
+            position: items.center(),
+            delta: ScrollDelta::Pixels(point(px(0.), px(-180.))),
+            ..Default::default()
+        });
+        visual_cx.update(|window, cx| {
+            _ = window.draw(cx);
+        });
+        let header_after = visual_cx
+            .debug_bounds("workbench-scenarios-sticky-header")
+            .expect("scenario toolbar should remain rendered after scrolling");
+        let run_after = visual_cx
+            .debug_bounds("run-scenario-restore-defaults")
+            .expect("scenario rows should remain laid out after scrolling");
+        assert_eq!(header_after.origin, header_before.origin);
+        assert!(
+            run_after.origin.y < run.origin.y,
+            "scenario rows should move beneath the fixed toolbar: before={run:?}, after={run_after:?}"
+        );
+
+        let reset = visual_cx
+            .debug_bounds("workbench-scenarios-reset")
+            .expect("scenario toolbar Reset button should remain visible");
+        visual_cx.simulate_click(reset.center(), gpui::Modifiers::none());
+        visual_cx.run_until_parked();
+        visual_cx.update(|window, cx| {
+            _ = window.draw(cx);
+        });
+
+        assert_eq!(SCENARIO_RESET_STORY_CREATIONS.load(Ordering::SeqCst), 2);
+        assert!(workbench.read_with(&visual_cx, |workbench, _| {
+            workbench.scenario_run.is_none()
+        }));
+
+        visual_cx.update(|window, cx| {
+            workbench.update(cx, |workbench, cx| {
+                workbench.scenario_run = Some(ScenarioRunState::Running {
+                    story_key: String::new(),
+                    scenario: StoryScenario::new("restore-defaults", "Restore defaults"),
+                });
+                cx.notify();
+            });
+            _ = window.draw(cx);
+        });
+        let reset = visual_cx
+            .debug_bounds("workbench-scenarios-reset")
+            .expect("disabled scenario Reset button should remain visible");
+        visual_cx.simulate_click(reset.center(), gpui::Modifiers::none());
+        visual_cx.run_until_parked();
+        assert_eq!(
+            SCENARIO_RESET_STORY_CREATIONS.load(Ordering::SeqCst),
+            2,
+            "Reset must be inert while a scenario is running"
         );
     }
 

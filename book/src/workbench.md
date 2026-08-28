@@ -142,7 +142,10 @@ target and focus handle, applies initial controls and presentation, executes the
 steps, evaluates exact semantic postconditions, and optionally captures a PNG.
 The standard `gpui_storybook::init` path installs this live in-process runner,
 so **Run fresh** works in an ordinary application launch. The `mcp` feature
-connects remote tools and capture support to the same controller.
+connects remote tools and capture support to the same controller. The sticky
+toolbar keeps **Reset** available while scenario rows scroll. It recreates the
+selected story at its constructor defaults, rebinds the same runtime adapters,
+and clears the displayed run result without executing a scenario.
 
 During a run, the panel marks steps as running or queued. A completed run shows
 passed, failed, and unexecuted steps plus its postcondition count and capture
@@ -178,7 +181,9 @@ actions.
 Each row includes action documentation, its registered JSON argument schema,
 and every effective key binding resolved for the action scope. **Dispatch**
 sends the action directly to the same scope through GPUI's normal action
-dispatcher.
+dispatcher. The sticky toolbar keeps **Reset** available while action rows
+scroll; Reset recreates the selected story and rebinds its action scope before
+the next dispatch.
 
 Parameterized actions whose type cannot be constructed from an empty object do
 not appear in GPUI's available-action list. Use typed story scenarios or the
