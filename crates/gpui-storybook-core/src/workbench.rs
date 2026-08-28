@@ -17,7 +17,7 @@ use gpui::{
     prelude::FluentBuilder as _, px, size,
 };
 use gpui_component::{
-    ActiveTheme as _, Disableable as _, Selectable as _, Sizable as _,
+    ActiveTheme as _, Disableable as _, Sizable as _,
     button::{Button, ButtonVariants as _},
     checkbox::Checkbox,
     clipboard::Clipboard,
@@ -28,6 +28,8 @@ use gpui_component::{
     link::Link,
     menu::DropdownMenu as _,
     scroll::ScrollableElement as _,
+    searchable_list::SearchableListItem,
+    select::{Select, SelectEvent, SelectState},
     slider::{Slider, SliderEvent, SliderState},
     tab::{Tab, TabBar},
     v_flex,
@@ -49,6 +51,11 @@ pub enum WorkbenchTab {
     Scenarios,
     #[cfg(feature = "performance")]
     Performance,
+}
+
+#[cfg(feature = "dock")]
+pub(crate) enum WorkbenchEvent {
+    OpenVariant(Entity<StoryContainer>),
 }
 
 impl WorkbenchTab {
@@ -86,18 +93,45 @@ pub struct WorkbenchState {
 }
 
 impl WorkbenchState {
-    pub fn new(initial_story: Option<Entity<StoryContainer>>) -> Self {
-        let mut state = Self {
-            active_group: None,
-            active_story: None,
+    /// Creates window-scoped workbench state and resolves a variant group to its
+    /// first concrete member.
+    pub fn new(initial_story: Option<Entity<StoryContainer>>, cx: &App) -> Self {
+        let (active_group, active_story) = Self::resolve_story(initial_story, cx);
+        Self {
+            active_group,
+            active_story,
             presentation: StoryPresentation::default(),
             responsive_size: None,
-        };
-        if let Some(story) = initial_story {
-            state.active_group = Some(story.clone());
-            state.active_story = Some(story);
         }
-        state
+    }
+
+    fn resolve_story(
+        story: Option<Entity<StoryContainer>>,
+        cx: &App,
+    ) -> (
+        Option<Entity<StoryContainer>>,
+        Option<Entity<StoryContainer>>,
+    ) {
+        story.map_or((None, None), |story| {
+            let (first_variant, variant_group) = {
+                let story_data = story.read(cx);
+                (
+                    story_data.variants.first().cloned(),
+                    story_data
+                        .variant_group
+                        .as_ref()
+                        .and_then(gpui::WeakEntity::upgrade),
+                )
+            };
+
+            if let Some(first_variant) = first_variant {
+                (Some(story), Some(first_variant))
+            } else if let Some(variant_group) = variant_group {
+                (Some(variant_group), Some(story))
+            } else {
+                (Some(story.clone()), Some(story))
+            }
+        })
     }
 
     /// Select a gallery or dock story, choosing its first variant when grouped.
@@ -106,9 +140,9 @@ impl WorkbenchState {
         story: Option<Entity<StoryContainer>>,
         cx: &mut Context<Self>,
     ) {
-        self.active_group = story.clone();
-        self.active_story =
-            story.and_then(|story| story.read(cx).list_members.first().cloned().or(Some(story)));
+        let (group, active_story) = Self::resolve_story(story, cx);
+        self.active_group = group;
+        self.active_story = active_story;
         self.apply_presentation(cx);
         cx.notify();
     }
@@ -131,7 +165,7 @@ impl WorkbenchState {
                     story
                         .story_key_label()
                         .is_some_and(|candidate| candidate == key),
-                    story.list_members.clone(),
+                    story.variants.clone(),
                 )
             };
             if matches {
@@ -140,9 +174,18 @@ impl WorkbenchState {
             members.iter().find_map(|member| find(member, key, cx))
         }
 
-        self.active_group = Some(story.clone());
+        self.active_group = if story.read(cx).variants.is_empty() {
+            story
+                .read(cx)
+                .variant_group
+                .as_ref()
+                .and_then(gpui::WeakEntity::upgrade)
+                .or(Some(story.clone()))
+        } else {
+            Some(story.clone())
+        };
         self.active_story = find(&story, key, cx)
-            .or_else(|| story.read(cx).list_members.first().cloned().or(Some(story)));
+            .or_else(|| story.read(cx).variants.first().cloned().or(Some(story)));
         self.apply_presentation(cx);
         cx.notify();
     }
@@ -152,13 +195,17 @@ impl WorkbenchState {
         let belongs_to_group = self.active_group.as_ref().is_some_and(|group| {
             group
                 .read(cx)
-                .list_members
+                .variants
                 .iter()
                 .any(|member| member == &story)
         });
         if belongs_to_group || self.active_group.as_ref() == Some(&story) {
+            #[cfg(feature = "dock")]
+            let variant = story.clone();
             self.active_story = Some(story);
             self.apply_presentation(cx);
+            #[cfg(feature = "dock")]
+            cx.emit(WorkbenchEvent::OpenVariant(variant));
             cx.notify();
         }
     }
@@ -174,7 +221,7 @@ impl WorkbenchState {
     pub fn variants(&self, cx: &App) -> Vec<Entity<StoryContainer>> {
         self.active_group
             .as_ref()
-            .map(|group| group.read(cx).list_members.clone())
+            .map(|group| group.read(cx).variants.clone())
             .unwrap_or_default()
     }
 
@@ -325,6 +372,27 @@ impl WorkbenchState {
     }
 }
 
+#[cfg(feature = "dock")]
+impl EventEmitter<WorkbenchEvent> for WorkbenchState {}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct StoryVariantOption {
+    id: EntityId,
+    label: SharedString,
+}
+
+impl SearchableListItem for StoryVariantOption {
+    type Value = EntityId;
+
+    fn title(&self) -> SharedString {
+        self.label.clone()
+    }
+
+    fn value(&self) -> &Self::Value {
+        &self.id
+    }
+}
+
 #[derive(Action, Clone, Eq, PartialEq)]
 #[action(namespace = storybook_workbench, no_json)]
 struct SelectControlOption {
@@ -433,10 +501,13 @@ enum ScenarioRunState {
 pub struct StoryWorkbench {
     focus_handle: FocusHandle,
     state: Entity<WorkbenchState>,
+    variant_select: Entity<SelectState<Vec<StoryVariantOption>>>,
+    variant_options: Vec<StoryVariantOption>,
     selected_tab: WorkbenchTab,
     editor_story: Option<EntityId>,
     editors: BTreeMap<String, ControlEditor>,
     editor_subscriptions: Vec<Subscription>,
+    _variant_subscription: Subscription,
     _state_subscription: Subscription,
     theme_draft: ThemeDraft,
     theme_search: Entity<InputState>,
@@ -453,7 +524,31 @@ impl StoryWorkbench {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
-        let state_subscription = cx.observe(&state, |_, _, cx| cx.notify());
+        let variant_select = cx.new(|cx| SelectState::new(Vec::new(), None, window, cx));
+        let state_for_select = state.clone();
+        let variant_subscription = cx.subscribe_in(
+            &variant_select,
+            window,
+            move |_, _, event: &SelectEvent<Vec<StoryVariantOption>>, _, cx| {
+                let SelectEvent::Confirm(Some(id)) = event else {
+                    return;
+                };
+                let variant = state_for_select
+                    .read(cx)
+                    .variants(cx)
+                    .into_iter()
+                    .find(|variant| variant.entity_id() == *id);
+                if let Some(variant) = variant {
+                    state_for_select.update(cx, |state, cx| {
+                        state.set_active_variant(variant, cx);
+                    });
+                }
+            },
+        );
+        let state_subscription = cx.observe_in(&state, window, |this, state, window, cx| {
+            this.sync_variant_select(&state, window, cx);
+            cx.notify();
+        });
         let theme_draft = ThemeDraft::new(cx.theme())
             .expect("the active GPUI Component theme must produce a workbench draft");
         let theme_search =
@@ -463,10 +558,13 @@ impl StoryWorkbench {
         let mut this = Self {
             focus_handle: cx.focus_handle(),
             state,
+            variant_select,
+            variant_options: Vec::new(),
             selected_tab,
             editor_story: None,
             editors: BTreeMap::new(),
             editor_subscriptions: Vec::new(),
+            _variant_subscription: variant_subscription,
             _state_subscription: state_subscription,
             theme_draft,
             theme_search,
@@ -475,6 +573,8 @@ impl StoryWorkbench {
             scenario_run: None,
             last_error: None,
         };
+        let state = this.state.clone();
+        this.sync_variant_select(&state, window, cx);
         this.rebuild_control_editors(window, cx);
         this.rebuild_theme_editors(window, cx);
         this
@@ -496,6 +596,43 @@ impl StoryWorkbench {
 
     fn active_target(&self, cx: &App) -> Option<Rc<dyn ControlTarget>> {
         self.active_story(cx)?.read(cx).control_target()
+    }
+
+    fn sync_variant_select(
+        &mut self,
+        state: &Entity<WorkbenchState>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let state = state.read(cx);
+        let options = state
+            .variants(cx)
+            .into_iter()
+            .map(|variant| StoryVariantOption {
+                id: variant.entity_id(),
+                label: variant.read(cx).variant_label(cx).into(),
+            })
+            .collect::<Vec<_>>();
+        let selected = state.active_story().map(|story| story.entity_id());
+        let current_selected = self.variant_select.read(cx).selected_value().cloned();
+
+        let options_changed = self.variant_options != options;
+        if options_changed {
+            self.variant_options = options.clone();
+            self.variant_select.update(cx, |select, cx| {
+                select.set_items(options, window, cx);
+            });
+        }
+
+        if options_changed || current_selected != selected {
+            self.variant_select.update(cx, |select, cx| {
+                if let Some(selected) = selected {
+                    select.set_selected_value(&selected, window, cx);
+                } else {
+                    select.set_selected_index(None, window, cx);
+                }
+            });
+        }
     }
 
     fn editor_value(value: &ControlValue) -> String {
@@ -1749,10 +1886,7 @@ impl Render for StoryWorkbench {
         self.sync_editor_values(window, cx);
         self.sync_theme_editors(window, cx);
 
-        let active_story = self.active_story(cx);
-        let variants = self.state.read(cx).variants(cx);
         let presentation = self.state.read(cx).presentation();
-        let active_story_id = active_story.map(|story| story.entity_id());
 
         v_flex()
             .id("story-workbench")
@@ -1767,34 +1901,21 @@ impl Render for StoryWorkbench {
                     .gap_2()
                     .border_b_1()
                     .border_color(cx.theme().border)
-                    .when(!variants.is_empty(), |this| {
+                    .when(!self.variant_options.is_empty(), |this| {
                         this.child(
-                            h_flex()
+                            v_flex()
                                 .gap_1()
-                                .flex_wrap()
-                                .children(variants.into_iter().map(|variant| {
-                                    let title = variant.read(cx).display_description(cx);
-                                    let selected = active_story_id == Some(variant.entity_id());
-                                    let state = self.state.clone();
-                                    Button::new(format!(
-                                        "workbench-variant-{}",
-                                        variant.entity_id()
-                                    ))
-                                    .label(if title.is_empty() {
-                                        variant.read(cx).display_title(cx)
-                                    } else {
-                                        title
-                                    })
-                                    .xsmall()
-                                    .selected(selected)
-                                    .on_click(
-                                        move |_, _, cx| {
-                                            state.update(cx, |state, cx| {
-                                                state.set_active_variant(variant.clone(), cx);
-                                            });
-                                        },
-                                    )
-                                })),
+                                .child(
+                                    div()
+                                        .text_xs()
+                                        .text_color(cx.theme().muted_foreground)
+                                        .child("Variant"),
+                                )
+                                .child(
+                                    div()
+                                        .debug_selector(|| "workbench-variant-select".to_owned())
+                                        .child(Select::new(&self.variant_select).xsmall().w_full()),
+                                ),
                         )
                     })
                     .child(
@@ -2088,7 +2209,7 @@ mod tests {
     impl ActionResetWorkbenchFixture {
         fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
             let story = StoryContainer::panel::<ActionResetStory>(window, cx);
-            let state = cx.new(|_| WorkbenchState::new(Some(story.clone())));
+            let state = cx.new(|cx| WorkbenchState::new(Some(story.clone()), cx));
             let workbench =
                 cx.new(|cx| StoryWorkbench::new(state, WorkbenchTab::Controls, window, cx));
             Self { story, workbench }
@@ -2191,6 +2312,70 @@ mod tests {
             assert_eq!(tab.index(), index);
             assert_eq!(WorkbenchTab::from_index(index), tab);
         }
+    }
+
+    #[gpui::test]
+    fn grouped_story_select_targets_one_concrete_variant(cx: &mut TestAppContext) {
+        cx.update(gpui_component::init);
+        let window = cx.update(|cx| {
+            cx.open_window(Default::default(), |window, cx| {
+                let mut variant = |description: &str, klass: &str, cx: &mut App| {
+                    cx.new(|cx| {
+                        let mut story = StoryContainer::new(window, cx);
+                        story.name = "Button".into();
+                        story.description = description.to_owned().into();
+                        story.story_klass = Some(klass.to_owned().into());
+                        story
+                    })
+                };
+                let primary = variant("Primary variant", "PrimaryButtonStory", cx);
+                let danger = variant("Danger variant", "DangerButtonStory", cx);
+                let group =
+                    StoryContainer::variant_group("Button", vec![primary, danger], window, cx);
+                let state = cx.new(|cx| WorkbenchState::new(None, cx));
+                state.update(cx, |state, cx| {
+                    state.set_active_story(Some(group), cx);
+                });
+                cx.new(|cx| StoryWorkbench::new(state, WorkbenchTab::Controls, window, cx))
+            })
+            .expect("grouped workbench window should open")
+        });
+        let mut visual_cx = VisualTestContext::from_window(window.into(), cx);
+        let workbench = window
+            .root(&mut visual_cx)
+            .expect("workbench should be the window root");
+        visual_cx.update(|window, cx| {
+            _ = window.draw(cx);
+        });
+
+        let (select, danger_id) = workbench.read_with(&visual_cx, |workbench, _| {
+            (
+                workbench.variant_select.clone(),
+                workbench.variant_options[1].id,
+            )
+        });
+        assert!(
+            visual_cx.debug_bounds("workbench-variant-select").is_some(),
+            "grouped stories should render a variant select"
+        );
+        visual_cx.update(|_, cx| {
+            select.update(cx, |_, cx| {
+                cx.emit(SelectEvent::Confirm(Some(danger_id)));
+            });
+        });
+        let (active_story, active_group, variant_count) =
+            workbench.read_with(&visual_cx, |workbench, cx| {
+                let state = workbench.state.read(cx);
+                (
+                    state.active_story().map(|story| story.entity_id()),
+                    state.active_group().map(|story| story.entity_id()),
+                    state.variants(cx).len(),
+                )
+            });
+
+        assert_eq!(active_story, Some(danger_id));
+        assert_ne!(active_group, active_story);
+        assert_eq!(variant_count, 2);
     }
 
     #[test]
@@ -2464,7 +2649,7 @@ mod tests {
             gpui_component::init(cx);
             cx.open_window(Default::default(), |window, cx| {
                 let story = StoryContainer::panel::<ScenarioResetStory>(window, cx);
-                let state = cx.new(|_| WorkbenchState::new(Some(story)));
+                let state = cx.new(|cx| WorkbenchState::new(Some(story), cx));
                 cx.new(|cx| StoryWorkbench::new(state, WorkbenchTab::Scenarios, window, cx))
             })
             .expect("scenario reset test window")
@@ -2584,7 +2769,7 @@ mod tests {
         let mut app = TestAppContext::single();
         app.update(gpui_component::init);
         let window = app.open_window(size(px(400.), px(600.)), |window, cx| {
-            let state = cx.new(|_| WorkbenchState::new(None));
+            let state = cx.new(|cx| WorkbenchState::new(None, cx));
             StoryWorkbench::new(state, WorkbenchTab::Theme, window, cx)
         });
         let mut visual_cx = VisualTestContext::from_window(*window, &app);
@@ -2629,8 +2814,8 @@ mod tests {
 
     #[gpui::test]
     fn window_scoped_states_keep_preview_independent(cx: &mut App) {
-        let first = cx.new(|_| WorkbenchState::new(None));
-        let second = cx.new(|_| WorkbenchState::new(None));
+        let first = cx.new(|cx| WorkbenchState::new(None, cx));
+        let second = cx.new(|cx| WorkbenchState::new(None, cx));
 
         first.update(cx, |state, cx| {
             state.set_viewport(StoryViewportPreset::Mobile, cx);
@@ -2650,7 +2835,7 @@ mod tests {
 
     #[gpui::test]
     fn responsive_viewport_inherits_the_previous_fixed_preset(cx: &mut App) {
-        let state = cx.new(|_| WorkbenchState::new(None));
+        let state = cx.new(|cx| WorkbenchState::new(None, cx));
 
         state.update(cx, |state, cx| {
             state.set_viewport(StoryViewportPreset::Mobile, cx);

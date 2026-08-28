@@ -35,6 +35,11 @@ struct ButtonStory {
 }
 ```
 
+Duplicate visible titles within one group and section share a navigation entry.
+Use the workbench's **Variant** select to choose the concrete story. The gallery
+renders that member alone, and the dock workspace gives each selected member an
+independent tab.
+
 Implement `Story::scenarios()` for explicit stories, or pass
 `scenarios = Component::scenarios()` to `ComponentStory`, to publish reusable
 named interaction flows. The Scenarios workbench tab and MCP list/run tools use

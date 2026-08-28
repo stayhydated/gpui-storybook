@@ -22,6 +22,11 @@ appearance settings, toggle story navigation and the workbench in gallery and
 dock layouts. The initial Responsive frame keeps a small, symmetric resize
 gutter so its handles remain reachable at every size.
 
+`StoryContainer::variant_group` gives duplicate-title stories one navigation
+descriptor while retaining their concrete containers. The workbench presents
+those members in a **Variant** select; gallery mode renders the selected member,
+and dock mode mounts selected members as independent tabs.
+
 Its public integration APIs include `ControlValue`, `ControlSpec`,
 `ControlTarget`, `StoryPresentation`, `WorkbenchState`, `ThemeDraft`, and the
 shared automation controller. The `inspector` feature adds

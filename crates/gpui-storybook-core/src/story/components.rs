@@ -36,8 +36,7 @@ use gpui_component::{
 use super::state::AppState;
 use crate::{
     capture_region::{
-        capture_scroll_scope, capture_story_view, capture_story_view_with_scroll, capture_substory,
-        capture_substory_with_key, current_capture_scroll_handle,
+        capture_scroll_scope, capture_story_view, capture_substory, capture_substory_with_key,
     },
     controls::{ControlTarget, EntityControlTarget, StoryControls},
     presentation::{StoryCanvasBackground, StoryPresentation},
@@ -45,7 +44,7 @@ use crate::{
     story::StoryScenario,
 };
 
-pub const STORY_LIST_KLASS_PREFIX: &str = "__gpui_storybook_list__:";
+pub const STORY_GROUP_KLASS_PREFIX: &str = "__gpui_storybook_group__:";
 const STORY_CANVAS_MIN_SIZE: Size<Pixels> = size(px(240.), px(160.));
 const STORY_CANVAS_RESIZE_GUTTER: Pixels = px(32.);
 
@@ -294,7 +293,8 @@ pub struct StoryContainer {
     pub section: Option<SharedString>,
     pub title_bg: Option<Hsla>,
     pub description: SharedString,
-    pub(crate) list_members: Vec<Entity<StoryContainer>>,
+    pub(crate) variants: Vec<Entity<StoryContainer>>,
+    pub(crate) variant_group: Option<gpui::WeakEntity<StoryContainer>>,
     scroll_handle: ScrollHandle,
     story_scroll_handle: ScrollHandle,
     width: Option<gpui::Pixels>,
@@ -326,7 +326,7 @@ pub struct StoryContainer {
     recreate: Option<StoryRecreateFn>,
 }
 
-pub fn story_list_klass(stories: &[Entity<StoryContainer>], cx: &App) -> SharedString {
+pub fn story_group_klass(stories: &[Entity<StoryContainer>], cx: &App) -> SharedString {
     let mut klasses = stories
         .iter()
         .filter_map(|story| story.read(cx).story_klass.clone())
@@ -334,12 +334,12 @@ pub fn story_list_klass(stories: &[Entity<StoryContainer>], cx: &App) -> SharedS
         .collect::<Vec<_>>();
     klasses.sort();
 
-    format!("{}{}", STORY_LIST_KLASS_PREFIX, klasses.join("|")).into()
+    format!("{}{}", STORY_GROUP_KLASS_PREFIX, klasses.join("|")).into()
 }
 
 #[cfg(feature = "dock")]
-pub fn parse_story_list_klass(story_klass: &str) -> Option<Vec<String>> {
-    let members = story_klass.strip_prefix(STORY_LIST_KLASS_PREFIX)?;
+pub fn parse_story_group_klass(story_klass: &str) -> Option<Vec<String>> {
+    let members = story_klass.strip_prefix(STORY_GROUP_KLASS_PREFIX)?;
     Some(
         members
             .split('|')
@@ -347,112 +347,6 @@ pub fn parse_story_list_klass(story_klass: &str) -> Option<Vec<String>> {
             .map(str::to_string)
             .collect(),
     )
-}
-
-pub struct StoryList {
-    focus_handle: gpui::FocusHandle,
-    stories: Vec<Entity<StoryContainer>>,
-}
-
-impl StoryList {
-    pub fn new(stories: Vec<Entity<StoryContainer>>, cx: &mut gpui::Context<Self>) -> Self {
-        Self {
-            focus_handle: cx.focus_handle(),
-            stories,
-        }
-    }
-
-    fn on_active_any(view: AnyView, active: bool, window: &mut Window, cx: &mut App) {
-        if let Ok(list) = view.downcast::<Self>() {
-            cx.update_entity(&list, |list, cx| {
-                for story_entity in &list.stories {
-                    story_entity.update(cx, |story, cx| {
-                        story.is_active = active;
-                        if let Some(on_active) = story.on_active
-                            && let Some(story_view) = story.story.clone()
-                        {
-                            on_active(story_view, active, window, cx);
-                        }
-                    });
-                }
-            });
-        }
-    }
-}
-
-impl Focusable for StoryList {
-    fn focus_handle(&self, _: &App) -> gpui::FocusHandle {
-        self.focus_handle.clone()
-    }
-}
-
-impl Render for StoryList {
-    fn render(&mut self, _: &mut Window, cx: &mut gpui::Context<Self>) -> impl IntoElement {
-        v_flex()
-            .id("storybook-story-list")
-            .w_full()
-            .gap_4()
-            .children(
-                self.stories
-                    .iter()
-                    .enumerate()
-                    .map(|(index, story_entity)| {
-                        let story = story_entity.read(cx);
-                        let title = story.display_title(cx);
-                        let description = story.display_description(cx);
-                        let story_klass = story.story_klass.clone().unwrap_or_default();
-                        let story_view = story.story.clone();
-                        let story_key = story.story_key_label().map(str::to_owned);
-
-                        let item = v_flex()
-                            .id(format!("storybook-story-list-item-{index}"))
-                            .w_full()
-                            .border_1()
-                            .border_color(cx.theme().border)
-                            .rounded(cx.theme().radius)
-                            .overflow_hidden()
-                            .child(
-                                v_flex()
-                                    .w_full()
-                                    .gap_1()
-                                    .p_3()
-                                    .border_b_1()
-                                    .border_color(cx.theme().border)
-                                    .bg(cx.theme().muted.opacity(0.35))
-                                    .child(
-                                        h_flex().justify_between().gap_3().child(title).child(
-                                            div()
-                                                .text_xs()
-                                                .text_color(cx.theme().muted_foreground)
-                                                .child(story_klass),
-                                        ),
-                                    )
-                                    .when(!description.is_empty(), |this| {
-                                        this.child(
-                                            div()
-                                                .text_sm()
-                                                .text_color(cx.theme().muted_foreground)
-                                                .child(description),
-                                        )
-                                    }),
-                            )
-                            .when_some(story_view, |this, story| {
-                                this.child(div().w_full().p_4().child(story))
-                            });
-
-                        if let Some(story_key) = story_key {
-                            capture_story_view_with_scroll(
-                                story_key,
-                                current_capture_scroll_handle(),
-                                item,
-                            )
-                            .into_any_element()
-                        } else {
-                            item.into_any_element()
-                        }
-                    }),
-            )
-    }
 }
 
 #[derive(Debug)]
@@ -535,7 +429,8 @@ impl StoryContainer {
             section: None,
             title_bg: None,
             description: "".into(),
-            list_members: Vec::new(),
+            variants: Vec::new(),
+            variant_group: None,
             scroll_handle: ScrollHandle::new(),
             story_scroll_handle: ScrollHandle::new(),
             width: None,
@@ -617,29 +512,47 @@ impl StoryContainer {
         })
     }
 
-    pub fn list_panel(
+    /// Creates a navigation descriptor for stories that share one visible title.
+    ///
+    /// Hosts render or open the selected concrete variant instead of mounting
+    /// this descriptor as a panel.
+    pub fn variant_group(
         name: impl Into<SharedString>,
         stories: Vec<Entity<StoryContainer>>,
         window: &mut Window,
         cx: &mut App,
     ) -> Entity<Self> {
         let name = name.into();
-        let story_klass = story_list_klass(&stories, cx);
+        let story_klass = story_group_klass(&stories, cx);
         let description = format!("{} story variants", stories.len());
-        let list_members = stories.clone();
-        let list = cx.new(|cx| StoryList::new(stories, cx));
-        let focus_handle = list.focus_handle(cx);
-
-        cx.new(|cx| {
-            let mut story = Self::new(window, cx)
-                .story(list.into(), story_klass)
-                .on_active(StoryList::on_active_any);
-            story.focus_handle = focus_handle;
+        let group = cx.new(|cx| {
+            let mut story = Self::new(window, cx);
             story.name = name;
             story.description = description.into();
-            story.list_members = list_members;
+            story.story_klass = Some(story_klass);
+            story.variants = stories.clone();
             story
-        })
+        });
+        let weak_group = group.downgrade();
+        for story in stories {
+            story.update(cx, |story, _| {
+                story.variant_group = Some(weak_group.clone());
+            });
+        }
+        group
+    }
+
+    pub(crate) fn variant_label(&self, cx: &App) -> String {
+        let description = self.display_description(cx);
+        if !description.is_empty() {
+            return description;
+        }
+
+        self.story_name
+            .as_ref()
+            .or(self.story_klass.as_ref())
+            .map(ToString::to_string)
+            .unwrap_or_else(|| self.display_title(cx))
     }
 
     pub fn width(mut self, width: gpui::Pixels) -> Self {
@@ -1097,7 +1010,12 @@ impl Panel for StoryContainer {
     fn title(&mut self, _window: &mut Window, _cx: &mut gpui::Context<Self>) -> impl IntoElement {
         let tab_group = self.tab_group.clone();
         let story_panel = _cx.entity().downgrade();
-        let title = self.display_title(_cx).into_any_element();
+        let title = if self.variant_group.is_some() {
+            self.variant_label(_cx)
+        } else {
+            self.display_title(_cx)
+        }
+        .into_any_element();
 
         h_flex()
             .items_center()
@@ -1475,14 +1393,14 @@ mod tests {
 
     #[cfg(feature = "dock")]
     #[test]
-    fn story_list_class_round_trips_sorted_members() {
-        assert_eq!(parse_story_list_klass("ButtonStory"), None);
+    fn story_group_class_round_trips_sorted_members() {
+        assert_eq!(parse_story_group_klass("ButtonStory"), None);
         assert_eq!(
-            parse_story_list_klass(STORY_LIST_KLASS_PREFIX),
+            parse_story_group_klass(STORY_GROUP_KLASS_PREFIX),
             Some(Vec::new())
         );
         assert_eq!(
-            parse_story_list_klass("__gpui_storybook_list__:TableStory||ButtonStory"),
+            parse_story_group_klass("__gpui_storybook_group__:TableStory||ButtonStory"),
             Some(vec!["TableStory".to_string(), "ButtonStory".to_string()])
         );
     }
@@ -1748,7 +1666,7 @@ mod tests {
             assert_eq!(cx.debug_bounds("story-canvas-resize-corner"), None);
         }
 
-        let workbench = cx.new(|_| WorkbenchState::new(Some(container.clone())));
+        let workbench = cx.new(|cx| WorkbenchState::new(Some(container.clone()), cx));
         workbench.update(cx, |state, cx| {
             state.set_viewport(crate::presentation::StoryViewportPreset::Mobile, cx);
             state.set_viewport(crate::presentation::StoryViewportPreset::Responsive, cx);
@@ -1903,7 +1821,7 @@ mod tests {
     #[gpui::test]
     fn panel_activation_defers_workbench_story_reads(cx: &mut App) {
         gpui_component::init(cx);
-        let state = cx.new(|_| WorkbenchState::new(None));
+        let state = cx.new(|cx| WorkbenchState::new(None, cx));
         let state_for_window = state.clone();
         let window: gpui::WindowHandle<StoryContainer> = cx
             .open_window(Default::default(), move |window, cx| {
@@ -1924,7 +1842,7 @@ mod tests {
     }
 
     #[gpui::test]
-    fn story_list_class_sorts_entities_and_ignores_missing_classes(cx: &mut App) {
+    fn story_group_class_sorts_entities_and_ignores_missing_classes(cx: &mut App) {
         gpui_component::init(cx);
         let window: gpui::WindowHandle<StoryContainer> = cx
             .open_window(Default::default(), |window, cx| {
@@ -1947,8 +1865,8 @@ mod tests {
                 let missing = cx.new(|cx| StoryContainer::new(window, cx));
 
                 assert_eq!(
-                    story_list_klass(&[table, missing, button], cx).as_ref(),
-                    "__gpui_storybook_list__:ButtonStory|TableStory"
+                    story_group_klass(&[table, missing, button], cx).as_ref(),
+                    "__gpui_storybook_group__:ButtonStory|TableStory"
                 );
             })
             .expect("story classes should be computed");

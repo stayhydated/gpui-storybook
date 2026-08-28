@@ -12,13 +12,15 @@
 //! Important module boundaries:
 //!
 //! - `story`: the [`story::Story`] contract, [`story::StoryContainer`],
+//!   duplicate-title variant groups whose members remain concrete previews,
 //!   section helpers with stable sub-story capture metadata, runtime startup,
 //!   and standard window helpers
 //! - `gallery`: searchable sidebar plus active-story display
 //! - `controls`, `workbench`, and `presentation`: typed live field editing,
 //!   per-window selection and preview state, theme editing, story source
 //!   details, focus-scoped actions and key bindings, optional GPUI profiler
-//!   telemetry and Inspector integration, viewport presets, and canvas settings
+//!   telemetry and Inspector integration, grouped-story selection, viewport
+//!   presets, and canvas settings
 //! - `theme_workbench`: deterministic session drafts layered over the selected
 //!   base theme, including token rebuilding and external-reload rebasing
 //! - `dock_gallery`: feature-gated dock workspace, sidebar panel, story panel

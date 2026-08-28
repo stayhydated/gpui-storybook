@@ -31,7 +31,10 @@ The registrations live under `src/components` and show literal, computed, and
 localized metadata. `WelcomeCard`, `SignalBoard`, and `FieldNotes` also show
 how `#[storybook(control)]` stores defaults from `example = ...` and overlays
 live values on each render while leaving unmarked component fields out of the
-control registry. See [Write stories](../../book/src/stories.md) for
+control registry. Component stories that declare the same visible title, group,
+and section share one navigation entry; the workbench **Variant** select chooses
+the concrete wrapper, and dock mode keeps each selected wrapper in its own tab.
+See [Write stories](../../book/src/stories.md) for
 the derive contract, [Use the workbench](../../book/src/workbench.md) for live
 editing, viewport settings, action/keymap diagnostics, and performance
 telemetry, and [Getting

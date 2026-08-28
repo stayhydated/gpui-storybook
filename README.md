@@ -47,6 +47,10 @@ struct ButtonStory {
 }
 ```
 
+Stories that share a title, group, and section use one navigation entry. The
+workbench's **Variant** select switches the concrete preview; gallery mode shows
+only that member, while dock mode opens every selected member in its own tab.
+
 Stories can also declare named scenarios made from the same typed controls,
 semantic targets, actions, postconditions, and optional capture used by live
 automation. The Scenarios tab and MCP both recreate the concrete story before

@@ -4,7 +4,8 @@ The right-side workbench edits the selected story instance, previews the active
 theme, shows its key and source location, and inspects selected-story GPUI
 actions without rebuilding the application.
 It is available in both the gallery and dock workspace; grouped stories expose
-an explicit variant selector so edits target one concrete variant.
+a **Variant** select so edits target one concrete variant. Gallery mode renders
+only that member, while dock mode opens selected members as independent tabs.
 
 Enable and forward the opt-in Inspector feature to add the **Open GPUI
 Inspector** button and story-root metadata:
@@ -115,7 +116,7 @@ The workbench header provides settings shared by the selected story in that
 window:
 
 - **Responsive**, **Mobile**, **Tablet**, and **Desktop** viewport presets;
-- explicit variant buttons for grouped stories.
+- a **Variant** select for stories that share one navigation entry.
 
 Every viewport is centered inside a bordered frame. **Mobile**, **Tablet**, and
 **Desktop** lock the frame to their preset dimensions. **Responsive** provides
@@ -246,10 +247,11 @@ together.
 ## Verify the result
 
 Open a controlled story and change one value. Only that story instance should
-rerender, **Reset** should restore its example value, and switching stories or
-variants should replace the displayed controls. In dock mode, close and reopen
-the application to verify that workbench width, visibility, and selected tab
-restore with the layout.
+rerender, **Reset** should restore its example value, and switching the
+**Variant** select should replace the preview and displayed controls. In dock
+mode, select two variants and verify that each remains available in its own tab,
+then close and reopen the application to verify that workbench width, visibility,
+and selected tab restore with the layout.
 
 Live edits change serialized values and theme data. Changed Rust types or
 component source still require recompilation.

@@ -77,9 +77,10 @@ Inspector button and story-root metadata:
 inspector = ["gpui-storybook/inspector"]
 ```
 
-The workbench edits controls on the active concrete variant. Viewport,
-selection, and action/performance inspection state belong to that Storybook
-window.
+The workbench edits controls on the active concrete variant. Its **Variant**
+select switches duplicate-title members; gallery mode renders one member and
+dock mode opens members in independent tabs. Viewport, selection, and
+action/performance inspection state belong to that Storybook window.
 Theme edits are session overrides on the process-global GPUI Component
 theme: they rebuild derived tokens and refresh open windows without changing
 saved preference intent. **Copy export** and **Import clipboard** exchange a

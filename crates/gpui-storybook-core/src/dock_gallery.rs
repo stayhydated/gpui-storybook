@@ -9,12 +9,12 @@ use crate::{
     dock_layout_store::DockLayoutStore,
     dock_sidebar_index::{SidebarStoryMetadata, group_matching_stories},
     registry::StoryEntry,
-    story::{StoryContainer, StoryState, parse_story_list_klass, reveal_story_panel},
+    story::{StoryContainer, StoryState, parse_story_group_klass, reveal_story_panel},
     storybook_window_ui::StorybookWindowUi,
     title_bar::{AppTitleBar, sidebar_toggle_button},
     window_options::default_storybook_window_options,
     window_view::DockWindowView,
-    workbench::{StoryWorkbench, WorkbenchState, WorkbenchTab},
+    workbench::{StoryWorkbench, WorkbenchEvent, WorkbenchState, WorkbenchTab},
 };
 use anyhow::{Context as _, Result};
 use gpui::{
@@ -56,7 +56,7 @@ pub struct ToggleSidebar;
 
 const MAIN_DOCK_AREA: DockAreaTab = DockAreaTab {
     id: "storybook-main-dock",
-    version: 6,
+    version: 7,
 };
 
 #[cfg(debug_assertions)]
@@ -162,14 +162,20 @@ impl StorySidebar {
         let Some(dock_area) = dock_area.upgrade() else {
             return;
         };
-        let story_key = story.read(cx).story_key_label().map(str::to_owned);
+        let concrete_story = story
+            .read(cx)
+            .variants
+            .first()
+            .cloned()
+            .unwrap_or_else(|| story.clone());
+        let story_key = concrete_story.read(cx).story_key_label().map(str::to_owned);
         if let Some(workbench_state) = workbench_state(&dock_area.downgrade()) {
             workbench_state.update(cx, |state, cx| {
                 state.set_active_story(Some(story.clone()), cx);
             });
         }
 
-        if reveal_story_panel(&story, window, cx) {
+        if reveal_story_panel(&concrete_story, window, cx) {
             if let Some(automation) = automation
                 && let Some(story_key) = story_key
             {
@@ -178,7 +184,7 @@ impl StorySidebar {
             return;
         }
 
-        let panel = panel_handle(story.clone());
+        let panel = panel_handle(concrete_story);
         let state = dock_area.update(cx, |dock_area, cx| {
             // Normalize the persisted tree before extending the live layout.
             // This avoids retaining stale split children across additions.
@@ -207,6 +213,7 @@ impl StorySidebar {
         story: &Entity<StoryContainer>,
         cx: &mut App,
     ) {
+        let variants = story.read(cx).variants.clone();
         if let Some(state) = workbench_state(dock_area) {
             story.update(cx, |story, _| {
                 story.set_workbench_state(state.downgrade());
@@ -222,6 +229,10 @@ impl StorySidebar {
             if let Some(story_key) = story.read(cx).story_key_label() {
                 registry.insert(story_key.to_string(), story.downgrade());
             }
+        }
+
+        for variant in variants {
+            Self::register_story(dock_area, &variant, cx);
         }
     }
 
@@ -293,7 +304,7 @@ impl StorySidebar {
         }
 
         let story_seed = Self::story_seed(dock_area, story_klass);
-        if let Some(member_klasses) = parse_story_list_klass(story_klass) {
+        if let Some(member_klasses) = parse_story_group_klass(story_klass) {
             let story_seed = story_seed?;
             let member_stories = member_klasses
                 .iter()
@@ -313,7 +324,7 @@ impl StorySidebar {
                 return None;
             }
 
-            let panel = StoryContainer::list_panel(story_seed.name, member_stories, window, cx);
+            let panel = StoryContainer::variant_group(story_seed.name, member_stories, window, cx);
             panel.update(cx, |c, _| {
                 c.group = story_seed.group.clone().map(Into::into);
                 c.section = story_seed.section.clone().map(Into::into);
@@ -631,7 +642,7 @@ impl StoryWorkspace {
         let (dock_area, dock_skin) =
             DockSkin::dock_area(MAIN_DOCK_AREA.id, Some(MAIN_DOCK_AREA.version), window, cx);
         let weak_dock_area = dock_area.downgrade();
-        let workbench_state = cx.new(|_| WorkbenchState::new(None));
+        let workbench_state = cx.new(|cx| WorkbenchState::new(None, cx));
         workbench_state.update(cx, |state, cx| {
             state.set_active_story(stories.first().cloned(), cx);
         });
@@ -705,6 +716,19 @@ impl StoryWorkspace {
                 crate::preferences::window_activated(window, cx);
             }),
         ];
+        preference_subscriptions.push(cx.subscribe_in(
+            &workbench_state,
+            window,
+            |this, _, event: &WorkbenchEvent, window, cx| match event {
+                WorkbenchEvent::OpenVariant(story) => StorySidebar::open_story(
+                    this.dock_area.downgrade(),
+                    story.clone(),
+                    this.automation.clone(),
+                    window,
+                    cx,
+                ),
+            },
+        ));
         if let Some(automation) = automation.clone() {
             preference_subscriptions.push(cx.observe(&workbench_state, move |_, state, cx| {
                 let Some(story) = state.read(cx).active_story() else {
@@ -1357,7 +1381,7 @@ mod tests {
                 let dock_area = cx.new(|cx| {
                     DockArea::new(MAIN_DOCK_AREA.id, Some(MAIN_DOCK_AREA.version), window, cx)
                 });
-                let state = cx.new(|_| WorkbenchState::new(None));
+                let state = cx.new(|cx| WorkbenchState::new(None, cx));
                 register_workbench_state(&dock_area.downgrade(), &state);
                 StoryWorkspace::reset_default_layout(dock_area.downgrade(), &[], None, window, cx);
                 dock_area
@@ -1367,13 +1391,70 @@ mod tests {
         window
             .update(cx, |dock_area, _, cx| {
                 let state = dock_area.dump(cx);
-                assert_eq!(state.version, Some(6));
+                assert_eq!(state.version, Some(7));
                 let json = serde_json::to_string(&state).expect("dock layout serializes");
                 assert!(json.contains("StoryWorkbench"));
                 assert!(json.contains("right_dock"));
                 assert!(json.contains("320"));
             })
             .expect("dock test window should update");
+    }
+
+    #[gpui::test]
+    fn grouped_story_variants_open_as_individual_tabs(cx: &mut App) {
+        crate::story::init(cx).expect("Storybook runtime should initialize");
+        let window: gpui::WindowHandle<StoryWorkspace> = cx
+            .open_window(Default::default(), |window, cx| {
+                let mut variant = |description: &str, klass: &str, cx: &mut App| {
+                    cx.new(|cx| {
+                        let mut story = StoryContainer::new(window, cx);
+                        story.name = "Button".into();
+                        story.description = description.to_owned().into();
+                        story.story_klass = Some(klass.to_owned().into());
+                        story
+                    })
+                };
+                let primary = variant("Primary variant", "PrimaryButtonStory", cx);
+                let danger = variant("Danger variant", "DangerButtonStory", cx);
+                let group =
+                    StoryContainer::variant_group("Button", vec![primary, danger], window, cx);
+                cx.new(|cx| {
+                    StoryWorkspace::new(vec![group], StorybookWindowUi::default(), None, window, cx)
+                })
+            })
+            .expect("grouped dock window should open");
+
+        let (dock_area, workbench_state, group, variants) = window
+            .update(cx, |workspace, _, cx| {
+                let state = workspace.workbench_state.read(cx);
+                (
+                    workspace.dock_area.clone(),
+                    workspace.workbench_state.clone(),
+                    state
+                        .active_group()
+                        .expect("variant group should be active"),
+                    state.variants(cx),
+                )
+            })
+            .expect("grouped dock state should be readable");
+        window
+            .update(cx, |_, window, cx| {
+                StorySidebar::open_story(dock_area.downgrade(), group, None, window, cx);
+            })
+            .expect("first grouped variant should open");
+        workbench_state.update(cx, |state, cx| {
+            state.set_active_variant(variants[1].clone(), cx);
+        });
+
+        window
+            .update(cx, |workspace, _, cx| {
+                let state = workspace.dock_area.read(cx).dump(cx);
+                let json = serde_json::to_string(&state).expect("dock layout serializes");
+                assert!(json.contains("PrimaryButtonStory"));
+                assert!(json.contains("DangerButtonStory"));
+                assert!(!json.contains("__gpui_storybook_group__:"));
+            })
+            .expect("grouped member tabs should be mounted");
     }
 
     #[gpui::test]

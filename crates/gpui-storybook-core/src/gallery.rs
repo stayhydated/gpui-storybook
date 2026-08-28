@@ -60,7 +60,7 @@ impl Gallery {
     ) -> Self {
         let search_input =
             cx.new(|cx_input| InputState::new(window, cx_input).placeholder("Search..."));
-        let workbench_state = cx.new(|_| WorkbenchState::new(None));
+        let workbench_state = cx.new(|cx| WorkbenchState::new(None, cx));
         let workbench = cx.new(|cx| {
             StoryWorkbench::new(workbench_state.clone(), WorkbenchTab::Controls, window, cx)
         });
@@ -112,16 +112,12 @@ impl Gallery {
                 _ => {},
             }),
             cx.observe(&workbench_state, |this, state, cx| {
-                let Some(automation) = &this.automation else {
-                    return;
-                };
-                let Some(story) = state.read(cx).active_story() else {
-                    return;
-                };
-                let Some(key) = story.read(cx).story_key_label() else {
-                    return;
-                };
-                let _ = automation.confirm_current_story(key);
+                if let Some(automation) = &this.automation
+                    && let Some(story) = state.read(cx).active_story()
+                    && let Some(key) = story.read(cx).story_key_label()
+                {
+                    let _ = automation.confirm_current_story(key);
+                }
                 cx.notify();
             }),
         ];
@@ -389,7 +385,7 @@ impl Gallery {
                 story
                     .story_key_label()
                     .is_some_and(|story_key| story_key == key),
-                story.list_members.clone(),
+                story.variants.clone(),
             )
         };
 
@@ -740,7 +736,7 @@ impl Render for Gallery {
                 .iter()
                 .position(|s| s == story_from_original_list)
         {
-            active_story_to_render = Some(story_from_original_list.clone());
+            active_story_to_render = self.workbench_state.read(cx).active_story();
             ui_active_index_in_filtered_list = Some(idx_in_filtered);
         }
 
@@ -1464,7 +1460,7 @@ mod tests {
                     cx,
                 );
                 let grouped =
-                    StoryContainer::list_panel("Button", vec![primary, danger], window, cx);
+                    StoryContainer::variant_group("Button", vec![primary, danger], window, cx);
                 Gallery::view_with_automation(vec![grouped], None, automation, window, cx)
             })
             .expect("grouped gallery window should open");

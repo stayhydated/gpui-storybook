@@ -53,6 +53,10 @@ description: >-
 - Treat display labels and stable route keys as separate values.
 - Keep control metadata and values on the typed story entity; use
   `StoryControls` and `#[storybook(control...)]` rather than a second value model.
+- Treat duplicate-title stories in one group and section as concrete variants
+  behind one navigation entry. The workbench **Variant** select owns member
+  choice; gallery mode renders one member and dock mode opens members as
+  independent tabs.
 - Keep reusable interaction in `Story::scenarios()` or a component derive's
   `scenarios = ...` expression. Scenario runs recreate the story and use the
   shared executor; do not resume or retry partial runs.

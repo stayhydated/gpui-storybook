@@ -1177,7 +1177,7 @@ pub fn story_snapshots_from_containers(
             let story = story.read(cx.borrow());
             (
                 StorySnapshot::from_container(story, cx),
-                story.list_members.clone(),
+                story.variants.clone(),
             )
         };
 

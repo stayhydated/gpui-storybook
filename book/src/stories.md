@@ -155,6 +155,11 @@ Use the same expression with the derive form:
 A crate-level `group` from `storybook.toml` appears outside the story's
 section in navigation. See [Configure Storybook](configuration.md).
 
+Stories with the same visible title, group, and section share one navigation
+entry. Give each concrete story a distinct, concise description; the workbench
+uses it as the **Variant** select label. Gallery mode renders one selected
+member, while dock mode keeps selected members in independent tabs.
+
 ## Run one-time setup
 
 Register application setup that must run after the core runtime is installed

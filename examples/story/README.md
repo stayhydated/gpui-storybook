@@ -45,6 +45,9 @@ and enum-select `StoryControls`, reset behavior, preview viewport presentation,
 and stable `Substory` capture routes. `InteractionStory` keeps its root
 action-scope handle separate from its nested input interaction focus, so input
 editing actions do not leak into the Actions tab.
+`GroupedSummaryStory` and `GroupedDetailsStory` share one visible title and
+navigation entry. Choose them from the workbench's **Variant** select; the
+gallery displays one at a time, and dock mode opens each choice in its own tab.
 Controls are opt-in; fields without `#[storybook(control...)]` remain story-only
 state. See [Write stories](../../book/src/stories.md) for the registration
 contract and [Use the workbench](../../book/src/workbench.md) for controls,

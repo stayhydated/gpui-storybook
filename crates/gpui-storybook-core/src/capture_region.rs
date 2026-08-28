@@ -528,6 +528,7 @@ pub(crate) fn semantic_values(
     })
 }
 
+#[cfg(test)]
 pub(crate) fn current_capture_scroll_handle() -> Option<ScrollHandle> {
     current_scope().and_then(|scope| scope.scroll_handle)
 }

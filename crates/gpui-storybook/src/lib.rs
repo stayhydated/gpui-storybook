@@ -261,7 +261,7 @@ fn group_duplicate_story_titles(
                 return bucket.into_iter().next().expect("bucket has one story");
             }
 
-            let panel = StoryContainer::list_panel(key.title, bucket, window, cx);
+            let panel = StoryContainer::variant_group(key.title, bucket, window, cx);
             panel.update(cx, |container, _| {
                 container.group = key.group.map(Into::into);
                 container.section = key.section.map(Into::into);
@@ -785,7 +785,7 @@ fn exit_after_mcp_stdio(exit_code: i32) -> ! {
 ///
 /// Stories are sorted by enum-section order when available, then by section and
 /// registered story name. Stories with the same title in the same group and
-/// section are grouped into one list panel.
+/// section share one navigation entry whose concrete variants open separately.
 pub fn generate_stories(
     window: &mut ::gpui::Window,
     cx: &mut ::gpui::App,

@@ -88,6 +88,11 @@ Both registration styles accept string sections or enum variants. Use a
 `#[repr(usize)]` enum when stable section ordering matters; string sections
 sort alphabetically.
 
+Registrations with the same visible title, group, and section become concrete
+variants behind one navigation entry. Give each a concise description so the
+workbench **Variant** select has distinct option labels. Gallery mode renders
+the selected member, and dock mode opens selected members as independent tabs.
+
 Use `#[gpui_storybook::story_init]` for application setup that runs once after
 the core runtime is installed and before preference readiness begins.
 
