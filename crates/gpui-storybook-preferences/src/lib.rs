@@ -7,8 +7,9 @@
 //! public `gpui-storybook` facade owns GPUI appearance events, application
 //! startup, and UI orchestration.
 //!
-//! [`StorybookPreferences`] retains saved intent. [`ResolvedPreferences`]
-//! explains effective values and their sources without rewriting that intent.
+//! [`StorybookPreferences`] retains saved layout and presentation intent.
+//! [`ResolvedPreferences`] explains effective presentation values and their
+//! sources without rewriting that intent.
 //! [`ConsumerId`] identifies each preference document and scopes its default
 //! persistent path. Persistent, temporary, and disabled modes make filesystem
 //! behavior explicit; only persistent mode accepts a JSON path override.
@@ -36,8 +37,8 @@ pub use resolution::{
 pub use value::{
     ConsumerId, ConsumerIdError, LanguageTag, LanguageTagError, MAX_CONSUMER_ID_LEN,
     MAX_LANGUAGE_TAG_LEN, MAX_THEME_ID_LEN, PreferenceRecord, PreferredColorScheme,
-    PreferredLanguage, PreferredLanguageMode, PreferredScrollbar, StorybookPreferences, ThemeId,
-    ThemeIdError,
+    PreferredLanguage, PreferredLanguageMode, PreferredScrollbar, StorybookPreferences,
+    StorybookWindowMode, ThemeId, ThemeIdError,
 };
 
 #[cfg(test)]

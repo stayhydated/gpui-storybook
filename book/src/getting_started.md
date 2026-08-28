@@ -114,10 +114,10 @@ pub mod stories;
 ## Initialize before opening a window
 
 Create one stable `ConsumerId` for the Storybook binary. Call `init`, await
-the returned readiness task, and then construct the gallery:
+the returned readiness task, and then construct the Storybook window:
 
 ```rust
-use gpui_storybook::{Assets, ConsumerId, Gallery, StorybookOptions};
+use gpui_storybook::{Assets, ConsumerId, StorybookOptions, StorybookWindow};
 use my_app_storybook::i18n::{self, Languages};
 
 fn main() {
@@ -142,11 +142,11 @@ fn main() {
             }
 
             cx.update(|cx| {
-                gpui_storybook::create_new_window(
+                gpui_storybook::create_storybook_window(
                     "My App - Stories",
                     |window, cx| {
                         let stories = gpui_storybook::generate_stories(window, cx);
-                        Gallery::view(stories, None, window, cx)
+                        StorybookWindow::new(stories)
                     },
                     cx,
                 );
@@ -161,6 +161,12 @@ Awaiting readiness prevents the first frame from briefly using default
 appearance or language values before saved preferences load. Handle
 `StorybookInitError` instead of using `expect` in an application that needs
 graceful startup recovery.
+
+Use the title-bar **Layout** select to switch between Gallery and Dock
+workspace. The consumer-scoped preference makes that selection the initial
+layout on the next launch. Set top-level `window_mode = "gallery"` or
+`window_mode = "dock"` in the active `storybook.toml` when the binary needs a
+configured initial layout instead.
 
 ## Run the binary
 

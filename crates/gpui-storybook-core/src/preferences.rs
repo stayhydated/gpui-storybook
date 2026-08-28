@@ -17,7 +17,7 @@ use gpui_storybook_preferences::{
     PreferenceRepository, PreferredColorScheme, PreferredLanguage, PreferredScrollbar,
     RecoveryDiagnostic, RepositoryOpenError, RepositoryOptions, ResolutionDiagnostic,
     ResolutionOverrides, ResolvePreferencesError, ResolvedPreferences, StorybookPreferences,
-    SupportedLanguages, SystemColorScheme, ThemeId, resolve_preferences,
+    StorybookWindowMode, SupportedLanguages, SystemColorScheme, ThemeId, resolve_preferences,
 };
 use unic_langid::LanguageIdentifier;
 
@@ -130,6 +130,7 @@ pub(crate) trait PreferenceRuntime: 'static {
     fn select_theme(&mut self, scheme: SystemColorScheme, theme: ThemeId, cx: &mut App);
     fn select_language(&mut self, value: PreferredLanguage, cx: &mut App);
     fn select_scrollbar(&mut self, value: PreferredScrollbar, cx: &mut App);
+    fn select_window_mode(&mut self, value: StorybookWindowMode, cx: &mut App);
     fn window_appearance_changed(&mut self, window: &mut Window, cx: &mut App);
     fn window_activated(&mut self, window: &mut Window, cx: &mut App);
     #[cfg(not(target_family = "wasm"))]
@@ -177,6 +178,7 @@ struct AppliedTheme {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum PreferenceEdit {
+    WindowMode(StorybookWindowMode),
     ColorScheme(PreferredColorScheme),
     Theme {
         scheme: SystemColorScheme,
@@ -189,6 +191,7 @@ enum PreferenceEdit {
 impl PreferenceEdit {
     fn apply_to(&self, preferences: &mut StorybookPreferences) {
         match self {
+            Self::WindowMode(value) => preferences.window_mode = *value,
             Self::ColorScheme(value) => preferences.color_scheme = *value,
             Self::Theme { scheme, theme } => match scheme {
                 SystemColorScheme::Light => preferences.light_theme = theme.clone(),
@@ -202,6 +205,7 @@ impl PreferenceEdit {
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 struct PreferenceEdits {
+    window_mode: Option<StorybookWindowMode>,
     color_scheme: Option<PreferredColorScheme>,
     light_theme: Option<Option<ThemeId>>,
     dark_theme: Option<Option<ThemeId>>,
@@ -211,7 +215,8 @@ struct PreferenceEdits {
 
 impl PreferenceEdits {
     fn is_empty(&self) -> bool {
-        self.color_scheme.is_none()
+        self.window_mode.is_none()
+            && self.color_scheme.is_none()
             && self.light_theme.is_none()
             && self.dark_theme.is_none()
             && self.language.is_none()
@@ -220,6 +225,7 @@ impl PreferenceEdits {
 
     fn record(&mut self, edit: PreferenceEdit) {
         match edit {
+            PreferenceEdit::WindowMode(value) => self.window_mode = Some(value),
             PreferenceEdit::ColorScheme(value) => self.color_scheme = Some(value),
             PreferenceEdit::Theme { scheme, theme } => match scheme {
                 SystemColorScheme::Light => self.light_theme = Some(theme),
@@ -231,6 +237,9 @@ impl PreferenceEdits {
     }
 
     fn apply_to(&self, preferences: &mut StorybookPreferences) {
+        if let Some(value) = self.window_mode {
+            preferences.window_mode = value;
+        }
         if let Some(value) = self.color_scheme {
             preferences.color_scheme = value;
         }
@@ -249,6 +258,9 @@ impl PreferenceEdits {
     }
 
     fn coalesce(&mut self, newer: Self) {
+        if newer.window_mode.is_some() {
+            self.window_mode = newer.window_mode;
+        }
         if newer.color_scheme.is_some() {
             self.color_scheme = newer.color_scheme;
         }
@@ -717,6 +729,10 @@ where
         self.optimistic_change(PreferenceEdit::Scrollbar(value), cx);
     }
 
+    fn select_window_mode(&mut self, value: StorybookWindowMode, cx: &mut App) {
+        self.optimistic_change(PreferenceEdit::WindowMode(value), cx);
+    }
+
     fn window_appearance_changed(&mut self, window: &mut Window, cx: &mut App) {
         self.detected_scheme = color_scheme(window.appearance());
         if self.state.saved.color_scheme == PreferredColorScheme::System
@@ -976,6 +992,17 @@ pub fn select_scrollbar(value: PreferredScrollbar, cx: &mut App) {
     if cx.try_global::<StorybookPreferencesGlobal>().is_some() {
         cx.update_global::<StorybookPreferencesGlobal, _>(|runtime, cx| {
             runtime.0.select_scrollbar(value, cx);
+        });
+    }
+}
+
+/// Applies a Storybook window mode and queues persistence.
+///
+/// This is a no-op when the facade preference runtime is not installed.
+pub fn select_window_mode(value: StorybookWindowMode, cx: &mut App) {
+    if cx.try_global::<StorybookPreferencesGlobal>().is_some() {
+        cx.update_global::<StorybookPreferencesGlobal, _>(|runtime, cx| {
+            runtime.0.select_window_mode(value, cx);
         });
     }
 }
@@ -1245,6 +1272,7 @@ mod tests {
 
     fn non_default_preferences() -> StorybookPreferences {
         StorybookPreferences {
+            window_mode: StorybookWindowMode::Dock,
             color_scheme: PreferredColorScheme::Light,
             light_theme: Some(ThemeId::new("Solarized Light").expect("valid light theme")),
             dark_theme: Some(ThemeId::new("Solarized Dark").expect("valid dark theme")),
@@ -1398,6 +1426,7 @@ mod tests {
     fn preference_edits_coalesce_latest_values_without_replacing_untouched_fields() {
         let baseline = non_default_preferences();
         let mut edits = PreferenceEdits::default();
+        edits.record(PreferenceEdit::WindowMode(StorybookWindowMode::Gallery));
         edits.record(PreferenceEdit::ColorScheme(PreferredColorScheme::Dark));
         edits.record(PreferenceEdit::Language(PreferredLanguage::Explicit(
             LanguageTag::new("en-US").expect("valid regional English tag"),
@@ -1410,6 +1439,7 @@ mod tests {
 
         let mut merged = baseline.clone();
         edits.apply_to(&mut merged);
+        assert_eq!(merged.window_mode, StorybookWindowMode::Gallery);
         assert_eq!(merged.color_scheme, PreferredColorScheme::System);
         assert_eq!(merged.light_theme, None);
         assert_eq!(
@@ -1758,6 +1788,29 @@ mod tests {
         assert_eq!(runtime.state.saved.scrollbar, PreferredScrollbar::Always);
         assert_eq!(runtime.state.resolved.scrollbar, PreferredScrollbar::Always);
         assert_eq!(Theme::global(cx).scrollbar_mode, ScrollbarMode::Always);
+    }
+
+    #[gpui::test]
+    fn window_mode_selection_updates_saved_state(cx: &mut App) {
+        init_test_runtime(cx);
+        let mut runtime = Runtime::new(
+            test_options(
+                SystemColorScheme::Light,
+                ResolutionOverrides::default(),
+                successful_callback(),
+            ),
+            cx,
+        )
+        .expect("runtime resolves");
+        runtime.save_in_flight = true;
+
+        runtime.select_window_mode(StorybookWindowMode::Dock, cx);
+
+        assert_eq!(runtime.state.saved.window_mode, StorybookWindowMode::Dock);
+        assert_eq!(
+            runtime.pending_edits.window_mode,
+            Some(StorybookWindowMode::Dock)
+        );
     }
 
     #[gpui::test]

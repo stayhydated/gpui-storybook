@@ -1,15 +1,23 @@
 # gpui-storybook-core
 
 `gpui-storybook-core` provides the gallery, dock workspace, story containers,
-window-scoped controls/theme/inspect/actions workbench, optional GPUI Inspector
-integration, preview presentation state, localization bridge, preference UI,
-and automation controller used by GPUI Storybook.
+the runtime layout selector, window-scoped controls/theme/inspect/actions
+workbench, optional GPUI Inspector integration, preview presentation state,
+localization bridge, preference UI, and automation controller used by GPUI
+Storybook.
 
 Application developers should normally depend on
 [`gpui-storybook`](../gpui-storybook/README.md), which owns initialization,
 configuration discovery, story generation, and optional macro and MCP
 re-exports. Depend on this crate directly only when building a custom Storybook
 runtime integration.
+
+The standard shell owns one automation command receiver while it swaps Gallery
+and Dock workspace views. Its title-bar **Layout** select saves a typed
+`StorybookWindowMode`; application title-bar additions remain composed beside
+the selector. The facade resolves the initial mode from a per-window
+`StorybookWindow::with_mode` value, then the active `storybook.toml`
+`window_mode`, then the saved consumer preference.
 
 The runtime centers every preview canvas inside a visible frame. Fixed viewport
 presets lock that frame to their named dimensions. Responsive mode alone exposes

@@ -28,8 +28,8 @@ description: >-
 4. Build native apps with `gpui_platform::application()` and the facade's
    embedded assets.
 5. Create a stable, binary-specific `ConsumerId`, call
-   `gpui_storybook::init`, await readiness, and only then open the gallery or
-   dock window.
+   `gpui_storybook::init`, await readiness, and only then open the standard
+   runtime-selectable window.
 6. Update the manifest, entry point, locale assets, story modules, and
    `storybook.toml` together when the requested workflow crosses those
    surfaces.
@@ -62,9 +62,13 @@ description: >-
   shared executor; do not resume or retry partial runs.
 - Match `disable_story` against the registered type name, not the display title
   or package-qualified key.
+- Use `create_storybook_window` with `StorybookWindow::new`; let the title-bar
+  **Layout** select persist Gallery or Dock workspace. Use top-level
+  `storybook.toml` `window_mode` for a binary's launch-specific initial mode,
+  or `with_mode` for a per-window choice. Precedence is `with_mode`, TOML, then
+  the saved preference.
 - Forward optional package features explicitly when users launch with
-  `--features dock`, `--features inspector`, `--features performance`, or
-  `--features mcp`.
+  `--features inspector`, `--features performance`, or `--features mcp`.
 - Use the Actions workbench tab for GPUI actions exposed through the selected
   story's opt-in `Story::action_scope_focus_handle`. Track that handle on the
   handler-owning root and keep it separate from nested input focus. The tab

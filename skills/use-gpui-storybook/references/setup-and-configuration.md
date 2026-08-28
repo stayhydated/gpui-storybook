@@ -15,7 +15,7 @@ Use the facade's startup order:
 4. Call `gpui_storybook::init` and handle `StorybookInitError`.
 5. Await the returned `Task<StorybookReady>`.
 6. Inspect readiness diagnostics.
-7. Generate stories and construct the first gallery or dock window.
+7. Generate stories and construct the first runtime-selectable window.
 
 Opening the window before step 5 can render a first frame with default
 preferences.
@@ -42,15 +42,14 @@ by `_I18N_MODULE`.
 
 ## Window selection
 
-Use `create_new_window` plus `Gallery::view` for the default browser.
-
-For the dock workspace, forward the feature and use `create_dock_window` plus
-`StoryWorkspace::view`:
-
-```toml
-[features]
-dock = ["gpui-storybook/dock"]
-```
+Use `create_storybook_window` and return `StorybookWindow::new(stories)` from
+its callback. The title-bar **Layout** select switches between Gallery and Dock
+workspace at runtime and saves the typed `StorybookWindowMode` for the consumer.
+Set top-level `window_mode = "dock"` in the active `storybook.toml` when the
+binary needs that initial layout. Use
+`StorybookWindow::with_mode(StorybookWindowMode::Dock)` for a per-window initial
+selection. Precedence is `with_mode`, TOML, then the saved preference; the
+selector remains available and saves later choices.
 
 Both modes include the right workbench. Gallery uses a third resizable region.
 Dock mode persists the right dock's width, visibility, and selected tab; use
@@ -104,6 +103,7 @@ Put `storybook.toml` beside the story crate's `Cargo.toml`:
 
 ```toml
 group = "UI Kit"
+window_mode = "dock"
 allow = ["UI Kit", "Shared"]
 disable_story = ["ExperimentalCardStory"]
 
@@ -116,6 +116,7 @@ language = "en"
 Apply these semantics:
 
 - `group` is required when the file exists.
+- `window_mode` accepts `"gallery"` or `"dock"` as the initial layout.
 - Omitted `allow` includes only the file's own normalized group.
 - `allow = ["*"]` includes every group.
 - `allow = []` includes no groups.
@@ -123,6 +124,8 @@ Apply these semantics:
 - Component registrations use the component type, not the generated wrapper.
 - The active runtime config belongs to the registered story package whose name
   matches the running binary.
+- A per-window `with_mode` value wins over `window_mode`, which wins over the
+  saved consumer preference.
 - Programmatic overrides win field by field over TOML.
 - MCP deterministic overrides win over programmatic and TOML values.
 - Overrides change resolved presentation without rewriting saved intent.

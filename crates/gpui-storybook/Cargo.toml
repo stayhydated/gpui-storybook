@@ -13,7 +13,6 @@ readme = "README.md"
 
 [features]
 default = [ "macros" ]
-dock = [ "gpui-storybook-core/dock" ]
 inspector = [ "gpui-storybook-core/inspector" ]
 macros = [ "dep:gpui-storybook-macros" ]
 mcp = [ "dep:gpui-storybook-mcp", "gpui-storybook-core/capture" ]

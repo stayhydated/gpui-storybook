@@ -4503,6 +4503,7 @@ dependencies = [
 name = "gpui-storybook-toml"
 version = "0.5.0"
 dependencies = [
+ "gpui-storybook-preferences",
  "serde",
  "toml 1.1.4+spec-1.1.0",
 ]

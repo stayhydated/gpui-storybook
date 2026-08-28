@@ -3,17 +3,16 @@
 This package demonstrates `#[derive(ComponentStory)]` for components that can
 render from example data while Storybook supplies the focusable wrapper.
 
-Run the gallery:
+Run the Storybook:
 
 ```bash
 cargo run -p gpui-storybook-example-component
 ```
 
-Run the dock workspace:
-
-```bash
-cargo run -p gpui-storybook-example-component --features dock
-```
+Use the title-bar **Layout** select to switch between Gallery and Dock workspace.
+The selection is saved for this example binary. Uncomment
+`window_mode = "dock"` in this package's `storybook.toml` to start a launch in
+Dock workspace; the selector can still change and save the later choice.
 
 Run the gallery with the opt-in GPUI Inspector integration:
 

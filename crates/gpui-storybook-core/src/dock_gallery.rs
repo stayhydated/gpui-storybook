@@ -12,8 +12,6 @@ use crate::{
     story::{StoryContainer, StoryState, parse_story_group_klass, reveal_story_panel},
     storybook_window_ui::StorybookWindowUi,
     title_bar::{AppTitleBar, sidebar_toggle_button},
-    window_options::default_storybook_window_options,
-    window_view::DockWindowView,
     workbench::{StoryWorkbench, WorkbenchEvent, WorkbenchState, WorkbenchTab},
 };
 use anyhow::{Context as _, Result};
@@ -26,9 +24,8 @@ use gpui_component::{
     ActiveTheme as _, Root, Side, Sizable as _,
     button::{Button, ButtonVariants as _},
     dock::{
-        BasePanel, ClosePanel, DockArea, DockAreaState, DockEvent, DockLayout, DockPlacement,
-        DockSkin, Panel, PanelControl, PanelEvent, PanelInfo, ToggleZoom, panel_handle,
-        register_panel,
+        BasePanel, DockArea, DockAreaState, DockEvent, DockLayout, DockPlacement, DockSkin, Panel,
+        PanelControl, PanelEvent, PanelInfo, panel_handle, register_panel,
     },
     h_flex,
     input::{Input, InputEvent, InputState},
@@ -624,6 +621,7 @@ pub struct StoryWorkspace {
     automation: Option<SharedStorybookAutomation>,
     last_layout_state: Option<DockAreaState>,
     toggle_button_visible: bool,
+    _app_quit_subscription: Subscription,
     _preference_subscriptions: Vec<Subscription>,
 }
 
@@ -632,6 +630,37 @@ impl StoryWorkspace {
         stories: Vec<Entity<StoryContainer>>,
         ui: StorybookWindowUi,
         automation: Option<SharedStorybookAutomation>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
+        Self::new_with_host(
+            stories,
+            "Storybook".into(),
+            ui,
+            automation,
+            true,
+            window,
+            cx,
+        )
+    }
+
+    pub(crate) fn new_without_automation_host(
+        stories: Vec<Entity<StoryContainer>>,
+        title: SharedString,
+        ui: StorybookWindowUi,
+        automation: Option<SharedStorybookAutomation>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
+        Self::new_with_host(stories, title, ui, automation, false, window, cx)
+    }
+
+    fn new_with_host(
+        stories: Vec<Entity<StoryContainer>>,
+        title: SharedString,
+        ui: StorybookWindowUi,
+        automation: Option<SharedStorybookAutomation>,
+        attach_automation_host: bool,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
@@ -678,7 +707,7 @@ impl StoryWorkspace {
         )
         .detach();
 
-        cx.on_app_quit({
+        let app_quit_subscription = cx.on_app_quit({
             let dock_area = dock_area.clone();
             move |_, cx| {
                 let state = dock_area.read(cx).dump(cx);
@@ -688,12 +717,11 @@ impl StoryWorkspace {
                     }
                 }
             }
-        })
-        .detach();
+        });
 
         let dock_area_for_title_bar = dock_area.clone();
         let title_bar = cx.new(|cx| {
-            AppTitleBar::new("Storybook", ui, window, cx)
+            AppTitleBar::new(title, ui, window, cx)
                 .system_child(|_, _| {
                     Button::new("reset-storybook-layout")
                         .label("Reset layout")
@@ -750,9 +778,10 @@ impl StoryWorkspace {
             automation,
             last_layout_state: None,
             toggle_button_visible: false,
+            _app_quit_subscription: app_quit_subscription,
             _preference_subscriptions: preference_subscriptions,
         };
-        if let Some(automation) = this.automation.clone() {
+        if attach_automation_host && let Some(automation) = this.automation.clone() {
             this.attach_automation_host(automation, window, cx);
         }
 
@@ -995,7 +1024,7 @@ impl StoryWorkspace {
         .detach();
     }
 
-    fn handle_automation_command(
+    pub(crate) fn handle_automation_command(
         &mut self,
         command: StorybookAutomationCommand,
         window: &mut Window,
@@ -1267,8 +1296,6 @@ impl StoryWorkspace {
     }
 }
 
-impl DockWindowView for StoryWorkspace {}
-
 impl Render for StoryWorkspace {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let sheet_layer = Root::render_sheet_layer(window, cx);
@@ -1336,36 +1363,6 @@ pub fn register_story_panels(cx: &mut App) {
             .expect("StoryWorkbench panel must have a registered window state");
         panel_handle(cx.new(|cx| StoryWorkbench::new(state, selected_tab, window, cx)))
     });
-}
-
-/// Create a new dock-based storybook window
-pub fn create_dock_window<F, V>(title: &str, create_view_fn: F, cx: &mut App)
-where
-    V: DockWindowView,
-    F: FnOnce(&mut Window, &mut App) -> Entity<V> + Send + 'static,
-{
-    let options = default_storybook_window_options(cx);
-    let title = SharedString::from(title.to_string());
-
-    cx.bind_keys(vec![
-        gpui::KeyBinding::new("shift-escape", ToggleZoom, None),
-        gpui::KeyBinding::new("ctrl-w", ClosePanel, None),
-    ]);
-
-    cx.spawn(async move |cx| {
-        let window = cx.open_window(options, |window, cx| {
-            let view = create_view_fn(window, cx);
-            cx.new(|cx| Root::new(view, window, cx))
-        })?;
-
-        window.update(cx, |_, window, _| {
-            window.activate_window();
-            window.set_window_title(&title);
-        })?;
-
-        Ok::<_, anyhow::Error>(())
-    })
-    .detach();
 }
 
 #[cfg(test)]

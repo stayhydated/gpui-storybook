@@ -1,7 +1,7 @@
 //! Runtime shell for GPUI Storybook.
 //!
 //! `gpui-storybook-core` owns the UI runtime used by the public facade crate:
-//! window creation, the gallery layout, the optional dock workspace, story
+//! window creation, runtime-selectable gallery and dock layouts, story
 //! container panel behavior, title-bar composition, local preference
 //! resolution and persistence, embedded localization/assets, and shared
 //! registry entry types.
@@ -23,7 +23,7 @@
 //!   presets, and canvas settings
 //! - `theme_workbench`: deterministic session drafts layered over the selected
 //!   base theme, including token rebuilding and external-reload rebasing
-//! - `dock_gallery`: feature-gated dock workspace, sidebar panel, story panel
+//! - `dock_gallery`: dock workspace, sidebar panel, story panel
 //!   registry, and layout persistence
 //! - `automation`: shared controller and command types for live story
 //!   listing, story opening, control reads/edits/resets, serialized capture
@@ -63,11 +63,8 @@ mod capture_output;
 pub mod capture_region;
 pub mod catalog;
 pub mod controls;
-#[cfg(feature = "dock")]
 pub mod dock_gallery;
-#[cfg(feature = "dock")]
 mod dock_layout_store;
-#[cfg(feature = "dock")]
 mod dock_sidebar_index;
 pub mod gallery;
 pub mod i18n;
@@ -84,5 +81,4 @@ pub mod theme_workbench;
 pub mod title_bar;
 mod web_fonts;
 mod window_options;
-pub mod window_view;
 pub mod workbench;

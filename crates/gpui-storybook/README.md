@@ -1,10 +1,10 @@
 # gpui-storybook
 
 `gpui-storybook` is the public facade for adding a searchable Storybook window
-to a GPUI application. It exposes initialization, gallery and window helpers,
-story registration, typed controls, the live controls, theme, inspect, and actions
-workbench, typed preferences, localization support, and optional GPUI Inspector,
-dock, and MCP integrations.
+to a GPUI application. It exposes initialization, the runtime-selectable gallery
+and dock window, story registration, typed controls, the live controls, theme,
+inspect, and actions workbench, typed preferences, localization support, and
+optional GPUI Inspector and MCP integrations.
 
 Most applications should use this crate rather than the lower-level workspace
 crates.
@@ -14,13 +14,21 @@ crates.
 | Feature | Default | Purpose |
 |---|---:|---|
 | `macros` | Yes | Re-export `#[story]`, `#[story_init]`, `StoryControls`, `ComponentStory`, and `Substory` |
-| `dock` | No | Add the panel-based `StoryWorkspace` |
 | `inspector` | No | Add the GPUI Inspector button, UI, and story-root metadata |
 | `mcp` | No | Add MCP tools, opt-in in-process interaction, and PNG capture support |
 | `performance` | No | Add GPUI window timing histograms and the debug frame overlay to the workbench |
 
 Initialization is asynchronous: call `gpui_storybook::init`, await the returned
 readiness task, and only then create the first story window.
+
+Create the window with `create_storybook_window` and `StorybookWindow::new`.
+The title-bar **Layout** select switches between Gallery and Dock workspace at
+runtime and saves `StorybookWindowMode` in the consumer preference document.
+Set top-level `window_mode = "gallery"` or `window_mode = "dock"` in the
+active `storybook.toml` when the binary needs a configured initial mode. Use
+`StorybookWindow::with_mode` for a per-window initial mode; it takes precedence
+over TOML, which takes precedence over the saved preference. The selector
+remains available and saves later user choices.
 
 Both the gallery and dock workspace include a right-side workbench. Derive
 `StoryControls` on explicit story structs, or mark fields on a

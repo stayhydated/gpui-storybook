@@ -2,9 +2,9 @@
 //!
 //! Most applications should depend on this crate rather than the lower-level
 //! runtime, macro, or TOML crates. It re-exports the standard runtime shell,
-//! typed controls and workbench state, story traits, locale helpers, window
-//! helpers, and, with the default `macros` feature, the story registration
-//! macros.
+//! typed controls and workbench state, story traits, locale helpers, the
+//! runtime-selectable Gallery/Dock window, and, with the default `macros`
+//! feature, the story registration macros.
 //! The Inspect workbench tab always shows the active story key and source.
 //! Enable the opt-in `inspector` feature for its GPUI Component Inspector
 //! button and `StoryInspectorState` story-root metadata.
@@ -34,10 +34,10 @@
 //! [`init`] and `generate_stories` load crate-local `storybook.toml` files for
 //! discovered story crates and select a runtime config by matching the running
 //! binary name against registered story crate names. Initialization applies
-//! launch-only preference overrides; story generation applies `allow` and
-//! `disable_story` filtering, then materializes sorted [`StoryContainer`]
-//! values. A story crate config's `group` becomes the sidebar's outer group; a
-//! story's declared section remains the nested label.
+//! its initial `window_mode` and launch-only preference overrides; story
+//! generation applies `allow` and `disable_story` filtering, then materializes
+//! sorted [`StoryContainer`] values. A story crate config's `group` becomes the
+//! sidebar's outer group; a story's declared section remains the nested label.
 //!
 //! Macro-generated stories carry stable [`StoryKey`] values in the form
 //! `{crate-package-name}-{registered-story-name}`. These keys are copied into
@@ -52,7 +52,6 @@
 //! Feature boundaries:
 //!
 //! - `macros`: re-exports proc macros from `gpui-storybook-macros`
-//! - `dock`: re-exports the dock workspace helpers from `gpui-storybook-core`
 //! - `inspector`: adds GPUI Inspector activation and story-root metadata; the
 //!   Inspect tab's story key and source remain part of the base workbench
 //! - `mcp`: serves the live controller installed by [`init`] over MCP and
@@ -69,9 +68,10 @@
 //! typed [`StorybookOptions`] to [`init`] and await readiness before creating a
 //! story window.
 //!
-//! [`PreferenceState::saved`] retains durable user intent, including `System`
-//! choices and independent light/dark theme slots. Choosing a named theme also
-//! activates its matching appearance while preserving the opposite slot.
+//! [`PreferenceState::saved`] retains durable user intent, including the
+//! Gallery/Dock window mode, `System` choices, and independent light/dark theme
+//! slots. Choosing a named theme also activates its matching appearance while
+//! preserving the opposite slot.
 //! [`PreferenceState::resolved`] reports effective values and their sources
 //! after live system detection, registry fallback, and deterministic overrides.
 //! [`PersistenceStatus`] is storage-only; locale-adapter failures are reported
@@ -97,8 +97,8 @@ pub use preferences::{
     PreferenceDiagnostic, PreferenceOverrides, PreferenceState, PreferredColorScheme,
     PreferredLanguage, PreferredLanguageMode, PreferredScrollbar, RecoveryDiagnostic,
     RecoveryReason, ResolutionDiagnostic, ResolvedPreferences, StorybookInitError,
-    StorybookOptions, StorybookPreferences, StorybookReady, SystemColorScheme, ThemeId,
-    ThemeIdError, ThemeResolution, ThemeSource, UnsupportedValueSource,
+    StorybookOptions, StorybookPreferences, StorybookReady, StorybookWindowMode, SystemColorScheme,
+    ThemeId, ThemeIdError, ThemeResolution, ThemeSource, UnsupportedValueSource,
 };
 
 pub use gpui_es_fluent::try_localize_message as localize_message;
@@ -108,17 +108,12 @@ pub use gpui_storybook_core::catalog::{
     static_story_catalog, static_story_catalog_json, static_story_catalog_json_pretty,
     write_static_catalog_json, write_static_catalog_json_pretty,
 };
-#[cfg(feature = "dock")]
-pub use gpui_storybook_core::dock_gallery::{
-    StoryWorkspace, create_dock_window, register_story_panels,
-};
+pub use gpui_storybook_core::dock_gallery::{StoryWorkspace, register_story_panels};
 pub use gpui_storybook_core::registry::{
     RegisteredStoryMetadata, StoryAutodoc, StoryKey, StoryName, StorySectionName,
 };
 #[cfg(feature = "inspector")]
 pub use gpui_storybook_core::story_inspector::StoryInspectorState;
-#[cfg(feature = "dock")]
-pub use gpui_storybook_core::window_view::DockWindowView;
 pub use gpui_storybook_core::{
     assets::Assets,
     automation::{
@@ -145,12 +140,11 @@ pub use gpui_storybook_core::{
     story::themes::STORYBOOK_THEME_DIR_ENV,
     story::{
         Story, StoryContainer, StoryScenario, StoryScenarioSnapshot, StoryScenarioStep,
-        StorySection, StorySectionBase, StorySectionTitle, Substory, create_new_window,
-        create_new_window_with_ui, section,
+        StorySection, StorySectionBase, StorySectionTitle, Substory, create_storybook_window,
+        section,
     },
     storybook_window_ui::{StorybookWindow, StorybookWindowUi},
     theme_workbench::{ThemeColorRow, ThemeDraft, ThemeDraftError, theme_color_rows},
-    window_view::SimpleWindowView,
     workbench::{StoryWorkbench, WorkbenchState, WorkbenchTab},
 };
 
@@ -531,9 +525,12 @@ where
 /// the first window so saved theme and language intent is applied before the
 /// first frame.
 ///
-/// The active runtime `storybook.toml` may provide launch-only preference
-/// overrides. Values supplied through [`StorybookOptions::with_overrides`] take
-/// precedence field by field, and deterministic automation profiles take
+/// The active runtime `storybook.toml` may provide an initial window mode and
+/// launch-only preference overrides. A per-window
+/// [`StorybookWindow::with_mode`] value takes precedence over the TOML mode,
+/// which takes precedence over the saved window preference. Values supplied
+/// through [`StorybookOptions::with_overrides`] take precedence field by field
+/// over TOML preference overrides, and deterministic automation profiles take
 /// precedence over both.
 ///
 /// Storage failures are represented by [`PersistenceStatus::Error`] in the
@@ -560,6 +557,10 @@ where
     }
 
     let init_context = load_init_context()?;
+    let configured_window_mode = init_context
+        .runtime_config
+        .as_ref()
+        .and_then(|config| config.window_mode);
     if let Some(runtime_config) = init_context.runtime_config.as_ref() {
         apply_toml_preference_overrides(&mut options.overrides, runtime_config)?;
     }
@@ -645,9 +646,9 @@ where
             category: "embedded_localization".to_owned(),
         }
     })?;
-    #[cfg(feature = "dock")]
-    register_story_panels(cx);
-
+    if let Some(mode) = configured_window_mode {
+        gpui_storybook_core::storybook_window_ui::set_configured_storybook_window_mode(mode, cx);
+    }
     let global_init_count = inventory::iter::<__registry::InitEntry>().count();
     if global_init_count > 0 {
         tracing::info!("Discovered {} global init function(s)", global_init_count);
@@ -1046,6 +1047,7 @@ mod tests {
     fn runtime_config(allow: &[&str]) -> gpui_storybook_toml::StorybookToml {
         gpui_storybook_toml::StorybookToml {
             group: "storybook-app".into(),
+            window_mode: None,
             allow: Some(allow.iter().map(|group| (*group).to_string()).collect()),
             disable_story: Vec::new(),
             overrides: gpui_storybook_toml::StorybookPreferenceOverrides::default(),
@@ -1446,11 +1448,16 @@ mod tests {
 
             assert_eq!(load_storybook_config(&entry), None);
 
-            std::fs::write(dir.join("storybook.toml"), "group = \"Temp\"\n")
-                .expect("valid config should be written");
+            std::fs::write(
+                dir.join("storybook.toml"),
+                "group = \"Temp\"\nwindow_mode = \"dock\"\n",
+            )
+            .expect("valid config should be written");
+            let config = load_storybook_config(&entry).expect("valid config should load");
+            assert_eq!(config.group, "Temp");
             assert_eq!(
-                load_storybook_config(&entry).map(|config| config.group),
-                Some("Temp".to_string())
+                config.window_mode,
+                Some(gpui_storybook_toml::StorybookWindowMode::Dock)
             );
 
             std::fs::write(dir.join("storybook.toml"), "invalid = true\n")

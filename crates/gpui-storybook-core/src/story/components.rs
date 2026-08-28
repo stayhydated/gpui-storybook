@@ -337,7 +337,6 @@ pub fn story_group_klass(stories: &[Entity<StoryContainer>], cx: &App) -> Shared
     format!("{}{}", STORY_GROUP_KLASS_PREFIX, klasses.join("|")).into()
 }
 
-#[cfg(feature = "dock")]
 pub fn parse_story_group_klass(story_klass: &str) -> Option<Vec<String>> {
     let members = story_klass.strip_prefix(STORY_GROUP_KLASS_PREFIX)?;
     Some(
@@ -1391,7 +1390,6 @@ mod tests {
         assert_eq!(section.children.len(), 1);
     }
 
-    #[cfg(feature = "dock")]
     #[test]
     fn story_group_class_round_trips_sorted_members() {
         assert_eq!(parse_story_group_klass("ButtonStory"), None);

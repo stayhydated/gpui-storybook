@@ -53,7 +53,6 @@ pub enum WorkbenchTab {
     Performance,
 }
 
-#[cfg(feature = "dock")]
 pub(crate) enum WorkbenchEvent {
     OpenVariant(Entity<StoryContainer>),
 }
@@ -200,11 +199,9 @@ impl WorkbenchState {
                 .any(|member| member == &story)
         });
         if belongs_to_group || self.active_group.as_ref() == Some(&story) {
-            #[cfg(feature = "dock")]
             let variant = story.clone();
             self.active_story = Some(story);
             self.apply_presentation(cx);
-            #[cfg(feature = "dock")]
             cx.emit(WorkbenchEvent::OpenVariant(variant));
             cx.notify();
         }
@@ -372,7 +369,6 @@ impl WorkbenchState {
     }
 }
 
-#[cfg(feature = "dock")]
 impl EventEmitter<WorkbenchEvent> for WorkbenchState {}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -580,7 +576,6 @@ impl StoryWorkbench {
         this
     }
 
-    #[cfg(feature = "dock")]
     pub(crate) fn selected_tab_from_panel(info: &PanelInfo) -> WorkbenchTab {
         let PanelInfo::Panel(value) = info else {
             return WorkbenchTab::default();
@@ -2749,7 +2744,6 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "dock")]
     #[test]
     fn persisted_panel_state_restores_the_selected_tab() {
         let info = PanelInfo::panel(

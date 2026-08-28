@@ -1,56 +1,62 @@
-use crate::{
-    gallery::Gallery,
-    storybook_window_ui::{StorybookWindow, StorybookWindowUi},
-    title_bar::AppTitleBar,
-    window_options::default_storybook_window_options,
-    window_view::SimpleWindowView,
-};
+use std::rc::Rc;
+
 use gpui::{
     AnyView, App, AppContext as _, Context, Entity, FocusHandle, Focusable,
     InteractiveElement as _, IntoElement, ParentElement as _, Render, SharedString, Styled as _,
     Subscription, Window, div,
 };
-use gpui_component::{Root, v_flex};
+use gpui_component::{
+    IndexPath, Root, Sizable as _,
+    dock::{ClosePanel, ToggleZoom},
+    h_flex,
+    searchable_list::SearchableListItem,
+    select::{Select, SelectEvent, SelectState},
+    v_flex,
+};
+use gpui_storybook_preferences::StorybookWindowMode;
 
-pub fn create_new_window<F, V>(title: &str, crate_view_fn: F, cx: &mut App)
-where
-    V: SimpleWindowView,
-    F: FnOnce(&mut Window, &mut App) -> Entity<V> + Send + 'static,
-{
-    create_new_window_with_ui(
-        title,
-        move |window, cx| StorybookWindow::new(crate_view_fn(window, cx)),
-        cx,
-    );
-}
+use crate::{
+    automation::{
+        SharedStorybookAutomation, StorybookAutomationCommand, default_storybook_automation,
+    },
+    dock_gallery::StoryWorkspace,
+    gallery::Gallery,
+    messages::{StorybookMessage, text},
+    preferences::{self, StorybookPreferencesGlobal},
+    storybook_window_ui::{StorybookWindow, StorybookWindowUi, configured_storybook_window_mode},
+    title_bar::AppTitleBar,
+    window_options::default_storybook_window_options,
+};
 
-pub fn create_new_window_with_ui<F, V>(title: &str, create_view_fn: F, cx: &mut App)
+use super::StoryContainer;
+
+/// Opens the standard Storybook window with a runtime-selectable layout.
+///
+/// The initial mode is selected in this order: a
+/// [`StorybookWindow::with_mode`] value, the active `storybook.toml`
+/// `window_mode`, then the saved consumer preference. Users can switch layouts
+/// from the title bar, and the choice is saved for later windows.
+pub fn create_storybook_window<F>(title: &str, create_window: F, cx: &mut App)
 where
-    V: SimpleWindowView,
-    F: FnOnce(&mut Window, &mut App) -> StorybookWindow<V> + Send + 'static,
+    F: FnOnce(&mut Window, &mut App) -> StorybookWindow + Send + 'static,
 {
     let options = default_storybook_window_options(cx);
-    let title = SharedString::from(title.to_string());
+    let title = SharedString::from(title.to_owned());
+
+    cx.bind_keys(vec![
+        gpui::KeyBinding::new("shift-escape", ToggleZoom, None),
+        gpui::KeyBinding::new("ctrl-w", ClosePanel, None),
+    ]);
 
     cx.spawn(async move |cx| {
         let window = cx.open_window(options, |window, cx| {
-            let storybook_window = create_view_fn(window, cx);
-            let root = cx.new(|cx| {
-                StoryRoot::new(
-                    title.clone(),
-                    storybook_window.view,
-                    storybook_window.ui,
-                    window,
-                    cx,
-                )
-            });
-
-            let focus_handle = root.focus_handle(cx);
+            let spec = create_window(window, cx);
+            let shell = cx.new(|cx| StorybookShell::new(title.clone(), spec, window, cx));
+            let focus_handle = shell.focus_handle(cx);
             window.defer(cx, move |window, cx| {
                 focus_handle.focus(window, cx);
             });
-
-            cx.new(|cx| Root::new(root, window, cx))
+            cx.new(|cx| Root::new(shell, window, cx))
         })?;
 
         window.update(cx, |_, window, _| {
@@ -61,6 +67,297 @@ where
         Ok::<_, anyhow::Error>(())
     })
     .detach();
+}
+
+#[derive(Clone)]
+struct WindowModeOption {
+    value: StorybookWindowMode,
+    label: SharedString,
+}
+
+impl SearchableListItem for WindowModeOption {
+    type Value = StorybookWindowMode;
+
+    fn title(&self) -> SharedString {
+        self.label.clone()
+    }
+
+    fn value(&self) -> &Self::Value {
+        &self.value
+    }
+}
+
+enum ActiveStorybookView {
+    Gallery {
+        root: Entity<StoryRoot>,
+        gallery: Entity<Gallery>,
+    },
+    Dock(Entity<StoryWorkspace>),
+}
+
+impl ActiveStorybookView {
+    fn view(&self) -> AnyView {
+        match self {
+            Self::Gallery { root, .. } => root.clone().into(),
+            Self::Dock(workspace) => workspace.clone().into(),
+        }
+    }
+
+    fn handle_automation_command(
+        &self,
+        command: StorybookAutomationCommand,
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        match self {
+            Self::Gallery { gallery, .. } => {
+                gallery.update(cx, |gallery, cx| {
+                    gallery.handle_automation_command(command, window, cx);
+                });
+            },
+            Self::Dock(workspace) => {
+                workspace.update(cx, |workspace, cx| {
+                    workspace.handle_automation_command(command, window, cx);
+                });
+            },
+        }
+    }
+}
+
+struct StorybookShell {
+    focus_handle: FocusHandle,
+    title: SharedString,
+    stories: Vec<Entity<StoryContainer>>,
+    ui: StorybookWindowUi,
+    mode: StorybookWindowMode,
+    follows_saved_mode: bool,
+    mode_select: Entity<SelectState<Vec<WindowModeOption>>>,
+    active: ActiveStorybookView,
+    automation: Option<SharedStorybookAutomation>,
+    _subscriptions: Vec<Subscription>,
+}
+
+impl StorybookShell {
+    fn new(
+        title: SharedString,
+        spec: StorybookWindow,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
+        let saved_mode = preferences::try_state(cx)
+            .map(|state| state.saved.window_mode)
+            .unwrap_or_default();
+        let (mode, follows_saved_mode) =
+            initial_window_mode(spec.mode, configured_storybook_window_mode(cx), saved_mode);
+        let selected_index = StorybookWindowMode::ALL
+            .iter()
+            .position(|candidate| *candidate == mode)
+            .map(IndexPath::new);
+        let mode_select =
+            cx.new(|cx| SelectState::new(Self::mode_options(cx), selected_index, window, cx));
+        let automation = default_storybook_automation(cx);
+        let active = Self::build_active(
+            mode,
+            title.clone(),
+            spec.stories.clone(),
+            Self::ui_with_mode_select(spec.ui.clone(), mode_select.clone()),
+            automation.clone(),
+            window,
+            cx,
+        );
+
+        let mut subscriptions = vec![cx.subscribe_in(
+            &mode_select,
+            window,
+            |this, _, event: &SelectEvent<Vec<WindowModeOption>>, window, cx| {
+                let SelectEvent::Confirm(Some(mode)) = event else {
+                    return;
+                };
+                this.follows_saved_mode = true;
+                this.set_mode(*mode, true, window, cx);
+            },
+        )];
+
+        if cx.try_global::<StorybookPreferencesGlobal>().is_some() {
+            subscriptions.push(cx.observe_global_in::<StorybookPreferencesGlobal>(
+                window,
+                |this, window, cx| {
+                    this.refresh_mode_options(window, cx);
+                    if this.follows_saved_mode
+                        && let Some(mode) =
+                            preferences::try_state(cx).map(|state| state.saved.window_mode)
+                    {
+                        this.set_mode(mode, false, window, cx);
+                    }
+                },
+            ));
+        }
+
+        let this = Self {
+            focus_handle: cx.focus_handle(),
+            title,
+            stories: spec.stories,
+            ui: spec.ui,
+            mode,
+            follows_saved_mode,
+            mode_select,
+            active,
+            automation,
+            _subscriptions: subscriptions,
+        };
+        this.attach_automation_host(window, cx);
+        this
+    }
+
+    fn mode_options(cx: &App) -> Vec<WindowModeOption> {
+        vec![
+            WindowModeOption {
+                value: StorybookWindowMode::Gallery,
+                label: text(cx, StorybookMessage::Gallery).into(),
+            },
+            WindowModeOption {
+                value: StorybookWindowMode::Dock,
+                label: text(cx, StorybookMessage::DockWorkspace).into(),
+            },
+        ]
+    }
+
+    fn ui_with_mode_select(
+        ui: StorybookWindowUi,
+        mode_select: Entity<SelectState<Vec<WindowModeOption>>>,
+    ) -> StorybookWindowUi {
+        let custom_title_bar = ui.title_bar_items.clone();
+        StorybookWindowUi {
+            app_menu_items: ui.app_menu_items,
+            title_bar_items: Some(Rc::new(move |window, cx| {
+                h_flex()
+                    .gap_2()
+                    .children(custom_title_bar.as_ref().map(|render| render(window, cx)))
+                    .child(
+                        Select::new(&mode_select)
+                            .title_prefix(format!("{}: ", text(cx, StorybookMessage::Layout)))
+                            .xsmall(),
+                    )
+                    .into_any_element()
+            })),
+        }
+    }
+
+    fn build_active(
+        mode: StorybookWindowMode,
+        title: SharedString,
+        stories: Vec<Entity<StoryContainer>>,
+        ui: StorybookWindowUi,
+        automation: Option<SharedStorybookAutomation>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> ActiveStorybookView {
+        match mode {
+            StorybookWindowMode::Gallery => {
+                let gallery = cx.new(|cx| {
+                    Gallery::new_without_automation_host(stories, None, automation, window, cx)
+                });
+                let root = cx.new(|cx| StoryRoot::new(title, gallery.clone(), ui, window, cx));
+                ActiveStorybookView::Gallery { root, gallery }
+            },
+            StorybookWindowMode::Dock => ActiveStorybookView::Dock(cx.new(|cx| {
+                StoryWorkspace::new_without_automation_host(
+                    stories, title, ui, automation, window, cx,
+                )
+            })),
+        }
+    }
+
+    fn set_mode(
+        &mut self,
+        mode: StorybookWindowMode,
+        persist: bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.mode != mode {
+            self.mode = mode;
+            self.active = Self::build_active(
+                mode,
+                self.title.clone(),
+                self.stories.clone(),
+                Self::ui_with_mode_select(self.ui.clone(), self.mode_select.clone()),
+                self.automation.clone(),
+                window,
+                cx,
+            );
+            self.active_focus_handle(cx).focus(window, cx);
+            cx.notify();
+        }
+
+        if self.mode_select.read(cx).selected_value() != Some(&mode) {
+            self.mode_select.update(cx, |select, cx| {
+                select.set_selected_value(&mode, window, cx);
+            });
+        }
+        if persist {
+            preferences::select_window_mode(mode, cx);
+        }
+    }
+
+    fn refresh_mode_options(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.mode_select.update(cx, |select, cx| {
+            select.set_items(Self::mode_options(cx), window, cx);
+            select.set_selected_value(&self.mode, window, cx);
+        });
+    }
+
+    fn attach_automation_host(&self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(automation) = self.automation.clone() else {
+            return;
+        };
+        let Some(mut receiver) = automation.take_command_receiver() else {
+            return;
+        };
+
+        cx.spawn_in(window, async move |this, cx| {
+            while let Some(command) = receiver.recv().await {
+                let _ = this.update_in(cx, |shell, window, cx| {
+                    shell.active.handle_automation_command(command, window, cx);
+                });
+            }
+        })
+        .detach();
+    }
+
+    fn active_focus_handle(&self, cx: &App) -> FocusHandle {
+        match &self.active {
+            ActiveStorybookView::Gallery { root, .. } => root.focus_handle(cx),
+            ActiveStorybookView::Dock(_) => self.focus_handle.clone(),
+        }
+    }
+}
+
+fn initial_window_mode(
+    explicit: Option<StorybookWindowMode>,
+    configured: Option<StorybookWindowMode>,
+    saved: StorybookWindowMode,
+) -> (StorybookWindowMode, bool) {
+    match (explicit, configured) {
+        (Some(mode), _) | (None, Some(mode)) => (mode, false),
+        (None, None) => (saved, true),
+    }
+}
+
+impl Focusable for StorybookShell {
+    fn focus_handle(&self, cx: &App) -> FocusHandle {
+        self.active_focus_handle(cx)
+    }
+}
+
+impl Render for StorybookShell {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div()
+            .id("storybook-shell")
+            .track_focus(&self.focus_handle)
+            .size_full()
+            .child(self.active.view())
+    }
 }
 
 pub(crate) struct StoryRoot {
@@ -142,15 +439,29 @@ impl Render for StoryRoot {
 mod tests {
     use super::*;
 
-    struct DirectCoreView;
-
-    impl Render for DirectCoreView {
-        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-            div().child("direct core view")
-        }
+    #[test]
+    fn initial_window_mode_prefers_explicit_then_toml_then_saved() {
+        assert_eq!(
+            initial_window_mode(
+                Some(StorybookWindowMode::Gallery),
+                Some(StorybookWindowMode::Dock),
+                StorybookWindowMode::Dock,
+            ),
+            (StorybookWindowMode::Gallery, false)
+        );
+        assert_eq!(
+            initial_window_mode(
+                None,
+                Some(StorybookWindowMode::Dock),
+                StorybookWindowMode::Gallery,
+            ),
+            (StorybookWindowMode::Dock, false)
+        );
+        assert_eq!(
+            initial_window_mode(None, None, StorybookWindowMode::Dock),
+            (StorybookWindowMode::Dock, true)
+        );
     }
-
-    impl SimpleWindowView for DirectCoreView {}
 
     #[gpui::test]
     fn direct_core_window_does_not_require_the_preference_global(cx: &mut App) {
@@ -161,14 +472,12 @@ mod tests {
                 .is_none()
         );
 
-        let window: gpui::WindowHandle<StoryRoot> = cx
+        let window: gpui::WindowHandle<StorybookShell> = cx
             .open_window(Default::default(), |window, cx| {
-                let view = cx.new(|_| DirectCoreView);
                 cx.new(|cx| {
-                    StoryRoot::new(
-                        "Direct Core",
-                        view,
-                        StorybookWindowUi::default(),
+                    StorybookShell::new(
+                        "Direct Core".into(),
+                        StorybookWindow::new(Vec::new()),
                         window,
                         cx,
                     )
@@ -177,8 +486,14 @@ mod tests {
             .expect("direct core window should open without facade preferences");
 
         window
-            .update(cx, |_, window, cx| {
-                crate::preferences::window_activated(window, cx);
+            .update(cx, |shell, window, cx| {
+                assert_eq!(shell.mode, StorybookWindowMode::Gallery);
+                shell.set_mode(StorybookWindowMode::Dock, true, window, cx);
+                assert_eq!(shell.mode, StorybookWindowMode::Dock);
+                assert_eq!(
+                    shell.mode_select.read(cx).selected_value(),
+                    Some(&StorybookWindowMode::Dock)
+                );
                 crate::preferences::select_scrollbar(
                     gpui_storybook_preferences::PreferredScrollbar::Always,
                     cx,

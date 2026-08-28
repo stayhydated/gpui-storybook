@@ -18,6 +18,7 @@ pub fn init(cx: &mut App) -> Result<(), gpui_es_fluent::EmbeddedInitError> {
     crate::story_inspector::init(cx);
     themes::init(cx);
     app_menus::register_actions(cx);
+    crate::dock_gallery::register_story_panels(cx);
 
     cx.bind_keys([
         KeyBinding::new("/", ToggleSearch, None),
@@ -95,6 +96,18 @@ mod tests {
         assert_eq!(
             crate::messages::text(cx, crate::messages::StorybookMessage::Storybook),
             "GPUI Storybook"
+        );
+        assert_eq!(
+            crate::messages::text(cx, crate::messages::StorybookMessage::Layout),
+            "Layout"
+        );
+        assert_eq!(
+            crate::messages::text(cx, crate::messages::StorybookMessage::Gallery),
+            "Gallery"
+        );
+        assert_eq!(
+            crate::messages::text(cx, crate::messages::StorybookMessage::DockWorkspace),
+            "Dock workspace"
         );
     }
 

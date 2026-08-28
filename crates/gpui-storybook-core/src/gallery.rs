@@ -58,6 +58,41 @@ impl Gallery {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
+        Self::new_with_host(
+            initial_stories,
+            init_story_name,
+            automation,
+            true,
+            window,
+            cx,
+        )
+    }
+
+    pub(crate) fn new_without_automation_host(
+        initial_stories: Vec<Entity<StoryContainer>>,
+        init_story_name: Option<&str>,
+        automation: Option<SharedStorybookAutomation>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
+        Self::new_with_host(
+            initial_stories,
+            init_story_name,
+            automation,
+            false,
+            window,
+            cx,
+        )
+    }
+
+    fn new_with_host(
+        initial_stories: Vec<Entity<StoryContainer>>,
+        init_story_name: Option<&str>,
+        automation: Option<SharedStorybookAutomation>,
+        attach_automation_host: bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
         let search_input =
             cx.new(|cx_input| InputState::new(window, cx_input).placeholder("Search..."));
         let workbench_state = cx.new(|cx| WorkbenchState::new(None, cx));
@@ -147,7 +182,7 @@ impl Gallery {
         this.sync_automation_stories(cx);
         this.sync_workbench_active(cx);
         this.confirm_active_story(cx);
-        if let Some(automation) = this.automation.clone() {
+        if attach_automation_host && let Some(automation) = this.automation.clone() {
             this.attach_automation_host(automation, window, cx);
         }
 
@@ -442,7 +477,7 @@ impl Gallery {
         .detach();
     }
 
-    fn handle_automation_command(
+    pub(crate) fn handle_automation_command(
         &mut self,
         command: StorybookAutomationCommand,
         window: &mut Window,
@@ -697,8 +732,6 @@ impl Gallery {
         })
     }
 }
-
-impl crate::window_view::SimpleWindowView for Gallery {}
 
 impl Render for Gallery {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {

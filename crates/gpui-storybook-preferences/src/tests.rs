@@ -11,9 +11,9 @@ use crate::{
     PreferenceClockError, PreferenceRepository, PreferenceStoreError, PreferredColorScheme,
     PreferredLanguage, PreferredLanguageMode, PreferredScrollbar, RecoveryReason,
     RepositoryOpenError, RepositoryOptions, ResolutionDiagnostic, ResolutionOverrides,
-    ResolvePreferencesError, StorybookPreferences, SupportedLanguages, SupportedLanguagesError,
-    SystemColorScheme, ThemeId, ThemeIdError, ThemeSource, UnsupportedValueSource,
-    persistent_json_path, preference_json_schema, resolve_preferences,
+    ResolvePreferencesError, StorybookPreferences, StorybookWindowMode, SupportedLanguages,
+    SupportedLanguagesError, SystemColorScheme, ThemeId, ThemeIdError, ThemeSource,
+    UnsupportedValueSource, persistent_json_path, preference_json_schema, resolve_preferences,
 };
 
 const TEST_CONSUMER: &str = "test.storybook";
@@ -97,6 +97,7 @@ fn supported_languages() -> SupportedLanguages {
 
 fn saved_preferences() -> StorybookPreferences {
     StorybookPreferences {
+        window_mode: StorybookWindowMode::Dock,
         color_scheme: PreferredColorScheme::System,
         light_theme: Some(theme("light-paper")),
         dark_theme: Some(theme("dark-ocean")),
@@ -143,6 +144,18 @@ fn preference_json_schema_is_derived_from_the_typed_document() {
         "#/$defs/StorybookPreferences"
     );
     assert_eq!(schema["$defs"]["StorybookPreferences"]["type"], "object");
+    assert_eq!(
+        schema["$defs"]["StorybookPreferences"]["properties"]["window_mode"]["$ref"],
+        "#/$defs/StorybookWindowMode"
+    );
+    assert_eq!(
+        schema["$defs"]["StorybookWindowMode"]["oneOf"][0]["const"],
+        "gallery"
+    );
+    assert_eq!(
+        schema["$defs"]["StorybookWindowMode"]["oneOf"][1]["const"],
+        "dock"
+    );
     assert_eq!(schema["$defs"]["ConsumerId"]["type"], "string");
     for field in ["light_theme", "dark_theme"] {
         assert_eq!(
@@ -245,8 +258,26 @@ fn typed_values_normalize_and_reject_invalid_storage_tokens() {
     assert_eq!(PreferredScrollbar::Hover.token(), "hover");
     assert_eq!(PreferredScrollbar::Always.token(), "always");
     assert_eq!("always".parse(), Ok(PreferredScrollbar::Always));
+    assert_eq!(StorybookWindowMode::Gallery.token(), "gallery");
+    assert_eq!(StorybookWindowMode::Dock.token(), "dock");
+    assert_eq!("dock".parse(), Ok(StorybookWindowMode::Dock));
+    assert!("Dock".parse::<StorybookWindowMode>().is_err());
     assert_eq!(PersistenceMode::Temporary.token(), "temporary");
     assert_eq!("disabled".parse(), Ok(PersistenceMode::Disabled));
+}
+
+#[test]
+fn omitted_window_mode_defaults_to_gallery() {
+    let mut value = serde_json::to_value(saved_preferences()).expect("preferences serialize");
+    value
+        .as_object_mut()
+        .expect("preferences serialize as an object")
+        .remove("window_mode");
+
+    let preferences: StorybookPreferences =
+        serde_json::from_value(value).expect("window mode may be omitted");
+
+    assert_eq!(preferences.window_mode, StorybookWindowMode::Gallery);
 }
 
 #[test]
@@ -554,6 +585,7 @@ async fn json_repository_supports_typed_crud_reopen_and_generated_schema() {
     assert_eq!(document.get("format_version"), None);
     assert_eq!(document.get("created_at_millis"), None);
     assert_eq!(document.get("updated_at_millis"), None);
+    assert_eq!(document["preferences"]["window_mode"], "dock");
     assert_eq!(document["preferences"]["color_scheme"], "system");
     assert_eq!(document["preferences"]["language"]["mode"], "explicit");
     assert_eq!(document["preferences"]["language"]["tag"], "fr");

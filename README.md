@@ -7,9 +7,10 @@
 
 GPUI Storybook is a searchable component preview shell for GPUI applications. It
 supports stateful stories, component-derived stories, persistent appearance and
-language preferences, a live controls/theme/inspect/actions workbench, opt-in GPUI
-Inspector integration, an optional dock workspace, and optional MCP automation
-for typed controls, in-process interaction, and PNG capture.
+language and layout preferences, runtime-selectable gallery and dock workspaces,
+a live controls/theme/inspect/actions workbench, opt-in GPUI Inspector
+integration, and optional MCP automation for typed controls, in-process
+interaction, and PNG capture.
 
 ## Try the examples
 
@@ -25,10 +26,16 @@ Run the `#[derive(ComponentStory)]` example:
 cargo run -p gpui-storybook-example-component
 ```
 
-Add `--features dock` to either command to open the dock workspace. Add
+Use the title-bar **Layout** select to switch either example between **Gallery**
+and **Dock workspace**. Storybook saves that choice for the example binary. Add
 `--features inspector` to expose the GPUI Inspector button and story-root
-metadata. Both features are opt-in and can be combined as
-`--features dock,inspector`.
+metadata.
+
+Set top-level `window_mode = "gallery"` or `window_mode = "dock"` in the
+active `storybook.toml` when a binary needs a launch-specific initial layout.
+`StorybookWindow::with_mode` takes precedence over TOML, and TOML takes
+precedence over the saved layout. The title-bar select remains available and
+saves later choices.
 
 Add `--features performance` to expose GPUI's window timing histograms and
 debug frame overlay in the workbench.
@@ -175,7 +182,7 @@ baselines](book/src/portable_testing.md).
 
 Most applications should depend on the `gpui-storybook` facade crate. Register
 a component or a stateful story, initialize Storybook, await preference
-readiness, and then open a gallery or dock window.
+readiness, and then open the runtime-selectable Storybook window.
 
 - [User guide](book/src/introduction.md)
 - [Getting started](book/src/getting_started.md)

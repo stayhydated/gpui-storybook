@@ -3,17 +3,16 @@
 This package demonstrates the `#[story]` workflow for previews that own GPUI
 state, focus, actions, or custom wrapper UI.
 
-Run the gallery:
+Run the Storybook:
 
 ```bash
 cargo run -p gpui-storybook-example-story
 ```
 
-Run the dock workspace:
-
-```bash
-cargo run -p gpui-storybook-example-story --features dock
-```
+Use the title-bar **Layout** select to switch between Gallery and Dock workspace.
+The selection is saved for this example binary. Uncomment
+`window_mode = "dock"` in this package's `storybook.toml` to start a launch in
+Dock workspace; the selector can still change and save the later choice.
 
 Run the gallery with the opt-in GPUI Inspector integration:
 
@@ -89,7 +88,7 @@ On Linux, install `gpui-storybook-launch` and place it before the Cargo command
 as documented in the automation guide. The application remains on GPUI's normal
 Wayland backend and receives compositor-driven frame callbacks.
 
-Add `dock` to the feature list to run the identical executor through the dock
+Switch to **Dock workspace** to run the identical executor through the dock
 host. Rediscover registered actions after each launch before dispatching one.
 Opening a route for an interaction batch focuses that story's focus handle. The
 fixture therefore inserts text first, moves focus once to reach the select, and
