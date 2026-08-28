@@ -1,5 +1,9 @@
 //! MCP tools for driving a live `gpui-storybook` window.
 //!
+//! This crate supports Linux only. macOS, Windows, and other targets produce a
+//! compile-time error; applications should enable the facade's `mcp` feature
+//! only for Linux Storybook binaries.
+//!
 //! Tools can navigate stable routes, read/set/reset the selected story's typed
 //! controls, read or wait for route-local structured application values, apply
 //! a serialized control map before capture, and use named or explicit viewport
@@ -24,6 +28,11 @@
 //! MCP servers retain the shared automation registry for the complete live-host
 //! lifetime; completing an automation call never requests application
 //! shutdown.
+
+#[cfg(not(target_os = "linux"))]
+compile_error!(
+    "gpui-storybook-mcp supports Linux only; macOS, Windows, and other targets are unsupported"
+);
 
 use component_shape_mcp::{
     McpJsonSchema, McpSchema, McpSchemaProperties, McpServer, McpToolError, McpToolInput,
@@ -140,8 +149,11 @@ pub struct StorybookCaptureSession {
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[schemars(deny_unknown_fields)]
 pub struct CaptureLaunchEnv {
+    /// Environment variables to merge into the launched process.
     pub env: BTreeMap<String, String>,
+    /// Cargo arguments included after the launcher's `cargo` command.
     pub cargo_args: Vec<String>,
+    /// Linux `gpui-storybook-launch` command and its arguments.
     pub command: Vec<String>,
 }
 
@@ -317,7 +329,7 @@ struct WaitForValueInput {
     max_frames: Option<u16>,
 }
 
-/// Build the environment and platform command for launching a capture-enabled storybook.
+/// Build the environment and Linux launcher command for a capture-enabled storybook.
 #[derive(Clone, Debug, component_shape_mcp::McpToolInput)]
 struct CaptureLaunchEnvInput {
     /// Stable story key or `story-key/substory-key` route.
@@ -1019,7 +1031,7 @@ pub fn register_tools_with_options(
         capture_tool::<CaptureLaunchEnvInput>(
             TOOL_CAPTURE_LAUNCH_ENV,
             "Capture Launch Env",
-            "Build frame-capture environment variables and a platform launch command for a story route.",
+            "Build frame-capture environment variables and a Linux launcher command for a story route.",
             capture_launch_env_output_schema(),
             ToolHints::read_only(),
             true,
@@ -1902,15 +1914,11 @@ fn build_capture_launch_env(
 }
 
 fn cargo_launch_command(cargo_args: &[String]) -> Vec<String> {
-    #[cfg(target_os = "linux")]
     let mut command = vec![
         "gpui-storybook-launch".to_string(),
         "--".to_string(),
         "cargo".to_string(),
     ];
-
-    #[cfg(not(target_os = "linux"))]
-    let mut command = vec!["cargo".to_string()];
 
     command.extend(cargo_args.iter().cloned());
     command
@@ -2666,26 +2674,11 @@ mod tests {
         assert_eq!(structured["env"]["WGPU_CAPTURE_WIDTH"], "900");
         assert_eq!(structured["env"]["WGPU_CAPTURE_HEIGHT"], "700");
         assert_eq!(structured["env"][STDIO_ENV_VAR], "1");
-        #[cfg(target_os = "linux")]
         assert_eq!(
             structured["command"],
             json!([
                 "gpui-storybook-launch",
                 "--",
-                "cargo",
-                "run",
-                "-p",
-                "gpui-storybook-example-story",
-                "--features",
-                "mcp",
-                "--bin",
-                "story"
-            ])
-        );
-        #[cfg(not(target_os = "linux"))]
-        assert_eq!(
-            structured["command"],
-            json!([
                 "cargo",
                 "run",
                 "-p",
@@ -2863,13 +2856,10 @@ mod tests {
         .expect("minimal launch environment should build");
 
         assert_eq!(launch.cargo_args, vec!["run"]);
-        #[cfg(target_os = "linux")]
         assert_eq!(
             launch.command,
             vec!["gpui-storybook-launch", "--", "cargo", "run",]
         );
-        #[cfg(not(target_os = "linux"))]
-        assert_eq!(launch.command, vec!["cargo", "run"]);
         assert!(!launch.env.contains_key(STDIO_ENV_VAR));
         assert_eq!(launch.env["WGPU_CAPTURE_ROUTE"], "example-ButtonStory");
 

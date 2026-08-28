@@ -68,7 +68,8 @@ description: >-
   or `with_mode` for a per-window choice. Precedence is `with_mode`, TOML, then
   the saved preference.
 - Forward optional package features explicitly when users launch with
-  `--features inspector`, `--features performance`, or `--features mcp`.
+  `--features inspector` or `--features performance`, and forward the
+  Linux-only `--features mcp` integration only for Linux Storybook binaries.
 - Use the Actions workbench tab for GPUI actions exposed through the selected
   story's opt-in `Story::action_scope_focus_handle`. Track that handle on the
   handler-owning root and keep it separate from nested input focus. The tab
@@ -80,7 +81,8 @@ description: >-
 - Retain the MCP automation handle for the host lifetime. Tool completion
   does not request shutdown; stdin, cancellation, or application policy ends
   the host explicitly.
-- Run Linux MCP and startup-capture sessions through
+- Treat MCP and startup capture as Linux-only; macOS and Windows are
+  unsupported. Run those sessions through
   `gpui-storybook-launch`; keep the application on its normal Wayland platform
   backend and use `GPUI_STORYBOOK_SWAY` for a private Sway executable.
 - Require `GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1` before generic focus,

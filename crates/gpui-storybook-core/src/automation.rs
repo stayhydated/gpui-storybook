@@ -14,9 +14,9 @@
 //! the same operation. Runtime failures after dispatch report partial progress
 //! and must not be retried automatically.
 //!
-//! This controller uses the application's normal platform window. Linux
-//! automation runners can provide a Wayland compositor with Sway's wlroots
-//! headless backend; the MCP launch helper generates that platform wrapper.
+//! This controller uses the application's normal platform window. The
+//! Linux-only MCP integration provides a Wayland compositor with Sway's wlroots
+//! headless backend; its launch helper generates that platform wrapper.
 
 #[cfg(feature = "capture")]
 use crate::capture_output::CaptureOutputStore;

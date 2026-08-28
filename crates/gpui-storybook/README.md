@@ -4,7 +4,7 @@
 to a GPUI application. It exposes initialization, the runtime-selectable gallery
 and dock window, story registration, typed controls, the live controls, theme,
 inspect, and actions workbench, typed preferences, localization support, and
-optional GPUI Inspector and MCP integrations.
+optional GPUI Inspector and Linux MCP integrations.
 
 Most applications should use this crate rather than the lower-level workspace
 crates.
@@ -15,7 +15,7 @@ crates.
 |---|---:|---|
 | `macros` | Yes | Re-export `#[story]`, `#[story_init]`, `StoryControls`, `ComponentStory`, and `Substory` |
 | `inspector` | No | Add the GPUI Inspector button, UI, and story-root metadata |
-| `mcp` | No | Add MCP tools, opt-in in-process interaction, and PNG capture support |
+| `mcp` | No | On Linux, add MCP tools, opt-in in-process interaction, and PNG capture support |
 | `performance` | No | Add GPUI window timing histograms and the debug frame overlay to the workbench |
 
 Initialization is asynchronous: call `gpui_storybook::init`, await the returned
@@ -54,8 +54,8 @@ named interaction flows. The Scenarios workbench tab and MCP list/run tools use
 the same executor. Every scenario recreates its concrete story before applying
 controls, presentation, steps, exact semantic postconditions, and optional
 capture. Normal `gpui_storybook::init` installs the live in-process runner, so
-**Run fresh** works in a standard `cargo run`; the `mcp` feature adds remote
-tools and capture support to that same controller. The sticky Scenarios
+**Run fresh** works in a standard `cargo run`; on Linux, the `mcp` feature adds
+remote tools and capture support to that same controller. The sticky Scenarios
 toolbar's **Reset** action recreates the story at its constructor defaults and
 clears the last run result without executing a scenario.
 
@@ -100,7 +100,8 @@ The explicit example's
 shows Buttons, contextual shortcuts, the Actions tab, and scenarios dispatching
 the same GPUI commands.
 
-With `mcp` enabled, set both `GPUI_STORYBOOK_MCP_STDIO=1` and
+The `mcp` feature supports Linux; enabling it on macOS or Windows produces a
+compile-time error. With `mcp` enabled, set both `GPUI_STORYBOOK_MCP_STDIO=1` and
 `GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1` to advertise generic focus, keyboard,
 registered-action, story-relative pointer, scroll, frame-wait, and atomic
 post-interaction capture tools. The interaction gate is separate because a

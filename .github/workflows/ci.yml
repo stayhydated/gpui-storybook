@@ -49,15 +49,25 @@ jobs:
         with:
           sway: true
 
-      - name: Run tests
-        if: runner.os != 'Windows'
+      - name: Run Linux tests with every feature
+        if: runner.os == 'Linux'
         run: cargo test --workspace --all-features --locked
 
-      - name: Run tests
+      - name: Run macOS tests outside Linux-only MCP crates
+        if: runner.os == 'macOS'
+        run: >-
+          cargo test --workspace --locked
+          --exclude gpui-storybook-launch
+          --exclude gpui-storybook-mcp
+
+      - name: Run Windows tests outside Linux-only MCP crates
         if: runner.os == 'Windows'
         env:
           RUSTC_WRAPPER: ""
-        run: cargo test --workspace --all-features --locked
+        run: >-
+          cargo test --workspace --locked
+          --exclude gpui-storybook-launch
+          --exclude gpui-storybook-mcp
 
       - name: Smoke test Storybook capture through headless Sway
         if: runner.os == 'Linux'

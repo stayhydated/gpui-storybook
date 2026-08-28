@@ -5,15 +5,16 @@ diagnosing automation.
 
 ## Enable automation
 
-Forward the facade feature:
+On Linux, forward the facade feature:
 
 ```toml
 [features]
 mcp = ["gpui-storybook/mcp"]
 ```
 
-Set `GPUI_STORYBOOK_MCP_STDIO=1` to serve MCP over stdio. Route tracing and
-diagnostic logs to standard error.
+The `mcp` feature is unsupported on macOS and Windows and produces a
+compile-time error there. Set `GPUI_STORYBOOK_MCP_STDIO=1` to serve MCP over
+stdio. Route tracing and diagnostic logs to standard error.
 
 On Linux, install Sway plus `libgl1-mesa-dri` and `mesa-vulkan-drivers`, then
 install the reusable launcher and run stdio and startup-capture sessions
@@ -29,8 +30,8 @@ The launcher provides a compatibility seat, window management, bounded socket
 readiness, and frame callbacks while retaining GPUI's normal Wayland backend.
 It selects the headless backend and software Pixman renderer, inherits MCP
 stdio, and stops Sway when the child exits. Set `GPUI_STORYBOOK_SWAY` for a
-private Sway executable. The launch-env tool emits this command on Linux and a
-direct Cargo command elsewhere.
+private Sway executable. The launch-env tool always emits this Linux launcher
+command.
 
 ### Verify raw stdio in this repository
 
@@ -224,10 +225,10 @@ Optional variables:
 
 Capture startup disables persistence and forces light appearance, the
 `Default Light` theme, and the typed fallback language. Stdio-only startup
-uses the same presentation with temporary storage. On Linux,
+uses the same presentation with temporary storage.
 `storybook_capture_launch_env` returns an `env` map and a `command` array. Merge
 every `env` entry into the child process environment before executing
-`command`; on Linux the command invokes the installed launcher, which creates a
+`command`; the command invokes the installed launcher, which creates a
 private Wayland runtime, waits for headless Sway, and then runs Cargo. It does
 not inline the capture or MCP variables.
 

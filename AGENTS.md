@@ -171,12 +171,15 @@ Build `web/public/book`, `web/public/llms*`, `web/public/gpui-demo`, and
 - `crates/gpui-storybook-mcp`
   Audience: **Public integration**
   Docs: [README](crates/gpui-storybook-mcp/README.md), crate Rustdocs
-  Role: MCP tools, stdio serving, environment-driven capture startup, and capture launch helpers exposed through the facade crate's `mcp` feature.
+  Role: Linux-only MCP tools, stdio serving, environment-driven capture
+  startup, and capture launch helpers exposed through the facade crate's `mcp`
+  feature; macOS and Windows are unsupported.
 
 - `crates/gpui-storybook-launch`
   Audience: **Public integration**
   Docs: [README](crates/gpui-storybook-launch/README.md), crate Rustdocs
-  Role: standalone Linux headless Sway lifecycle wrapper used by MCP and startup-capture hosts; non-Linux targets execute the child directly.
+  Role: standalone Linux-only headless Sway lifecycle wrapper used by MCP and
+  startup-capture hosts; macOS and Windows are unsupported.
 
 - `crates/gpui-storybook-test`
   Audience: **Public integration**
@@ -238,8 +241,9 @@ Build `web/public/book`, `web/public/llms*`, `web/public/gpui-demo`, and
   `cargo clippy --workspace --all-features`,
   `cargo doc --workspace --all-features --no-deps --locked`,
   `cargo package --workspace --list`, workspace coverage uploaded to Codecov,
-  the full workspace test suite on Rust stable across Linux, macOS, and Windows,
-  and a cargo-machete action.
+  the full all-feature workspace test suite on Rust stable Linux, the
+  default-feature workspace outside the Linux-only MCP and launcher crates on
+  macOS and Windows, and a cargo-machete action.
 - Use `cargo test -p gpui-storybook-preferences --locked` for focused changes
   to typed preference values, JSON/schema repository behavior, invalid-file
   recovery, system detectors, or theme/language resolution.

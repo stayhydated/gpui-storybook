@@ -58,7 +58,8 @@
 //!   re-exports automation and capture helpers. Generic remote input tools are
 //!   advertised only when
 //!   `GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1`; typed controls remain available
-//!   without that capability.
+//!   without that capability. This feature is supported on Linux; enabling it
+//!   on macOS, Windows, or another target produces a compile-time error.
 //! - `performance`: enables GPUI window profiler histograms and the debug frame
 //!   overlay in the Perf workbench tab
 //!
@@ -77,6 +78,11 @@
 //! [`PersistenceStatus`] is storage-only; locale-adapter failures are reported
 //! as diagnostics and are retried on later window activation without falsifying
 //! storage state.
+
+#[cfg(all(feature = "mcp", not(target_os = "linux")))]
+compile_error!(
+    "the `gpui-storybook/mcp` feature supports Linux only; macOS, Windows, and other targets are unsupported"
+);
 
 #[cfg(feature = "macros")]
 pub use gpui_storybook_macros::*;
@@ -154,12 +160,12 @@ pub use gpui_storybook_core::registry as __registry;
 #[doc(hidden)]
 pub use inventory as __inventory;
 
-#[cfg(feature = "mcp")]
+#[cfg(all(feature = "mcp", target_os = "linux"))]
 pub mod mcp {
     pub use gpui_storybook_mcp::*;
 }
 
-#[cfg(feature = "mcp")]
+#[cfg(all(feature = "mcp", target_os = "linux"))]
 pub mod capture {
     pub use gpui_storybook_mcp::capture::*;
 }
@@ -484,14 +490,14 @@ struct StorybookInitialized;
 
 impl ::gpui::Global for StorybookInitialized {}
 
-#[cfg(feature = "mcp")]
+#[cfg(all(feature = "mcp", target_os = "linux"))]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum AutomationPreferenceProfile {
     Capture,
     Stdio,
 }
 
-#[cfg(feature = "mcp")]
+#[cfg(all(feature = "mcp", target_os = "linux"))]
 fn apply_automation_preference_profile<L>(
     profile: AutomationPreferenceProfile,
     persistence: &mut PersistenceMode,
@@ -565,7 +571,7 @@ where
         apply_toml_preference_overrides(&mut options.overrides, runtime_config)?;
     }
 
-    #[cfg(feature = "mcp")]
+    #[cfg(all(feature = "mcp", target_os = "linux"))]
     {
         let profile = if gpui_storybook_mcp::capture_requested() {
             Some(AutomationPreferenceProfile::Capture)
@@ -700,7 +706,7 @@ where
 
     Ok(cx.spawn(async move |_cx| {
         let ready = readiness.await;
-        #[cfg(feature = "mcp")]
+        #[cfg(all(feature = "mcp", target_os = "linux"))]
         {
             _cx.update(start_mcp_automation);
         }
@@ -727,7 +733,7 @@ pub fn try_preference_state(cx: &::gpui::App) -> Option<&PreferenceState> {
     gpui_storybook_core::preferences::try_state(cx)
 }
 
-#[cfg(feature = "mcp")]
+#[cfg(all(feature = "mcp", target_os = "linux"))]
 fn start_mcp_automation(cx: &mut ::gpui::App) {
     let automation = gpui_storybook_core::automation::default_storybook_automation(cx)
         .expect("gpui-storybook init should install live automation before MCP startup");
@@ -764,16 +770,11 @@ fn start_mcp_automation(cx: &mut ::gpui::App) {
     }
 }
 
-#[cfg(all(feature = "mcp", unix))]
+#[cfg(all(feature = "mcp", target_os = "linux"))]
 fn exit_after_mcp_stdio(exit_code: i32) -> ! {
     // SAFETY: the stdio transport has completed and the automation session owns
     // this process. `_exit` avoids native platform and thread-local teardown.
     unsafe { libc::_exit(exit_code) }
-}
-
-#[cfg(all(feature = "mcp", not(unix)))]
-fn exit_after_mcp_stdio(exit_code: i32) -> ! {
-    std::process::exit(exit_code)
 }
 
 /// Discovers registered stories, applies `storybook.toml` filtering, and
@@ -1130,7 +1131,7 @@ mod tests {
         ));
     }
 
-    #[cfg(feature = "mcp")]
+    #[cfg(all(feature = "mcp", target_os = "linux"))]
     #[test]
     fn capture_profile_is_deterministic_and_disables_storage() {
         let mut persistence = PersistenceMode::Persistent;
@@ -1160,7 +1161,7 @@ mod tests {
         assert_eq!(overrides.language, Some(7));
     }
 
-    #[cfg(feature = "mcp")]
+    #[cfg(all(feature = "mcp", target_os = "linux"))]
     #[test]
     fn stdio_profile_is_deterministic_and_uses_temporary_storage() {
         let mut persistence = PersistenceMode::Persistent;

@@ -80,9 +80,9 @@ prepaint with `storybook_target`, and route-local Serde-serializable state durin
 the same phase with `storybook_value`. The implicit methods use the GPUI element ID as
 the key and derive a readable label; the `_as` methods accept both explicitly.
 Duplicate keys within either registry are rejected.
-On Linux,
-non-interactive automation should run the normal Wayland application through
-the `gpui-storybook-launch` Sway wrapper.
+The Linux-only MCP integration runs non-interactive automation through the
+`gpui-storybook-launch` Sway wrapper while retaining the normal Wayland
+application path. macOS and Windows do not support the MCP feature.
 
 In native debug builds, `STORYBOOK_THEME_DIR` selects the consumer-owned custom
 theme directory watched by the runtime. With no override, the runtime watches

@@ -1,19 +1,24 @@
 //! Process launcher for GPUI Storybook automation sessions.
 //!
-//! Linux sessions receive a private Sway compositor configured with wlroots'
-//! headless backend and the Pixman software renderer. Other targets execute the
-//! child directly.
+//! This Linux-only crate starts a private Sway compositor configured with
+//! wlroots' headless backend and the Pixman software renderer. macOS, Windows,
+//! and other targets are unsupported.
+
+#[cfg(not(target_os = "linux"))]
+compile_error!(
+    "gpui-storybook-launch supports Linux only; macOS, Windows, and other targets are unsupported"
+);
 
 use std::{
     ffi::{OsStr, OsString},
     io,
-    process::{Command, ExitStatus},
+    process::ExitStatus,
 };
 
 /// Environment variable that overrides the Sway executable.
 pub const SWAY_ENV_VAR: &str = "GPUI_STORYBOOK_SWAY";
 
-/// One child command to execute through the platform launcher.
+/// One child command to execute inside the private Sway session.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LaunchCommand {
     program: OsString,
@@ -43,7 +48,7 @@ impl LaunchCommand {
     }
 }
 
-/// Platform launcher options.
+/// Private Sway launcher options.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct LaunchOptions {
     /// Explicit Sway executable. The environment override and then `sway` are
@@ -60,10 +65,14 @@ pub fn run(command: &LaunchCommand, options: &LaunchOptions) -> io::Result<ExitS
 mod platform {
     use super::*;
 
-    pub(super) fn run(command: &LaunchCommand, _options: &LaunchOptions) -> io::Result<ExitStatus> {
-        Command::new(command.program())
-            .args(command.args())
-            .status()
+    pub(super) fn run(
+        _command: &LaunchCommand,
+        _options: &LaunchOptions,
+    ) -> io::Result<ExitStatus> {
+        Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "gpui-storybook-launch supports Linux only",
+        ))
     }
 }
 
@@ -74,7 +83,7 @@ mod platform {
         fs::{self, File},
         os::unix::fs::{FileTypeExt as _, PermissionsExt as _},
         path::{Path, PathBuf},
-        process::{Child, Stdio},
+        process::{Child, Command, Stdio},
         thread,
         time::{Duration, Instant},
     };
