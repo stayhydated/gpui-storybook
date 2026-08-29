@@ -8,11 +8,7 @@ impl StoryWorkbench {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let automation = self
-            .state
-            .read(cx)
-            .automation()
-            .or_else(|| default_storybook_automation(cx));
+        let automation = self.state.read(cx).automation();
         let Some(automation) = automation else {
             self.scenario_run = Some(ScenarioRunState::Finished {
                 story_key,

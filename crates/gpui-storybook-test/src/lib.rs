@@ -689,12 +689,7 @@ impl HeadlessStoryRunner {
         );
 
         context.update(|app| {
-            init_story_runtime(app).map_err(|error| StorybookTestError::RuntimeInitialization {
-                message: error.to_string(),
-            })?;
-            for init in inventory::iter::<InitEntry>() {
-                (init.init_fn)(app);
-            }
+            initialize_portable_story_app(app)?;
             if let Some(initializer) = &self.config.app_initializer {
                 initializer(app);
             }
@@ -1071,6 +1066,18 @@ fn apply_builtin_theme(theme: &ThemeCase, window: &mut Window, app: &mut App) {
     }
 }
 
+fn initialize_portable_story_app(app: &mut App) -> Result<(), StorybookTestError> {
+    #[cfg(not(target_family = "wasm"))]
+    gpui_tokio::init(app);
+    init_story_runtime(app).map_err(|error| StorybookTestError::RuntimeInitialization {
+        message: error.to_string(),
+    })?;
+    for init in inventory::iter::<InitEntry>() {
+        (init.init_fn)(app);
+    }
+    Ok(())
+}
+
 fn apply_controls_to_story(
     story: &Entity<StoryContainer>,
     controls: &BTreeMap<String, ControlValue>,
@@ -1115,27 +1122,62 @@ fn viewport_preset(viewport: &ViewportCase) -> StoryViewportPreset {
     }
 }
 
-/// Sanitizes a case ID for a single deterministic PNG filename.
-pub(crate) fn case_file_name(id: &str) -> String {
-    let mut name = id
-        .chars()
-        .map(|character| {
-            if character.is_ascii_alphanumeric() || matches!(character, '-' | '_') {
-                character
-            } else {
-                '_'
-            }
-        })
-        .collect::<String>();
-    if name.is_empty() {
-        name.push_str("case");
+pub(crate) fn encode_id_fragment(value: &str) -> String {
+    const HEX: &[u8; 16] = b"0123456789ABCDEF";
+
+    let mut encoded = String::with_capacity(value.len());
+    for byte in value.bytes() {
+        if byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'-' | b'_' | b'.')
+        {
+            encoded.push(char::from(byte));
+        } else {
+            encoded.push('%');
+            encoded.push(char::from(HEX[usize::from(byte >> 4)]));
+            encoded.push(char::from(HEX[usize::from(byte & 0x0f)]));
+        }
     }
-    name
+    encoded
+}
+
+/// Encodes a case ID as one deterministic PNG filename component.
+pub(crate) fn case_file_name(id: &str) -> String {
+    format!("id-{}", encode_id_fragment(id))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(target_family = "wasm"))]
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    #[cfg(not(target_family = "wasm"))]
+    static TOKIO_STORY_INIT_RAN: AtomicBool = AtomicBool::new(false);
+
+    #[cfg(not(target_family = "wasm"))]
+    fn tokio_story_init(app: &mut App) {
+        let _handle = gpui_tokio::Tokio::handle(app);
+        TOKIO_STORY_INIT_RAN.store(true, Ordering::SeqCst);
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    inventory::submit! {
+        InitEntry {
+            init_fn: tokio_story_init,
+            fn_name: "tokio_story_init",
+            file: file!(),
+            line: line!(),
+        }
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    #[gpui::test]
+    fn portable_runtime_installs_tokio_before_story_init_hooks(cx: &mut App) {
+        TOKIO_STORY_INIT_RAN.store(false, Ordering::SeqCst);
+
+        initialize_portable_story_app(cx).expect("portable runtime should initialize");
+
+        assert!(TOKIO_STORY_INIT_RAN.load(Ordering::SeqCst));
+    }
 
     #[gpui::test]
     fn story_without_control_target_has_an_empty_snapshot(cx: &mut App) {
@@ -1157,8 +1199,16 @@ mod tests {
 
     #[test]
     fn case_file_name_is_stable_and_safe() {
-        assert_eq!(case_file_name("crate/Button root"), "crate_Button_root");
-        assert_eq!(case_file_name(""), "case");
+        assert_eq!(
+            case_file_name("crate/Button root"),
+            "id-crate%2F%42utton%20root"
+        );
+        assert_eq!(case_file_name(""), "id-");
+        assert_ne!(case_file_name("a b"), case_file_name("a?b"));
+        assert_ne!(
+            case_file_name("A").to_ascii_lowercase(),
+            case_file_name("a").to_ascii_lowercase()
+        );
     }
 
     #[test]

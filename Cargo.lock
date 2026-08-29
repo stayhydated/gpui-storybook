@@ -4490,6 +4490,7 @@ dependencies = [
  "gpui-component",
  "gpui-storybook-core",
  "gpui_platform",
+ "gpui_tokio",
  "gpui_wgpu",
  "image",
  "inventory",

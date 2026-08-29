@@ -8,9 +8,12 @@ baseline or capture-matrix jobs.
 
 The crate is intended for debug tools, CI runners, and integration tests. A
 fresh context is created for every capture, so story entities and story-local
-globals are isolated from adjacent cases. The `capture` feature is enabled by
-default. Enable `performance` to collect GPUI's window profiler histograms and
-enforce draw and dirty-to-present budgets:
+globals are isolated from adjacent cases. On native targets, the runner installs
+`gpui_tokio` before initializing the core runtime and invoking linked
+`#[story_init]` hooks, so hooks can use `gpui_tokio::Tokio::spawn` or
+`gpui_tokio::Tokio::handle` as they do under the facade. The `capture` feature
+is enabled by default. Enable `performance` to collect GPUI's window profiler
+histograms and enforce draw and dirty-to-present budgets:
 
 ```toml
 [dev-dependencies]
@@ -36,7 +39,10 @@ when intentionally accepting new output. `CaptureMatrix` expands the selected
 stories, routes, named viewports, presentation cases, themes, languages, and
 named control sets into stable case IDs. Every expanded case is executed in a
 fresh context and `MatrixReport` records each success or typed failure as
-structured JSON-compatible data. Root and substory routes use the core
+structured JSON-compatible data. Generated request IDs encode serialized
+control maps without losing punctuation, and `output_dir` encodes the complete
+case ID into one filename component, so distinct control values and case labels
+cannot overwrite one another. Root and substory routes use the core
 capture-region crop and scroll helpers; `RunnerConfig::route_capture` can
 override that policy and own route verification when an application needs a
 custom route surface. Stories without a typed control target produce an empty

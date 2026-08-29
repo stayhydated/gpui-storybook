@@ -1,9 +1,9 @@
 use crate::{
     automation::{
         SharedStorybookAutomation, StoryCurrentSnapshot, StoryScreenshotRequest, StorySnapshot,
-        StorybookAutomationCommand, StorybookAutomationError, default_storybook_automation,
-        schedule_story_capture, set_capture_target_size, story_snapshots_from_containers,
-        validate_capture_target_size,
+        StorybookAutomationCommand, StorybookAutomationCommandReceiver, StorybookAutomationError,
+        default_storybook_automation, schedule_story_capture, set_capture_target_size,
+        story_snapshots_from_containers, validate_capture_target_size,
     },
     capture_region::capture_route_story_key,
     story::StoryContainer,
@@ -93,6 +93,18 @@ impl Gallery {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
+        let command_receiver = if attach_automation_host {
+            automation
+                .as_ref()
+                .and_then(|automation| automation.take_command_receiver())
+        } else {
+            None
+        };
+        let automation = if attach_automation_host && command_receiver.is_none() {
+            None
+        } else {
+            automation
+        };
         let search_input =
             cx.new(|cx_input| InputState::new(window, cx_input).placeholder("Search..."));
         let workbench_state =
@@ -183,8 +195,8 @@ impl Gallery {
         this.sync_automation_stories(cx);
         this.sync_workbench_active(cx);
         this.confirm_active_story(cx);
-        if attach_automation_host && let Some(automation) = this.automation.clone() {
-            this.attach_automation_host(automation, window, cx);
+        if let Some(command_receiver) = command_receiver {
+            this.attach_automation_host(command_receiver, window, cx);
         }
 
         this
@@ -460,14 +472,10 @@ impl Gallery {
 
     fn attach_automation_host(
         &self,
-        automation: SharedStorybookAutomation,
+        mut receiver: StorybookAutomationCommandReceiver,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let Some(mut receiver) = automation.take_command_receiver() else {
-            return;
-        };
-
         cx.spawn_in(window, async move |this, cx| {
             while let Some(command) = receiver.recv().await {
                 let _ = this.update_in(cx, |gallery, window, cx| {
@@ -1564,5 +1572,33 @@ mod tests {
                 );
             })
             .expect("second gallery should update");
+    }
+
+    #[gpui::test]
+    fn only_the_window_that_claims_the_default_controller_can_run_scenarios(cx: &mut App) {
+        gpui_component::init(cx);
+        let automation = crate::automation::StorybookAutomation::new();
+        crate::automation::set_default_storybook_automation(cx, automation);
+        let open = |cx: &mut App| {
+            cx.open_window(Default::default(), |window, cx| {
+                Gallery::view(Vec::new(), None, window, cx)
+            })
+            .expect("gallery window should open")
+        };
+        let first: gpui::WindowHandle<Gallery> = open(cx);
+        let second: gpui::WindowHandle<Gallery> = open(cx);
+
+        first
+            .update(cx, |gallery, _, cx| {
+                assert!(gallery.automation.is_some());
+                assert!(gallery.workbench_state.read(cx).automation().is_some());
+            })
+            .expect("first gallery should own the controller host");
+        second
+            .update(cx, |gallery, _, cx| {
+                assert!(gallery.automation.is_none());
+                assert!(gallery.workbench_state.read(cx).automation().is_none());
+            })
+            .expect("second gallery should reject the claimed controller");
     }
 }

@@ -3,7 +3,7 @@
 use crate::{
     automation::{
         SharedStorybookAutomation, StoryControlsSnapshot, StoryScenarioRunSnapshot, StorySnapshot,
-        StorybookAutomationError, default_storybook_automation,
+        StorybookAutomationError,
     },
     controls::{ControlKind, ControlSpec, ControlTarget, ControlValue},
     presentation::{StoryCanvasBackground, StoryPresentation, StoryViewportPreset},

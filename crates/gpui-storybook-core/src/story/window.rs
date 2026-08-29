@@ -17,7 +17,8 @@ use gpui_storybook_preferences::StorybookWindowMode;
 
 use crate::{
     automation::{
-        SharedStorybookAutomation, StorybookAutomationCommand, default_storybook_automation,
+        SharedStorybookAutomation, StorybookAutomationCommand, StorybookAutomationCommandReceiver,
+        default_storybook_automation,
     },
     dock_gallery::StoryWorkspace,
     gallery::Gallery,
@@ -156,6 +157,14 @@ impl StorybookShell {
         let mode_select =
             cx.new(|cx| SelectState::new(Self::mode_options(cx), selected_index, window, cx));
         let automation = default_storybook_automation(cx);
+        let command_receiver = automation
+            .as_ref()
+            .and_then(|automation| automation.take_command_receiver());
+        let automation = if command_receiver.is_some() {
+            automation
+        } else {
+            None
+        };
         let active = Self::build_active(
             mode,
             title.clone(),
@@ -205,7 +214,9 @@ impl StorybookShell {
             automation,
             _subscriptions: subscriptions,
         };
-        this.attach_automation_host(window, cx);
+        if let Some(command_receiver) = command_receiver {
+            this.attach_automation_host(command_receiver, window, cx);
+        }
         this
     }
 
@@ -307,14 +318,12 @@ impl StorybookShell {
         });
     }
 
-    fn attach_automation_host(&self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(automation) = self.automation.clone() else {
-            return;
-        };
-        let Some(mut receiver) = automation.take_command_receiver() else {
-            return;
-        };
-
+    fn attach_automation_host(
+        &self,
+        mut receiver: StorybookAutomationCommandReceiver,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         cx.spawn_in(window, async move |this, cx| {
             while let Some(command) = receiver.recv().await {
                 let _ = this.update_in(cx, |shell, window, cx| {
@@ -500,5 +509,35 @@ mod tests {
                 );
             })
             .expect("optional preference forwarding should remain a no-op");
+    }
+
+    #[gpui::test]
+    fn only_the_first_storybook_shell_claims_the_default_controller(cx: &mut App) {
+        gpui_component::init(cx);
+        crate::i18n::init(cx).expect("Storybook localization should initialize");
+        let automation = crate::automation::StorybookAutomation::new();
+        crate::automation::set_default_storybook_automation(cx, automation);
+        let open = |cx: &mut App| {
+            cx.open_window(Default::default(), |window, cx| {
+                cx.new(|cx| {
+                    StorybookShell::new(
+                        "Storybook".into(),
+                        StorybookWindow::new(Vec::new()),
+                        window,
+                        cx,
+                    )
+                })
+            })
+            .expect("Storybook window should open")
+        };
+        let first: gpui::WindowHandle<StorybookShell> = open(cx);
+        let second: gpui::WindowHandle<StorybookShell> = open(cx);
+
+        first
+            .update(cx, |shell, _, _| assert!(shell.automation.is_some()))
+            .expect("first shell should own the controller host");
+        second
+            .update(cx, |shell, _, _| assert!(shell.automation.is_none()))
+            .expect("second shell should reject the claimed controller");
     }
 }

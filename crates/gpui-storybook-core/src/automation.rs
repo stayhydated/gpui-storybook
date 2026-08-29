@@ -443,6 +443,9 @@ pub(crate) enum StorybookAutomationCommand {
     },
 }
 
+pub(crate) type StorybookAutomationCommandReceiver =
+    mpsc::UnboundedReceiver<StorybookAutomationCommand>;
+
 pub(crate) struct AutomationOperationGuard {
     pending: Arc<AtomicBool>,
 }
@@ -890,9 +893,7 @@ impl StorybookAutomation {
         Ok(oneshot::channel())
     }
 
-    pub(crate) fn take_command_receiver(
-        &self,
-    ) -> Option<mpsc::UnboundedReceiver<StorybookAutomationCommand>> {
+    pub(crate) fn take_command_receiver(&self) -> Option<StorybookAutomationCommandReceiver> {
         let receiver = self
             .command_rx
             .lock()

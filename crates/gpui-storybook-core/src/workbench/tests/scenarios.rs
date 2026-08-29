@@ -55,6 +55,46 @@ fn scenario_runner_uses_the_controller_attached_to_its_host() {
     }));
 }
 
+#[test]
+fn scenario_runner_rejects_a_default_controller_owned_by_another_host() {
+    let mut app = TestAppContext::single();
+    let automation = crate::automation::StorybookAutomation::new();
+    let _other_host = automation
+        .take_command_receiver()
+        .expect("another host should claim the default controller");
+    app.update(|cx| {
+        gpui_component::init(cx);
+        crate::automation::set_default_storybook_automation(cx, automation);
+    });
+    let window = app.open_window(size(px(400.), px(600.)), |window, cx| {
+        let state = cx.new(|cx| WorkbenchState::new(None, cx));
+        StoryWorkbench::new(state, WorkbenchTab::Scenarios, window, cx)
+    });
+    let mut visual_cx = VisualTestContext::from_window(*window, &app);
+    let workbench = window
+        .root(&mut visual_cx)
+        .expect("workbench should be the window root");
+
+    visual_cx.update(|window, cx| {
+        workbench.update(cx, |workbench, cx| {
+            workbench.run_scenario(
+                "local-story".to_owned(),
+                StoryScenario::new("local-scenario", "Local scenario"),
+                window,
+                cx,
+            );
+        });
+    });
+
+    assert!(workbench.read_with(&visual_cx, |workbench, _| {
+        matches!(
+            &workbench.scenario_run,
+            Some(ScenarioRunState::Finished { result, .. })
+                if matches!(result.as_ref(), Err(StorybookAutomationError::NoLiveHost))
+        )
+    }));
+}
+
 #[gpui::test]
 fn scenario_reset_toolbar_stays_visible_recreates_the_story_and_clears_the_result(
     cx: &mut TestAppContext,

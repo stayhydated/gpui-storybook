@@ -1,9 +1,9 @@
 use crate::{
     automation::{
         SharedStorybookAutomation, StoryCurrentSnapshot, StoryScreenshotRequest, StorySnapshot,
-        StorybookAutomationCommand, StorybookAutomationError, default_storybook_automation,
-        schedule_story_capture, set_capture_target_size, story_snapshots_from_containers,
-        validate_capture_target_size,
+        StorybookAutomationCommand, StorybookAutomationCommandReceiver, StorybookAutomationError,
+        default_storybook_automation, schedule_story_capture, set_capture_target_size,
+        story_snapshots_from_containers, validate_capture_target_size,
     },
     capture_region::capture_route_story_key,
     dock_layout_store::DockLayoutStore,
@@ -664,6 +664,18 @@ impl StoryWorkspace {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
+        let command_receiver = if attach_automation_host {
+            automation
+                .as_ref()
+                .and_then(|automation| automation.take_command_receiver())
+        } else {
+            None
+        };
+        let automation = if attach_automation_host && command_receiver.is_none() {
+            None
+        } else {
+            automation
+        };
         if let Some(automation) = &automation {
             automation.set_stories(story_snapshots_from_containers(&stories, cx));
         }
@@ -782,8 +794,8 @@ impl StoryWorkspace {
             _app_quit_subscription: app_quit_subscription,
             _preference_subscriptions: preference_subscriptions,
         };
-        if attach_automation_host && let Some(automation) = this.automation.clone() {
-            this.attach_automation_host(automation, window, cx);
+        if let Some(command_receiver) = command_receiver {
+            this.attach_automation_host(command_receiver, window, cx);
         }
 
         this
@@ -1007,14 +1019,10 @@ impl StoryWorkspace {
 
     fn attach_automation_host(
         &self,
-        automation: SharedStorybookAutomation,
+        mut receiver: StorybookAutomationCommandReceiver,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let Some(mut receiver) = automation.take_command_receiver() else {
-            return;
-        };
-
         cx.spawn_in(window, async move |this, cx| {
             while let Some(command) = receiver.recv().await {
                 let _ = this.update_in(cx, |workspace, window, cx| {

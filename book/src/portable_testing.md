@@ -34,6 +34,9 @@ assert_eq!(report.story.key, "my-stories-ButtonStory");
 ```
 
 Every request gets a new app, window, story entity, and set of GPUI globals.
+On native targets, the fresh app installs `gpui_tokio` before the core runtime
+and linked `#[story_init]` hooks, so those hooks can call
+`gpui_tokio::Tokio::spawn` or `gpui_tokio::Tokio::handle`.
 Use `runner.open(request)` when a test needs to update the live app, set a
 control, advance the test clock, or inspect a runtime story snapshot before
 capturing. A story without a typed control target reports an empty control
@@ -52,7 +55,9 @@ runner fails the case instead of attaching an unapplied label to a capture.
 `CaptureMatrix` expands the Cartesian product of stories, root or substory
 routes, viewports, canvas backgrounds, themes, languages, and named typed-control
 sets. Stable case IDs drive output paths, baseline paths, and structured
-reports:
+reports. Request IDs encode serialized controls without losing punctuation, and
+`output_dir` encodes each complete case ID as one filename component so distinct
+values and labels remain distinct:
 
 ```rust,no_run
 use gpui_storybook_test::{

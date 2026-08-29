@@ -437,17 +437,9 @@ impl CaptureRequest {
         let controls = if self.controls.is_empty() {
             "default".to_owned()
         } else {
-            serde_json::to_string(&self.controls)
-                .unwrap_or_else(|_| "controls".to_owned())
-                .chars()
-                .map(|character| {
-                    if character.is_ascii_alphanumeric() {
-                        character
-                    } else {
-                        '_'
-                    }
-                })
-                .collect()
+            let serialized = serde_json::to_string(&self.controls)
+                .expect("string-keyed ControlValue maps serialize to JSON");
+            crate::encode_id_fragment(&serialized)
         };
         format!(
             "{}/{}/{}/{}/{}/{}/{}",
@@ -825,7 +817,7 @@ mod tests {
             .controls(ControlCase::new("enabled", values));
 
         let cases = matrix.expand(&descriptors()).unwrap();
-        assert_eq!(cases.len(), 2 * 2 * 2 * 2 * 2 * 1);
+        assert_eq!(cases.len(), 2 * 2 * 2 * 2 * 2);
         assert_eq!(cases[0].route_id, "crate-Button");
         assert!(
             cases
@@ -853,6 +845,40 @@ mod tests {
         let id = request.id();
         assert!(id.starts_with("crate-Button/root/responsive/theme/current/current/"));
         assert!(id.contains("enabled"));
+    }
+
+    #[test]
+    fn request_ids_preserve_distinct_control_values() {
+        let request_id = |value: &str| {
+            let mut request = CaptureRequest::new("crate-Button");
+            request
+                .controls
+                .insert("label".to_owned(), ControlValue::Text(value.to_owned()));
+            request.id()
+        };
+
+        assert_ne!(request_id("a-b"), request_id("a_b"));
+    }
+
+    #[test]
+    fn matrix_output_paths_preserve_distinct_case_labels() {
+        let matrix = CaptureMatrix::new()
+            .story("crate-Button")
+            .controls(ControlCase::new("a b", BTreeMap::new()))
+            .controls(ControlCase::new("a?b", BTreeMap::new()))
+            .output_dir("target/captures");
+
+        let cases = matrix.expand(&descriptors()).unwrap();
+        let first = cases[0]
+            .output_path
+            .as_ref()
+            .expect("matrix output path should be generated");
+        let second = cases[1]
+            .output_path
+            .as_ref()
+            .expect("matrix output path should be generated");
+
+        assert_ne!(first, second);
     }
 
     #[test]
