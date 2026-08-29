@@ -39,15 +39,16 @@ when intentionally accepting new output. `CaptureMatrix` expands the selected
 stories, routes, named viewports, presentation cases, themes, languages, and
 named control sets into stable case IDs. Every expanded case is executed in a
 fresh context and `MatrixReport` records each success or typed failure as
-structured JSON-compatible data. Generated request IDs encode serialized
-control maps without losing punctuation, and `output_dir` encodes the complete
-case ID into one filename component, so distinct control values and case labels
-cannot overwrite one another. Root and substory routes use the core
-capture-region crop and scroll helpers; `RunnerConfig::route_capture` can
-override that policy and own route verification when an application needs a
-custom route surface. Stories without a typed control target produce an empty
-control snapshot. Supplying a non-empty control map to such a story remains a
-typed `ControlsUnavailable` failure.
+structured JSON-compatible data. Each matrix axis is encoded before the case ID
+is joined, and generated request IDs represent serialized control maps with a
+bounded digest while retaining the complete controls in reports. `output_dir`
+encodes the complete case ID into one filename component, so distinct control
+values and case labels cannot overwrite one another or create unbounded control
+filenames. Root and substory routes use the core capture-region crop and scroll
+helpers; `RunnerConfig::route_capture` can override that policy and own route
+verification when an application needs a custom route surface. Stories without
+a typed control target produce an empty control snapshot. Supplying a non-empty
+control map to such a story remains a typed `ControlsUnavailable` failure.
 
 Built-in `light`, `dark`, `Default Light`, and `Default Dark` theme names use
 GPUI Component's `Theme::change` automatically. Other theme and language

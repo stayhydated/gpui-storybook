@@ -136,6 +136,8 @@ documentation](https://docs.rs/gpui-storybook/). Use the public-integration
 stories, capture matrices, visual baselines, and frame budgets. Native portable
 contexts install `gpui_tokio` before the core runtime and linked
 `#[story_init]` hooks, matching facade initialization. Stories without typed
-controls report an empty control snapshot; non-empty control maps still fail. A
-custom `RunnerConfig::route_capture` callback owns verification and cropping for
-application-defined substory surfaces.
+controls report an empty control snapshot; non-empty control maps still fail.
+Matrix IDs encode every axis independently, and generated request IDs use a
+bounded digest for control data while reports retain the complete typed values.
+A custom `RunnerConfig::route_capture` callback owns verification and cropping
+for application-defined substory surfaces.

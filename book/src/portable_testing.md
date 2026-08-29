@@ -55,9 +55,11 @@ runner fails the case instead of attaching an unapplied label to a capture.
 `CaptureMatrix` expands the Cartesian product of stories, root or substory
 routes, viewports, canvas backgrounds, themes, languages, and named typed-control
 sets. Stable case IDs drive output paths, baseline paths, and structured
-reports. Request IDs encode serialized controls without losing punctuation, and
-`output_dir` encodes each complete case ID as one filename component so distinct
-values and labels remain distinct:
+reports. Each matrix axis is encoded before the case ID is joined. Generated
+request IDs use a bounded digest for serialized controls while reports retain
+the complete typed values, and `output_dir` encodes each complete case ID as one
+filename component so distinct values and labels remain distinct without
+creating unbounded control filenames:
 
 ```rust,no_run
 use gpui_storybook_test::{

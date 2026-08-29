@@ -400,7 +400,7 @@ impl Gallery {
         });
     }
 
-    fn active_story_snapshot(&self, cx: &impl Borrow<App>) -> Option<StorySnapshot> {
+    pub(crate) fn active_story_snapshot(&self, cx: &impl Borrow<App>) -> Option<StorySnapshot> {
         let story = self.workbench_state.read(cx.borrow()).active_story()?;
         StorySnapshot::from_container(story.read(cx.borrow()), cx)
     }
@@ -443,7 +443,7 @@ impl Gallery {
                 .any(|member| Self::story_contains_key(member, key, cx))
     }
 
-    fn set_active_story_by_key(
+    pub(crate) fn set_active_story_by_key(
         &mut self,
         key: &str,
         cx: &mut App,

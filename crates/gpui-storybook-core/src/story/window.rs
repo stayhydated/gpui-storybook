@@ -123,6 +123,35 @@ impl ActiveStorybookView {
             },
         }
     }
+
+    fn open_story_by_key(
+        &self,
+        key: &str,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Result<(), crate::automation::StorybookAutomationError> {
+        match self {
+            Self::Gallery { gallery, .. } => gallery.update(cx, |gallery, cx| {
+                gallery.set_active_story_by_key(key, cx).map(drop)
+            }),
+            Self::Dock(workspace) => workspace.update(cx, |workspace, cx| {
+                workspace.open_story_by_key(key, window, cx).map(drop)
+            }),
+        }
+    }
+
+    fn active_story_key(&self, cx: &App) -> Option<String> {
+        match self {
+            Self::Gallery { gallery, .. } => gallery
+                .read(cx)
+                .active_story_snapshot(cx)
+                .map(|story| story.key),
+            Self::Dock(workspace) => workspace
+                .read(cx)
+                .active_story_snapshot(cx)
+                .map(|story| story.key),
+        }
+    }
 }
 
 struct StorybookShell {
@@ -287,6 +316,12 @@ impl StorybookShell {
         cx: &mut Context<Self>,
     ) {
         if self.mode != mode {
+            let current_story_key = self.automation.as_ref().and_then(|automation| {
+                automation
+                    .current_story()
+                    .story
+                    .map(|story| story.capture_route_id)
+            });
             self.mode = mode;
             self.active = Self::build_active(
                 mode,
@@ -297,6 +332,13 @@ impl StorybookShell {
                 window,
                 cx,
             );
+            if let Some(key) = current_story_key
+                && self.active.open_story_by_key(&key, window, cx).is_err()
+                && let Some(key) = self.active.active_story_key(cx)
+                && let Some(automation) = &self.automation
+            {
+                let _ = automation.confirm_current_story(&key);
+            }
             self.active_focus_handle(cx).focus(window, cx);
             cx.notify();
         }
@@ -447,6 +489,31 @@ impl Render for StoryRoot {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::registry::{RegisteredStoryMetadata, StoryKey, StoryName};
+    use tokio::sync::oneshot;
+
+    fn story(
+        key: &'static str,
+        name: &'static str,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Entity<StoryContainer> {
+        cx.new(|cx| {
+            let mut story = StoryContainer::new(window, cx);
+            story.name = name.into();
+            story.story_klass = Some(name.into());
+            story.set_registration_metadata(RegisteredStoryMetadata::new(
+                StoryKey::new(key),
+                StoryName::new(name),
+                None,
+                "crate",
+                "/tmp/crate",
+                "src/stories.rs",
+                1,
+            ));
+            story
+        })
+    }
 
     #[test]
     fn initial_window_mode_prefers_explicit_then_toml_then_saved() {
@@ -539,5 +606,73 @@ mod tests {
         second
             .update(cx, |shell, _, _| assert!(shell.automation.is_none()))
             .expect("second shell should reject the claimed controller");
+    }
+
+    #[gpui::test]
+    fn switching_modes_keeps_the_live_view_on_the_automation_route(cx: &mut App) {
+        gpui_component::init(cx);
+        crate::i18n::init(cx).expect("Storybook localization should initialize");
+        let automation = crate::automation::StorybookAutomation::new();
+        crate::automation::set_default_storybook_automation(cx, automation.clone());
+        let window: gpui::WindowHandle<StorybookShell> = cx
+            .open_window(Default::default(), |window, cx| {
+                let button = story("crate-ButtonStory", "ButtonStory", window, cx);
+                let table = story("crate-TableStory", "TableStory", window, cx);
+                cx.new(|cx| {
+                    StorybookShell::new(
+                        "Storybook".into(),
+                        StorybookWindow::new(vec![button, table])
+                            .with_mode(StorybookWindowMode::Gallery),
+                        window,
+                        cx,
+                    )
+                })
+            })
+            .expect("Storybook shell should open");
+
+        window
+            .update(cx, |shell, window, cx| {
+                let (response, mut result) = oneshot::channel();
+                shell.active.handle_automation_command(
+                    StorybookAutomationCommand::OpenStory {
+                        key: "crate-TableStory/expanded".to_owned(),
+                        response,
+                        _operation: automation
+                            .begin_operation()
+                            .expect("story-open operation should start"),
+                    },
+                    window,
+                    cx,
+                );
+                result
+                    .try_recv()
+                    .expect("story-open response should be sent")
+                    .expect("table story should open");
+                assert_eq!(
+                    shell.active.active_story_key(cx).as_deref(),
+                    Some("crate-TableStory")
+                );
+
+                shell.set_mode(StorybookWindowMode::Dock, false, window, cx);
+                assert_eq!(
+                    shell.active.active_story_key(cx).as_deref(),
+                    Some("crate-TableStory")
+                );
+                assert_eq!(
+                    automation
+                        .current_story()
+                        .story
+                        .expect("automation should keep the selected story")
+                        .capture_route_id,
+                    "crate-TableStory/expanded"
+                );
+
+                shell.set_mode(StorybookWindowMode::Gallery, false, window, cx);
+                assert_eq!(
+                    shell.active.active_story_key(cx).as_deref(),
+                    Some("crate-TableStory")
+                );
+            })
+            .expect("Storybook shell should switch modes");
     }
 }

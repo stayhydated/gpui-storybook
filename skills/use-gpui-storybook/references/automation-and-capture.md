@@ -248,12 +248,13 @@ and linked `story_init` hooks, constructs one registered story, applies typed
 controls and presentation, and captures the rendered root or substory region.
 On native targets, `gpui_tokio` is installed before the core runtime and hooks,
 so hooks can use `gpui_tokio::Tokio::spawn` or `gpui_tokio::Tokio::handle`.
-Generated request IDs and `output_dir` filenames preserve punctuation-distinct
-controls and case labels. Stories without typed controls report an empty control
-snapshot; a non-empty control map still fails. For an application-owned
-substory surface, install `RunnerConfig::route_capture` and let the callback own
-route verification and cropping without registering that route with the core
-capture helpers.
+Matrix IDs encode each axis independently. Generated request IDs use a bounded
+digest for serialized controls while structured reports retain the complete
+typed values, and `output_dir` filenames preserve distinct case labels. Stories
+without typed controls report an empty control snapshot; a non-empty control map
+still fails. For an application-owned substory surface, install
+`RunnerConfig::route_capture` and let the callback own route verification and
+cropping without registering that route with the core capture helpers.
 
 Pass consumer assets through `RunnerConfig::asset_source` and install any
 application-owned globals with its initializer. Built-in light and dark theme

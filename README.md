@@ -179,7 +179,9 @@ matrices, checks explicit visual-baseline policies, and optionally enforces GPUI
 draw and dirty-to-present budgets. On native targets, each fresh context
 installs `gpui_tokio` before the core runtime and linked `#[story_init]` hooks,
 matching facade initialization. Stories without typed controls report an empty
-control snapshot; non-empty control maps still fail. A custom
+control snapshot; non-empty control maps still fail. Matrix IDs encode every
+axis independently, and generated request IDs use a bounded digest for control
+data while reports retain the complete typed values. A custom
 `RunnerConfig::route_capture` callback owns verification and cropping for
 application-defined substory surfaces. See [Portable testing and visual
 baselines](book/src/portable_testing.md).

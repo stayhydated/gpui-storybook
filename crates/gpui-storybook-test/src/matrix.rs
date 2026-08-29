@@ -6,7 +6,34 @@ use gpui_storybook_core::{
     presentation::StoryCanvasBackground,
 };
 use serde::{Deserialize, Serialize};
+use sha2::{Digest as _, Sha256};
 use std::{collections::BTreeMap, path::PathBuf};
+
+fn case_id<'a>(components: impl IntoIterator<Item = &'a str>) -> String {
+    components
+        .into_iter()
+        .map(crate::encode_id_fragment)
+        .collect::<Vec<_>>()
+        .join("/")
+}
+
+fn controls_id(controls: &BTreeMap<String, ControlValue>) -> String {
+    if controls.is_empty() {
+        return "default".to_owned();
+    }
+
+    let serialized =
+        serde_json::to_vec(controls).expect("string-keyed ControlValue maps serialize to JSON");
+    let digest = Sha256::digest(serialized);
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut id = String::with_capacity(73);
+    id.push_str("controls-");
+    for byte in digest {
+        id.push(char::from(HEX[usize::from(byte >> 4)]));
+        id.push(char::from(HEX[usize::from(byte & 0x0f)]));
+    }
+    id
+}
 
 /// A named logical viewport used for one capture case.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -430,27 +457,23 @@ impl CaptureRequest {
     }
 
     /// Returns the stable ID used when no explicit matrix ID was supplied.
+    ///
+    /// String axes are encoded independently, and non-empty controls are
+    /// represented by a bounded digest of their serialized typed values.
     pub fn id(&self) -> String {
         if let Some(case_id) = &self.case_id {
             return case_id.clone();
         }
-        let controls = if self.controls.is_empty() {
-            "default".to_owned()
-        } else {
-            let serialized = serde_json::to_string(&self.controls)
-                .expect("string-keyed ControlValue maps serialize to JSON");
-            crate::encode_id_fragment(&serialized)
-        };
-        format!(
-            "{}/{}/{}/{}/{}/{}/{}",
-            self.story_key,
+        let controls = controls_id(&self.controls);
+        case_id([
+            self.story_key.as_str(),
             self.route.label(),
-            self.viewport.name,
-            self.presentation.name,
-            self.theme.name,
-            self.language.name,
-            controls,
-        )
+            self.viewport.name.as_str(),
+            self.presentation.name.as_str(),
+            self.theme.name.as_str(),
+            self.language.name.as_str(),
+            controls.as_str(),
+        ])
     }
 
     pub(crate) fn validate(&self) -> Result<String, StorybookTestError> {
@@ -478,6 +501,8 @@ impl CaptureRequest {
 }
 
 /// A Cartesian-product capture plan.
+///
+/// Expanded IDs encode each axis independently before joining them with `/`.
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct CaptureMatrix {
@@ -640,18 +665,19 @@ impl CaptureMatrix {
                                 language.validate()?;
                                 for controls in &control_cases {
                                     controls.validate()?;
-                                    let id = format!(
-                                        "{}/{}/{}/{}/{}/{}/{}/{}/{}",
+                                    let width = viewport.width.to_string();
+                                    let height = viewport.height.to_string();
+                                    let id = case_id([
                                         story.key(),
                                         route.label(),
-                                        viewport.name,
-                                        viewport.width,
-                                        viewport.height,
-                                        presentation.name,
-                                        theme.name,
-                                        language.name,
-                                        controls.name,
-                                    );
+                                        viewport.name.as_str(),
+                                        width.as_str(),
+                                        height.as_str(),
+                                        presentation.name.as_str(),
+                                        theme.name.as_str(),
+                                        language.name.as_str(),
+                                        controls.name.as_str(),
+                                    ]);
                                     let output_path = self.output_dir.as_ref().map(|directory| {
                                         directory
                                             .join(format!("{}.png", crate::case_file_name(&id)))
@@ -837,14 +863,18 @@ mod tests {
     }
 
     #[test]
-    fn request_ids_include_controls_when_not_explicit() {
+    fn request_ids_include_a_bounded_control_digest_when_not_explicit() {
         let mut request = CaptureRequest::new("crate-Button");
         request
             .controls
             .insert("enabled".to_owned(), ControlValue::Boolean(true));
         let id = request.id();
-        assert!(id.starts_with("crate-Button/root/responsive/theme/current/current/"));
-        assert!(id.contains("enabled"));
+        assert!(id.starts_with("crate-%42utton/root/responsive/theme/current/current/controls-"));
+        assert_eq!(
+            id.rsplit('/').next().expect("controls ID component").len(),
+            73
+        );
+        assert!(!id.contains("enabled"));
     }
 
     #[test]
@@ -858,6 +888,57 @@ mod tests {
         };
 
         assert_ne!(request_id("a-b"), request_id("a_b"));
+    }
+
+    #[test]
+    fn request_ids_bound_large_control_values() {
+        let mut request = CaptureRequest::new("crate-Button");
+        request
+            .controls
+            .insert("label".to_owned(), ControlValue::Text("x".repeat(4_096)));
+
+        let id = request.id();
+        let controls = id.rsplit('/').next().expect("controls ID component");
+        assert_eq!(controls.len(), 73);
+        assert!(controls.starts_with("controls-"));
+
+        let directory = tempfile::tempdir().expect("temporary baseline directory");
+        let store = crate::BaselineStore::new(directory.path());
+        let path = store.path_for(&id);
+        assert!(
+            path.file_name()
+                .expect("baseline filename")
+                .as_encoded_bytes()
+                .len()
+                < 255
+        );
+        let image = image::RgbaImage::from_pixel(1, 1, image::Rgba([0, 0, 0, 255]));
+        store
+            .update(&id, &image)
+            .expect("bounded request ID should be writable as a baseline path");
+        assert!(path.exists());
+    }
+
+    #[test]
+    fn matrix_ids_escape_each_axis_before_joining() {
+        let matrix = CaptureMatrix::new()
+            .story("crate-Button")
+            .theme(ThemeCase::named("foo/bar"))
+            .theme(ThemeCase::named("foo"))
+            .language(LanguageCase::named("baz"))
+            .language(LanguageCase::named("bar/baz"));
+
+        let cases = matrix.expand(&descriptors()).unwrap();
+        let ids = cases
+            .iter()
+            .map(|case| case.id.as_str())
+            .collect::<std::collections::BTreeSet<_>>();
+
+        assert_eq!(cases.len(), 4);
+        assert_eq!(ids.len(), cases.len());
+        assert!(ids.iter().any(|id| id.contains("foo%2Fbar/baz")));
+        assert!(ids.iter().any(|id| id.contains("foo/bar%2Fbaz")));
+        assert!(ids.iter().all(|id| id.split('/').count() == 9));
     }
 
     #[test]

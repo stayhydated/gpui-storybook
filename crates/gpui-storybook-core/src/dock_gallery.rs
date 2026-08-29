@@ -60,6 +60,9 @@ const MAIN_DOCK_AREA: DockAreaTab = DockAreaTab {
 const STATE_FILE: &str = "target/storybook-docks.json";
 #[cfg(not(debug_assertions))]
 const STATE_FILE: &str = "storybook-docks.json";
+// Unit tests use fixture-specific story registries and exercise the layout
+// store through explicit temporary paths, so they must not share this file.
+const PERSIST_DOCK_LAYOUT: bool = !cfg!(test);
 
 struct DockAreaTab {
     id: &'static str,
@@ -194,7 +197,7 @@ impl StorySidebar {
             dock_area.dump(cx)
         });
 
-        if let Err(err) = DockLayoutStore::save_to_path(STATE_FILE, &state) {
+        if PERSIST_DOCK_LAYOUT && let Err(err) = DockLayoutStore::save_to_path(STATE_FILE, &state) {
             eprintln!("failed to save dock layout after open to {STATE_FILE}: {err:#}");
         }
 
@@ -693,20 +696,24 @@ impl StoryWorkspace {
         StorySidebar::register_stories(&weak_dock_area, &stories, cx);
 
         // Load saved layout when available; otherwise build the default layout.
-        match Self::load_layout(dock_area.clone(), window, cx) {
-            Ok(_) => {
-                // The saved layout is mounted.
-            },
-            Err(_) => {
-                Self::reset_default_layout(
-                    weak_dock_area,
-                    &stories,
-                    automation.clone(),
-                    window,
-                    cx,
-                );
-            },
-        };
+        if PERSIST_DOCK_LAYOUT {
+            match Self::load_layout(dock_area.clone(), window, cx) {
+                Ok(_) => {
+                    // The saved layout is mounted.
+                },
+                Err(_) => {
+                    Self::reset_default_layout(
+                        weak_dock_area,
+                        &stories,
+                        automation.clone(),
+                        window,
+                        cx,
+                    );
+                },
+            };
+        } else {
+            Self::reset_default_layout(weak_dock_area, &stories, automation.clone(), window, cx);
+        }
         dock_skin.set_toggle_button_visible(false, cx);
 
         cx.subscribe_in(
@@ -723,9 +730,11 @@ impl StoryWorkspace {
         let app_quit_subscription = cx.on_app_quit({
             let dock_area = dock_area.clone();
             move |_, cx| {
-                let state = dock_area.read(cx).dump(cx);
+                let state = PERSIST_DOCK_LAYOUT.then(|| dock_area.read(cx).dump(cx));
                 async move {
-                    if let Err(err) = Self::save_state(&state) {
+                    if let Some(state) = state
+                        && let Err(err) = Self::save_state(&state)
+                    {
                         eprintln!("failed to save dock layout on quit to {STATE_FILE}: {err:#}");
                     }
                 }
@@ -867,6 +876,9 @@ impl StoryWorkspace {
         _: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        if !PERSIST_DOCK_LAYOUT {
+            return;
+        }
         let state = dock_area.read(cx).dump(cx);
 
         if Some(&state) == self.last_layout_state.as_ref() {
@@ -1218,7 +1230,7 @@ impl StoryWorkspace {
         }
     }
 
-    fn open_story_by_key(
+    pub(crate) fn open_story_by_key(
         &mut self,
         key: &str,
         window: &mut Window,
@@ -1271,6 +1283,11 @@ impl StoryWorkspace {
         Ok(story)
     }
 
+    pub(crate) fn active_story_snapshot(&self, cx: &App) -> Option<StorySnapshot> {
+        let story = self.workbench_state.read(cx).active_story()?;
+        StorySnapshot::from_container(story.read(cx), cx)
+    }
+
     fn on_action_toggle_dock_toggle_button(
         &mut self,
         _: &ToggleDockToggleButton,
@@ -1298,8 +1315,10 @@ impl StoryWorkspace {
             window,
             cx,
         );
-        // Delete saved state file
-        let _ = std::fs::remove_file(STATE_FILE);
+        if PERSIST_DOCK_LAYOUT {
+            // Delete saved state file after resetting the live layout.
+            let _ = std::fs::remove_file(STATE_FILE);
+        }
 
         cx.notify();
     }
