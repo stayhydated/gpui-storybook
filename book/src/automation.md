@@ -1,8 +1,10 @@
 # Automation and capture
 
-Enable the `mcp` feature to inspect and open stories from another process or
-to capture the rendered story region as a PNG. The standard gallery and dock
-views attach the automation controller installed by `gpui_storybook::init`.
+On Linux or macOS, enable the `mcp` feature to inspect and open stories from
+another process or to capture the rendered story region as a PNG. The feature
+is unsupported on Windows and produces a compile-time error there. The standard
+gallery and dock views attach the automation controller installed by
+`gpui_storybook::init`.
 
 ## Enable MCP support
 
@@ -20,8 +22,8 @@ GPUI_STORYBOOK_MCP_STDIO=1 \
 cargo run -p my-app-storybook --features mcp
 ```
 
-On Linux, install Sway and Mesa's software graphics drivers. For Debian or
-Ubuntu:
+On macOS, this direct Cargo command uses GPUI's native image renderer. On Linux,
+install Sway and Mesa's software graphics drivers. For Debian or Ubuntu:
 
 ```bash
 sudo apt-get install --no-install-recommends \
@@ -41,7 +43,10 @@ This uses the normal Wayland-backed GPUI application. The launcher creates a
 private `XDG_RUNTIME_DIR`, starts Sway with wlroots' headless backend and the
 Pixman software renderer, waits for `WAYLAND_DISPLAY`, inherits MCP stdio, and
 stops Sway after the child exits. Set `GPUI_STORYBOOK_SWAY=/path/to/sway` for a
-private package extraction. macOS and Windows execute the child directly.
+private package extraction.
+
+On macOS, omit `gpui-storybook-launch` from the commands below. The application
+runs through Cargo directly.
 
 This launch exposes route, control, and capture tools. Generic input can invoke
 arbitrary application behavior, so enable it separately and only against a
@@ -123,6 +128,7 @@ not need a startup polling loop.
 | `storybook_get_story` | Inspect one story or substory route |
 | `storybook_current_story` | Inspect the story displayed by the live window |
 | `storybook_open_story` | Navigate the live window to a route |
+| `storybook_list_scenarios` | List named scenarios owned by the current or requested story |
 | `storybook_read_controls` | Read control metadata and current values from the active variant |
 | `storybook_read_semantic_values` | Read route-local JSON values refreshed from rendered application state |
 | `storybook_read_value` | Read one route-local JSON value by `value_key` |
@@ -134,11 +140,33 @@ not need a startup polling loop.
 | `storybook_list_actions` | List runtime GPUI actions, documentation, and argument schemas; interaction gate required |
 | `storybook_list_interaction_targets` | List stable semantic targets and live route-relative bounds; interaction gate required |
 | `storybook_click_target` | Click one semantic target exactly once; interaction gate required |
+| `storybook_run_scenario` | Recreate a story and run one declared scenario; interaction gate required |
 | `storybook_run_steps` | Run one ordered in-process interaction batch with optional capture; interaction gate required |
 
 Tool inputs and outputs use closed typed schemas. Route, target, value, and
 control inputs use `story_key`, `target_key`, `value_key`, and `control_key`
 respectively. Unknown, missing, or invalid fields return structured errors.
+
+## Run a declared scenario
+
+Call `storybook_list_scenarios` with an optional `story_key` to discover stable
+scenario keys, initial controls and presentation, named steps, exact semantic
+postconditions, and optional capture. The list tool is read-only. With the
+interaction gate enabled, run one declaration from constructor defaults:
+
+```json
+{
+  "story_key": "gpui-storybook-example-story-InteractionStory",
+  "scenario_key": "type-click-and-dispatch"
+}
+```
+
+`storybook_run_scenario` recreates the concrete story entity, rebinds its
+control target and focus handle, then delegates the generated request to the
+same exclusive executor as `storybook_run_steps`. Its result returns the
+scenario descriptor and structured interaction observations, postconditions,
+and capture. Scenario execution is destructive and non-idempotent; a partial
+run is reported and never resumed or retried.
 
 ## Run an in-process interaction batch
 
@@ -381,7 +409,7 @@ cargo run -p my-app-storybook --features mcp
 Storybook opens the route, creates missing parent directories, writes the PNG,
 and exits after capture. Capture startup disables preference persistence and
 uses the deterministic light presentation. On Linux, wrap this command with
-`gpui-storybook-launch` as shown above.
+`gpui-storybook-launch` as shown above. On macOS, use the direct Cargo command.
 
 | Environment variable | Meaning |
 |---|---|
@@ -393,12 +421,12 @@ uses the deterministic light presentation. On Linux, wrap this command with
 
 Set width and height together, and make both values greater than zero.
 `WGPU_CAPTURE_FRAME`, when present, must also be greater than zero.
-On Linux, `storybook_capture_launch_env` returns an `env` map and a `command`
-array. Merge every `env` entry into the child process environment before
-executing `command`. On Linux the command invokes the installed
+`storybook_capture_launch_env` returns an `env` map and a `command` array.
+Merge every `env` entry into the child process environment before executing
+`command`. On Linux, the command invokes the installed
 `gpui-storybook-launch`, which creates the private Wayland runtime, waits for
-headless Sway, and then runs Cargo. It does not inline the capture or MCP
-variables.
+headless Sway, and then runs Cargo. On macOS, it invokes Cargo directly. It does
+not inline the capture or MCP variables.
 
 ## Capture a live session
 
@@ -431,9 +459,9 @@ contains the request ID, actual path, rendered pixel dimensions, and story
 metadata.
 
 `storybook_capture_launch_env` can construct the environment and platform
-command for an external launcher. It accepts a `story_key` plus optional output
-path, frame, paired dimensions, package, binary, feature list, and stdio selection.
-It also accepts a named viewport when paired dimensions are omitted.
+launch command for an external host. It accepts a `story_key` plus optional
+output path, frame, paired dimensions, package, binary, feature list, and stdio
+selection. It also accepts a named viewport when paired dimensions are omitted.
 
 ## Understand capture bounds and size
 
@@ -451,9 +479,10 @@ PNG size.
 
 An interaction capture is part of the same exclusive UI-thread operation. It
 captures the first requested rendered frame after the final step; explicit
-`wait_frames` steps delay that frame. If capture fails after input was
-dispatched, the structured error includes the partial dispatched-step count.
-Do not retry an interaction batch automatically.
+`wait_frames` steps delay that frame. If a semantic postcondition or capture
+fails after input was dispatched, the structured error includes the request ID
+and partial dispatched-step count. Do not retry an interaction batch
+automatically.
 
 ## Troubleshoot automation
 

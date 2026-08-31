@@ -1,9 +1,9 @@
 # Preferences
 
-Storybook stores appearance and language intent per Storybook binary. Give each
-binary a distinct stable `ConsumerId`, await initialization readiness, and let
-the appearance, theme, and language menu controls update the same typed state
-used by application code.
+Storybook stores layout, appearance, and language intent per Storybook binary.
+Give each binary a distinct stable `ConsumerId`, await initialization readiness,
+and let the layout, appearance, theme, and language controls update the same
+typed state used by application code.
 
 ## Scope preference storage
 
@@ -48,6 +48,7 @@ An explicit `with_json_path(...)` is valid only with `Persistent` mode.
 
 `PreferenceState::saved` preserves what the user chose:
 
+- Gallery or Dock workspace layout;
 - `System` or an explicit light/dark appearance;
 - `System` or an explicit language;
 - separate theme choices for light and dark appearance;
@@ -57,6 +58,14 @@ An explicit `with_json_path(...)` is valid only with `Persistent` mode.
 language after system detection, registered-theme availability, and launch
 overrides. Each resolved value includes its source, and fallback decisions add
 structured diagnostics.
+
+The title-bar **Layout** select writes `StorybookWindowMode::Gallery` or
+`StorybookWindowMode::Dock`. New windows use a launch-specific
+`StorybookWindow::with_mode` value first, then the active `storybook.toml`
+`window_mode`, then the saved value. TOML selects the initial layout without
+rewriting the saved document; the title-bar select persists later user choices.
+While the TOML key remains present, it continues to win over that saved value
+for each new window.
 
 Selecting a named light or dark theme saves that theme in its matching slot and
 activates the same appearance, so the selected theme is visible immediately.

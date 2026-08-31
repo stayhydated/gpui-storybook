@@ -1,9 +1,5 @@
 use gpui::Application;
-#[cfg(not(feature = "dock"))]
-use gpui_storybook::Gallery;
-#[cfg(feature = "dock")]
-use gpui_storybook::StoryWorkspace;
-use gpui_storybook::{ConsumerId, StorybookOptions};
+use gpui_storybook::{ConsumerId, StorybookOptions, StorybookWindow};
 
 pub mod i18n;
 pub mod stories;
@@ -89,8 +85,7 @@ pub fn run_storybook(app: Application) {
                     }
                     app_cx.activate(true);
 
-                    #[cfg(not(feature = "dock"))]
-                    gpui_storybook::create_new_window(
+                    gpui_storybook::create_storybook_window(
                         &format!("{} - Stories", env!("CARGO_PKG_NAME")),
                         move |window, cx| {
                             let stories = gpui_storybook::generate_stories(window, cx);
@@ -98,21 +93,7 @@ pub fn run_storybook(app: Application) {
                                 !stories.is_empty(),
                                 "story example Storybook requires linked stories"
                             );
-                            Gallery::view(stories, None, window, cx)
-                        },
-                        app_cx,
-                    );
-
-                    #[cfg(feature = "dock")]
-                    gpui_storybook::create_dock_window(
-                        &format!("{} - Stories", env!("CARGO_PKG_NAME")),
-                        move |window, cx| {
-                            let stories = gpui_storybook::generate_stories(window, cx);
-                            assert!(
-                                !stories.is_empty(),
-                                "story example Storybook requires linked stories"
-                            );
-                            StoryWorkspace::view(stories, window, cx)
+                            StorybookWindow::new(stories)
                         },
                         app_cx,
                     );
@@ -147,6 +128,7 @@ mod tests {
         assert_eq!(
             story_keys,
             [
+                "gpui-storybook-example-story-ActionsAndScenariosStory",
                 "gpui-storybook-example-story-ButtonStory",
                 "gpui-storybook-example-story-CustomSectionStory",
                 "gpui-storybook-example-story-GroupedDetailsStory",

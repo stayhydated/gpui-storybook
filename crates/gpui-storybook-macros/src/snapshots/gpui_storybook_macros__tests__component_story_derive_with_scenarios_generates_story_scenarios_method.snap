@@ -1,0 +1,78 @@
+---
+source: crates/gpui-storybook-macros/src/lib.rs
+expression: snapshot_tokens(expanded)
+---
+struct __ButtonChipComponentStoryView {
+    focus_handle: ::gpui::FocusHandle,
+}
+impl __ButtonChipComponentStoryView {
+    fn view(_window: &mut ::gpui::Window, cx: &mut ::gpui::App) -> ::gpui::Entity<Self> {
+        ::gpui::AppContext::new(
+            cx,
+            |cx| Self {
+                focus_handle: cx.focus_handle(),
+            },
+        )
+    }
+}
+impl ::gpui::Focusable for __ButtonChipComponentStoryView {
+    fn focus_handle(&self, _cx: &::gpui::App) -> ::gpui::FocusHandle {
+        self.focus_handle.clone()
+    }
+}
+impl ::gpui::Render for __ButtonChipComponentStoryView {
+    fn render(
+        &mut self,
+        window: &mut ::gpui::Window,
+        cx: &mut ::gpui::Context<Self>,
+    ) -> impl ::gpui::IntoElement {
+        let _ = &self.focus_handle;
+        let _ = window;
+        let _ = cx;
+        <ButtonChip as ::std::default::Default>::default()
+    }
+}
+impl ::gpui_storybook::StoryControls for __ButtonChipComponentStoryView {}
+impl ::gpui_storybook::Story for __ButtonChipComponentStoryView {
+    fn klass() -> &'static str {
+        "ButtonChip"
+    }
+    fn title(cx: &::gpui::App) -> ::std::string::String {
+        let _ = cx;
+        ("Button").into()
+    }
+    fn description(cx: &::gpui::App) -> ::std::string::String {
+        let _ = cx;
+        ("").into()
+    }
+    fn new_view(
+        window: &mut ::gpui::Window,
+        cx: &mut ::gpui::App,
+    ) -> ::gpui::Entity<Self> {
+        Self::view(window, cx)
+    }
+    fn scenarios() -> ::std::vec::Vec<::gpui_storybook::StoryScenario> {
+        (ButtonChip::scenarios())
+    }
+}
+#[doc(hidden)]
+#[used]
+#[unsafe(
+    export_name = concat!(
+        "__gpui_storybook_story_key__",
+        env!("CARGO_PKG_NAME"),
+        "__",
+        "ButtonChip",
+    )
+)]
+static __gpui_storybook_story_key_marker_ButtonChip: u8 = 0;
+gpui_storybook::__inventory::submit! {
+    ::gpui_storybook::__registry::StoryEntry::new(concat!(::std::env!("CARGO_PKG_NAME"),
+    "-", "ButtonChip"), "ButtonChip", None, None, | window, cx | {
+    ::gpui_storybook::StoryContainer::panel:: < __ButtonChipComponentStoryView > (window,
+    cx) },
+    ::gpui_storybook::__registry::StoryRegistrationSource::new(::std::env!("CARGO_PKG_NAME"),
+    ::std::env!("CARGO_MANIFEST_DIR"), ::std::file!(), ::std::line!(),),)
+    .with_autodoc(::gpui_storybook::__registry::StoryAutodoc::new("A component story with a reusable scenario.",
+    & []))
+}

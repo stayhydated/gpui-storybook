@@ -2,9 +2,9 @@
 //!
 //! This crate deliberately does not know about GPUI, inventory, story
 //! containers, or runtime config selection. It only loads a config file from a
-//! directory, deserializes the schema, exposes deterministic preference
-//! overrides, and evaluates group/story filters for a caller-supplied
-//! candidate.
+//! directory, deserializes the schema, exposes the launch-specific initial
+//! window mode and deterministic preference overrides, and evaluates
+//! group/story filters for a caller-supplied candidate.
 //!
 //! `gpui-storybook` is the crate that decides which config is the active
 //! runtime config for a process and whether a candidate group comes from a
@@ -12,6 +12,7 @@
 
 use std::path::{Path, PathBuf};
 
+pub use gpui_storybook_preferences::StorybookWindowMode;
 use serde::Deserialize;
 
 /// File name loaded by [`load_from_dir`].
@@ -50,12 +51,16 @@ pub struct StorybookPreferenceOverrides {
 /// The `group` key has no serde default, so it is required when the file
 /// exists. `allow` defaults to `None`, which means only the config's own
 /// normalized group is allowed. `disable_story` defaults to an empty denylist,
-/// and `overrides` defaults to no preference overrides.
+/// `window_mode` defaults to no launch-specific initial mode, and `overrides`
+/// defaults to no preference overrides.
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct StorybookToml {
     /// Top-level group for stories from the crate that owns this config.
     pub group: String,
+    /// Launch-specific initial window mode.
+    #[serde(default)]
+    pub window_mode: Option<StorybookWindowMode>,
     /// Optional runtime group allowlist. `["*"]` allows every group.
     #[serde(default)]
     pub allow: Option<Vec<String>>,
@@ -328,6 +333,37 @@ mod tests {
     }
 
     #[test]
+    fn window_mode_parses_as_a_typed_initial_layout() {
+        with_temp_dir(|dir| {
+            std::fs::write(
+                dir.join(STORYBOOK_TOML_FILE_NAME),
+                "group = \"Examples\"\nwindow_mode = \"dock\"\n",
+            )
+            .expect("should write config file");
+
+            let config = load_from_dir(dir)
+                .expect("valid config should parse")
+                .expect("config should exist");
+
+            assert_eq!(config.window_mode, Some(StorybookWindowMode::Dock));
+        });
+    }
+
+    #[test]
+    fn invalid_window_mode_is_a_parse_error() {
+        with_temp_dir(|dir| {
+            std::fs::write(
+                dir.join(STORYBOOK_TOML_FILE_NAME),
+                "group = \"Examples\"\nwindow_mode = \"sidebar\"\n",
+            )
+            .expect("should write config file");
+
+            let error = load_from_dir(dir).expect_err("unknown window mode should fail parsing");
+            assert!(error.to_string().contains("unknown variant `sidebar`"));
+        });
+    }
+
+    #[test]
     fn invalid_preference_override_is_a_parse_error() {
         with_temp_dir(|dir| {
             std::fs::write(
@@ -356,6 +392,7 @@ mod tests {
     fn filters_normalize_blank_and_whitespace_groups() {
         let config = StorybookToml {
             group: "  Examples  ".to_string(),
+            window_mode: None,
             allow: None,
             disable_story: Vec::new(),
             overrides: StorybookPreferenceOverrides::default(),
@@ -375,6 +412,7 @@ mod tests {
 
         let allow = StorybookToml {
             group: "Examples".to_string(),
+            window_mode: None,
             allow: Some(vec![" Other ".to_string()]),
             disable_story: Vec::new(),
             overrides: StorybookPreferenceOverrides::default(),

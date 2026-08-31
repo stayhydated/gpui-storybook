@@ -1,9 +1,11 @@
 # Use the workbench
 
 The right-side workbench edits the selected story instance, previews the active
-theme, and shows its key and source location without rebuilding the application.
+theme, shows its key and source location, and inspects selected-story GPUI
+actions without rebuilding the application.
 It is available in both the gallery and dock workspace; grouped stories expose
-an explicit variant selector so edits target one concrete variant.
+a **Variant** select so edits target one concrete variant. Gallery mode renders
+only that member, while dock mode opens selected members as independent tabs.
 
 Enable and forward the opt-in Inspector feature to add the **Open GPUI
 Inspector** button and story-root metadata:
@@ -15,6 +17,14 @@ inspector = ["gpui-storybook/inspector"]
 
 Launch the Storybook package with `--features inspector` when using that button.
 The Inspect tab remains available without the feature.
+
+Forward the opt-in performance feature to add GPUI window histograms and its
+debug frame overlay:
+
+```toml
+[features]
+performance = ["gpui-storybook/performance"]
+```
 
 ## Add controls to an explicit story
 
@@ -106,7 +116,7 @@ The workbench header provides settings shared by the selected story in that
 window:
 
 - **Responsive**, **Mobile**, **Tablet**, and **Desktop** viewport presets;
-- explicit variant buttons for grouped stories.
+- a **Variant** select for stories that share one navigation entry.
 
 Every viewport is centered inside a bordered frame. **Mobile**, **Tablet**, and
 **Desktop** lock the frame to their preset dimensions. **Responsive** provides
@@ -123,6 +133,81 @@ source location to open the story file with the system's configured application.
 With `inspector` enabled, choose **Open GPUI Inspector** to inspect the rendered
 element tree. Each Storybook window owns its own selection, preview settings,
 and controls.
+
+## Run story scenarios
+
+Open **Scenarios** to see workflows declared by the selected story. Each row
+shows the stable scenario key, description, and ordered named steps. **Run
+fresh** recreates the concrete story entity, rebinds the workbench control
+target and focus handle, applies initial controls and presentation, executes the
+steps, evaluates exact semantic postconditions, and optionally captures a PNG.
+The standard `gpui_storybook::init` path installs this live in-process runner,
+so **Run fresh** works in an ordinary application launch. On Linux and macOS,
+the `mcp` feature connects remote tools and capture support to the same
+controller. The sticky toolbar keeps **Reset** available while scenario rows
+scroll. It recreates the selected story at its constructor defaults, rebinds the
+same runtime adapters, and clears the displayed run result without executing a
+scenario.
+
+During a run, the panel marks steps as running or queued. A completed run shows
+passed, failed, and unexecuted steps plus its postcondition count and capture
+path. Runtime input is never retried after a partial failure. Switching back to
+Controls after completion edits the recreated story instance.
+
+## Inspect actions and key bindings
+
+Select a story, then open **Actions**. The tab uses the story's opt-in
+`Story::action_scope_focus_handle` instead of its primary `Focusable` handle or
+the window's current focus. Track the action-scope handle on the root element
+that installs the page or component action handlers:
+
+```rust
+fn action_scope_focus_handle(&self, _: &gpui::App) -> Option<gpui::FocusHandle> {
+    Some(self.action_scope_focus_handle.clone())
+}
+
+// In Render::render:
+div()
+    .track_focus(&self.action_scope_focus_handle)
+    .on_action(cx.listener(Self::handle_page_action))
+    .child(Input::new(&self.input))
+```
+
+Use a separate handle when the primary story focus belongs to a nested input.
+The tab keeps only default-buildable actions available at the explicit root
+scope after excluding actions also exposed through Storybook's workbench/root
+path. Nested input actions, actions from other components, and Storybook shell
+commands stay out of the list. A story without an action scope shows no inferred
+actions.
+
+Each row includes action documentation, its registered JSON argument schema,
+and every effective key binding resolved for the action scope. **Dispatch**
+sends the action directly to the same scope through GPUI's normal action
+dispatcher. The sticky toolbar keeps **Reset** available while action rows
+scroll; Reset recreates the selected story and rebinds its action scope before
+the next dispatch.
+
+Parameterized actions whose type cannot be constructed from an empty object do
+not appear in GPUI's available-action list. Use typed story scenarios or the
+automation action step when a specific argument payload is part of the example.
+
+See
+[`ActionsAndScenariosStory`](../../examples/story/src/stories/actions_scenarios_story.rs)
+for a complete example where Buttons, contextual shortcuts, Actions-tab
+dispatch, and two reusable scenarios share the same three GPUI actions and
+rendered semantic state.
+
+## Inspect window performance
+
+Launch with `--features performance` and open **Perf**. The tab reads GPUI's
+native histograms for draw duration, dirty-to-present latency, intervals between
+animated presentations, and input-to-frame latency. Each metric reports sample
+count plus p50, p95, p99, and maximum duration. **Refresh** takes a new snapshot;
+**Overlay** cycles GPUI's hidden, minimal, and full frame overlay modes.
+
+These cumulative window metrics help explain an interactive preview. Enforce
+story-isolated budgets with the portable test runner so shell rendering and
+earlier stories do not contaminate a regression result.
 
 ## Edit the active theme
 
@@ -163,10 +248,11 @@ together.
 ## Verify the result
 
 Open a controlled story and change one value. Only that story instance should
-rerender, **Reset** should restore its example value, and switching stories or
-variants should replace the displayed controls. In dock mode, close and reopen
-the application to verify that workbench width, visibility, and selected tab
-restore with the layout.
+rerender, **Reset** should restore its example value, and switching the
+**Variant** select should replace the preview and displayed controls. In dock
+mode, select two variants and verify that each remains available in its own tab,
+then close and reopen the application to verify that workbench width, visibility,
+and selected tab restore with the layout.
 
 Live edits change serialized values and theme data. Changed Rust types or
 component source still require recompilation.
@@ -181,3 +267,7 @@ component source still require recompilation.
 | External themes do not reload | The process is not a native debug build or the directory is wrong | Set `STORYBOOK_THEME_DIR` before launch and confirm the directory exists |
 | The Open GPUI Inspector button is unavailable | The Storybook package was launched without Inspector support | Forward `gpui-storybook/inspector` and launch with `--features inspector` |
 | Inspector opens without Storybook metadata | A nested element is selected | Select the `storybook-inspectable-*` story root |
+| A scenario is missing | The active story did not declare it, or a component derive omitted `scenarios = ...` | Implement `Story::scenarios()` or pass the component scenario expression and rebuild |
+| A scenario fails after some steps | A runtime handler, semantic postcondition, or capture failed | Inspect the named step result and error; fix the story or scenario and start a new fresh run |
+| An expected action is absent | The story did not expose and track an action-scope handle, or the action needs arguments to build | Implement `Story::action_scope_focus_handle`, track it on the handler-owning root, or use a typed scenario for parameterized actions |
+| The Perf tab is absent | The Storybook package was launched without GPUI profiler instrumentation | Forward `gpui-storybook/performance` and launch with `--features performance` |

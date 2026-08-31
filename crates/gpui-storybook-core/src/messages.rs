@@ -5,6 +5,9 @@ use gpui::App;
 #[derive(Clone, Copy, Debug, EsFluent)]
 pub(crate) enum StorybookMessage {
     Storybook,
+    Layout,
+    Gallery,
+    DockWorkspace,
     Appearance,
     UseSystemAppearance,
     Light,

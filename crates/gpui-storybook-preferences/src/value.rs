@@ -499,10 +499,47 @@ impl PreferredScrollbar {
     }
 }
 
+/// Storybook window presentation selected by the user or launch configuration.
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    Deserialize,
+    EnumString,
+    Eq,
+    IntoStaticStr,
+    JsonSchema,
+    PartialEq,
+    Serialize,
+)]
+#[serde(rename_all = "snake_case")]
+#[strum(const_into_str, serialize_all = "snake_case")]
+pub enum StorybookWindowMode {
+    /// Show one selected story in the searchable gallery shell.
+    #[default]
+    Gallery,
+    /// Show stories as independently managed panels in the dock workspace.
+    Dock,
+}
+
+impl StorybookWindowMode {
+    /// All window modes in stable UI order.
+    pub const ALL: [Self; 2] = [Self::Gallery, Self::Dock];
+
+    /// Returns the stable persisted token.
+    pub const fn token(self) -> &'static str {
+        self.into_str()
+    }
+}
+
 /// One typed Storybook preference aggregate.
 #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct StorybookPreferences {
+    /// Saved Storybook window presentation.
+    #[serde(default)]
+    pub window_mode: StorybookWindowMode,
     /// Saved appearance intent.
     pub color_scheme: PreferredColorScheme,
     /// Saved theme registry identifier for light appearance.

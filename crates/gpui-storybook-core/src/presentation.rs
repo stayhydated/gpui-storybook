@@ -39,7 +39,7 @@ impl StoryViewportPreset {
 }
 
 /// Background applied behind the active story preview.
-#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum StoryCanvasBackground {
     #[default]
@@ -63,7 +63,7 @@ impl StoryCanvasBackground {
 }
 
 /// Viewport and canvas background applied to the selected story entity.
-#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 pub struct StoryPresentation {
     pub viewport: StoryViewportPreset,
     pub background: StoryCanvasBackground,

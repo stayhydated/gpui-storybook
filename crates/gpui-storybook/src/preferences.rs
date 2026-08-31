@@ -19,9 +19,9 @@ pub use gpui_storybook_preferences::{
     ColorSchemeResolution, ColorSchemeSource, ConsumerId, ConsumerIdError, LanguageResolution,
     LanguageSource, LanguageTag, PersistenceMode, PreferredColorScheme, PreferredLanguage,
     PreferredLanguageMode, PreferredScrollbar, RecoveryDiagnostic, RecoveryReason,
-    ResolutionDiagnostic, ResolvedPreferences, StorybookPreferences, SystemColorScheme, ThemeId,
-    ThemeIdError, ThemeResolution, ThemeSource, UnsupportedValueSource, preference_json_schema,
-    preference_json_schema_pretty,
+    ResolutionDiagnostic, ResolvedPreferences, StorybookPreferences, StorybookWindowMode,
+    SystemColorScheme, ThemeId, ThemeIdError, ThemeResolution, ThemeSource, UnsupportedValueSource,
+    preference_json_schema, preference_json_schema_pretty,
 };
 
 type ApplyLocale<L> = Rc<dyn Fn(L, &mut App) -> Result<(), LocaleApplicationError>>;

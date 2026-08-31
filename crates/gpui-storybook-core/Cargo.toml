@@ -17,8 +17,8 @@ ignored = [ "gpui_platform" ]
 
 [features]
 capture = [ "dep:gpui_platform", "dep:image", "gpui/test-support", "gpui_platform/test-support" ]
-dock = [  ]
 inspector = [ "gpui-component/inspector" ]
+performance = [ "gpui/profiler" ]
 
 [dependencies]
 anyhow = { workspace = true }

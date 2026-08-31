@@ -1,5 +1,8 @@
 group = "gpui-storybook-example-story"
 
+# Optional launch-specific initial layout:
+# window_mode = "dock"
+
 # Optional launch-only presentation overrides:
 # [overrides]
 # color_scheme = "dark"

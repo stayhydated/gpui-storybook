@@ -1,8 +1,4 @@
-#[cfg(not(feature = "dock"))]
-use gpui_storybook::Gallery;
-#[cfg(feature = "dock")]
-use gpui_storybook::StoryWorkspace;
-use gpui_storybook::{Assets, ConsumerId, StorybookOptions};
+use gpui_storybook::{Assets, ConsumerId, StorybookOptions, StorybookWindow};
 use gpui_storybook_example_component::i18n::{self, Languages};
 
 #[allow(unused_imports)]
@@ -74,22 +70,11 @@ fn main() {
                     }
                     app_cx.activate(true);
 
-                    #[cfg(not(feature = "dock"))]
-                    gpui_storybook::create_new_window(
+                    gpui_storybook::create_storybook_window(
                         &format!("{} - Stories", env!("CARGO_PKG_NAME")),
                         move |window, cx| {
                             let all_stories = gpui_storybook::generate_stories(window, cx);
-                            Gallery::view(all_stories, None, window, cx)
-                        },
-                        app_cx,
-                    );
-
-                    #[cfg(feature = "dock")]
-                    gpui_storybook::create_dock_window(
-                        &format!("{} - Stories", env!("CARGO_PKG_NAME")),
-                        move |window, cx| {
-                            let all_stories = gpui_storybook::generate_stories(window, cx);
-                            StoryWorkspace::view(all_stories, window, cx)
+                            StorybookWindow::new(all_stories)
                         },
                         app_cx,
                     );

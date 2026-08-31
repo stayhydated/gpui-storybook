@@ -55,7 +55,6 @@ impl AppTitleBar {
         }
     }
 
-    #[cfg(feature = "dock")]
     pub(crate) fn system_child<F, E>(mut self, f: F) -> Self
     where
         E: IntoElement,

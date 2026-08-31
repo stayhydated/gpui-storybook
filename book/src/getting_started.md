@@ -14,7 +14,7 @@ You need:
 - compatible revisions of GPUI, GPUI Component, and the Fluent integration
   crates.
 
-GPUI Storybook version 0.5 targets Rust 1.96 and edition 2024.
+GPUI Storybook version 0.5 targets Rust 1.98 and edition 2024.
 
 ## Add the Storybook package dependencies
 
@@ -54,6 +54,17 @@ inspector = ["gpui-storybook/inspector"]
 Launch that package with `--features inspector` to add the GPUI Inspector button
 and Storybook story-root metadata to GPUI Component's Inspector. The Inspect
 workbench tab remains available without this feature.
+
+Forward GPUI profiler instrumentation when the Storybook binary should expose
+the Perf workbench tab:
+
+```toml
+[features]
+performance = ["gpui-storybook/performance"]
+```
+
+Launch with `--features performance` to inspect frame and input-latency
+percentiles and control GPUI's debug frame overlay.
 
 ## Wire the locale adapter
 
@@ -103,10 +114,10 @@ pub mod stories;
 ## Initialize before opening a window
 
 Create one stable `ConsumerId` for the Storybook binary. Call `init`, await
-the returned readiness task, and then construct the gallery:
+the returned readiness task, and then construct the Storybook window:
 
 ```rust
-use gpui_storybook::{Assets, ConsumerId, Gallery, StorybookOptions};
+use gpui_storybook::{Assets, ConsumerId, StorybookOptions, StorybookWindow};
 use my_app_storybook::i18n::{self, Languages};
 
 fn main() {
@@ -131,11 +142,11 @@ fn main() {
             }
 
             cx.update(|cx| {
-                gpui_storybook::create_new_window(
+                gpui_storybook::create_storybook_window(
                     "My App - Stories",
                     |window, cx| {
                         let stories = gpui_storybook::generate_stories(window, cx);
-                        Gallery::view(stories, None, window, cx)
+                        StorybookWindow::new(stories)
                     },
                     cx,
                 );
@@ -151,6 +162,12 @@ appearance or language values before saved preferences load. Handle
 `StorybookInitError` instead of using `expect` in an application that needs
 graceful startup recovery.
 
+Use the title-bar **Layout** select to switch between Gallery and Dock
+workspace. The consumer-scoped preference makes that selection the initial
+layout on the next launch. Set top-level `window_mode = "gallery"` or
+`window_mode = "dock"` in the active `storybook.toml` when the binary needs a
+configured initial layout instead.
+
 ## Run the binary
 
 Run the package that owns the entry point:
@@ -159,9 +176,10 @@ Run the package that owns the entry point:
 cargo run -p my-app-storybook
 ```
 
-Linux MCP and startup-capture sessions use the same application under Sway's
-wlroots headless backend. The [automation guide](automation.md) covers the
-required packages and launch command.
+The `mcp` feature supports Linux and macOS and produces a compile-time error on
+Windows. Linux MCP and startup-capture sessions use the same application under
+Sway's wlroots headless backend. macOS uses GPUI's native image renderer. The
+[automation guide](automation.md) covers the platform launch commands.
 
 The window should list every linked story allowed by the active
 `storybook.toml`. Continue with [Write stories](stories.md) if the gallery is

@@ -12,8 +12,8 @@ custom wrapper UI:
 
 ```rust
 use gpui::{
-    App, AppContext as _, Context, Entity, FocusHandle, Focusable, IntoElement,
-    ParentElement as _, Render, Window, div,
+    App, AppContext as _, Context, Entity, FocusHandle, Focusable,
+    InteractiveElement as _, IntoElement, ParentElement as _, Render, Window, div,
 };
 
 #[derive(gpui_storybook::StoryControls)]
@@ -38,7 +38,9 @@ impl Focusable for ButtonStory {
 
 impl Render for ButtonStory {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        div().child("Button preview")
+        div()
+            .track_focus(&self.focus_handle)
+            .child("Button preview")
     }
 }
 
@@ -50,11 +52,19 @@ impl gpui_storybook::Story for ButtonStory {
     fn new_view(window: &mut Window, cx: &mut App) -> Entity<Self> {
         Self::view(window, cx)
     }
+
+    fn action_scope_focus_handle(&self, _: &App) -> Option<FocusHandle> {
+        Some(self.focus_handle.clone())
+    }
 }
 ```
 
 `Story::title` supplies the visible label. Implement `description` when the
-gallery should show supporting text.
+gallery should show supporting text. `action_scope_focus_handle` is an explicit
+opt-in for the Actions workbench. Track it on the element that installs the
+story's action handlers. If the primary `Focusable` handle belongs to an input
+or another nested control, store and track a separate root handle for the
+action scope.
 
 ## Register a component directly
 
@@ -145,6 +155,11 @@ Use the same expression with the derive form:
 A crate-level `group` from `storybook.toml` appears outside the story's
 section in navigation. See [Configure Storybook](configuration.md).
 
+Stories with the same visible title, group, and section share one navigation
+entry. Give each concrete story a distinct, concise description; the workbench
+uses it as the **Variant** select label. Gallery mode renders one selected
+member, while dock mode keeps selected members in independent tabs.
+
 ## Run one-time setup
 
 Register application setup that must run after the core runtime is installed
@@ -180,6 +195,86 @@ my-app-storybook-ButtonStory
 
 Use `storybook_list_stories` or startup registration logs as the source of
 truth for active keys.
+
+## Declare reusable scenarios
+
+Keep repeatable interaction with the story that owns it. An explicit story
+returns `StoryScenario` values from `Story::scenarios()`:
+
+```rust
+fn scenarios() -> Vec<gpui_storybook::StoryScenario> {
+    use gpui_storybook::{
+        StoryInteractionPostcondition, StoryInteractionStep,
+        StoryScenario, StoryScenarioStep,
+    };
+
+    vec![StoryScenario::new("submit", "Submit the form")
+        .step(StoryScenarioStep::new(
+            "Click submit",
+            StoryInteractionStep::ClickTarget {
+                target_key: "submit".into(),
+                button: Default::default(),
+                click_count: 1,
+                modifiers: Default::default(),
+            },
+        ))
+        .postcondition(
+            StoryInteractionPostcondition::new("form-state", serde_json::json!("saved"))
+                .json_pointer("/status"),
+        )]
+}
+```
+
+A scenario can set initial typed controls and presentation, execute ordered
+named steps, assert exact route-local semantic values or JSON Pointers, and
+request one final PNG. The Scenarios workbench tab and MCP both use the shared
+interaction executor. Every invocation recreates the concrete story entity and
+rebinds its controls and focus before applying the scenario, so repeated runs
+start from constructor defaults. A partial destructive run is reported and is
+never resumed or retried. Standard `gpui_storybook::init` installs the live
+runner used by the workbench; on Linux and macOS, the `mcp` feature connects
+remote tools and capture support to that controller.
+
+For a component-derived story, expose an expression that returns the same
+vector:
+
+```rust
+#[derive(gpui_storybook::ComponentStory, gpui::IntoElement)]
+#[storybook(
+    example = WelcomeCard::example(),
+    scenarios = WelcomeCard::scenarios(),
+)]
+struct WelcomeCard {
+    // ...
+}
+```
+
+Scenario keys must be unique within their story. Titles, descriptions, and
+step names are display copy; automation selects the stable story and scenario
+keys.
+
+## Export static autodocs
+
+`#[story]` and `#[derive(ComponentStory)]` capture declaration Rustdocs and the
+static shape of marked controls in each inventory registration. A tooling binary
+can export every linked registration without initializing GPUI or constructing
+a story:
+
+```rust
+use my_story_crate as _;
+
+fn main() -> Result<(), gpui_storybook::StoryCatalogExportError> {
+    println!("{}", gpui_storybook::static_story_catalog_json_pretty()?);
+    Ok(())
+}
+```
+
+Entries are sorted by stable story key and source provenance. JSON includes the
+registered name and section, source crate/file/line, Rust documentation, and
+control keys, labels, descriptions, categories, editor kinds, numeric bounds,
+and choices. Localized titles and descriptions plus constructor-derived control
+defaults require a live `App`, so query the runtime catalog and controls when
+those values matter.
 
 ## Add captureable sections inside a story
 

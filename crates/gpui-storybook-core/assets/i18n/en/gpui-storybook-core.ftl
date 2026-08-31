@@ -1,6 +1,9 @@
 ## StorybookMessage
 
 storybook_message-Storybook = GPUI Storybook
+storybook_message-Layout = Layout
+storybook_message-Gallery = Gallery
+storybook_message-DockWorkspace = Dock workspace
 storybook_message-Appearance = Appearance
 storybook_message-UseSystemAppearance = Use System
 storybook_message-Light = Light

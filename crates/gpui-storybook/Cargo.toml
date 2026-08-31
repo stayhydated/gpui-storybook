@@ -13,17 +13,16 @@ readme = "README.md"
 
 [features]
 default = [ "macros" ]
-dock = [ "gpui-storybook-core/dock" ]
 inspector = [ "gpui-storybook-core/inspector" ]
 macros = [ "dep:gpui-storybook-macros" ]
-mcp = [ "dep:gpui-storybook-mcp", "gpui-storybook-core/capture" ]
+mcp = [ "dep:gpui-storybook-mcp" ]
+performance = [ "gpui-storybook-core/performance" ]
 
 [dependencies]
 gpui = { workspace = true }
 gpui-es-fluent = { workspace = true }
 gpui-storybook-core = { workspace = true }
 gpui-storybook-macros = { optional = true, workspace = true }
-gpui-storybook-mcp = { optional = true, workspace = true }
 gpui-storybook-preferences = { workspace = true }
 gpui-storybook-toml = { workspace = true }
 inventory = { workspace = true }
@@ -34,6 +33,9 @@ unic-langid = { workspace = true }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 gpui_tokio = { workspace = true }
+
+[target.'cfg(any(target_os = "linux", target_os = "macos"))'.dependencies]
+gpui-storybook-mcp = { optional = true, workspace = true }
 
 [target.'cfg(unix)'.dependencies]
 libc = { workspace = true }

@@ -9,18 +9,20 @@ roots, switch appearance and language, and capture stable story routes.
 
 A Storybook binary can provide:
 
-- a searchable gallery of linked stories;
-- a dock workspace for panel-based inspection;
-- stateful stories with their own focus, actions, and lifecycle;
+- a searchable gallery and a dock workspace selected at runtime;
+- stateful stories with their own interaction focus, explicit root action
+  scope, and lifecycle;
 - component stories generated from example data;
 - a right-side workbench with controls, theme editing, preview settings, story
-  source details, and opt-in GPUI Inspector integration;
+  source details, selected-story actions and key bindings, opt-in performance
+  telemetry, and opt-in GPUI Inspector integration;
 - persistent, consumer-scoped appearance and language preferences;
-- stable story and substory routes for MCP automation and PNG capture.
+- stable story and substory routes for Linux and macOS MCP automation and PNG
+  capture.
 
 The `gpui-storybook` facade is the normal application dependency. The
-`-core`, `-macros`, `-toml`, and `-mcp` crates support deeper runtime or
-tooling integrations.
+`-core`, `-macros`, and `-toml` crates support deeper runtime or tooling
+integrations. The Linux/macOS `-mcp` crate owns remote automation and capture.
 
 ## Choose a registration style
 
@@ -37,10 +39,12 @@ keys. You can mix them in one binary.
 
 ## Choose a window mode
 
-The default gallery is the shortest path to a focused story browser. Enable the
-`dock` feature when the Storybook should use docked panels and a workspace
-layout. Story registration, configuration, and the workbench are shared between
-both modes.
+Open the standard Storybook window, then use its title-bar **Layout** select to
+switch between the focused Gallery and the panel-based Dock workspace.
+Storybook saves the typed mode per consumer; story registration, configuration,
+and the workbench remain shared between both layouts. The active
+`storybook.toml` can set `window_mode = "gallery"` or `window_mode = "dock"`
+for a launch-specific initial layout.
 
 ## Continue
 

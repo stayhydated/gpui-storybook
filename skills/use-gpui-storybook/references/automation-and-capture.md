@@ -5,15 +5,16 @@ diagnosing automation.
 
 ## Enable automation
 
-Forward the facade feature:
+On Linux or macOS, forward the facade feature:
 
 ```toml
 [features]
 mcp = ["gpui-storybook/mcp"]
 ```
 
-Set `GPUI_STORYBOOK_MCP_STDIO=1` to serve MCP over stdio. Route tracing and
-diagnostic logs to standard error.
+The `mcp` feature is unsupported on Windows and produces a compile-time error
+there. Set `GPUI_STORYBOOK_MCP_STDIO=1` to serve MCP over stdio. Route tracing
+and diagnostic logs to standard error.
 
 On Linux, install Sway plus `libgl1-mesa-dri` and `mesa-vulkan-drivers`, then
 install the reusable launcher and run stdio and startup-capture sessions
@@ -29,8 +30,9 @@ The launcher provides a compatibility seat, window management, bounded socket
 readiness, and frame callbacks while retaining GPUI's normal Wayland backend.
 It selects the headless backend and software Pixman renderer, inherits MCP
 stdio, and stops Sway when the child exits. Set `GPUI_STORYBOOK_SWAY` for a
-private Sway executable. The launch-env tool emits this command on Linux and a
-direct Cargo command elsewhere.
+private Sway executable. The launch-env tool emits this launcher command on
+Linux. On macOS, it emits Cargo directly and GPUI's native image renderer owns
+capture.
 
 ### Verify raw stdio in this repository
 
@@ -88,6 +90,8 @@ story action or input handler, so use an inert fixture or a safe backend.
 
 The standard `Gallery::view` and `StoryWorkspace::view` constructors attach
 the controller installed by `gpui_storybook::init`.
+Their `view_with_automation` variants carry the supplied controller into the
+Scenarios workbench even when it is not installed as the default global.
 Retain the MCP automation state across calls until the transport or
 application host is explicitly stopped.
 
@@ -97,6 +101,7 @@ application host is explicitly stopped.
 - `storybook_get_story`
 - `storybook_current_story`
 - `storybook_open_story`
+- `storybook_list_scenarios`
 - `storybook_read_controls`
 - `storybook_read_semantic_values`
 - `storybook_read_value`
@@ -108,6 +113,7 @@ application host is explicitly stopped.
 - `storybook_list_actions` (interaction capability)
 - `storybook_list_interaction_targets` (interaction capability)
 - `storybook_click_target` (interaction capability)
+- `storybook_run_scenario` (interaction capability)
 - `storybook_run_steps` (interaction capability)
 
 Use advertised typed fields. Width and height are optional only as a pair.
@@ -147,6 +153,13 @@ Prefer controls, then registered actions, semantic targets, keystrokes, and
 finally story-relative pointer coordinates. Discover non-internal runtime
 actions and their JSON argument schemas with `storybook_list_actions` after
 every launch.
+
+Use `storybook_list_scenarios` to discover stable scenario keys on the current
+or requested story. `storybook_run_scenario` recreates that story from
+constructor defaults, rebinds controls and focus, and runs the declaration's
+initial controls and presentation, named steps, exact semantic postconditions,
+and optional capture. It shares the interaction operation guard and reports the
+declaration with its structured result. Never resume or retry a partial run.
 
 Wrap visible controls with `.storybook_target()`. After opening a route,
 call `storybook_list_interaction_targets` to discover live route-relative
@@ -213,16 +226,52 @@ Optional variables:
 
 Capture startup disables persistence and forces light appearance, the
 `Default Light` theme, and the typed fallback language. Stdio-only startup
-uses the same presentation with temporary storage. On Linux,
+uses the same presentation with temporary storage.
 `storybook_capture_launch_env` returns an `env` map and a `command` array. Merge
 every `env` entry into the child process environment before executing
-`command`; on Linux the command invokes the installed launcher, which creates a
-private Wayland runtime, waits for headless Sway, and then runs Cargo. It does
-not inline the capture or MCP variables.
+`command`. On Linux, the command invokes the installed launcher, which creates
+a private Wayland runtime, waits for headless Sway, and then runs Cargo. On
+macOS, it invokes Cargo directly. It does not inline the capture or MCP
+variables.
 
 Captures exclude gallery or dock chrome. A substory route crops to its section.
 Paired dimensions target the story region rather than collapsing the complete
 window. Use returned pixel dimensions as the rendered source of truth.
+
+## Portable headless tests
+
+Use `gpui-storybook-test` when a test or CI job should run a story without the
+gallery, dock shell, MCP process, or external compositor lifecycle. Keep the
+story-bearing crate linked so inventory discovery retains its registrations.
+Each request creates a fresh `HeadlessAppContext`, initializes the core runtime
+and linked `story_init` hooks, constructs one registered story, applies typed
+controls and presentation, and captures the rendered root or substory region.
+On native targets, `gpui_tokio` is installed before the core runtime and hooks,
+so hooks can use `gpui_tokio::Tokio::spawn` or `gpui_tokio::Tokio::handle`.
+Matrix IDs encode each axis independently. Generated request IDs use a bounded
+digest for serialized controls while structured reports retain the complete
+typed values, and `output_dir` filenames preserve distinct case labels. Stories
+without typed controls report an empty control snapshot; a non-empty control map
+still fails. For an application-owned substory surface, install
+`RunnerConfig::route_capture` and let the callback own route verification and
+cropping without registering that route with the core capture helpers.
+
+Pass consumer assets through `RunnerConfig::asset_source` and install any
+application-owned globals with its initializer. Built-in light and dark theme
+names apply GPUI Component's modes directly; any other named theme and every
+named language matrix axis must have a case configurator. Allow the typed
+configuration error to fail the case instead of recording a misleading label.
+
+Build deterministic matrices from route, viewport, canvas background, theme,
+language, and named control axes. Keep baseline policy explicit: use `Check`
+in verification, and expose `Update` only through a deliberate acceptance
+workflow. With the `performance` feature, require enough native GPUI profiler
+samples before enforcing draw or dirty-to-present p95 and maximum budgets.
+
+The current GPUI platform supplies Metal headless rendering on macOS and the
+Linux headless renderer on Linux and FreeBSD. Treat renderer, fonts, assets,
+and CI hardware as part of the baseline or timing environment; keep
+platform-specific accepted output where rasterization differs.
 
 ## Failure checks
 
