@@ -679,7 +679,7 @@ dependencies = [
  "bitflags 2.13.1",
  "cexpr",
  "clang-sys",
- "itertools 0.11.0",
+ "itertools 0.13.0",
  "log",
  "prettyplease",
  "proc-macro2",
@@ -1935,13 +1935,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
 name = "es-fluent"
 version = "0.18.1"
-source = "git+https://github.com/stayhydated/es-fluent?rev=69aeaa62c03b23317be13d0ce0661f3160d62db7#69aeaa62c03b23317be13d0ce0661f3160d62db7"
+source = "git+https://github.com/stayhydated/es-fluent?rev=4b900ddaebdc6d4335a6bcb15a610277b1b193f8#4b900ddaebdc6d4335a6bcb15a610277b1b193f8"
 dependencies = [
  "es-fluent-derive",
  "es-fluent-manager-core",
@@ -1954,15 +1954,16 @@ dependencies = [
 [[package]]
 name = "es-fluent-build"
 version = "0.18.1"
-source = "git+https://github.com/stayhydated/es-fluent?rev=69aeaa62c03b23317be13d0ce0661f3160d62db7#69aeaa62c03b23317be13d0ce0661f3160d62db7"
+source = "git+https://github.com/stayhydated/es-fluent?rev=4b900ddaebdc6d4335a6bcb15a610277b1b193f8#4b900ddaebdc6d4335a6bcb15a610277b1b193f8"
 dependencies = [
+ "es-fluent-shared",
  "es-fluent-toml",
 ]
 
 [[package]]
 name = "es-fluent-derive"
 version = "0.18.1"
-source = "git+https://github.com/stayhydated/es-fluent?rev=69aeaa62c03b23317be13d0ce0661f3160d62db7#69aeaa62c03b23317be13d0ce0661f3160d62db7"
+source = "git+https://github.com/stayhydated/es-fluent?rev=4b900ddaebdc6d4335a6bcb15a610277b1b193f8#4b900ddaebdc6d4335a6bcb15a610277b1b193f8"
 dependencies = [
  "darling 0.24.1",
  "es-fluent-derive-core",
@@ -1975,7 +1976,7 @@ dependencies = [
 [[package]]
 name = "es-fluent-derive-core"
 version = "0.18.1"
-source = "git+https://github.com/stayhydated/es-fluent?rev=69aeaa62c03b23317be13d0ce0661f3160d62db7#69aeaa62c03b23317be13d0ce0661f3160d62db7"
+source = "git+https://github.com/stayhydated/es-fluent?rev=4b900ddaebdc6d4335a6bcb15a610277b1b193f8#4b900ddaebdc6d4335a6bcb15a610277b1b193f8"
 dependencies = [
  "bon",
  "darling 0.24.1",
@@ -1989,12 +1990,13 @@ dependencies = [
  "strum",
  "syn 3.0.3",
  "thiserror 2.0.20",
+ "toml 1.1.4+spec-1.1.0",
 ]
 
 [[package]]
 name = "es-fluent-manager-core"
 version = "0.18.1"
-source = "git+https://github.com/stayhydated/es-fluent?rev=69aeaa62c03b23317be13d0ce0661f3160d62db7#69aeaa62c03b23317be13d0ce0661f3160d62db7"
+source = "git+https://github.com/stayhydated/es-fluent?rev=4b900ddaebdc6d4335a6bcb15a610277b1b193f8#4b900ddaebdc6d4335a6bcb15a610277b1b193f8"
 dependencies = [
  "es-fluent-shared",
  "fluent-bundle",
@@ -2013,7 +2015,7 @@ dependencies = [
 [[package]]
 name = "es-fluent-manager-embedded"
 version = "0.18.1"
-source = "git+https://github.com/stayhydated/es-fluent?rev=69aeaa62c03b23317be13d0ce0661f3160d62db7#69aeaa62c03b23317be13d0ce0661f3160d62db7"
+source = "git+https://github.com/stayhydated/es-fluent?rev=4b900ddaebdc6d4335a6bcb15a610277b1b193f8#4b900ddaebdc6d4335a6bcb15a610277b1b193f8"
 dependencies = [
  "es-fluent",
  "es-fluent-manager-core",
@@ -2026,7 +2028,7 @@ dependencies = [
 [[package]]
 name = "es-fluent-manager-macros"
 version = "0.18.1"
-source = "git+https://github.com/stayhydated/es-fluent?rev=69aeaa62c03b23317be13d0ce0661f3160d62db7#69aeaa62c03b23317be13d0ce0661f3160d62db7"
+source = "git+https://github.com/stayhydated/es-fluent?rev=4b900ddaebdc6d4335a6bcb15a610277b1b193f8#4b900ddaebdc6d4335a6bcb15a610277b1b193f8"
 dependencies = [
  "es-fluent-derive-core",
  "es-fluent-shared",
@@ -2042,7 +2044,7 @@ dependencies = [
 [[package]]
 name = "es-fluent-shared"
 version = "0.18.1"
-source = "git+https://github.com/stayhydated/es-fluent?rev=69aeaa62c03b23317be13d0ce0661f3160d62db7#69aeaa62c03b23317be13d0ce0661f3160d62db7"
+source = "git+https://github.com/stayhydated/es-fluent?rev=4b900ddaebdc6d4335a6bcb15a610277b1b193f8#4b900ddaebdc6d4335a6bcb15a610277b1b193f8"
 dependencies = [
  "anyhow",
  "camino",
@@ -2065,7 +2067,7 @@ dependencies = [
 [[package]]
 name = "es-fluent-toml"
 version = "0.18.1"
-source = "git+https://github.com/stayhydated/es-fluent?rev=69aeaa62c03b23317be13d0ce0661f3160d62db7#69aeaa62c03b23317be13d0ce0661f3160d62db7"
+source = "git+https://github.com/stayhydated/es-fluent?rev=4b900ddaebdc6d4335a6bcb15a610277b1b193f8#4b900ddaebdc6d4335a6bcb15a610277b1b193f8"
 dependencies = [
  "bon",
  "es-fluent-shared",
@@ -3074,7 +3076,7 @@ dependencies = [
 [[package]]
 name = "gpui-es-fluent"
 version = "0.1.0"
-source = "git+https://github.com/stayhydated/gpui-es-fluent?rev=b3cec2eebc2e5d53b7dbd4ab77271c272a1ac07e#b3cec2eebc2e5d53b7dbd4ab77271c272a1ac07e"
+source = "git+https://github.com/stayhydated/gpui-es-fluent?rev=be0c4d1bf84a17313517b01d3bd1dbfc7b35676f#be0c4d1bf84a17313517b01d3bd1dbfc7b35676f"
 dependencies = [
  "es-fluent",
  "es-fluent-manager-embedded",
@@ -3792,7 +3794,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.58.0",
+ "windows-core 0.62.2",
 ]
 
 [[package]]
@@ -4263,7 +4265,7 @@ checksum = "e2db585e1d738fc771bf08a151420d3ed193d9d895a36df7f6f8a9456b911ddc"
 [[package]]
 name = "koruma"
 version = "0.11.0"
-source = "git+https://github.com/stayhydated/koruma?rev=ca2ca21ea7fa346e939d6d789814dd08beeea35e#ca2ca21ea7fa346e939d6d789814dd08beeea35e"
+source = "git+https://github.com/stayhydated/koruma?rev=b462d649a26289ad98ca6959ac4cea37739ed8d3#b462d649a26289ad98ca6959ac4cea37739ed8d3"
 dependencies = [
  "koruma-core",
  "koruma-derive",
@@ -4272,12 +4274,12 @@ dependencies = [
 [[package]]
 name = "koruma-core"
 version = "0.11.0"
-source = "git+https://github.com/stayhydated/koruma?rev=ca2ca21ea7fa346e939d6d789814dd08beeea35e#ca2ca21ea7fa346e939d6d789814dd08beeea35e"
+source = "git+https://github.com/stayhydated/koruma?rev=b462d649a26289ad98ca6959ac4cea37739ed8d3#b462d649a26289ad98ca6959ac4cea37739ed8d3"
 
 [[package]]
 name = "koruma-derive"
 version = "0.11.0"
-source = "git+https://github.com/stayhydated/koruma?rev=ca2ca21ea7fa346e939d6d789814dd08beeea35e#ca2ca21ea7fa346e939d6d789814dd08beeea35e"
+source = "git+https://github.com/stayhydated/koruma?rev=b462d649a26289ad98ca6959ac4cea37739ed8d3#b462d649a26289ad98ca6959ac4cea37739ed8d3"
 dependencies = [
  "heck 0.5.0",
  "koruma-derive-core",
@@ -4290,7 +4292,7 @@ dependencies = [
 [[package]]
 name = "koruma-derive-core"
 version = "0.11.0"
-source = "git+https://github.com/stayhydated/koruma?rev=ca2ca21ea7fa346e939d6d789814dd08beeea35e#ca2ca21ea7fa346e939d6d789814dd08beeea35e"
+source = "git+https://github.com/stayhydated/koruma?rev=b462d649a26289ad98ca6959ac4cea37739ed8d3#b462d649a26289ad98ca6959ac4cea37739ed8d3"
 dependencies = [
  "attribute-dsl",
  "heck 0.5.0",
@@ -6024,7 +6026,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -6555,7 +6557,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -7512,7 +7514,7 @@ dependencies = [
  "getrandom 0.4.3",
  "once_cell",
  "rustix",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -8757,7 +8759,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
