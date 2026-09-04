@@ -9,7 +9,12 @@ fn action_debugger_formats_multi_stroke_bindings() {
         },
         None,
     );
-    assert_eq!(format_key_binding(&binding), "ctrl-K enter");
+    let expected = if cfg!(target_os = "macos") {
+        "^K enter"
+    } else {
+        "ctrl-K enter"
+    };
+    assert_eq!(format_key_binding(&binding), expected);
 }
 
 #[gpui::test]

@@ -244,11 +244,11 @@ use config::{
 #[cfg(test)]
 use config::{current_binary_name, find_cargo_project_root};
 use entries::group_duplicate_story_titles;
-pub use init::init;
 #[cfg(test)]
-use init::{
-    AutomationPreferenceProfile, StorybookInitialized, apply_automation_preference_profile,
-};
+use init::StorybookInitialized;
+pub use init::init;
+#[cfg(all(test, feature = "mcp", any(target_os = "linux", target_os = "macos")))]
+use init::{AutomationPreferenceProfile, apply_automation_preference_profile};
 pub use stories::generate_stories;
 #[cfg(test)]
 use stories::validate_unique_story_keys;

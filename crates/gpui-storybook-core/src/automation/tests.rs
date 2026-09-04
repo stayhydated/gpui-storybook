@@ -1,4 +1,6 @@
-use super::capture::{expanded_window_size, image_crop_rect};
+use super::capture::expanded_window_size;
+#[cfg(feature = "capture")]
+use super::capture::image_crop_rect;
 use super::*;
 
 fn sample_story(key: &str, title: &str) -> StorySnapshot {
