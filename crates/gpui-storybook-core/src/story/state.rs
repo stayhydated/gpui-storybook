@@ -1,4 +1,4 @@
-use gpui::{App, AppContext as _, Entity, Global, SharedString};
+use gpui_kit::{App, AppContext as _, Entity, Global, SharedString};
 
 pub struct AppState {
     pub invisible_panels: Entity<Vec<SharedString>>,
@@ -27,7 +27,7 @@ impl Global for AppState {}
 mod tests {
     use super::*;
 
-    #[gpui::test]
+    #[gpui_kit::test]
     fn app_state_initializes_and_exposes_mutable_global_state(cx: &mut App) {
         AppState::init(cx);
         let invisible_panels = AppState::global(cx).invisible_panels.clone();

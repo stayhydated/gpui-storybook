@@ -1,9 +1,11 @@
 //! Portable headless story execution, visual capture, and matrix testing.
-//!
-//! The runner deliberately owns one [`gpui::HeadlessAppContext`] per case. A
+
+//! The runner deliberately owns one [`gpui_kit::HeadlessAppContext`] per case. A
 //! context contains the app, renderer, window, entities, and GPUI globals, so
 //! constructing it inside each operation keeps story state isolated while
 //! still allowing the real story registration functions to run.
+
+extern crate gpui_kit as gpui;
 
 mod baseline;
 mod matrix;
@@ -21,11 +23,11 @@ pub use performance::{
     PerformanceReport, PerformanceStatistic, PerformanceViolation,
 };
 
-use gpui::{
+use gpui_kit::component::{Theme, ThemeMode};
+use gpui_kit::{
     AnyWindowHandle, App, AssetSource, Entity, HeadlessAppContext, PlatformTextSystem, Size,
     Window, WindowHandle, px, size,
 };
-use gpui_component::{Theme, ThemeMode};
 #[cfg(feature = "capture")]
 use gpui_storybook_core::capture_region::{CaptureRegionImageError, crop_capture_region_image};
 use gpui_storybook_core::capture_region::{
@@ -75,7 +77,7 @@ pub type CaseConfigurator = Rc<
 /// this callback so applications can choose their own crop policy while the
 /// matrix runner still treats substory routing as executable work.
 pub type RouteCapture =
-    Rc<dyn Fn(&str, &RgbaImage, Size<gpui::Pixels>) -> Result<RgbaImage, String> + 'static>;
+    Rc<dyn Fn(&str, &RgbaImage, Size<gpui_kit::Pixels>) -> Result<RgbaImage, String> + 'static>;
 
 /// A callback for application-owned global initialization.
 pub type AppInitializer = Rc<dyn Fn(&mut App) + 'static>;

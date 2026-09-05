@@ -1,5 +1,5 @@
-use gpui::{App, Bounds, WindowBounds, WindowKind, WindowOptions, px, size};
-use gpui_component::TitleBar;
+use gpui_kit::component::TitleBar;
+use gpui_kit::{App, Bounds, WindowBounds, WindowKind, WindowOptions, px, size};
 
 pub(crate) fn default_storybook_window_options(cx: &App) -> WindowOptions {
     let mut window_size = size(px(1600.0), px(1200.0));
@@ -13,15 +13,15 @@ pub(crate) fn default_storybook_window_options(cx: &App) -> WindowOptions {
     WindowOptions {
         window_bounds: Some(WindowBounds::Windowed(window_bounds)),
         titlebar: Some(TitleBar::title_bar_options()),
-        window_min_size: Some(gpui::Size {
+        window_min_size: Some(gpui_kit::Size {
             width: px(640.),
             height: px(480.),
         }),
         kind: WindowKind::Normal,
         #[cfg(target_os = "linux")]
-        window_background: gpui::WindowBackgroundAppearance::Transparent,
+        window_background: gpui_kit::WindowBackgroundAppearance::Transparent,
         #[cfg(target_os = "linux")]
-        window_decorations: Some(gpui::WindowDecorations::Client),
+        window_decorations: Some(gpui_kit::WindowDecorations::Client),
         ..Default::default()
     }
 }
@@ -30,7 +30,7 @@ pub(crate) fn default_storybook_window_options(cx: &App) -> WindowOptions {
 mod tests {
     use super::*;
 
-    #[gpui::test]
+    #[gpui_kit::test]
     fn default_window_options_set_storybook_size_and_chrome(cx: &mut App) {
         let expected_size = cx
             .primary_display()
@@ -49,7 +49,7 @@ mod tests {
         assert_eq!(bounds.size, expected_size);
         assert_eq!(
             options.window_min_size,
-            Some(gpui::size(px(640.), px(480.)))
+            Some(gpui_kit::size(px(640.), px(480.)))
         );
         assert_eq!(options.kind, WindowKind::Normal);
         assert!(options.titlebar.is_some());
@@ -57,11 +57,11 @@ mod tests {
         {
             assert_eq!(
                 options.window_background,
-                gpui::WindowBackgroundAppearance::Transparent
+                gpui_kit::WindowBackgroundAppearance::Transparent
             );
             assert_eq!(
                 options.window_decorations,
-                Some(gpui::WindowDecorations::Client)
+                Some(gpui_kit::WindowDecorations::Client)
             );
         }
     }

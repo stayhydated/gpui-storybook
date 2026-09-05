@@ -20,18 +20,23 @@ impl BasePanel for StoryContainer {
             .contains(&self.name)
     }
 
-    fn set_zoomed(&mut self, zoomed: bool, _window: &mut Window, _cx: &mut gpui::Context<Self>) {
+    fn set_zoomed(
+        &mut self,
+        zoomed: bool,
+        _window: &mut Window,
+        _cx: &mut gpui_kit::Context<Self>,
+    ) {
         tracing::debug!(panel = %self.name, zoomed, "Storybook panel zoom changed");
     }
 
-    fn set_active(&mut self, active: bool, window: &mut Window, cx: &mut gpui::Context<Self>) {
+    fn set_active(&mut self, active: bool, window: &mut Window, cx: &mut gpui_kit::Context<Self>) {
         tracing::debug!(panel = %self.name, active, "Storybook panel activation changed");
         self.is_active = active;
         if active
             && let Some(state) = self
                 .workbench_state
                 .as_ref()
-                .and_then(gpui::WeakEntity::upgrade)
+                .and_then(gpui_kit::WeakEntity::upgrade)
         {
             let story = cx.entity();
             // Panel activation updates this entity while the dock group is
@@ -50,14 +55,14 @@ impl BasePanel for StoryContainer {
 
     fn on_added_to(
         &mut self,
-        tab_group: gpui::WeakEntity<TabGroup>,
+        tab_group: gpui_kit::WeakEntity<TabGroup>,
         _window: &mut Window,
-        _cx: &mut gpui::Context<Self>,
+        _cx: &mut gpui_kit::Context<Self>,
     ) {
         self.tab_group = Some(tab_group);
     }
 
-    fn on_removed(&mut self, _window: &mut Window, _cx: &mut gpui::Context<Self>) {
+    fn on_removed(&mut self, _window: &mut Window, _cx: &mut gpui_kit::Context<Self>) {
         self.tab_group = None;
         self.is_active = false;
     }
@@ -73,7 +78,11 @@ impl BasePanel for StoryContainer {
 }
 
 impl Panel for StoryContainer {
-    fn title(&mut self, _window: &mut Window, _cx: &mut gpui::Context<Self>) -> impl IntoElement {
+    fn title(
+        &mut self,
+        _window: &mut Window,
+        _cx: &mut gpui_kit::Context<Self>,
+    ) -> impl IntoElement {
         let tab_group = self.tab_group.clone();
         let story_panel = _cx.entity().downgrade();
         let title = if self.variant_group.is_some() {
@@ -131,7 +140,7 @@ impl Panel for StoryContainer {
         &mut self,
         menu: PopupMenu,
         _window: &mut Window,
-        _cx: &mut gpui::Context<Self>,
+        _cx: &mut gpui_kit::Context<Self>,
     ) -> PopupMenu {
         menu.menu("Info", Box::new(ShowPanelInfo))
     }
@@ -172,7 +181,7 @@ pub fn reveal_story_panel(
 
 impl EventEmitter<PanelEvent> for StoryContainer {}
 impl Focusable for StoryContainer {
-    fn focus_handle(&self, _: &App) -> gpui::FocusHandle {
+    fn focus_handle(&self, _: &App) -> gpui_kit::FocusHandle {
         self.focus_handle.clone()
     }
 }

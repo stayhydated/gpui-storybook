@@ -13,7 +13,7 @@ impl StoryContainer {
         self.responsive_size = responsive_size;
     }
 
-    pub(crate) fn set_automation_size(&mut self, size: Option<gpui::Size<gpui::Pixels>>) {
+    pub(crate) fn set_automation_size(&mut self, size: Option<gpui_kit::Size<gpui_kit::Pixels>>) {
         self.automation_size = size;
     }
 
@@ -23,7 +23,7 @@ impl StoryContainer {
 
     pub(crate) fn set_workbench_state(
         &mut self,
-        state: gpui::WeakEntity<crate::workbench::WorkbenchState>,
+        state: gpui_kit::WeakEntity<crate::workbench::WorkbenchState>,
     ) {
         self.workbench_state = Some(state);
     }
@@ -67,7 +67,7 @@ impl StoryContainer {
         &mut self,
         axis: StoryCanvasResizeAxis,
         position: Point<Pixels>,
-        cx: &mut gpui::Context<Self>,
+        cx: &mut gpui_kit::Context<Self>,
     ) {
         if self.presentation.viewport != crate::presentation::StoryViewportPreset::Responsive {
             return;
@@ -95,7 +95,7 @@ impl StoryContainer {
         if let Some(workbench_state) = self
             .workbench_state
             .as_ref()
-            .and_then(gpui::WeakEntity::upgrade)
+            .and_then(gpui_kit::WeakEntity::upgrade)
         {
             workbench_state.update(cx, |state, cx| {
                 state.set_responsive_size(responsive_size, cx);
@@ -107,7 +107,7 @@ impl StoryContainer {
     pub(super) fn render_canvas_resize_handle(
         &self,
         axis: StoryCanvasResizeAxis,
-        cx: &mut gpui::Context<Self>,
+        cx: &mut gpui_kit::Context<Self>,
     ) -> impl IntoElement {
         let entity_id = cx.entity_id();
         let story_for_mouse_down = cx.entity();
@@ -146,7 +146,7 @@ impl StoryContainer {
                     .size(px(12.))
                     .cursor_nwse_resize(),
             })
-            .on_mouse_down(gpui::MouseButton::Left, move |event, _, cx| {
+            .on_mouse_down(gpui_kit::MouseButton::Left, move |event, _, cx| {
                 cx.stop_propagation();
                 story_for_mouse_down.update(cx, |story, _| {
                     story.begin_canvas_resize(event.position);

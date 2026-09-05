@@ -1,11 +1,11 @@
 //! GPUI Inspector metadata for Storybook story roots.
 
 use crate::story::StoryContainer;
-use gpui::{
+use gpui_kit::component::{ActiveTheme as _, v_flex};
+use gpui_kit::{
     AnyElement, App, Bounds, Element, ElementId, GlobalElementId, InspectorElementId, IntoElement,
     LayoutId, ParentElement as _, Pixels, Styled as _, Window,
 };
-use gpui_component::{ActiveTheme as _, v_flex};
 use std::panic::Location;
 
 /// Storybook-specific metadata displayed when a story root is inspected.

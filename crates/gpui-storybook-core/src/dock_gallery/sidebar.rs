@@ -4,7 +4,7 @@ pub struct StorySidebar {
     focus_handle: FocusHandle,
     search_input: Entity<InputState>,
     stories: Vec<Entity<StoryContainer>>,
-    dock_area: gpui::WeakEntity<DockArea>,
+    dock_area: gpui_kit::WeakEntity<DockArea>,
     automation: Option<SharedStorybookAutomation>,
     _subscriptions: Vec<Subscription>,
 }
@@ -12,7 +12,7 @@ pub struct StorySidebar {
 impl StorySidebar {
     pub fn new(
         stories: Vec<Entity<StoryContainer>>,
-        dock_area: gpui::WeakEntity<DockArea>,
+        dock_area: gpui_kit::WeakEntity<DockArea>,
         automation: Option<SharedStorybookAutomation>,
         window: &mut Window,
         cx: &mut Context<Self>,
@@ -42,7 +42,7 @@ impl StorySidebar {
 
     /// Open a story panel and reveal it if it is already mounted in a tab.
     pub(super) fn open_story(
-        dock_area: gpui::WeakEntity<DockArea>,
+        dock_area: gpui_kit::WeakEntity<DockArea>,
         story: Entity<StoryContainer>,
         automation: Option<SharedStorybookAutomation>,
         window: &mut Window,
@@ -98,7 +98,7 @@ impl StorySidebar {
     }
 
     fn register_story(
-        dock_area: &gpui::WeakEntity<DockArea>,
+        dock_area: &gpui_kit::WeakEntity<DockArea>,
         story: &Entity<StoryContainer>,
         cx: &mut App,
     ) {
@@ -126,7 +126,7 @@ impl StorySidebar {
     }
 
     pub(super) fn register_stories(
-        dock_area: &gpui::WeakEntity<DockArea>,
+        dock_area: &gpui_kit::WeakEntity<DockArea>,
         stories: &[Entity<StoryContainer>],
         cx: &mut App,
     ) {
@@ -136,7 +136,7 @@ impl StorySidebar {
     }
 
     pub(super) fn register_story_seeds(
-        dock_area: &gpui::WeakEntity<DockArea>,
+        dock_area: &gpui_kit::WeakEntity<DockArea>,
         stories: &[Entity<StoryContainer>],
         cx: &App,
     ) {
@@ -162,7 +162,7 @@ impl StorySidebar {
     }
 
     fn story_seed_by_key(
-        dock_area: &gpui::WeakEntity<DockArea>,
+        dock_area: &gpui_kit::WeakEntity<DockArea>,
         story_key: &str,
     ) -> Option<StorySeed> {
         let registries = STORY_SEEDS.lock().ok()?;
@@ -173,7 +173,10 @@ impl StorySidebar {
             .cloned()
     }
 
-    fn story_seed(dock_area: &gpui::WeakEntity<DockArea>, story_klass: &str) -> Option<StorySeed> {
+    fn story_seed(
+        dock_area: &gpui_kit::WeakEntity<DockArea>,
+        story_klass: &str,
+    ) -> Option<StorySeed> {
         let registries = STORY_SEEDS.lock().ok()?;
         registries
             .get(&dock_area.entity_id())?
@@ -184,7 +187,7 @@ impl StorySidebar {
 
     pub(super) fn create_story_by_klass(
         story_klass: &str,
-        dock_area: &gpui::WeakEntity<DockArea>,
+        dock_area: &gpui_kit::WeakEntity<DockArea>,
         window: &mut Window,
         cx: &mut App,
     ) -> Option<Entity<StoryContainer>> {
@@ -236,7 +239,7 @@ impl StorySidebar {
         story_klass: &str,
         group: Option<&str>,
         section: Option<&str>,
-        dock_area: &gpui::WeakEntity<DockArea>,
+        dock_area: &gpui_kit::WeakEntity<DockArea>,
         window: &mut Window,
         cx: &mut App,
     ) -> Option<Entity<StoryContainer>> {
@@ -258,7 +261,7 @@ impl StorySidebar {
 
     fn create_story_by_key(
         story_key: &str,
-        dock_area: &gpui::WeakEntity<DockArea>,
+        dock_area: &gpui_kit::WeakEntity<DockArea>,
         window: &mut Window,
         cx: &mut App,
     ) -> Option<Entity<StoryContainer>> {
@@ -281,7 +284,7 @@ impl StorySidebar {
         story_key: &str,
         group: Option<&str>,
         section: Option<&str>,
-        dock_area: &gpui::WeakEntity<DockArea>,
+        dock_area: &gpui_kit::WeakEntity<DockArea>,
         window: &mut Window,
         cx: &mut App,
     ) -> Option<Entity<StoryContainer>> {
@@ -302,7 +305,7 @@ impl StorySidebar {
     }
 
     pub(super) fn seeded_stories(
-        dock_area: &gpui::WeakEntity<DockArea>,
+        dock_area: &gpui_kit::WeakEntity<DockArea>,
         window: &mut Window,
         cx: &mut App,
     ) -> Vec<Entity<StoryContainer>> {
@@ -321,7 +324,7 @@ impl StorySidebar {
     }
 
     fn find_story_by_klass(
-        dock_area: &gpui::WeakEntity<DockArea>,
+        dock_area: &gpui_kit::WeakEntity<DockArea>,
         story_klass: &str,
     ) -> Option<Entity<StoryContainer>> {
         let mut registries = STORY_PANELS.lock().ok()?;
@@ -341,7 +344,7 @@ impl StorySidebar {
     }
 
     pub(super) fn open_story_by_klass(
-        dock_area: gpui::WeakEntity<DockArea>,
+        dock_area: gpui_kit::WeakEntity<DockArea>,
         story_klass: &str,
         window: &mut Window,
         cx: &mut App,
@@ -352,7 +355,7 @@ impl StorySidebar {
     }
 
     pub(super) fn open_story_by_key(
-        dock_area: gpui::WeakEntity<DockArea>,
+        dock_area: gpui_kit::WeakEntity<DockArea>,
         story_key: &str,
         automation: Option<SharedStorybookAutomation>,
         window: &mut Window,
@@ -422,7 +425,7 @@ impl Render for StorySidebar {
         let groups = group_matching_stories(&story_metadata, query.as_ref());
 
         Sidebar::new("story-sidebar")
-            .side(gpui_component::Side::Left)
+            .side(gpui_kit::component::Side::Left)
             .w(relative(1.))
             .border_0()
             .header(

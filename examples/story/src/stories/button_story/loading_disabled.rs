@@ -1,11 +1,11 @@
-use gpui::{Context, IntoElement, ParentElement as _, Styled as _};
-use gpui_component::{
+use gpui_kit::component::{
     ActiveTheme as _, Sizable as _,
     button::{Button, ButtonVariants as _},
     checkbox::Checkbox,
     h_flex,
     progress::ProgressCircle,
 };
+use gpui_kit::{Context, IntoElement, ParentElement as _, Styled as _};
 use gpui_storybook::section;
 
 use super::{ButtonControlState, ButtonStory, ButtonSubstory};
@@ -59,7 +59,7 @@ pub(super) fn controls(
                 .on_click(cx.listener(|_, _, window, cx| {
                     let mut theme = cx.theme().clone();
                     theme.shadow = !theme.shadow;
-                    cx.set_global::<gpui_component::Theme>(theme);
+                    cx.set_global::<gpui_kit::component::Theme>(theme);
                     window.refresh();
                 })),
         )

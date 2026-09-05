@@ -83,7 +83,7 @@ impl PerformanceReport {
     }
 
     #[cfg(feature = "performance")]
-    pub(crate) fn from_window(window: &gpui::Window) -> Self {
+    pub(crate) fn from_window(window: &gpui_kit::Window) -> Self {
         let snapshot = window.frame_duration_snapshot();
         let draw_duration = PerformanceMetricSummary {
             sample_count: snapshot.draw_duration_histogram.len(),

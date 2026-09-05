@@ -1,12 +1,12 @@
-use gpui::{
-    Anchor, Context, FocusHandle, InteractiveElement as _, IntoElement, ParentElement as _, Render,
-    Window, div, px,
-};
-use gpui_component::{
+use gpui_kit::component::{
     ActiveTheme as _, IconName, Side, Sizable as _, Theme,
     button::{Button, ButtonVariants as _},
     menu::DropdownMenu as _,
     scroll::ScrollbarMode,
+};
+use gpui_kit::{
+    Anchor, Context, FocusHandle, InteractiveElement as _, IntoElement, ParentElement as _, Render,
+    Window, div, px,
 };
 
 use crate::actions::{SelectFont, SelectRadius, SelectScrollbarMode};
@@ -125,12 +125,12 @@ impl Render for FontSizeSelector {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use gpui::{App, AppContext as _};
+    use gpui_kit::{App, AppContext as _};
 
-    #[gpui::test]
+    #[gpui_kit::test]
     fn selector_actions_update_theme_settings(cx: &mut App) {
-        gpui_component::init(cx);
-        let window: gpui::WindowHandle<FontSizeSelector> = cx
+        gpui_kit::init(cx);
+        let window: gpui_kit::WindowHandle<FontSizeSelector> = cx
             .open_window(Default::default(), |window, cx| {
                 cx.new(|cx| FontSizeSelector::new(window, cx))
             })

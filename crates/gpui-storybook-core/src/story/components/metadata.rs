@@ -101,8 +101,8 @@ pub(super) fn recreate_story<S: Story>(
 ) -> (
     AnyView,
     Option<Rc<dyn ControlTarget>>,
-    gpui::FocusHandle,
-    Option<gpui::FocusHandle>,
+    gpui_kit::FocusHandle,
+    Option<gpui_kit::FocusHandle>,
 ) {
     let story = S::new_view(window, cx);
     let control_target = EntityControlTarget::optional(story.clone(), cx);

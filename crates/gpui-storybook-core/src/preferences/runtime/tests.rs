@@ -1,7 +1,7 @@
 use super::*;
 use es_fluent::{FluentMessage, FluentMessageLookup};
-use gpui::{AppContext as _, Entity, px};
-use gpui_component::ActiveTheme as _;
+use gpui_kit::component::ActiveTheme as _;
+use gpui_kit::{AppContext as _, Entity, px};
 use std::{
     cell::{Cell, RefCell},
     sync::atomic::{AtomicU64, Ordering},
@@ -88,7 +88,7 @@ fn test_options(
 }
 
 fn init_test_runtime(cx: &mut App) {
-    gpui_component::init(cx);
+    gpui_kit::init(cx);
     crate::i18n::init(cx).expect("Storybook test localization initializes");
     ThemeRegistry::global_mut(cx)
         .load_themes_from_str(include_str!("../../../assets/themes/solarized.json"))
@@ -127,7 +127,7 @@ fn successful_callback() -> Rc<dyn Fn(TestLanguage, &mut App) -> Result<(), Stri
     Rc::new(|_, _| Ok(()))
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn selecting_theme_activates_its_matching_appearance(cx: &mut App) {
     init_test_runtime(cx);
     let mut runtime = Runtime::new(
@@ -186,7 +186,7 @@ fn selecting_theme_activates_its_matching_appearance(cx: &mut App) {
     assert_eq!(cx.theme().theme_name().as_ref(), "Solarized Dark");
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn unchanged_effective_theme_preserves_runtime_font_and_radius(cx: &mut App) {
     init_test_runtime(cx);
     load_configured_test_theme(cx);
@@ -229,7 +229,7 @@ fn unchanged_effective_theme_preserves_runtime_font_and_radius(cx: &mut App) {
     );
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn theme_registry_change_reapplies_the_same_effective_theme_once(cx: &mut App) {
     init_test_runtime(cx);
     load_configured_test_theme(cx);
@@ -301,7 +301,7 @@ fn schema_collision_has_stable_runtime_diagnostics() {
     assert_eq!(repository_open_path(&error), Some(preference_path));
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn explicit_scheme_and_overrides_ignore_later_detection(cx: &mut App) {
     init_test_runtime(cx);
     let mut runtime = Runtime::new(
@@ -336,7 +336,7 @@ fn explicit_scheme_and_overrides_ignore_later_detection(cx: &mut App) {
     );
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn typed_locale_adapter_tracks_initial_and_later_resolved_languages(cx: &mut App) {
     init_test_runtime(cx);
     let applied = Rc::new(RefCell::new(Vec::new()));
@@ -380,7 +380,7 @@ fn typed_locale_adapter_tracks_initial_and_later_resolved_languages(cx: &mut App
     );
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn available_locale_labels_use_the_consumer_localizer(cx: &mut App) {
     init_test_runtime(cx);
     let runtime = Runtime::new(
@@ -408,7 +408,7 @@ fn available_locale_labels_use_the_consumer_localizer(cx: &mut App) {
     );
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn missing_typed_language_mapping_is_diagnostic_without_fallback_substitution(cx: &mut App) {
     init_test_runtime(cx);
     let attempts = Rc::new(Cell::new(0));
@@ -442,7 +442,7 @@ fn missing_typed_language_mapping_is_diagnostic_without_fallback_substitution(cx
     );
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn locale_failure_is_diagnostic_without_changing_storage_status(cx: &mut App) {
     init_test_runtime(cx);
     let attempts = Rc::new(std::cell::Cell::new(0));
@@ -468,7 +468,7 @@ fn locale_failure_is_diagnostic_without_changing_storage_status(cx: &mut App) {
             .0,
         TestLanguage::En
     );
-    assert_eq!(&*gpui_component::locale(), "en");
+    assert_eq!(&*gpui_kit::component::locale(), "en");
     assert!(matches!(
         runtime.state.diagnostics.last(),
         Some(PreferenceDiagnostic::LocaleApplicationFailed { .. })
@@ -483,7 +483,7 @@ fn locale_failure_is_diagnostic_without_changing_storage_status(cx: &mut App) {
     assert_eq!(runtime.state.persistence_status, PersistenceStatus::Ready);
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn save_status_transitions_to_ready_or_error_without_losing_session_state(cx: &mut App) {
     init_test_runtime(cx);
     let mut runtime = Runtime::new(
@@ -508,7 +508,7 @@ fn save_status_transitions_to_ready_or_error_without_losing_session_state(cx: &m
     ));
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn failed_save_restores_dirty_fields_with_newer_edits_winning(cx: &mut App) {
     init_test_runtime(cx);
     let mut runtime = Runtime::new(
@@ -542,20 +542,24 @@ fn failed_save_restores_dirty_fields_with_newer_edits_winning(cx: &mut App) {
 }
 
 struct NotificationTestView {
-    notifications: Entity<gpui_component::notification::NotificationList>,
+    notifications: Entity<gpui_kit::component::notification::NotificationList>,
 }
 
-impl gpui::Render for NotificationTestView {
-    fn render(&mut self, _: &mut Window, _: &mut gpui::Context<Self>) -> impl gpui::IntoElement {
+impl gpui_kit::Render for NotificationTestView {
+    fn render(
+        &mut self,
+        _: &mut Window,
+        _: &mut gpui_kit::Context<Self>,
+    ) -> impl gpui_kit::IntoElement {
         self.notifications.clone()
     }
 }
 
-#[gpui::test]
-fn save_failure_notification_retries_and_dismisses(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn save_failure_notification_retries_and_dismisses(cx: &mut gpui_kit::TestAppContext) {
     let retry_count = Rc::new(Cell::new(0));
     cx.update(|cx| {
-        gpui_component::init(cx);
+        gpui_kit::init(cx);
         cx.set_reduce_motion(true);
         let retry_count = retry_count.clone();
         cx.on_action(move |_: &crate::actions::RetryPreferences, _: &mut App| {
@@ -564,7 +568,7 @@ fn save_failure_notification_retries_and_dismisses(cx: &mut gpui::TestAppContext
     });
     let (view, cx) = cx.add_window_view(|window, cx| {
         let notifications =
-            cx.new(|cx| gpui_component::notification::NotificationList::new(window, cx));
+            cx.new(|cx| gpui_kit::component::notification::NotificationList::new(window, cx));
         NotificationTestView { notifications }
     });
     let notifications = view.read_with(cx, |view, _| view.notifications.clone());
@@ -589,7 +593,7 @@ fn save_failure_notification_retries_and_dismisses(cx: &mut gpui::TestAppContext
     let retry_bounds = cx
         .debug_bounds("retry-preference-save")
         .expect("retry action should be rendered");
-    cx.simulate_click(retry_bounds.center(), gpui::Modifiers::none());
+    cx.simulate_click(retry_bounds.center(), gpui_kit::Modifiers::none());
     cx.run_until_parked();
     assert_eq!(retry_count.get(), 1);
 
@@ -602,7 +606,7 @@ fn save_failure_notification_retries_and_dismisses(cx: &mut gpui::TestAppContext
     );
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn scrollbar_selection_updates_saved_and_resolved_state(cx: &mut App) {
     init_test_runtime(cx);
     let mut runtime = Runtime::new(
@@ -621,7 +625,7 @@ fn scrollbar_selection_updates_saved_and_resolved_state(cx: &mut App) {
     assert_eq!(Theme::global(cx).scrollbar_mode, ScrollbarMode::Always);
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn window_mode_selection_updates_saved_state(cx: &mut App) {
     init_test_runtime(cx);
     let mut runtime = Runtime::new(
@@ -644,8 +648,8 @@ fn window_mode_selection_updates_saved_state(cx: &mut App) {
     );
 }
 
-#[gpui::test]
-async fn failed_reopen_can_retry_with_an_available_repository(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+async fn failed_reopen_can_retry_with_an_available_repository(cx: &mut gpui_kit::TestAppContext) {
     cx.executor().allow_parking();
     cx.update(gpui_tokio::init);
     let repository_task = cx.update(|cx| {
@@ -707,9 +711,9 @@ async fn failed_reopen_can_retry_with_an_available_repository(cx: &mut gpui::Tes
     });
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 async fn startup_retry_reloads_existing_intent_without_overwriting_it(
-    cx: &mut gpui::TestAppContext,
+    cx: &mut gpui_kit::TestAppContext,
 ) {
     cx.executor().allow_parking();
     cx.update(gpui_tokio::init);
@@ -787,8 +791,10 @@ async fn startup_retry_reloads_existing_intent_without_overwriting_it(
     assert_eq!(stored.preferences, expected);
 }
 
-#[gpui::test]
-async fn reopen_merges_one_local_edit_over_every_loaded_preference(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+async fn reopen_merges_one_local_edit_over_every_loaded_preference(
+    cx: &mut gpui_kit::TestAppContext,
+) {
     cx.executor().allow_parking();
     cx.update(gpui_tokio::init);
     let directory = std::env::temp_dir().join(format!(
@@ -882,8 +888,10 @@ async fn reopen_merges_one_local_edit_over_every_loaded_preference(cx: &mut gpui
     std::fs::remove_dir_all(directory).expect("temporary test directory removes");
 }
 
-#[gpui::test]
-async fn reload_merges_in_flight_edits_over_loaded_untouched_fields(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+async fn reload_merges_in_flight_edits_over_loaded_untouched_fields(
+    cx: &mut gpui_kit::TestAppContext,
+) {
     cx.executor().allow_parking();
     cx.update(gpui_tokio::init);
     let baseline = non_default_preferences();

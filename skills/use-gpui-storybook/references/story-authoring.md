@@ -14,7 +14,7 @@ Use `#[derive(gpui_storybook::ComponentStory)]` when the component implements
 `title`, `description`, `section`, and `example`.
 
 ```rust
-#[derive(gpui::IntoElement, gpui_storybook::ComponentStory)]
+#[derive(gpui_kit::IntoElement, gpui_storybook::ComponentStory)]
 #[storybook(
     title = "Welcome Card",
     section = crate::StorySection::Intro,
@@ -27,7 +27,7 @@ pub struct WelcomeCard {
 
 The derive accepts non-generic structs. Without `example`, the wrapper uses
 `Default::default()`. Title and description expressions have
-`cx: &gpui::App` in scope and may call `localize_message`.
+`cx: &gpui_kit::App` in scope and may call `localize_message`.
 
 ## Expose story-root actions
 
@@ -36,12 +36,12 @@ An explicit story opts into the Actions workbench with
 element that installs the story's action handlers:
 
 ```rust
-fn action_scope_focus_handle(&self, _: &gpui::App) -> Option<gpui::FocusHandle> {
+fn action_scope_focus_handle(&self, _: &gpui_kit::App) -> Option<gpui_kit::FocusHandle> {
     Some(self.action_scope_focus_handle.clone())
 }
 
 // In Render::render:
-gpui::div()
+gpui_kit::div()
     .track_focus(&self.action_scope_focus_handle)
     .on_action(cx.listener(Self::handle_page_action))
 ```
@@ -67,7 +67,7 @@ struct ButtonStory {
     disabled: bool,
     #[storybook(control(min = 0.0, max = 32.0, step = 1.0))]
     padding: f32,
-    focus_handle: gpui::FocusHandle,
+    focus_handle: gpui_kit::FocusHandle,
 }
 ```
 
@@ -108,7 +108,7 @@ For a component story, return the same `Vec<StoryScenario>` from an associated
 function and pass it to the derive:
 
 ```rust
-#[derive(gpui::IntoElement, gpui_storybook::ComponentStory)]
+#[derive(gpui_kit::IntoElement, gpui_storybook::ComponentStory)]
 #[storybook(
     example = WelcomeCard::example(),
     scenarios = WelcomeCard::scenarios(),

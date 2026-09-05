@@ -8,7 +8,7 @@ preferences, window mode, or `storybook.toml`.
 Use the facade's startup order:
 
 1. Build the native GPUI application with
-   `gpui_platform::application().with_assets(gpui_storybook::Assets)`.
+   `gpui_kit::application().with_assets(gpui_storybook::Assets)`.
 2. Construct a stable `ConsumerId` unique to the Storybook binary.
 3. Construct typed `StorybookOptions` with the fallback language and locale
    adapter.

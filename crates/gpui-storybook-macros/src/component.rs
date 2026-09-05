@@ -109,32 +109,32 @@ pub(super) fn component_story_impl(input: TokenStream2) -> TokenStream2 {
 
     quote! {
         struct #wrapper_ident {
-            focus_handle: ::gpui::FocusHandle,
+            focus_handle: ::gpui_kit::FocusHandle,
             #(#wrapper_fields)*
         }
 
         impl #wrapper_ident {
-            fn view(_window: &mut ::gpui::Window, cx: &mut ::gpui::App) -> ::gpui::Entity<Self> {
+            fn view(_window: &mut ::gpui_kit::Window, cx: &mut ::gpui_kit::App) -> ::gpui_kit::Entity<Self> {
                 #view_example
-                ::gpui::AppContext::new(cx, |cx| Self {
+                ::gpui_kit::AppContext::new(cx, |cx| Self {
                     focus_handle: cx.focus_handle(),
                     #(#wrapper_initializers)*
                 })
             }
         }
 
-        impl ::gpui::Focusable for #wrapper_ident {
-            fn focus_handle(&self, _cx: &::gpui::App) -> ::gpui::FocusHandle {
+        impl ::gpui_kit::Focusable for #wrapper_ident {
+            fn focus_handle(&self, _cx: &::gpui_kit::App) -> ::gpui_kit::FocusHandle {
                 self.focus_handle.clone()
             }
         }
 
-        impl ::gpui::Render for #wrapper_ident {
+        impl ::gpui_kit::Render for #wrapper_ident {
             fn render(
                 &mut self,
-                window: &mut ::gpui::Window,
-                cx: &mut ::gpui::Context<Self>,
-            ) -> impl ::gpui::IntoElement {
+                window: &mut ::gpui_kit::Window,
+                cx: &mut ::gpui_kit::Context<Self>,
+            ) -> impl ::gpui_kit::IntoElement {
                 let _ = &self.focus_handle;
                 let _ = window;
                 let _ = cx;
@@ -149,20 +149,20 @@ pub(super) fn component_story_impl(input: TokenStream2) -> TokenStream2 {
                 #struct_name_str
             }
 
-            fn title(cx: &::gpui::App) -> ::std::string::String {
+            fn title(cx: &::gpui_kit::App) -> ::std::string::String {
                 let _ = cx;
                 (#title).into()
             }
 
-            fn description(cx: &::gpui::App) -> ::std::string::String {
+            fn description(cx: &::gpui_kit::App) -> ::std::string::String {
                 let _ = cx;
                 (#description).into()
             }
 
             fn new_view(
-                window: &mut ::gpui::Window,
-                cx: &mut ::gpui::App,
-            ) -> ::gpui::Entity<Self> {
+                window: &mut ::gpui_kit::Window,
+                cx: &mut ::gpui_kit::App,
+            ) -> ::gpui_kit::Entity<Self> {
                 Self::view(window, cx)
             }
 

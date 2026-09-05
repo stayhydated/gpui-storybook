@@ -19,7 +19,7 @@ fn scenario_progress_reports_only_completed_steps() {
 #[test]
 fn scenario_runner_uses_the_controller_attached_to_its_host() {
     let mut app = TestAppContext::single();
-    app.update(gpui_component::init);
+    app.update(gpui_kit::init);
     let automation = crate::automation::StorybookAutomation::new();
     let window = app.open_window(size(px(400.), px(600.)), move |window, cx| {
         let state = cx.new(|cx| WorkbenchState::new_with_automation(None, Some(automation), cx));
@@ -63,7 +63,7 @@ fn scenario_runner_rejects_a_default_controller_owned_by_another_host() {
         .take_command_receiver()
         .expect("another host should claim the default controller");
     app.update(|cx| {
-        gpui_component::init(cx);
+        gpui_kit::init(cx);
         crate::automation::set_default_storybook_automation(cx, automation);
     });
     let window = app.open_window(size(px(400.), px(600.)), |window, cx| {
@@ -95,13 +95,13 @@ fn scenario_runner_rejects_a_default_controller_owned_by_another_host() {
     }));
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn scenario_reset_toolbar_stays_visible_recreates_the_story_and_clears_the_result(
     cx: &mut TestAppContext,
 ) {
     SCENARIO_RESET_STORY_CREATIONS.store(0, Ordering::SeqCst);
     let window = cx.update(|cx| {
-        gpui_component::init(cx);
+        gpui_kit::init(cx);
         cx.open_window(Default::default(), |window, cx| {
             let story = StoryContainer::panel::<ScenarioResetStory>(window, cx);
             let state = cx.new(|cx| WorkbenchState::new(Some(story), cx));
@@ -171,7 +171,7 @@ fn scenario_reset_toolbar_stays_visible_recreates_the_story_and_clears_the_resul
     let reset = visual_cx
         .debug_bounds("workbench-scenarios-reset")
         .expect("scenario toolbar Reset button should remain visible");
-    visual_cx.simulate_click(reset.center(), gpui::Modifiers::none());
+    visual_cx.simulate_click(reset.center(), gpui_kit::Modifiers::none());
     visual_cx.run_until_parked();
     visual_cx.update(|window, cx| {
         _ = window.draw(cx);
@@ -195,7 +195,7 @@ fn scenario_reset_toolbar_stays_visible_recreates_the_story_and_clears_the_resul
     let reset = visual_cx
         .debug_bounds("workbench-scenarios-reset")
         .expect("disabled scenario Reset button should remain visible");
-    visual_cx.simulate_click(reset.center(), gpui::Modifiers::none());
+    visual_cx.simulate_click(reset.center(), gpui_kit::Modifiers::none());
     visual_cx.run_until_parked();
     assert_eq!(
         SCENARIO_RESET_STORY_CREATIONS.load(Ordering::SeqCst),

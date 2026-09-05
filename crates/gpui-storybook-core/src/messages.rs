@@ -1,5 +1,5 @@
 use es_fluent::EsFluent;
-use gpui::App;
+use gpui_kit::App;
 
 /// User-facing text owned by the Storybook shell.
 #[derive(Clone, Copy, Debug, EsFluent)]

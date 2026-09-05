@@ -246,7 +246,7 @@ fn operation_guard_rejects_mutations_until_its_owner_drops() {
     assert!(automation.begin_operation().is_ok());
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn default_automation_round_trips_through_app_global(cx: &mut App) {
     assert!(default_storybook_automation(cx).is_none());
     let automation = StorybookAutomation::new();
@@ -314,13 +314,13 @@ fn default_sizes_paths_and_capture_validation_are_stable() {
 
 #[test]
 fn capture_target_size_only_expands_a_clipped_story_region() {
-    let window = gpui::size(px(800.), px(600.));
+    let window = gpui_kit::size(px(800.), px(600.));
     assert_eq!(
         expanded_window_size(
             window,
-            gpui::Bounds {
-                origin: gpui::point(px(200.), px(100.)),
-                size: gpui::size(px(400.), px(300.)),
+            gpui_kit::Bounds {
+                origin: gpui_kit::point(px(200.), px(100.)),
+                size: gpui_kit::size(px(400.), px(300.)),
             },
         ),
         None
@@ -328,12 +328,12 @@ fn capture_target_size_only_expands_a_clipped_story_region() {
     assert_eq!(
         expanded_window_size(
             window,
-            gpui::Bounds {
-                origin: gpui::point(px(300.), px(150.)),
-                size: gpui::size(px(600.), px(500.)),
+            gpui_kit::Bounds {
+                origin: gpui_kit::point(px(300.), px(150.)),
+                size: gpui_kit::size(px(600.), px(500.)),
             },
         ),
-        Some(gpui::size(px(900.), px(650.)))
+        Some(gpui_kit::size(px(900.), px(650.)))
     );
 }
 
@@ -432,13 +432,13 @@ fn automation_errors_have_actionable_messages_and_exit_codes() {
 #[test]
 fn image_crop_rect_scales_clamps_and_rejects_empty_regions() {
     let image = image::RgbaImage::new(200, 100);
-    let window_size = gpui::size(px(100.), px(50.));
+    let window_size = gpui_kit::size(px(100.), px(50.));
 
     assert_eq!(
         image_crop_rect(
             Bounds {
                 origin: point(px(10.), px(5.)),
-                size: gpui::size(px(40.), px(20.)),
+                size: gpui_kit::size(px(40.), px(20.)),
             },
             window_size,
             &image,
@@ -449,7 +449,7 @@ fn image_crop_rect_scales_clamps_and_rejects_empty_regions() {
         image_crop_rect(
             Bounds {
                 origin: point(px(-10.), px(-5.)),
-                size: gpui::size(px(200.), px(100.)),
+                size: gpui_kit::size(px(200.), px(100.)),
             },
             window_size,
             &image,
@@ -461,7 +461,7 @@ fn image_crop_rect_scales_clamps_and_rejects_empty_regions() {
         None
     );
     assert_eq!(
-        image_crop_rect(Bounds::default(), gpui::size(px(0.), px(50.)), &image,),
+        image_crop_rect(Bounds::default(), gpui_kit::size(px(0.), px(50.)), &image,),
         None
     );
     assert_eq!(

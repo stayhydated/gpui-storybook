@@ -2,15 +2,15 @@
 
 use std::{future::Future, mem, path::PathBuf, rc::Rc, sync::Arc};
 
-use gpui::{
-    App, AsyncApp, BorrowAppContext as _, Global, InteractiveElement as _, SharedString, Task,
-    Window, WindowAppearance,
-};
-use gpui_component::{
+use gpui_kit::component::{
     Theme, ThemeMode, ThemeRegistry, WindowExt as _,
     button::{Button, ButtonVariants as _},
     notification::Notification,
     scroll::ScrollbarMode,
+};
+use gpui_kit::{
+    App, AsyncApp, BorrowAppContext as _, Global, InteractiveElement as _, SharedString, Task,
+    Window, WindowAppearance,
 };
 use gpui_storybook_preferences::{
     AvailableThemeResolver, DetectedLocales, LanguageTag, LocaleDetector, PersistenceMode,

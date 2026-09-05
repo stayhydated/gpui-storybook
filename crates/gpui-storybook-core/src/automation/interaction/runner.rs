@@ -183,7 +183,7 @@ fn start_interaction_runner(
 fn resolve_step_point(
     step: PreparedInteractionStep,
     step_index: usize,
-    bounds: &gpui::Bounds<gpui::Pixels>,
+    bounds: &gpui_kit::Bounds<gpui_kit::Pixels>,
 ) -> Result<PreparedInteractionStep, StorybookAutomationError> {
     let resolve = |point: StoryPoint| {
         resolve_story_point(point, bounds).map_err(|message| {
@@ -289,7 +289,7 @@ fn resolve_target_click(
 
 pub(super) fn resolve_story_point(
     point: StoryPoint,
-    bounds: &gpui::Bounds<gpui::Pixels>,
+    bounds: &gpui_kit::Bounds<gpui_kit::Pixels>,
 ) -> Result<StoryPoint, String> {
     let origin_x = f32::from(bounds.origin.x);
     let origin_y = f32::from(bounds.origin.y);
@@ -517,16 +517,16 @@ fn dispatch_platform_event(
     }
 }
 
-fn window_point(story_point: StoryPoint) -> gpui::Point<gpui::Pixels> {
+fn window_point(story_point: StoryPoint) -> gpui_kit::Point<gpui_kit::Pixels> {
     debug_assert_eq!(story_point.space, StoryPointSpace::LogicalPixels);
     point(px(story_point.x), px(story_point.y))
 }
 
-fn mouse_button(button: StoryMouseButton) -> gpui::MouseButton {
+fn mouse_button(button: StoryMouseButton) -> gpui_kit::MouseButton {
     match button {
-        StoryMouseButton::Left => gpui::MouseButton::Left,
-        StoryMouseButton::Right => gpui::MouseButton::Right,
-        StoryMouseButton::Middle => gpui::MouseButton::Middle,
+        StoryMouseButton::Left => gpui_kit::MouseButton::Left,
+        StoryMouseButton::Right => gpui_kit::MouseButton::Right,
+        StoryMouseButton::Middle => gpui_kit::MouseButton::Middle,
     }
 }
 

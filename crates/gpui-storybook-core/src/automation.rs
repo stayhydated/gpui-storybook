@@ -36,9 +36,9 @@ use crate::{
     presentation::StoryViewportPreset,
     story::StoryContainer,
 };
-use gpui::{App, Entity, Global, Window, px};
+use gpui_kit::{App, Entity, Global, Window, px};
 #[cfg(feature = "capture")]
-use gpui::{Bounds, Pixels, point};
+use gpui_kit::{Bounds, Pixels, point};
 pub use interaction::{
     DEFAULT_INTERACTION_POSTCONDITION_FRAMES, MAX_INTERACTION_POSTCONDITIONS,
     MAX_INTERACTION_STEPS, MAX_INTERACTION_TEXT_BYTES, MAX_INTERACTION_WAITED_FRAMES,

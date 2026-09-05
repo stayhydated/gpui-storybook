@@ -16,9 +16,9 @@ fn workbench_tabs_have_stable_persisted_indices() {
     }
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn grouped_story_select_targets_one_concrete_variant(cx: &mut TestAppContext) {
-    cx.update(gpui_component::init);
+    cx.update(gpui_kit::init);
     let window = cx.update(|cx| {
         cx.open_window(Default::default(), |window, cx| {
             let mut variant = |description: &str, klass: &str, cx: &mut App| {
@@ -93,7 +93,7 @@ fn persisted_panel_state_restores_the_selected_tab() {
     );
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn window_scoped_states_keep_preview_independent(cx: &mut App) {
     let first = cx.new(|cx| WorkbenchState::new(None, cx));
     let second = cx.new(|cx| WorkbenchState::new(None, cx));
@@ -114,7 +114,7 @@ fn window_scoped_states_keep_preview_independent(cx: &mut App) {
     assert_eq!(second.read(cx).presentation(), StoryPresentation::default());
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn responsive_viewport_inherits_the_previous_fixed_preset(cx: &mut App) {
     let state = cx.new(|cx| WorkbenchState::new(None, cx));
 

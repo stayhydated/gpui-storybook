@@ -333,7 +333,7 @@ where
             .find_map(|(language, candidate)| (candidate == tag).then_some(*language))
             .ok_or_else(|| "typed_language_mapping".to_owned())?;
         cx.set_global(crate::language::CurrentLanguage(typed));
-        gpui_component::set_locale(&identifier.to_string());
+        gpui_kit::component::set_locale(&identifier.to_string());
         i18n::change_locale(cx, identifier).map_err(|_| "storybook_locale".to_owned())?;
         (self.apply_consumer_locale)(typed, cx)?;
         Ok(())

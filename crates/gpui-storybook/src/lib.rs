@@ -1,5 +1,5 @@
 //! Public facade for building GPUI storybook binaries.
-//!
+
 //! Most applications should depend on this crate rather than the lower-level
 //! runtime, macro, or TOML crates. It re-exports the standard runtime shell,
 //! typed controls and workbench state, story traits, locale helpers, the
@@ -78,6 +78,8 @@
 //! [`PersistenceStatus`] is storage-only; locale-adapter failures are reported
 //! as diagnostics and are retried on later window activation without falsifying
 //! storage state.
+
+extern crate gpui_kit as gpui;
 
 #[cfg(all(feature = "mcp", not(any(target_os = "linux", target_os = "macos"))))]
 compile_error!(

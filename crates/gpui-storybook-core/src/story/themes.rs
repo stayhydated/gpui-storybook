@@ -1,9 +1,9 @@
 #[cfg(all(debug_assertions, not(target_family = "wasm")))]
 use std::path::PathBuf;
 
-use gpui::App;
+use gpui_kit::App;
 #[cfg(all(debug_assertions, not(target_family = "wasm")))]
-use gpui_component::ThemeRegistry;
+use gpui_kit::component::ThemeRegistry;
 
 #[cfg(all(debug_assertions, not(target_family = "wasm")))]
 const THEMES_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/themes");

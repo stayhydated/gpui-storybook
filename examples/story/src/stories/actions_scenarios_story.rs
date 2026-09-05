@@ -1,12 +1,12 @@
-use gpui::{
-    Action as _, App, AppContext as _, Context, Entity, Focusable, InteractiveElement as _,
-    IntoElement, KeyBinding, ParentElement as _, Render, Styled as _, Window, div,
-};
-use gpui_component::{
+use gpui_kit::component::{
     ActiveTheme as _, Disableable as _, Sizable as _, StyledExt as _,
     button::{Button, ButtonVariants as _},
     group_box::{GroupBox, GroupBoxVariants as _},
     h_flex, v_flex,
+};
+use gpui_kit::{
+    Action as _, App, AppContext as _, Context, Entity, Focusable, InteractiveElement as _,
+    IntoElement, KeyBinding, ParentElement as _, Render, Styled as _, Window, div,
 };
 use gpui_storybook::{
     StoryInteractionPostcondition, StoryInteractionStep, StoryScenario, StoryScenarioStep,
@@ -17,17 +17,17 @@ use serde::Serialize;
 const ACTION_CONTEXT: &str = "ActionsAndScenariosStory";
 
 /// Increases the story counter unless updates are paused.
-#[derive(gpui::Action, Clone, Debug, Default, Eq, PartialEq)]
+#[derive(gpui_kit::Action, Clone, Debug, Default, Eq, PartialEq)]
 #[action(namespace = actions_scenarios_story)]
 pub struct IncreaseCount;
 
 /// Pauses or resumes counter updates.
-#[derive(gpui::Action, Clone, Debug, Default, Eq, PartialEq)]
+#[derive(gpui_kit::Action, Clone, Debug, Default, Eq, PartialEq)]
 #[action(namespace = actions_scenarios_story)]
 pub struct TogglePaused;
 
 /// Restores the counter and pause state without clearing dispatch history.
-#[derive(gpui::Action, Clone, Debug, Default, Eq, PartialEq)]
+#[derive(gpui_kit::Action, Clone, Debug, Default, Eq, PartialEq)]
 #[action(namespace = actions_scenarios_story)]
 pub struct ResetCount;
 
@@ -89,7 +89,7 @@ impl ActionScenarioState {
 #[derive(gpui_storybook::StoryControls)]
 #[gpui_storybook::story(crate::StorySection::Automation)]
 pub struct ActionsAndScenariosStory {
-    focus_handle: gpui::FocusHandle,
+    focus_handle: gpui_kit::FocusHandle,
     state: ActionScenarioState,
 }
 
@@ -131,7 +131,7 @@ impl gpui_storybook::Story for ActionsAndScenariosStory {
         cx.new(Self::new)
     }
 
-    fn action_scope_focus_handle(&self, _: &App) -> Option<gpui::FocusHandle> {
+    fn action_scope_focus_handle(&self, _: &App) -> Option<gpui_kit::FocusHandle> {
         Some(self.focus_handle.clone())
     }
 
@@ -230,7 +230,7 @@ impl gpui_storybook::Story for ActionsAndScenariosStory {
 }
 
 impl Focusable for ActionsAndScenariosStory {
-    fn focus_handle(&self, _: &App) -> gpui::FocusHandle {
+    fn focus_handle(&self, _: &App) -> gpui_kit::FocusHandle {
         self.focus_handle.clone()
     }
 }
@@ -444,10 +444,10 @@ mod tests {
         );
     }
 
-    #[gpui::test]
+    #[gpui_kit::test]
     fn showcased_actions_are_default_buildable(cx: &mut App) {
         for action in [
-            &IncreaseCount as &dyn gpui::Action,
+            &IncreaseCount as &dyn gpui_kit::Action,
             &TogglePaused,
             &ResetCount,
         ] {

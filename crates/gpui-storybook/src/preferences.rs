@@ -9,7 +9,7 @@
 
 use std::{error::Error, fmt, path::PathBuf, rc::Rc};
 
-use gpui::App;
+use gpui_kit::App;
 use gpui_storybook_core::language::Language;
 
 pub use gpui_storybook_core::preferences::{

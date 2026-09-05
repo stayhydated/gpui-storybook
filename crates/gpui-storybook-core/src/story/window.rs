@@ -1,17 +1,17 @@
 use std::rc::Rc;
 
-use gpui::{
-    AnyView, App, AppContext as _, Context, Entity, FocusHandle, Focusable,
-    InteractiveElement as _, IntoElement, ParentElement as _, Render, SharedString, Styled as _,
-    Subscription, Window, div,
-};
-use gpui_component::{
+use gpui_kit::component::{
     IndexPath, Root, Sizable as _,
     dock::{ClosePanel, ToggleZoom},
     h_flex,
     searchable_list::SearchableListItem,
     select::{Select, SelectEvent, SelectState},
     v_flex,
+};
+use gpui_kit::{
+    AnyView, App, AppContext as _, Context, Entity, FocusHandle, Focusable,
+    InteractiveElement as _, IntoElement, ParentElement as _, Render, SharedString, Styled as _,
+    Subscription, Window, div,
 };
 use gpui_storybook_preferences::StorybookWindowMode;
 
@@ -45,8 +45,8 @@ where
     let title = SharedString::from(title.to_owned());
 
     cx.bind_keys(vec![
-        gpui::KeyBinding::new("shift-escape", ToggleZoom, None),
-        gpui::KeyBinding::new("ctrl-w", ClosePanel, None),
+        gpui_kit::KeyBinding::new("shift-escape", ToggleZoom, None),
+        gpui_kit::KeyBinding::new("ctrl-w", ClosePanel, None),
     ]);
 
     cx.spawn(async move |cx| {
@@ -539,16 +539,16 @@ mod tests {
         );
     }
 
-    #[gpui::test]
+    #[gpui_kit::test]
     fn direct_core_window_does_not_require_the_preference_global(cx: &mut App) {
-        gpui_component::init(cx);
+        gpui_kit::init(cx);
         crate::i18n::init(cx).expect("Storybook localization should initialize");
         assert!(
             cx.try_global::<crate::preferences::StorybookPreferencesGlobal>()
                 .is_none()
         );
 
-        let window: gpui::WindowHandle<StorybookShell> = cx
+        let window: gpui_kit::WindowHandle<StorybookShell> = cx
             .open_window(Default::default(), |window, cx| {
                 cx.new(|cx| {
                     StorybookShell::new(
@@ -578,9 +578,9 @@ mod tests {
             .expect("optional preference forwarding should remain a no-op");
     }
 
-    #[gpui::test]
+    #[gpui_kit::test]
     fn only_the_first_storybook_shell_claims_the_default_controller(cx: &mut App) {
-        gpui_component::init(cx);
+        gpui_kit::init(cx);
         crate::i18n::init(cx).expect("Storybook localization should initialize");
         let automation = crate::automation::StorybookAutomation::new();
         crate::automation::set_default_storybook_automation(cx, automation);
@@ -597,8 +597,8 @@ mod tests {
             })
             .expect("Storybook window should open")
         };
-        let first: gpui::WindowHandle<StorybookShell> = open(cx);
-        let second: gpui::WindowHandle<StorybookShell> = open(cx);
+        let first: gpui_kit::WindowHandle<StorybookShell> = open(cx);
+        let second: gpui_kit::WindowHandle<StorybookShell> = open(cx);
 
         first
             .update(cx, |shell, _, _| assert!(shell.automation.is_some()))
@@ -608,13 +608,13 @@ mod tests {
             .expect("second shell should reject the claimed controller");
     }
 
-    #[gpui::test]
+    #[gpui_kit::test]
     fn switching_modes_keeps_the_live_view_on_the_automation_route(cx: &mut App) {
-        gpui_component::init(cx);
+        gpui_kit::init(cx);
         crate::i18n::init(cx).expect("Storybook localization should initialize");
         let automation = crate::automation::StorybookAutomation::new();
         crate::automation::set_default_storybook_automation(cx, automation.clone());
-        let window: gpui::WindowHandle<StorybookShell> = cx
+        let window: gpui_kit::WindowHandle<StorybookShell> = cx
             .open_window(Default::default(), |window, cx| {
                 let button = story("crate-ButtonStory", "ButtonStory", window, cx);
                 let table = story("crate-TableStory", "TableStory", window, cx);

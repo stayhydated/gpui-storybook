@@ -1,8 +1,4 @@
-use gpui::{
-    App, AppContext as _, Context, Entity, FocusHandle, Focusable, IntoElement, ParentElement as _,
-    Render, Styled as _, Window, prelude::FluentBuilder as _, px,
-};
-use gpui_component::{
+use gpui_kit::component::{
     ActiveTheme as _, Selectable as _, Sizable as _, Size,
     button::{Button, ButtonGroup},
     h_flex,
@@ -11,6 +7,10 @@ use gpui_component::{
     },
     tag::Tag,
     v_flex,
+};
+use gpui_kit::{
+    App, AppContext as _, Context, Entity, FocusHandle, Focusable, IntoElement, ParentElement as _,
+    Render, Styled as _, Window, prelude::FluentBuilder as _, px,
 };
 
 use gpui_storybook::section;

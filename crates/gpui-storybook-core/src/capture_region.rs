@@ -1,4 +1,4 @@
-use gpui::{
+use gpui_kit::{
     AnyElement, App, Bounds, Element, ElementId, GlobalElementId, InspectorElementId,
     InteractiveElement, IntoElement, LayoutId, Pixels, ScrollHandle, SharedString, Window, point,
 };
@@ -120,7 +120,7 @@ pub(crate) fn capture_story_view_with_scroll(
 /// route-local key and derives a human-readable label from it:
 ///
 /// ```no_run
-/// use gpui::{InteractiveElement as _, div};
+/// use gpui_kit::{InteractiveElement as _, div};
 /// use gpui_storybook_core::capture_region::StorybookElementExt as _;
 ///
 /// let button = div().id("execute-request").storybook_target();

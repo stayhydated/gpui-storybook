@@ -1,4 +1,4 @@
-use gpui::{AnyElement, App, Entity, Global, IntoElement, MenuItem, Window};
+use gpui_kit::{AnyElement, App, Entity, Global, IntoElement, MenuItem, Window};
 use gpui_storybook_preferences::StorybookWindowMode;
 
 use crate::story::StoryContainer;
@@ -96,9 +96,9 @@ impl StorybookWindow {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use gpui::{ParentElement as _, div};
+    use gpui_kit::{ParentElement as _, div};
 
-    #[gpui::test]
+    #[gpui_kit::test]
     fn window_ui_and_wrapper_preserve_custom_builders(cx: &mut App) {
         let default_ui = StorybookWindowUi::new();
         assert!(default_ui.app_menu_items.is_none());

@@ -4,11 +4,11 @@ use crate::{
     app_menus, i18n,
     messages::{StorybookMessage, text},
 };
-use gpui::{App, KeyBinding, Menu, MenuItem, OsAction};
-use gpui_component::input::{Copy, Cut, Paste, Redo, Undo};
+use gpui_kit::component::input::{Copy, Cut, Paste, Redo, Undo};
+use gpui_kit::{App, KeyBinding, Menu, MenuItem, OsAction};
 
 pub fn init(cx: &mut App) -> Result<(), gpui_es_fluent::EmbeddedInitError> {
-    gpui_component::init(cx);
+    gpui_kit::init(cx);
     #[cfg(not(feature = "inspector"))]
     disable_inspector_shortcut(cx);
     crate::web_fonts::init(cx);
@@ -69,7 +69,7 @@ fn disable_inspector_shortcut(cx: &mut App) {
     // default keyboard entry point unless its own inspector feature is selected.
     cx.bind_keys([KeyBinding::new(
         shortcut,
-        gpui::Unbind("inspector::ToggleInspector".into()),
+        gpui_kit::Unbind("inspector::ToggleInspector".into()),
         None,
     )]);
 }
@@ -86,13 +86,16 @@ mod tests {
         }
     }
 
-    #[gpui::test]
+    #[gpui_kit::test]
     fn runtime_init_installs_storybook_state(cx: &mut App) {
         init(cx).expect("Storybook localization should initialize");
 
         assert!(cx.try_global::<AppState>().is_some());
-        assert!(cx.try_global::<gpui_component::Theme>().is_some());
-        assert!(cx.try_global::<gpui_component::ThemeRegistry>().is_some());
+        assert!(cx.try_global::<gpui_kit::component::Theme>().is_some());
+        assert!(
+            cx.try_global::<gpui_kit::component::ThemeRegistry>()
+                .is_some()
+        );
         assert_eq!(
             crate::messages::text(cx, crate::messages::StorybookMessage::Storybook),
             "GPUI Storybook"
@@ -112,11 +115,11 @@ mod tests {
     }
 
     #[cfg(not(feature = "inspector"))]
-    #[gpui::test]
+    #[gpui_kit::test]
     fn runtime_init_disables_the_component_inspector_shortcut(cx: &mut App) {
         init(cx).expect("Storybook localization should initialize");
 
-        let keystroke = gpui::Keystroke::parse(inspector_shortcut()).expect("valid shortcut");
+        let keystroke = gpui_kit::Keystroke::parse(inspector_shortcut()).expect("valid shortcut");
         let keymap = cx.key_bindings();
         let (bindings, pending) = keymap.borrow().bindings_for_input(&[keystroke], &[]);
 
@@ -125,11 +128,11 @@ mod tests {
     }
 
     #[cfg(feature = "inspector")]
-    #[gpui::test]
+    #[gpui_kit::test]
     fn runtime_init_keeps_the_component_inspector_shortcut(cx: &mut App) {
         init(cx).expect("Storybook localization should initialize");
 
-        let keystroke = gpui::Keystroke::parse(inspector_shortcut()).expect("valid shortcut");
+        let keystroke = gpui_kit::Keystroke::parse(inspector_shortcut()).expect("valid shortcut");
         let keymap = cx.key_bindings();
         let (bindings, pending) = keymap.borrow().bindings_for_input(&[keystroke], &[]);
 
@@ -138,7 +141,7 @@ mod tests {
         assert_eq!(bindings[0].action().name(), "inspector::ToggleInspector");
     }
 
-    #[gpui::test]
+    #[gpui_kit::test]
     fn shell_messages_fall_back_when_requested_locale_is_consumer_only(cx: &mut App) {
         init(cx).expect("Storybook localization should initialize");
         crate::i18n::change_locale(

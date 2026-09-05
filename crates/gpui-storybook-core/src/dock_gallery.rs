@@ -15,12 +15,7 @@ use crate::{
     workbench::{StoryWorkbench, WorkbenchEvent, WorkbenchState, WorkbenchTab},
 };
 use anyhow::{Context as _, Result};
-use gpui::{
-    Action, AnyElement, App, AppContext as _, ClickEvent, Context, Entity, EntityId, EventEmitter,
-    FocusHandle, Focusable, InteractiveElement as _, IntoElement, ParentElement as _, Render,
-    SharedString, Styled as _, Subscription, Window, div, px, relative,
-};
-use gpui_component::{
+use gpui_kit::component::{
     ActiveTheme as _, Root, Side, Sizable as _,
     button::{Button, ButtonVariants as _},
     dock::{
@@ -31,6 +26,11 @@ use gpui_component::{
     input::{Input, InputEvent, InputState},
     sidebar::{Sidebar, SidebarGroup},
     v_flex,
+};
+use gpui_kit::{
+    Action, AnyElement, App, AppContext as _, ClickEvent, Context, Entity, EntityId, EventEmitter,
+    FocusHandle, Focusable, InteractiveElement as _, IntoElement, ParentElement as _, Render,
+    SharedString, Styled as _, Subscription, Window, div, px, relative,
 };
 use gpui_storybook_components::{StoryDrag, StorySidebarItem};
 use std::{
@@ -69,10 +69,10 @@ struct DockAreaTab {
     version: usize,
 }
 
-type StoryPanelMap = BTreeMap<String, gpui::WeakEntity<StoryContainer>>;
+type StoryPanelMap = BTreeMap<String, gpui_kit::WeakEntity<StoryContainer>>;
 type StoryPanelRegistries = BTreeMap<EntityId, StoryPanelMap>;
 type StorySeedRegistries = BTreeMap<EntityId, Vec<StorySeed>>;
-type WorkbenchStateRegistries = BTreeMap<EntityId, gpui::WeakEntity<WorkbenchState>>;
+type WorkbenchStateRegistries = BTreeMap<EntityId, gpui_kit::WeakEntity<WorkbenchState>>;
 
 static STORY_PANELS: LazyLock<Mutex<StoryPanelRegistries>> =
     LazyLock::new(|| Mutex::new(BTreeMap::new()));
@@ -82,7 +82,7 @@ static WORKBENCH_STATES: LazyLock<Mutex<WorkbenchStateRegistries>> =
     LazyLock::new(|| Mutex::new(BTreeMap::new()));
 
 fn register_workbench_state(
-    dock_area: &gpui::WeakEntity<DockArea>,
+    dock_area: &gpui_kit::WeakEntity<DockArea>,
     state: &Entity<WorkbenchState>,
 ) {
     if let Ok(mut states) = WORKBENCH_STATES.lock() {
@@ -90,11 +90,11 @@ fn register_workbench_state(
     }
 }
 
-fn workbench_state(dock_area: &gpui::WeakEntity<DockArea>) -> Option<Entity<WorkbenchState>> {
+fn workbench_state(dock_area: &gpui_kit::WeakEntity<DockArea>) -> Option<Entity<WorkbenchState>> {
     let mut states = WORKBENCH_STATES.lock().ok()?;
     let state = states
         .get(&dock_area.entity_id())
-        .and_then(gpui::WeakEntity::upgrade);
+        .and_then(gpui_kit::WeakEntity::upgrade);
     if state.is_none() {
         states.remove(&dock_area.entity_id());
     }

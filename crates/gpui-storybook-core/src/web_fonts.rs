@@ -1,9 +1,11 @@
 #[cfg(target_family = "wasm")]
 use std::borrow::Cow;
 
-use gpui::App;
+#[cfg(target_family = "wasm")]
+use base64::{Engine as _, engine::general_purpose::STANDARD};
+use gpui_kit::App;
 #[cfg(any(test, target_family = "wasm"))]
-use gpui_component::theme::Theme;
+use gpui_kit::component::theme::Theme;
 
 #[cfg(any(test, target_family = "wasm"))]
 const UI_FONT_FAMILY: &str = "Noto Sans SC";
@@ -14,36 +16,31 @@ pub(super) fn init(cx: &mut App) {
     #[cfg(target_family = "wasm")]
     {
         let fonts = vec![
-            Cow::Borrowed(
-                include_bytes!(concat!(
-                    env!("GPUI_COMPONENT_STORY_FONTS_DIR"),
-                    "/NotoSansSC-Regular-subset.ttf"
-                ))
-                .as_slice(),
-            ),
-            Cow::Borrowed(
-                include_bytes!(concat!(
-                    env!("GPUI_COMPONENT_STORY_FONTS_DIR"),
-                    "/NotoEmoji-Regular.ttf"
-                ))
-                .as_slice(),
-            ),
-            Cow::Borrowed(
-                include_bytes!(concat!(
-                    env!("GPUI_COMPONENT_STORY_FONTS_DIR"),
-                    "/JetBrainsMono-Regular.ttf"
-                ))
-                .as_slice(),
-            ),
+            decode_font(include_str!(
+                "../assets/fonts/NotoSansSC-Regular-subset.ttf.base64"
+            )),
+            decode_font(include_str!("../assets/fonts/NotoEmoji-Regular.ttf.base64")),
+            decode_font(include_str!(
+                "../assets/fonts/JetBrainsMono-Regular.ttf.base64"
+            )),
         ];
         cx.text_system()
             .add_fonts(fonts)
-            .expect("gpui-component web fonts should load");
+            .expect("GPUI Kit web fonts should load");
         apply_font_families(cx);
     }
 
     #[cfg(not(target_family = "wasm"))]
     let _ = cx;
+}
+
+#[cfg(target_family = "wasm")]
+fn decode_font(encoded: &'static str) -> Cow<'static, [u8]> {
+    Cow::Owned(
+        STANDARD
+            .decode(encoded)
+            .expect("embedded web font is valid base64"),
+    )
 }
 
 #[cfg(any(test, target_family = "wasm"))]
@@ -57,9 +54,9 @@ fn apply_font_families(cx: &mut App) {
 mod tests {
     use super::*;
 
-    #[gpui::test]
-    fn web_font_families_match_the_embedded_gpui_component_fonts(cx: &mut App) {
-        gpui_component::init(cx);
+    #[gpui_kit::test]
+    fn web_font_families_match_the_embedded_gpui_kit_fonts(cx: &mut App) {
+        gpui_kit::init(cx);
         apply_font_families(cx);
 
         let theme = Theme::global(cx);

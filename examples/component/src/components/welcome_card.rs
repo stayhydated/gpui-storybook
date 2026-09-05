@@ -1,7 +1,7 @@
-use gpui::{
+use gpui_kit::component::ActiveTheme as _;
+use gpui_kit::{
     App, IntoElement, ParentElement as _, RenderOnce, SharedString, Styled as _, Window, div, px,
 };
-use gpui_component::ActiveTheme as _;
 
 #[derive(gpui_storybook::ComponentStory, IntoElement)]
 #[storybook(
@@ -61,7 +61,7 @@ impl WelcomeCard {
 }
 
 impl RenderOnce for WelcomeCard {
-    fn render(self, _: &mut Window, cx: &mut App) -> impl gpui::IntoElement {
+    fn render(self, _: &mut Window, cx: &mut App) -> impl gpui_kit::IntoElement {
         div()
             .p_6()
             .max_w(px(520.))
@@ -75,7 +75,7 @@ impl RenderOnce for WelcomeCard {
                 div()
                     .mt_3()
                     .text_xl()
-                    .font_weight(gpui::FontWeight::BOLD)
+                    .font_weight(gpui_kit::FontWeight::BOLD)
                     .child(self.title),
             )
             .child(

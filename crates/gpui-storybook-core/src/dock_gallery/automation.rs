@@ -168,7 +168,7 @@ impl StoryWorkspace {
                         .ok_or(StorybookAutomationError::NoActiveStory)?;
                     set_capture_target_size(&story_entity, window, target_size, cx);
                     if request.story_key.is_some() {
-                        gpui::Focusable::focus_handle(&story_entity, cx).focus(window, cx);
+                        gpui_kit::Focusable::focus_handle(&story_entity, cx).focus(window, cx);
                     }
                     cx.notify();
                     window.refresh();

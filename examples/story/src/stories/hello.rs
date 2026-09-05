@@ -1,6 +1,6 @@
 use es_fluent::EsFluent;
-use gpui::*;
-use gpui_component::StyledExt as _;
+use gpui_kit::component::StyledExt as _;
+use gpui_kit::*;
 
 #[derive(EsFluent)]
 enum StoryItems {

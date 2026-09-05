@@ -1,6 +1,6 @@
 use super::*;
 
-pub(super) fn install_live_automation(cx: &mut ::gpui::App) {
+pub(super) fn install_live_automation(cx: &mut ::gpui_kit::App) {
     if gpui_storybook_core::automation::default_storybook_automation(cx).is_none() {
         gpui_storybook_core::automation::set_default_storybook_automation(
             cx,
@@ -15,12 +15,12 @@ pub(super) fn install_live_automation(cx: &mut ::gpui::App) {
 /// The snapshot reports `Loading` until the readiness task completes. It stays
 /// available in `Error` state when storage fails and fallback presentation is
 /// active.
-pub fn try_preference_state(cx: &::gpui::App) -> Option<&PreferenceState> {
+pub fn try_preference_state(cx: &::gpui_kit::App) -> Option<&PreferenceState> {
     gpui_storybook_core::preferences::try_state(cx)
 }
 
 #[cfg(all(feature = "mcp", any(target_os = "linux", target_os = "macos")))]
-pub(super) fn start_mcp_automation(cx: &mut ::gpui::App) {
+pub(super) fn start_mcp_automation(cx: &mut ::gpui_kit::App) {
     let automation = gpui_storybook_core::automation::default_storybook_automation(cx)
         .expect("gpui-storybook init should install live automation before MCP startup");
 

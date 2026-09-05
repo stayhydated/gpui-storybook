@@ -1,4 +1,4 @@
-use gpui::{App, AppContext as _, Context, FocusHandle, Focusable, IntoElement, Render, Window};
+use gpui_kit::{App, AppContext as _, Context, FocusHandle, Focusable, IntoElement, Render, Window};
 
 mod first {
     use super::*;
@@ -17,7 +17,7 @@ mod first {
 
     impl Render for DuplicateStory {
         fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-            gpui::div()
+            gpui_kit::div()
         }
     }
 
@@ -26,7 +26,7 @@ mod first {
             "Duplicate".to_string()
         }
 
-        fn new_view(window: &mut Window, cx: &mut App) -> gpui::Entity<Self> {
+        fn new_view(window: &mut Window, cx: &mut App) -> gpui_kit::Entity<Self> {
             let _ = window;
             cx.new(|cx| Self {
                 focus_handle: cx.focus_handle(),
@@ -52,7 +52,7 @@ mod second {
 
     impl Render for DuplicateStory {
         fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-            gpui::div()
+            gpui_kit::div()
         }
     }
 
@@ -61,7 +61,7 @@ mod second {
             "Duplicate".to_string()
         }
 
-        fn new_view(window: &mut Window, cx: &mut App) -> gpui::Entity<Self> {
+        fn new_view(window: &mut Window, cx: &mut App) -> gpui_kit::Entity<Self> {
             let _ = window;
             cx.new(|cx| Self {
                 focus_handle: cx.focus_handle(),

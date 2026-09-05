@@ -1,3 +1,6 @@
+#[cfg(test)]
+extern crate gpui_kit as gpui;
+
 use gpui_storybook::{Assets, ConsumerId, StorybookOptions, StorybookWindow};
 use gpui_storybook_example_component::i18n::{self, Languages};
 
@@ -15,7 +18,7 @@ fn main() {
         )
         .init();
 
-    let app = gpui_platform::application().with_assets(Assets);
+    let app = gpui_kit::application().with_assets(Assets);
 
     app.run(move |app_cx| {
         let consumer_id = match ConsumerId::new(CONSUMER_ID) {
@@ -97,8 +100,10 @@ mod tests {
         assert_eq!(options.fallback_language, Languages::default());
     }
 
-    #[gpui::test]
-    async fn facade_startup_localizes_the_linked_consumer_module(cx: &mut gpui::TestAppContext) {
+    #[gpui_kit::test]
+    async fn facade_startup_localizes_the_linked_consumer_module(
+        cx: &mut gpui_kit::TestAppContext,
+    ) {
         cx.executor().allow_parking();
         let readiness = cx.update(|cx| {
             let consumer = ConsumerId::new("gpui-storybook-component-i18n-test")

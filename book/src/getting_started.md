@@ -92,7 +92,7 @@ pub enum Languages {}
 
 pub fn apply_locale(
     language: Languages,
-    cx: &mut gpui::App,
+    cx: &mut gpui_kit::App,
 ) -> Result<(), gpui_es_fluent::EmbeddedInitError> {
     let _linked_module = &MY_APP_STORYBOOK_I18N_MODULE;
     gpui_es_fluent::replace_with_language(cx, language)
@@ -121,7 +121,7 @@ use gpui_storybook::{Assets, ConsumerId, StorybookOptions, StorybookWindow};
 use my_app_storybook::i18n::{self, Languages};
 
 fn main() {
-    let app = gpui_platform::application().with_assets(Assets);
+    let app = gpui_kit::application().with_assets(Assets);
 
     app.run(|cx| {
         let options = StorybookOptions::new(

@@ -12,12 +12,12 @@ readme = "README.md"
 [features]
 capture = [ "gpui-storybook-core/capture" ]
 default = [ "capture" ]
-performance = [ "gpui/profiler" ]
+performance = [ "dep:gpui-core", "gpui-core/profiler" ]
 
 [dependencies]
 anyhow = { workspace = true }
-gpui = { features = [ "test-support" ], workspace = true }
-gpui-component = { workspace = true }
+gpui-core = { optional = true, workspace = true }
+gpui-kit = { features = [ "test-support" ], workspace = true }
 gpui-storybook-core = { workspace = true }
 gpui_platform = { features = [
   "font-kit",

@@ -12,9 +12,9 @@ use super::*;
 /// registered story name. Stories with the same title in the same group and
 /// section share one navigation entry whose concrete variants open separately.
 pub fn generate_stories(
-    window: &mut ::gpui::Window,
-    cx: &mut ::gpui::App,
-) -> Vec<::gpui::Entity<StoryContainer>> {
+    window: &mut ::gpui_kit::Window,
+    cx: &mut ::gpui_kit::App,
+) -> Vec<::gpui_kit::Entity<StoryContainer>> {
     let story_count = inventory::iter::<__registry::StoryEntry>().count();
     let init_count = inventory::iter::<__registry::InitEntry>().count();
 

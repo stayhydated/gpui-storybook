@@ -2,14 +2,14 @@ mod font_size_selector;
 
 use crate::app_menus;
 use font_size_selector::FontSizeSelector;
-use gpui::{
-    AnyElement, App, AppContext as _, Context, Entity, InteractiveElement as _, IntoElement,
-    MouseButton, ParentElement as _, Render, SharedString, Styled as _, Window, div,
-};
-use gpui_component::{
+use gpui_kit::component::{
     IconName, Side, Sizable as _, TitleBar,
     button::{Button, ButtonVariants as _},
     menu::AppMenuBar,
+};
+use gpui_kit::{
+    AnyElement, App, AppContext as _, Context, Entity, InteractiveElement as _, IntoElement,
+    MouseButton, ParentElement as _, Render, SharedString, Styled as _, Window, div,
 };
 use std::rc::Rc;
 
@@ -108,13 +108,13 @@ mod tests {
     use super::*;
 
     fn init_test_globals(cx: &mut App) {
-        gpui_component::init(cx);
+        gpui_kit::init(cx);
     }
 
-    #[gpui::test]
+    #[gpui_kit::test]
     fn title_bar_builds_default_and_custom_content(cx: &mut App) {
         init_test_globals(cx);
-        let custom: gpui::WindowHandle<AppTitleBar> = cx
+        let custom: gpui_kit::WindowHandle<AppTitleBar> = cx
             .open_window(Default::default(), |window, cx| {
                 cx.new(|cx| {
                     AppTitleBar::new(
@@ -137,7 +137,7 @@ mod tests {
             })
             .expect("custom title bar should update");
 
-        let default: gpui::WindowHandle<AppTitleBar> = cx
+        let default: gpui_kit::WindowHandle<AppTitleBar> = cx
             .open_window(Default::default(), |window, cx| {
                 cx.new(|cx| AppTitleBar::new("Storybook", StorybookWindowUi::default(), window, cx))
             })

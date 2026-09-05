@@ -1,11 +1,11 @@
 use super::*;
 
 pub(super) fn group_duplicate_story_titles(
-    stories: Vec<::gpui::Entity<StoryContainer>>,
-    window: &mut ::gpui::Window,
-    cx: &mut ::gpui::App,
-) -> Vec<::gpui::Entity<StoryContainer>> {
-    let mut grouped: Vec<(StoryGroupKey, Vec<::gpui::Entity<StoryContainer>>)> = Vec::new();
+    stories: Vec<::gpui_kit::Entity<StoryContainer>>,
+    window: &mut ::gpui_kit::Window,
+    cx: &mut ::gpui_kit::App,
+) -> Vec<::gpui_kit::Entity<StoryContainer>> {
+    let mut grouped: Vec<(StoryGroupKey, Vec<::gpui_kit::Entity<StoryContainer>>)> = Vec::new();
 
     for story in stories {
         let key = {

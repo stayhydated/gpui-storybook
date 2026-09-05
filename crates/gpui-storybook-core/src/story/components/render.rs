@@ -1,7 +1,7 @@
 use super::*;
 
 impl Render for StoryContainer {
-    fn render(&mut self, _: &mut Window, cx: &mut gpui::Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _: &mut Window, cx: &mut gpui_kit::Context<Self>) -> impl IntoElement {
         let canvas_scroll_handle = self.scroll_handle.clone();
         let story_scroll_handle = self.story_scroll_handle.clone();
         let story_key = self.story_key_label().map(str::to_owned);

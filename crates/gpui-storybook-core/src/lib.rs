@@ -1,5 +1,5 @@
 //! Runtime shell for GPUI Storybook.
-//!
+
 //! `gpui-storybook-core` owns the UI runtime used by the public facade crate:
 //! window creation, runtime-selectable gallery and dock layouts, story
 //! container panel behavior, title-bar composition, local preference
@@ -53,6 +53,8 @@
 //! Storybook, the consumer adapter, `CurrentLanguage`, and GPUI Component.
 //! `PersistenceStatus` reports storage activity only; locale failures remain
 //! retryable diagnostics.
+
+extern crate gpui_kit as gpui;
 
 pub mod actions;
 pub mod app_menus;

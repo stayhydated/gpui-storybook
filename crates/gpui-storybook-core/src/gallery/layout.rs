@@ -153,7 +153,7 @@ impl Gallery {
         });
 
         Sidebar::new("sidebar-gallery")
-            .side(gpui_component::Side::Left)
+            .side(gpui_kit::component::Side::Left)
             .w(relative(1.))
             .border_0()
             .header(

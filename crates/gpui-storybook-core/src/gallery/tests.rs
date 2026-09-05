@@ -5,11 +5,11 @@ use crate::controls::{
 use crate::registry::{RegisteredStoryMetadata, StoryKey, StoryName};
 use crate::story::Story;
 use crate::storybook_window_ui::StorybookWindowUi;
-use gpui::{Focusable, Modifiers, MouseButton, TestAppContext, VisualTestContext, point};
+use gpui_kit::{Focusable, Modifiers, MouseButton, TestAppContext, VisualTestContext, point};
 use tokio::sync::oneshot;
 
 struct ControlledStory {
-    focus_handle: gpui::FocusHandle,
+    focus_handle: gpui_kit::FocusHandle,
     enabled: bool,
 }
 
@@ -50,7 +50,7 @@ impl StoryControls for ControlledStory {
 }
 
 impl Focusable for ControlledStory {
-    fn focus_handle(&self, _: &App) -> gpui::FocusHandle {
+    fn focus_handle(&self, _: &App) -> gpui_kit::FocusHandle {
         self.focus_handle.clone()
     }
 }
@@ -97,12 +97,12 @@ fn story(
     })
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn gallery_selects_by_title_key_and_automation_command(cx: &mut App) {
-    gpui_component::init(cx);
+    gpui_kit::init(cx);
     let automation = crate::automation::StorybookAutomation::new();
     let automation_for_view = automation.clone();
-    let window: gpui::WindowHandle<Gallery> = cx
+    let window: gpui_kit::WindowHandle<Gallery> = cx
         .open_window(Default::default(), move |window, cx| {
             let button = story("crate-ButtonStory", "ButtonStory", "Button", window, cx);
             let table = story("crate-TableStory", "TableStory", "Table", window, cx);
@@ -290,7 +290,7 @@ fn gallery_selects_by_title_key_and_automation_command(cx: &mut App) {
 #[test]
 fn sidebar_toggles_keep_responsive_canvas_centered_with_its_resize_gutter() {
     let mut app = TestAppContext::single();
-    app.update(gpui_component::init);
+    app.update(gpui_kit::init);
     let (_, cx) = app.add_window_view(move |window, cx| {
         let gallery = cx.new(|gallery_cx| {
             let story = story(
@@ -490,10 +490,10 @@ fn sidebar_toggles_keep_responsive_canvas_centered_with_its_resize_gutter() {
     assert_canvas_centered_with_resize_gutter(cx);
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn empty_gallery_has_no_active_story(cx: &mut App) {
-    gpui_component::init(cx);
-    let window: gpui::WindowHandle<Gallery> = cx
+    gpui_kit::init(cx);
+    let window: gpui_kit::WindowHandle<Gallery> = cx
         .open_window(Default::default(), |window, cx| {
             Gallery::view(Vec::new(), Some("Missing"), window, cx)
         })
@@ -509,12 +509,12 @@ fn empty_gallery_has_no_active_story(cx: &mut App) {
         .expect("empty gallery should update");
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn automation_controls_read_set_and_reset_the_live_entity(cx: &mut App) {
-    gpui_component::init(cx);
+    gpui_kit::init(cx);
     let automation = crate::automation::StorybookAutomation::new();
     let automation_for_view = automation.clone();
-    let window: gpui::WindowHandle<Gallery> = cx
+    let window: gpui_kit::WindowHandle<Gallery> = cx
         .open_window(Default::default(), move |window, cx| {
             let story = StoryContainer::panel::<ControlledStory>(window, cx);
             story.update(cx, |story, _| {
@@ -586,11 +586,11 @@ fn automation_controls_read_set_and_reset_the_live_entity(cx: &mut App) {
         .expect("gallery should update");
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn grouped_route_selects_the_exact_workbench_variant(cx: &mut App) {
-    gpui_component::init(cx);
+    gpui_kit::init(cx);
     let automation = crate::automation::StorybookAutomation::new();
-    let window: gpui::WindowHandle<Gallery> = cx
+    let window: gpui_kit::WindowHandle<Gallery> = cx
         .open_window(Default::default(), move |window, cx| {
             let primary = story(
                 "crate-PrimaryButtonStory",
@@ -630,9 +630,9 @@ fn grouped_route_selects_the_exact_workbench_variant(cx: &mut App) {
         .expect("grouped gallery should update");
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn separate_windows_keep_control_entities_independent(cx: &mut App) {
-    gpui_component::init(cx);
+    gpui_kit::init(cx);
     let open = |cx: &mut App| {
         cx.open_window(Default::default(), |window, cx| {
             let story = StoryContainer::panel::<ControlledStory>(window, cx);
@@ -640,8 +640,8 @@ fn separate_windows_keep_control_entities_independent(cx: &mut App) {
         })
         .expect("gallery window should open")
     };
-    let first: gpui::WindowHandle<Gallery> = open(cx);
-    let second: gpui::WindowHandle<Gallery> = open(cx);
+    let first: gpui_kit::WindowHandle<Gallery> = open(cx);
+    let second: gpui_kit::WindowHandle<Gallery> = open(cx);
 
     first
         .update(cx, |gallery, _, cx| {
@@ -678,9 +678,9 @@ fn separate_windows_keep_control_entities_independent(cx: &mut App) {
         .expect("second gallery should update");
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn only_the_window_that_claims_the_default_controller_can_run_scenarios(cx: &mut App) {
-    gpui_component::init(cx);
+    gpui_kit::init(cx);
     let automation = crate::automation::StorybookAutomation::new();
     crate::automation::set_default_storybook_automation(cx, automation);
     let open = |cx: &mut App| {
@@ -689,8 +689,8 @@ fn only_the_window_that_claims_the_default_controller_can_run_scenarios(cx: &mut
         })
         .expect("gallery window should open")
     };
-    let first: gpui::WindowHandle<Gallery> = open(cx);
-    let second: gpui::WindowHandle<Gallery> = open(cx);
+    let first: gpui_kit::WindowHandle<Gallery> = open(cx);
+    let second: gpui_kit::WindowHandle<Gallery> = open(cx);
 
     first
         .update(cx, |gallery, _, cx| {

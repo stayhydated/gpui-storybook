@@ -1,10 +1,10 @@
 use super::*;
 use tokio::sync::oneshot;
 
-#[gpui::test]
+#[gpui_kit::test]
 fn default_layout_contains_open_versioned_right_workbench(cx: &mut App) {
-    gpui_component::init(cx);
-    let window: gpui::WindowHandle<DockArea> = cx
+    gpui_kit::init(cx);
+    let window: gpui_kit::WindowHandle<DockArea> = cx
         .open_window(Default::default(), |window, cx| {
             let dock_area = cx.new(|cx| {
                 DockArea::new(MAIN_DOCK_AREA.id, Some(MAIN_DOCK_AREA.version), window, cx)
@@ -28,10 +28,10 @@ fn default_layout_contains_open_versioned_right_workbench(cx: &mut App) {
         .expect("dock test window should update");
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn grouped_story_variants_open_as_individual_tabs(cx: &mut App) {
     crate::story::init(cx).expect("Storybook runtime should initialize");
-    let window: gpui::WindowHandle<StoryWorkspace> = cx
+    let window: gpui_kit::WindowHandle<StoryWorkspace> = cx
         .open_window(Default::default(), |window, cx| {
             let mut variant = |description: &str, klass: &str, cx: &mut App| {
                 cx.new(|cx| {
@@ -84,12 +84,12 @@ fn grouped_story_variants_open_as_individual_tabs(cx: &mut App) {
         .expect("grouped member tabs should be mounted");
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn dock_host_rejects_an_invalid_batch_before_route_preparation(cx: &mut App) {
-    gpui_component::init(cx);
+    gpui_kit::init(cx);
     let automation = crate::automation::StorybookAutomation::new();
     let automation_for_view = automation.clone();
-    let window: gpui::WindowHandle<StoryWorkspace> = cx
+    let window: gpui_kit::WindowHandle<StoryWorkspace> = cx
         .open_window(Default::default(), move |window, cx| {
             StoryWorkspace::view_with_automation(Vec::new(), automation_for_view, window, cx)
         })

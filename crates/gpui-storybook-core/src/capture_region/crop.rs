@@ -1,7 +1,7 @@
 #[cfg(feature = "capture")]
 use super::capture_region_bounds;
 #[cfg(feature = "capture")]
-use gpui::{Bounds, Pixels, Size, point, px};
+use gpui_kit::{Bounds, Pixels, Size, point, px};
 
 /// Failure to crop a rendered full-window image to one registered story route.
 #[derive(Clone, Debug, Eq, thiserror::Error, PartialEq)]

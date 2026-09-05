@@ -12,8 +12,7 @@ repository.workspace = true
 readme = "README.md"
 
 [dependencies]
-gpui = { workspace = true }
-gpui-component = { workspace = true }
+gpui-kit = { workspace = true }
 
 [lints]
 workspace = true

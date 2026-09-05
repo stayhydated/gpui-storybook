@@ -1,9 +1,9 @@
-use gpui::{IntoElement, ParentElement as _, Styled as _, prelude::FluentBuilder as _};
-use gpui_component::{
+use gpui_kit::component::{
     Disableable as _, Icon, IconName, Selectable as _,
     button::{Button, ButtonVariants as _},
     h_flex,
 };
+use gpui_kit::{IntoElement, ParentElement as _, Styled as _, prelude::FluentBuilder as _};
 use gpui_storybook::section;
 
 use super::{ButtonControlState, ButtonStory, ButtonSubstory};

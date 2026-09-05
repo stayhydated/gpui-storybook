@@ -1,13 +1,16 @@
 ---
-source: crates/gpui-storybook-macros/src/lib.rs
+source: crates/gpui-storybook-macros/src/tests.rs
 expression: snapshot_tokens(expanded)
 ---
 struct __ButtonChipComponentStoryView {
-    focus_handle: ::gpui::FocusHandle,
+    focus_handle: ::gpui_kit::FocusHandle,
 }
 impl __ButtonChipComponentStoryView {
-    fn view(_window: &mut ::gpui::Window, cx: &mut ::gpui::App) -> ::gpui::Entity<Self> {
-        ::gpui::AppContext::new(
+    fn view(
+        _window: &mut ::gpui_kit::Window,
+        cx: &mut ::gpui_kit::App,
+    ) -> ::gpui_kit::Entity<Self> {
+        ::gpui_kit::AppContext::new(
             cx,
             |cx| Self {
                 focus_handle: cx.focus_handle(),
@@ -15,17 +18,17 @@ impl __ButtonChipComponentStoryView {
         )
     }
 }
-impl ::gpui::Focusable for __ButtonChipComponentStoryView {
-    fn focus_handle(&self, _cx: &::gpui::App) -> ::gpui::FocusHandle {
+impl ::gpui_kit::Focusable for __ButtonChipComponentStoryView {
+    fn focus_handle(&self, _cx: &::gpui_kit::App) -> ::gpui_kit::FocusHandle {
         self.focus_handle.clone()
     }
 }
-impl ::gpui::Render for __ButtonChipComponentStoryView {
+impl ::gpui_kit::Render for __ButtonChipComponentStoryView {
     fn render(
         &mut self,
-        window: &mut ::gpui::Window,
-        cx: &mut ::gpui::Context<Self>,
-    ) -> impl ::gpui::IntoElement {
+        window: &mut ::gpui_kit::Window,
+        cx: &mut ::gpui_kit::Context<Self>,
+    ) -> impl ::gpui_kit::IntoElement {
         let _ = &self.focus_handle;
         let _ = window;
         let _ = cx;
@@ -37,18 +40,18 @@ impl ::gpui_storybook::Story for __ButtonChipComponentStoryView {
     fn klass() -> &'static str {
         "ButtonChip"
     }
-    fn title(cx: &::gpui::App) -> ::std::string::String {
+    fn title(cx: &::gpui_kit::App) -> ::std::string::String {
         let _ = cx;
         (::std::string::String::from("Button")).into()
     }
-    fn description(cx: &::gpui::App) -> ::std::string::String {
+    fn description(cx: &::gpui_kit::App) -> ::std::string::String {
         let _ = cx;
         (["Interactive", " buttons"].concat()).into()
     }
     fn new_view(
-        window: &mut ::gpui::Window,
-        cx: &mut ::gpui::App,
-    ) -> ::gpui::Entity<Self> {
+        window: &mut ::gpui_kit::Window,
+        cx: &mut ::gpui_kit::App,
+    ) -> ::gpui_kit::Entity<Self> {
         Self::view(window, cx)
     }
 }

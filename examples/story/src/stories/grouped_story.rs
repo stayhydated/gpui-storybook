@@ -1,8 +1,8 @@
-use gpui::{
+use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
+use gpui_kit::{
     App, AppContext as _, Context, Entity, FocusHandle, Focusable, IntoElement, ParentElement as _,
     Render, Styled as _, Window, div, px,
 };
-use gpui_component::{ActiveTheme as _, h_flex, v_flex};
 
 enum GroupedVariant {
     Summary,

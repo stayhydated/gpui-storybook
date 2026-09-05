@@ -3,7 +3,7 @@ use es_fluent::{
 };
 use es_fluent_manager_core::{I18nModule as _, Localizer};
 use es_fluent_manager_embedded::{EmbeddedInitError, LocalizationError};
-use gpui::{App, Global};
+use gpui_kit::{App, Global};
 use std::borrow::Borrow;
 use unic_langid::LanguageIdentifier;
 

@@ -34,7 +34,7 @@ editable:
 ```rust
 #[derive(gpui_storybook::StoryControls)]
 pub struct ButtonStory {
-    focus_handle: gpui::FocusHandle,
+    focus_handle: gpui_kit::FocusHandle,
 
     #[storybook(control(
         label = "Disabled",
@@ -65,11 +65,11 @@ registration is explicit, so only marked fields appear in the workbench.
 Place the same field attributes on a `ComponentStory`:
 
 ```rust
-#[derive(gpui::IntoElement, gpui_storybook::ComponentStory)]
+#[derive(gpui_kit::IntoElement, gpui_storybook::ComponentStory)]
 #[storybook(example = WelcomeCard::example())]
 pub struct WelcomeCard {
     #[storybook(control(category = "Content"))]
-    title: gpui::SharedString,
+    title: gpui_kit::SharedString,
 
     #[storybook(control(category = "State"))]
     highlighted: bool,
@@ -162,7 +162,7 @@ the window's current focus. Track the action-scope handle on the root element
 that installs the page or component action handlers:
 
 ```rust
-fn action_scope_focus_handle(&self, _: &gpui::App) -> Option<gpui::FocusHandle> {
+fn action_scope_focus_handle(&self, _: &gpui_kit::App) -> Option<gpui_kit::FocusHandle> {
     Some(self.action_scope_focus_handle.clone())
 }
 

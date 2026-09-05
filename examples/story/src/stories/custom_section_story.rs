@@ -1,8 +1,8 @@
-use gpui::{
+use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
+use gpui_kit::{
     AnyElement, App, AppContext as _, Context, Entity, FocusHandle, Focusable, IntoElement,
     ParentElement, Render, RenderOnce, SharedString, Styled as _, Window, div, px, rems,
 };
-use gpui_component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_storybook::{StorySectionBase, StorySectionTitle};
 
 #[derive(gpui_storybook::Substory)]

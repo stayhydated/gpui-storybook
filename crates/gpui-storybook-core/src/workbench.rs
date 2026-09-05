@@ -10,13 +10,7 @@ use crate::{
     story::{ContainerEvent, StoryContainer, StoryScenario},
     theme_workbench::ThemeDraft,
 };
-use gpui::{
-    Action, AnyElement, App, AppContext as _, ClipboardItem, Context, Entity, EntityId,
-    EventEmitter, FocusHandle, Focusable, InteractiveElement as _, IntoElement, KeyBinding,
-    ParentElement as _, Pixels, Render, SharedString, Size, Styled as _, Subscription, Window, div,
-    prelude::FluentBuilder as _, px, size,
-};
-use gpui_component::{
+use gpui_kit::component::{
     ActiveTheme as _, Disableable as _, Sizable as _,
     button::{Button, ButtonVariants as _},
     checkbox::Checkbox,
@@ -33,6 +27,12 @@ use gpui_component::{
     slider::{Slider, SliderEvent, SliderState},
     tab::{Tab, TabBar},
     v_flex,
+};
+use gpui_kit::{
+    Action, AnyElement, App, AppContext as _, ClipboardItem, Context, Entity, EntityId,
+    EventEmitter, FocusHandle, Focusable, InteractiveElement as _, IntoElement, KeyBinding,
+    ParentElement as _, Pixels, Render, SharedString, Size, Styled as _, Subscription, Window, div,
+    prelude::FluentBuilder as _, px, size,
 };
 use serde::{Deserialize, Serialize};
 #[cfg(not(target_family = "wasm"))]

@@ -305,9 +305,9 @@ mod tests {
     };
 
     fn unused_create_fn(
-        _: &mut ::gpui::Window,
-        _: &mut ::gpui::App,
-    ) -> ::gpui::Entity<StoryContainer> {
+        _: &mut ::gpui_kit::Window,
+        _: &mut ::gpui_kit::App,
+    ) -> ::gpui_kit::Entity<StoryContainer> {
         unreachable!("story creation is not used in this test");
     }
 

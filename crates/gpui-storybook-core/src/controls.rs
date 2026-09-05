@@ -1,6 +1,6 @@
 //! Typed story controls shared by the workbench and automation surfaces.
 
-use gpui::{App, Entity, Hsla, SharedString};
+use gpui_kit::{App, Entity, Hsla, SharedString};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::{rc::Rc, str::FromStr};
@@ -500,7 +500,7 @@ mod tests {
         ControlBounds, ControlError, ControlKind, ControlSpec, ControlTarget, ControlValue,
         EntityControlTarget, StoryControls, validate_control_value,
     };
-    use gpui::{App, AppContext as _};
+    use gpui_kit::{App, AppContext as _};
     use std::rc::Rc;
 
     struct ControlledStory {
@@ -632,7 +632,7 @@ mod tests {
         );
     }
 
-    #[gpui::test]
+    #[gpui_kit::test]
     fn entity_targets_mutate_and_reset_only_their_exact_story(cx: &mut App) {
         let first = cx.new(|_| ControlledStory {
             enabled: false,

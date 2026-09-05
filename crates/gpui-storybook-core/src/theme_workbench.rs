@@ -1,13 +1,13 @@
 //! Session-scoped theme drafts used by the Storybook workbench.
 
-use gpui::{App, Hsla};
-use gpui_component::{Theme, ThemeColor, ThemeTokens};
+use gpui_kit::component::{Theme, ThemeColor, ThemeTokens};
+use gpui_kit::{App, Hsla};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, hash::Hasher as _};
 use thiserror::Error;
 
 mod theme_import {
-    use gpui_component::ThemeColor;
+    use gpui_kit::component::ThemeColor;
     use koruma::{Koruma, KorumaAllDisplay, Validate, validator};
     use std::fmt;
 
@@ -291,9 +291,9 @@ mod tests {
         );
     }
 
-    #[gpui::test]
+    #[gpui_kit::test]
     fn invalid_import_uses_the_short_koruma_message(cx: &mut App) {
-        gpui_component::init(cx);
+        gpui_kit::init(cx);
         let mut draft = ThemeDraft::new(Theme::global(cx)).expect("draft initializes");
 
         assert_eq!(
@@ -305,9 +305,9 @@ mod tests {
         );
     }
 
-    #[gpui::test]
+    #[gpui_kit::test]
     fn same_theme_reload_rebases_and_reapplies_session_overrides(cx: &mut App) {
-        gpui_component::init(cx);
+        gpui_kit::init(cx);
         let base_theme = Theme::global(cx).clone();
         let rows = theme_color_rows(&base_theme.colors).expect("base colors serialize");
         let override_row = &rows[0];

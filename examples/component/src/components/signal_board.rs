@@ -1,7 +1,7 @@
-use gpui::{
+use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, tag::Tag, v_flex};
+use gpui_kit::{
     App, IntoElement, ParentElement as _, RenderOnce, SharedString, Styled as _, Window, div, px,
 };
-use gpui_component::{ActiveTheme as _, Sizable as _, h_flex, tag::Tag, v_flex};
 
 #[derive(gpui_storybook::ComponentStory, IntoElement)]
 #[storybook(
@@ -47,7 +47,7 @@ impl SignalBoard {
 }
 
 impl RenderOnce for SignalBoard {
-    fn render(self, _: &mut Window, cx: &mut App) -> impl gpui::IntoElement {
+    fn render(self, _: &mut Window, cx: &mut App) -> impl gpui_kit::IntoElement {
         v_flex()
             .gap_4()
             .max_w(px(760.))
@@ -88,7 +88,7 @@ impl SignalTile {
         }
     }
 
-    fn into_card(self, cx: &App) -> impl gpui::IntoElement {
+    fn into_card(self, cx: &App) -> impl gpui_kit::IntoElement {
         let badge = self.state.badge();
 
         div()
@@ -110,7 +110,7 @@ impl SignalTile {
                 div()
                     .mt_1()
                     .text_xl()
-                    .font_weight(gpui::FontWeight::BOLD)
+                    .font_weight(gpui_kit::FontWeight::BOLD)
                     .child(self.value),
             )
             .child(

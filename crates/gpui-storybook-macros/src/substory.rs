@@ -84,7 +84,7 @@ pub(super) fn substory_impl(input: TokenStream2) -> TokenStream2 {
                 }
             }
 
-            fn title(&self) -> ::gpui::SharedString {
+            fn title(&self) -> ::gpui_kit::SharedString {
                 match self {
                     #(#title_arms)*
                 }

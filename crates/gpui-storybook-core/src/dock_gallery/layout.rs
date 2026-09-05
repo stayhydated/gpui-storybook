@@ -116,7 +116,7 @@ impl StoryWorkspace {
     }
 
     pub(super) fn reset_default_layout(
-        dock_area: gpui::WeakEntity<DockArea>,
+        dock_area: gpui_kit::WeakEntity<DockArea>,
         stories: &[Entity<StoryContainer>],
         automation: Option<SharedStorybookAutomation>,
         window: &mut Window,
@@ -147,7 +147,7 @@ impl StoryWorkspace {
 
     fn build_sidebar(
         stories: &[Entity<StoryContainer>],
-        dock_area: &gpui::WeakEntity<DockArea>,
+        dock_area: &gpui_kit::WeakEntity<DockArea>,
         automation: Option<SharedStorybookAutomation>,
         window: &mut Window,
         cx: &mut App,
@@ -160,7 +160,7 @@ impl StoryWorkspace {
     }
 
     fn build_workbench(
-        dock_area: &gpui::WeakEntity<DockArea>,
+        dock_area: &gpui_kit::WeakEntity<DockArea>,
         selected_tab: WorkbenchTab,
         window: &mut Window,
         cx: &mut App,

@@ -1,7 +1,7 @@
 # Portable testing and visual baselines
 
 `gpui-storybook-test` runs registered stories in fresh
-`gpui::HeadlessAppContext` instances. Use it for story-isolated integration
+`gpui_kit::HeadlessAppContext` instances. Use it for story-isolated integration
 tests, PNG capture, visual baselines, capture matrices, and optional GPUI frame
 budgets without opening the gallery or dock shell.
 

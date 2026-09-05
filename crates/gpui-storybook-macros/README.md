@@ -25,7 +25,7 @@ struct ButtonStory {
     disabled: bool,
     #[storybook(control(min = 0.0, max = 32.0, step = 1.0))]
     padding: f32,
-    focus_handle: gpui::FocusHandle,
+    focus_handle: gpui_kit::FocusHandle,
 }
 ```
 
@@ -38,7 +38,7 @@ registered, so leave other fields unmarked.
 that vector through `Story::scenarios()`, matching explicit stateful stories:
 
 ```rust
-#[derive(gpui::IntoElement, gpui_storybook::ComponentStory)]
+#[derive(gpui_kit::IntoElement, gpui_storybook::ComponentStory)]
 #[storybook(
     example = WelcomeCard::example(),
     scenarios = WelcomeCard::scenarios(),

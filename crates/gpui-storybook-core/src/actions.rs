@@ -1,5 +1,5 @@
-use gpui::Action;
-use gpui_component::scroll::ScrollbarMode;
+use gpui_kit::Action;
+use gpui_kit::component::scroll::ScrollbarMode;
 use gpui_storybook_preferences::{PreferredColorScheme, SystemColorScheme};
 use serde::Deserialize;
 use unic_langid::LanguageIdentifier;
@@ -20,7 +20,7 @@ pub struct SelectColorScheme(pub PreferredColorScheme);
 #[action(namespace = story, no_json)]
 pub struct SelectTheme {
     pub scheme: SystemColorScheme,
-    pub theme: gpui::SharedString,
+    pub theme: gpui_kit::SharedString,
 }
 
 #[derive(Action, Clone, Debug, Default, Eq, PartialEq)]

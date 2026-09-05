@@ -7,11 +7,11 @@ mod variants;
 
 use std::{fmt, str::FromStr};
 
-use gpui::{
+use gpui_kit::component::v_flex;
+use gpui_kit::{
     Action, App, AppContext as _, ClickEvent, Context, Entity, Focusable, InteractiveElement as _,
     IntoElement, ParentElement as _, Render, Styled as _, Window, px,
 };
-use gpui_component::v_flex;
 use serde::Deserialize;
 
 #[derive(Action, Clone, Deserialize, Eq, PartialEq)]
@@ -71,7 +71,7 @@ struct ButtonControlState {
 #[derive(gpui_storybook::StoryControls)]
 #[gpui_storybook::story(crate::StorySection::Buttons)]
 pub struct ButtonStory {
-    focus_handle: gpui::FocusHandle,
+    focus_handle: gpui_kit::FocusHandle,
     #[storybook(control(category = "State", description = "Disable every button example"))]
     disabled: bool,
     #[storybook(control(category = "State"))]
@@ -136,13 +136,13 @@ impl gpui_storybook::Story for ButtonStory {
         Self::view(window, cx)
     }
 
-    fn action_scope_focus_handle(&self, _: &App) -> Option<gpui::FocusHandle> {
+    fn action_scope_focus_handle(&self, _: &App) -> Option<gpui_kit::FocusHandle> {
         Some(self.focus_handle.clone())
     }
 }
 
 impl Focusable for ButtonStory {
-    fn focus_handle(&self, _: &gpui::App) -> gpui::FocusHandle {
+    fn focus_handle(&self, _: &gpui_kit::App) -> gpui_kit::FocusHandle {
         self.focus_handle.clone()
     }
 }

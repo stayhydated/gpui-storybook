@@ -2,7 +2,7 @@ use super::container::story_group_klass;
 use super::*;
 use crate::registry::{StoryKey, StoryName, StorySectionName};
 use crate::workbench::WorkbenchState;
-use gpui::{
+use gpui_kit::{
     Modifiers, MouseButton, ScrollDelta, ScrollWheelEvent, TestAppContext, VisualTestContext, div,
     point, px,
 };
@@ -28,13 +28,13 @@ struct TallStoryContent;
 impl StoryControls for DefaultStoryContract {}
 
 impl Focusable for DefaultStoryContract {
-    fn focus_handle(&self, _: &App) -> gpui::FocusHandle {
+    fn focus_handle(&self, _: &App) -> gpui_kit::FocusHandle {
         unreachable!("the static Story defaults do not require a focus handle")
     }
 }
 
 impl Render for DefaultStoryContract {
-    fn render(&mut self, _: &mut Window, _: &mut gpui::Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _: &mut Window, _: &mut gpui_kit::Context<Self>) -> impl IntoElement {
         div()
     }
 }
@@ -50,20 +50,20 @@ impl Story for DefaultStoryContract {
 }
 
 struct RecreatedStory {
-    focus_handle: gpui::FocusHandle,
+    focus_handle: gpui_kit::FocusHandle,
     count: usize,
 }
 
 impl StoryControls for RecreatedStory {}
 
 impl Focusable for RecreatedStory {
-    fn focus_handle(&self, _: &App) -> gpui::FocusHandle {
+    fn focus_handle(&self, _: &App) -> gpui_kit::FocusHandle {
         self.focus_handle.clone()
     }
 }
 
 impl Render for RecreatedStory {
-    fn render(&mut self, _: &mut Window, _: &mut gpui::Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _: &mut Window, _: &mut gpui_kit::Context<Self>) -> impl IntoElement {
         div()
     }
 }
@@ -82,7 +82,7 @@ impl Story for RecreatedStory {
 }
 
 impl Render for TallStoryContent {
-    fn render(&mut self, _: &mut Window, _: &mut gpui::Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _: &mut Window, _: &mut gpui_kit::Context<Self>) -> impl IntoElement {
         v_flex().w_full().child(div().h(px(1200.))).child(
             div()
                 .debug_selector(|| "tall-story-bottom".to_owned())
@@ -150,7 +150,7 @@ fn story_group_class_round_trips_sorted_members() {
     );
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn story_trait_defaults_are_stable(cx: &mut App) {
     assert_eq!(DefaultStoryContract::klass(), "DefaultStoryContract");
     assert_eq!(DefaultStoryContract::title(cx), "Default Story");
@@ -163,10 +163,10 @@ fn story_trait_defaults_are_stable(cx: &mut App) {
     assert!(DefaultStoryContract::scenarios().is_empty());
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn scenario_recreation_starts_each_run_from_constructor_defaults(cx: &mut App) {
-    gpui_component::init(cx);
-    let window: gpui::WindowHandle<StoryContainer> = cx
+    gpui_kit::init(cx);
+    let window: gpui_kit::WindowHandle<StoryContainer> = cx
         .open_window(Default::default(), |window, cx| {
             StoryContainer::panel::<RecreatedStory>(window, cx)
         })
@@ -206,10 +206,10 @@ fn scenario_recreation_starts_each_run_from_constructor_defaults(cx: &mut App) {
         .expect("story should recreate successfully");
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn story_container_builders_and_metadata_expose_runtime_contract(cx: &mut App) {
-    gpui_component::init(cx);
-    let window: gpui::WindowHandle<StoryContainer> = cx
+    gpui_kit::init(cx);
+    let window: gpui_kit::WindowHandle<StoryContainer> = cx
         .open_window(Default::default(), |window, cx| {
             cx.new(|cx| StoryContainer::new(window, cx))
         })
@@ -269,7 +269,7 @@ fn story_container_builders_and_metadata_expose_runtime_contract(cx: &mut App) {
 #[test]
 fn tall_stories_scroll_inside_canvas_without_panning_viewport_frame() {
     let mut app = TestAppContext::single();
-    app.update(gpui_component::init);
+    app.update(gpui_kit::init);
     let (container, cx) = app.add_window_view(|window, cx| -> StoryContainer {
         let story = cx.new(|_| TallStoryContent);
         let mut container = StoryContainer::new(window, cx).story(story.into(), "TallStoryContent");
@@ -324,7 +324,7 @@ fn tall_stories_scroll_inside_canvas_without_panning_viewport_frame() {
 #[test]
 fn viewport_presets_size_and_center_the_canvas() {
     let mut app = TestAppContext::single();
-    app.update(gpui_component::init);
+    app.update(gpui_kit::init);
     let (container, cx) = app.add_window_view(|window, cx| -> StoryContainer {
         let mut container = StoryContainer::new(window, cx);
         container.set_presentation(StoryPresentation {
@@ -354,7 +354,7 @@ fn viewport_presets_size_and_center_the_canvas() {
     assert_eq!(initial_stage_bounds, scroll_region_bounds);
     assert_eq!(
         initial_canvas_bounds.size,
-        gpui::size(
+        gpui_kit::size(
             initial_stage_bounds.size.width - STORY_CANVAS_RESIZE_GUTTER * 2.,
             initial_stage_bounds.size.height - STORY_CANVAS_RESIZE_GUTTER * 2.
         )
@@ -374,15 +374,15 @@ fn viewport_presets_size_and_center_the_canvas() {
     for (viewport, expected_size) in [
         (
             crate::presentation::StoryViewportPreset::Mobile,
-            gpui::size(px(390.), px(844.)),
+            gpui_kit::size(px(390.), px(844.)),
         ),
         (
             crate::presentation::StoryViewportPreset::Tablet,
-            gpui::size(px(768.), px(1024.)),
+            gpui_kit::size(px(768.), px(1024.)),
         ),
         (
             crate::presentation::StoryViewportPreset::Desktop,
-            gpui::size(px(1440.), px(900.)),
+            gpui_kit::size(px(1440.), px(900.)),
         ),
     ] {
         container.update(cx, |container, cx| {
@@ -423,7 +423,7 @@ fn viewport_presets_size_and_center_the_canvas() {
     let stage_bounds = cx
         .debug_bounds("story-canvas-stage")
         .expect("responsive canvas stage should render");
-    assert_eq!(canvas_bounds.size, gpui::size(px(390.), px(844.)));
+    assert_eq!(canvas_bounds.size, gpui_kit::size(px(390.), px(844.)));
     assert_eq!(canvas_bounds.center(), stage_bounds.center());
     assert!(cx.debug_bounds("story-canvas-resize-corner").is_some());
 
@@ -449,7 +449,7 @@ fn viewport_presets_size_and_center_the_canvas() {
         .expect("responsive canvas should resize during the drag");
     assert_eq!(
         first_resized_canvas.size,
-        gpui::size(
+        gpui_kit::size(
             canvas_bounds.size.width + px(60.),
             canvas_bounds.size.height + px(50.)
         )
@@ -466,7 +466,7 @@ fn viewport_presets_size_and_center_the_canvas() {
         .expect("responsive canvas should keep resizing during the drag");
     assert_eq!(
         second_resized_canvas.size,
-        gpui::size(
+        gpui_kit::size(
             canvas_bounds.size.width + px(100.),
             canvas_bounds.size.height + px(80.)
         )
@@ -488,7 +488,7 @@ fn viewport_presets_size_and_center_the_canvas() {
     );
 
     container.update(cx, |container, cx| {
-        container.set_responsive_size(Some(gpui::size(px(2000.), px(1500.))));
+        container.set_responsive_size(Some(gpui_kit::size(px(2000.), px(1500.))));
         cx.notify();
     });
     draw(cx);
@@ -532,7 +532,7 @@ fn viewport_presets_size_and_center_the_canvas() {
     }
 
     let scroll_region =
-        cx.update(|window, _| gpui::Bounds::new(point(px(0.), px(0.)), window.viewport_size()));
+        cx.update(|window, _| gpui_kit::Bounds::new(point(px(0.), px(0.)), window.viewport_size()));
     cx.simulate_event(ScrollWheelEvent {
         position: scroll_region.center(),
         delta: ScrollDelta::Pixels(point(px(-5000.), px(0.))),
@@ -562,12 +562,12 @@ fn viewport_presets_size_and_center_the_canvas() {
     );
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn panel_activation_defers_workbench_story_reads(cx: &mut App) {
-    gpui_component::init(cx);
+    gpui_kit::init(cx);
     let state = cx.new(|cx| WorkbenchState::new(None, cx));
     let state_for_window = state.clone();
-    let window: gpui::WindowHandle<StoryContainer> = cx
+    let window: gpui_kit::WindowHandle<StoryContainer> = cx
         .open_window(Default::default(), move |window, cx| {
             cx.new(|cx| {
                 let mut story = StoryContainer::new(window, cx);
@@ -585,10 +585,10 @@ fn panel_activation_defers_workbench_story_reads(cx: &mut App) {
         .expect("panel activation should not reenter the story entity");
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn story_group_class_sorts_entities_and_ignores_missing_classes(cx: &mut App) {
-    gpui_component::init(cx);
-    let window: gpui::WindowHandle<StoryContainer> = cx
+    gpui_kit::init(cx);
+    let window: gpui_kit::WindowHandle<StoryContainer> = cx
         .open_window(Default::default(), |window, cx| {
             cx.new(|cx| StoryContainer::new(window, cx))
         })

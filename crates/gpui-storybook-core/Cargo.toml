@@ -16,9 +16,9 @@ include = [ "src/**/*", "assets/**/*", "i18n.toml" ]
 ignored = [ "gpui_platform" ]
 
 [features]
-capture = [ "dep:gpui_platform", "dep:image", "gpui/test-support", "gpui_platform/test-support" ]
-inspector = [ "gpui-component/inspector" ]
-performance = [ "gpui/profiler" ]
+capture = [ "dep:gpui_platform", "dep:image", "gpui-kit/test-support", "gpui_platform/test-support" ]
+inspector = [ "gpui-kit/inspector" ]
+performance = [ "dep:gpui-core", "gpui-core/profiler" ]
 
 [dependencies]
 anyhow = { workspace = true }
@@ -26,9 +26,8 @@ derive_more = { features = [ "as_ref", "display", "from" ], workspace = true }
 es-fluent = { workspace = true }
 es-fluent-manager-core = { workspace = true }
 es-fluent-manager-embedded = { workspace = true }
-gpui = { workspace = true }
-gpui-component = { workspace = true }
-gpui-component-assets = { workspace = true }
+gpui-core = { optional = true, workspace = true }
+gpui-kit = { workspace = true }
 gpui-es-fluent = { workspace = true }
 gpui-storybook-components = { workspace = true }
 gpui-storybook-preferences = { workspace = true }
@@ -49,6 +48,9 @@ url = { workspace = true }
 [target.'cfg(target_os = "linux")'.dependencies]
 gtk = { version = "0.18" }
 
+[target.'cfg(target_family = "wasm")'.dependencies]
+base64 = { workspace = true }
+
 [target.'cfg(unix)'.dependencies]
 libc = { workspace = true }
 
@@ -59,7 +61,7 @@ gpui_tokio = { workspace = true }
 es-fluent-build = { workspace = true }
 
 [dev-dependencies]
-gpui = { features = [ "test-support" ], workspace = true }
+gpui-kit = { features = [ "test-support" ], workspace = true }
 strum.workspace = true
 tempfile.workspace = true
 tokio = { features = [ "rt" ], workspace = true }

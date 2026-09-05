@@ -17,7 +17,7 @@ fn action_debugger_formats_multi_stroke_bindings() {
     assert_eq!(format_key_binding(&binding), expected);
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn action_debugger_keeps_only_selected_story_actions(cx: &mut TestAppContext) {
     let window = cx.update(|cx| {
         cx.open_window(Default::default(), |_, cx| cx.new(ActionScopeFixture::new))
@@ -71,12 +71,12 @@ fn action_debugger_keeps_only_selected_story_actions(cx: &mut TestAppContext) {
     assert_eq!(action_names, vec![StoryAction.name()]);
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn action_debugger_uses_the_story_root_instead_of_its_nested_interaction_focus(
     cx: &mut TestAppContext,
 ) {
     let window = cx.update(|cx| {
-        gpui_component::init(cx);
+        gpui_kit::init(cx);
         cx.open_window(Default::default(), |window, cx| {
             cx.new(|cx| StoryContainerActionFixture::new(window, cx))
         })
@@ -136,17 +136,15 @@ fn action_debugger_uses_the_story_root_instead_of_its_nested_interaction_focus(
     assert_eq!(action_names, vec![StoryAction.name()]);
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn action_reset_toolbar_stays_visible_and_recreates_the_story(cx: &mut TestAppContext) {
     ACTION_RESET_STORY_CREATIONS.store(0, Ordering::SeqCst);
     let window = cx.update(|cx| {
-        gpui_component::init(cx);
-        let options = gpui::WindowOptions {
-            window_bounds: Some(gpui::WindowBounds::Windowed(gpui::Bounds::centered(
-                None,
-                size(px(800.), px(360.)),
-                cx,
-            ))),
+        gpui_kit::init(cx);
+        let options = gpui_kit::WindowOptions {
+            window_bounds: Some(gpui_kit::WindowBounds::Windowed(
+                gpui_kit::Bounds::centered(None, size(px(800.), px(360.)), cx),
+            )),
             ..Default::default()
         };
         cx.open_window(options, |window, cx| {
@@ -215,7 +213,7 @@ fn action_reset_toolbar_stays_visible_and_recreates_the_story(cx: &mut TestAppCo
     let reset = visual_cx
         .debug_bounds("workbench-actions-reset")
         .expect("Actions toolbar Reset button should remain visible");
-    visual_cx.simulate_click(reset.center(), gpui::Modifiers::none());
+    visual_cx.simulate_click(reset.center(), gpui_kit::Modifiers::none());
     visual_cx.run_until_parked();
     visual_cx.update(|window, cx| {
         _ = window.draw(cx);
@@ -242,7 +240,7 @@ fn action_reset_toolbar_stays_visible_and_recreates_the_story(cx: &mut TestAppCo
     let reset = visual_cx
         .debug_bounds("workbench-actions-reset")
         .expect("disabled Actions Reset button should remain visible");
-    visual_cx.simulate_click(reset.center(), gpui::Modifiers::none());
+    visual_cx.simulate_click(reset.center(), gpui_kit::Modifiers::none());
     visual_cx.run_until_parked();
     assert_eq!(
         ACTION_RESET_STORY_CREATIONS.load(Ordering::SeqCst),

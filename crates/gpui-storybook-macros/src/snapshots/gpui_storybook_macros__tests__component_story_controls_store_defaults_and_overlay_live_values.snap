@@ -1,16 +1,19 @@
 ---
-source: crates/gpui-storybook-macros/src/lib.rs
+source: crates/gpui-storybook-macros/src/tests.rs
 expression: snapshot_tokens(component_story_impl(input))
 ---
 struct __WelcomeCardComponentStoryView {
-    focus_handle: ::gpui::FocusHandle,
-    headline: gpui::SharedString,
+    focus_handle: ::gpui_kit::FocusHandle,
+    headline: gpui_kit::SharedString,
     selected: bool,
 }
 impl __WelcomeCardComponentStoryView {
-    fn view(_window: &mut ::gpui::Window, cx: &mut ::gpui::App) -> ::gpui::Entity<Self> {
+    fn view(
+        _window: &mut ::gpui_kit::Window,
+        cx: &mut ::gpui_kit::App,
+    ) -> ::gpui_kit::Entity<Self> {
         let example = WelcomeCard::example();
-        ::gpui::AppContext::new(
+        ::gpui_kit::AppContext::new(
             cx,
             |cx| Self {
                 focus_handle: cx.focus_handle(),
@@ -20,17 +23,17 @@ impl __WelcomeCardComponentStoryView {
         )
     }
 }
-impl ::gpui::Focusable for __WelcomeCardComponentStoryView {
-    fn focus_handle(&self, _cx: &::gpui::App) -> ::gpui::FocusHandle {
+impl ::gpui_kit::Focusable for __WelcomeCardComponentStoryView {
+    fn focus_handle(&self, _cx: &::gpui_kit::App) -> ::gpui_kit::FocusHandle {
         self.focus_handle.clone()
     }
 }
-impl ::gpui::Render for __WelcomeCardComponentStoryView {
+impl ::gpui_kit::Render for __WelcomeCardComponentStoryView {
     fn render(
         &mut self,
-        window: &mut ::gpui::Window,
-        cx: &mut ::gpui::Context<Self>,
-    ) -> impl ::gpui::IntoElement {
+        window: &mut ::gpui_kit::Window,
+        cx: &mut ::gpui_kit::Context<Self>,
+    ) -> impl ::gpui_kit::IntoElement {
         let _ = &self.focus_handle;
         let _ = window;
         let _ = cx;
@@ -45,9 +48,9 @@ impl ::gpui_storybook::StoryControls for __WelcomeCardComponentStoryView {
         vec![
             ::gpui_storybook::ControlSpec { key : "headline".to_owned(), label :
             "Headline".to_owned(), description : "".to_owned(), category : "Content"
-            .to_owned(), kind : < gpui::SharedString as
+            .to_owned(), kind : < gpui_kit::SharedString as
             ::gpui_storybook::ControlValueField > ::control_kind(), default : <
-            gpui::SharedString as ::gpui_storybook::ControlValueField >
+            gpui_kit::SharedString as ::gpui_storybook::ControlValueField >
             ::to_control_value(& self.headline), bounds : ::gpui_storybook::ControlBounds
             { min : None, max : None, step : None, }, options : vec![], },
             ::gpui_storybook::ControlSpec { key : "selected".to_owned(), label :
@@ -68,7 +71,7 @@ impl ::gpui_storybook::StoryControls for __WelcomeCardComponentStoryView {
         match key {
             "headline" => {
                 Ok(
-                    <gpui::SharedString as ::gpui_storybook::ControlValueField>::to_control_value(
+                    <gpui_kit::SharedString as ::gpui_storybook::ControlValueField>::to_control_value(
                         &self.headline,
                     ),
                 )
@@ -94,7 +97,7 @@ impl ::gpui_storybook::StoryControls for __WelcomeCardComponentStoryView {
     ) -> ::std::result::Result<(), ::gpui_storybook::ControlError> {
         match key {
             "headline" => {
-                self.headline = <gpui::SharedString as ::gpui_storybook::ControlValueField>::from_control_value(
+                self.headline = <gpui_kit::SharedString as ::gpui_storybook::ControlValueField>::from_control_value(
                     "headline",
                     value,
                 )?;
@@ -119,18 +122,18 @@ impl ::gpui_storybook::Story for __WelcomeCardComponentStoryView {
     fn klass() -> &'static str {
         "WelcomeCard"
     }
-    fn title(cx: &::gpui::App) -> ::std::string::String {
+    fn title(cx: &::gpui_kit::App) -> ::std::string::String {
         let _ = cx;
         ("Welcome Card").into()
     }
-    fn description(cx: &::gpui::App) -> ::std::string::String {
+    fn description(cx: &::gpui_kit::App) -> ::std::string::String {
         let _ = cx;
         ("").into()
     }
     fn new_view(
-        window: &mut ::gpui::Window,
-        cx: &mut ::gpui::App,
-    ) -> ::gpui::Entity<Self> {
+        window: &mut ::gpui_kit::Window,
+        cx: &mut ::gpui_kit::App,
+    ) -> ::gpui_kit::Entity<Self> {
         Self::view(window, cx)
     }
 }

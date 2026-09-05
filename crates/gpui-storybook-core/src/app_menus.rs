@@ -1,5 +1,5 @@
-use gpui::{App, Entity, Menu, MenuItem, SharedString};
-use gpui_component::{GlobalState, Theme, ThemeMode, ThemeRegistry, menu::AppMenuBar};
+use gpui_kit::component::{GlobalState, Theme, ThemeMode, ThemeRegistry, menu::AppMenuBar};
+use gpui_kit::{App, Entity, Menu, MenuItem, SharedString};
 use gpui_storybook_preferences::{
     PreferredColorScheme, PreferredLanguage, SystemColorScheme, ThemeId,
 };
@@ -239,9 +239,9 @@ mod tests {
 
     use super::*;
 
-    #[gpui::test]
+    #[gpui_kit::test]
     fn appearance_and_language_menus_expose_system_intent(cx: &mut App) {
-        gpui_component::init(cx);
+        gpui_kit::init(cx);
         crate::i18n::init(cx).expect("Storybook test localization initializes");
 
         let menus = build_menus("Storybook", None, cx);
@@ -269,8 +269,8 @@ mod tests {
         assert_eq!(name.as_ref(), text(cx, StorybookMessage::UseSystemLanguage));
     }
 
-    #[gpui::test]
-    fn menu_reload_crosses_a_foreground_task_boundary(cx: &mut gpui::TestAppContext) {
+    #[gpui_kit::test]
+    fn menu_reload_crosses_a_foreground_task_boundary(cx: &mut gpui_kit::TestAppContext) {
         let build_count = Rc::new(Cell::new(0));
         let extra_items: AppMenuItemsBuilder = {
             let build_count = build_count.clone();
@@ -280,7 +280,7 @@ mod tests {
             })
         };
         cx.update(|cx| {
-            gpui_component::init(cx);
+            gpui_kit::init(cx);
             crate::i18n::init(cx).expect("Storybook test localization initializes");
             let app_menu_bar = AppMenuBar::new(cx);
             schedule_app_menu_update("Storybook".into(), Some(extra_items), app_menu_bar, cx);

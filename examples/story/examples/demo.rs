@@ -1,12 +1,12 @@
 #[cfg(target_family = "wasm")]
-use gpui::Application;
+use gpui_kit::Application;
 use gpui_storybook::Assets;
 #[cfg(target_family = "wasm")]
 use wasm_bindgen::prelude::*;
 
 #[cfg(not(target_family = "wasm"))]
 fn main() {
-    gpui_storybook_example_story::run_storybook(gpui_platform::application().with_assets(Assets));
+    gpui_storybook_example_story::run_storybook(gpui_kit::application().with_assets(Assets));
 }
 
 #[cfg(target_family = "wasm")]
@@ -25,7 +25,7 @@ fn main() {
 
 #[cfg(target_family = "wasm")]
 fn keep_web_application_alive(app: Application) -> Application {
-    struct WasmApplication(std::rc::Rc<gpui::AppCell>);
+    struct WasmApplication(std::rc::Rc<gpui_kit::AppCell>);
 
     // GPUI keeps browser callbacks after `Application::run` returns.
     unsafe {

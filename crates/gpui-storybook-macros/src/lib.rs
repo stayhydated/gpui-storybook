@@ -193,12 +193,12 @@ pub fn story_controls(input: TokenStream) -> TokenStream {
 /// By default the wrapper renders `<Self as Default>::default()`. Use `example = ...`
 /// when the component needs a custom constructor or builder configuration. `title` and
 /// `description` accept expressions that evaluate into `String`, not only string literals.
-/// Those expressions are emitted inside methods with `cx: &gpui::App` in scope. An optional
+/// Those expressions are emitted inside methods with `cx: &gpui_kit::App` in scope. An optional
 /// `scenarios = ...` expression evaluates to `Vec<gpui_storybook::StoryScenario>` and is
 /// copied into the runtime story container for automation.
 ///
 /// ```ignore
-/// #[derive(gpui_storybook::ComponentStory, gpui::IntoElement)]
+/// #[derive(gpui_storybook::ComponentStory, gpui_kit::IntoElement)]
 /// #[storybook(
 ///     title = "Button",
 ///     section = StorySection::Components,
@@ -207,7 +207,7 @@ pub fn story_controls(input: TokenStream) -> TokenStream {
 /// )]
 /// pub struct ButtonChip {
 ///     #[storybook(control(category = "Content"))]
-///     label: gpui::SharedString,
+///     label: gpui_kit::SharedString,
 /// }
 /// ```
 #[proc_macro_derive(ComponentStory, attributes(storybook))]

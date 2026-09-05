@@ -22,7 +22,7 @@ inventory::submit! {
 }
 
 #[cfg(not(target_family = "wasm"))]
-#[gpui::test]
+#[gpui_kit::test]
 fn portable_runtime_installs_tokio_before_story_init_hooks(cx: &mut App) {
     TOKIO_STORY_INIT_RAN.store(false, Ordering::SeqCst);
 
@@ -31,7 +31,7 @@ fn portable_runtime_installs_tokio_before_story_init_hooks(cx: &mut App) {
     assert!(TOKIO_STORY_INIT_RAN.load(Ordering::SeqCst));
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn story_without_control_target_has_an_empty_snapshot(cx: &mut App) {
     let snapshots = read_control_snapshots(None, cx).expect("missing controls should be empty");
 

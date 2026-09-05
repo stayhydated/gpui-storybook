@@ -1,7 +1,7 @@
-use gpui::{
+use gpui_kit::component::{ActiveTheme as _, Sizable as _, tag::Tag, v_flex};
+use gpui_kit::{
     App, IntoElement, ParentElement as _, RenderOnce, SharedString, Styled as _, Window, div, px,
 };
-use gpui_component::{ActiveTheme as _, Sizable as _, tag::Tag, v_flex};
 
 #[derive(gpui_storybook::ComponentStory, IntoElement)]
 #[storybook(
@@ -49,7 +49,7 @@ impl FieldNotes {
 }
 
 impl RenderOnce for FieldNotes {
-    fn render(self, _: &mut Window, cx: &mut App) -> impl gpui::IntoElement {
+    fn render(self, _: &mut Window, cx: &mut App) -> impl gpui_kit::IntoElement {
         v_flex()
             .gap_3()
             .max_w(px(720.))
@@ -82,7 +82,7 @@ impl NoteCard {
         }
     }
 
-    fn into_card(self, cx: &App) -> impl gpui::IntoElement {
+    fn into_card(self, cx: &App) -> impl gpui_kit::IntoElement {
         div()
             .p_4()
             .border_1()
@@ -94,7 +94,7 @@ impl NoteCard {
                 div()
                     .mt_3()
                     .text_lg()
-                    .font_weight(gpui::FontWeight::BOLD)
+                    .font_weight(gpui_kit::FontWeight::BOLD)
                     .child(self.title),
             )
             .child(

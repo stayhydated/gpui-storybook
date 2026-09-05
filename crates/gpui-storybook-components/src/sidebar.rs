@@ -1,9 +1,11 @@
-use gpui::{
+use gpui_kit::component::{
+    ActiveTheme as _, Collapsible, StyledExt as _, h_flex, sidebar::SidebarItem,
+};
+use gpui_kit::{
     App, AppContext as _, ClickEvent, Context, ElementId, EventEmitter, InteractiveElement as _,
     IntoElement, ParentElement as _, Render, SharedString, StatefulInteractiveElement as _,
     Styled as _, Window, div, prelude::FluentBuilder as _,
 };
-use gpui_component::{ActiveTheme as _, Collapsible, StyledExt as _, h_flex, sidebar::SidebarItem};
 use std::rc::Rc;
 
 #[derive(Clone)]

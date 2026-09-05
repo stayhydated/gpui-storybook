@@ -51,7 +51,10 @@ fn test_options() -> StorybookOptions<TestLanguage> {
     )
 }
 
-fn unused_create_fn(_: &mut ::gpui::Window, _: &mut ::gpui::App) -> ::gpui::Entity<StoryContainer> {
+fn unused_create_fn(
+    _: &mut ::gpui_kit::Window,
+    _: &mut ::gpui_kit::App,
+) -> ::gpui_kit::Entity<StoryContainer> {
     unreachable!("story creation is not used in these tests");
 }
 
@@ -282,8 +285,8 @@ fn stdio_profile_is_deterministic_and_uses_temporary_storage() {
     assert_eq!(overrides.language, Some(7));
 }
 
-#[gpui::test]
-fn init_rejects_a_path_override_for_non_persistent_storage(cx: &mut ::gpui::App) {
+#[gpui_kit::test]
+fn init_rejects_a_path_override_for_non_persistent_storage(cx: &mut ::gpui_kit::App) {
     let options = test_options()
         .with_persistence(PersistenceMode::Temporary)
         .with_json_path("portable/preferences.json");
@@ -297,8 +300,8 @@ fn init_rejects_a_path_override_for_non_persistent_storage(cx: &mut ::gpui::App)
     assert!(cx.try_global::<StorybookInitialized>().is_none());
 }
 
-#[gpui::test]
-async fn init_rejects_a_second_initialization(cx: &mut ::gpui::TestAppContext) {
+#[gpui_kit::test]
+async fn init_rejects_a_second_initialization(cx: &mut ::gpui_kit::TestAppContext) {
     cx.executor().allow_parking();
     let first = cx.update(|cx| {
         init(
@@ -322,9 +325,9 @@ async fn init_rejects_a_second_initialization(cx: &mut ::gpui::TestAppContext) {
     let _ready = first.await;
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 async fn readiness_installs_live_automation_before_the_caller_constructs_a_window(
-    cx: &mut ::gpui::TestAppContext,
+    cx: &mut ::gpui_kit::TestAppContext,
 ) {
     cx.executor().allow_parking();
     assert!(cx.windows().is_empty());

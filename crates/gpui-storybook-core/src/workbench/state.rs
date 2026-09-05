@@ -90,7 +90,7 @@ impl WorkbenchState {
                     story_data
                         .variant_group
                         .as_ref()
-                        .and_then(gpui::WeakEntity::upgrade),
+                        .and_then(gpui_kit::WeakEntity::upgrade),
                 )
             };
 
@@ -149,7 +149,7 @@ impl WorkbenchState {
                 .read(cx)
                 .variant_group
                 .as_ref()
-                .and_then(gpui::WeakEntity::upgrade)
+                .and_then(gpui_kit::WeakEntity::upgrade)
                 .or(Some(story.clone()))
         } else {
             Some(story.clone())

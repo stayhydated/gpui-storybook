@@ -1,6 +1,6 @@
 use super::*;
-use gpui::{ScrollHandle, div, point, px, size};
-use gpui_component::button::Button;
+use gpui_kit::component::button::Button;
+use gpui_kit::{ScrollHandle, div, point, px, size};
 
 fn clear_registry() {
     CAPTURE_REGIONS.with_borrow_mut(|registry| *registry = CaptureRegionRegistry::default());
@@ -97,7 +97,7 @@ fn scopes_restore_previous_state_and_record_region_bounds() {
     };
     let bounds = Bounds {
         origin: point(px(10.), px(20.)),
-        size: gpui::size(px(100.), px(50.)),
+        size: gpui_kit::size(px(100.), px(50.)),
     };
 
     assert!(current_scope().is_none());
@@ -129,7 +129,7 @@ fn scrolling_recorded_region_aligns_it_with_viewport() {
         route_id: Some("story-key".to_string()),
         viewport_bounds: Some(Bounds {
             origin: point(px(20.), px(30.)),
-            size: gpui::size(px(100.), px(100.)),
+            size: gpui_kit::size(px(100.), px(100.)),
         }),
         scroll_handle: Some(handle.clone()),
     };
@@ -137,7 +137,7 @@ fn scrolling_recorded_region_aligns_it_with_viewport() {
         "story-key/section".to_string(),
         Bounds {
             origin: point(px(50.), px(70.)),
-            size: gpui::size(px(40.), px(20.)),
+            size: gpui_kit::size(px(40.), px(20.)),
         },
         &scope,
     );
@@ -222,7 +222,7 @@ fn interaction_targets_are_relative_to_route_and_sorted_by_key() {
     };
     let route_bounds = Bounds {
         origin: point(px(10.), px(20.)),
-        size: gpui::size(px(200.), px(100.)),
+        size: gpui_kit::size(px(200.), px(100.)),
     };
     record_region("story-key".to_string(), route_bounds, &scope);
     record_interaction_target(
@@ -231,7 +231,7 @@ fn interaction_targets_are_relative_to_route_and_sorted_by_key() {
         "Second".to_string(),
         Bounds {
             origin: point(px(40.), px(50.)),
-            size: gpui::size(px(60.), px(20.)),
+            size: gpui_kit::size(px(60.), px(20.)),
         },
     );
     record_interaction_target(
@@ -240,7 +240,7 @@ fn interaction_targets_are_relative_to_route_and_sorted_by_key() {
         "First".to_string(),
         Bounds {
             origin: point(px(20.), px(30.)),
-            size: gpui::size(px(30.), px(10.)),
+            size: gpui_kit::size(px(30.), px(10.)),
         },
     );
 
@@ -262,7 +262,7 @@ fn duplicate_interaction_target_keys_are_rejected() {
     };
     let bounds = Bounds {
         origin: point(px(0.), px(0.)),
-        size: gpui::size(px(10.), px(10.)),
+        size: gpui_kit::size(px(10.), px(10.)),
     };
     record_region("story-key".to_string(), bounds, &scope);
     record_interaction_target(
@@ -356,15 +356,18 @@ fn route_image_crop_scales_logical_bounds_to_physical_pixels() {
         "story-key/details".to_owned(),
         Bounds {
             origin: point(px(10.), px(5.)),
-            size: gpui::size(px(20.), px(10.)),
+            size: gpui_kit::size(px(20.), px(10.)),
         },
         &scope,
     );
     let image = image::RgbaImage::from_pixel(200, 100, image::Rgba([1, 2, 3, 255]));
 
-    let cropped =
-        crop_capture_region_image("story-key/details", image, gpui::size(px(100.), px(50.)))
-            .expect("registered route should crop");
+    let cropped = crop_capture_region_image(
+        "story-key/details",
+        image,
+        gpui_kit::size(px(100.), px(50.)),
+    )
+    .expect("registered route should crop");
 
     assert_eq!(cropped.dimensions(), (40, 20));
 }
@@ -376,7 +379,7 @@ fn route_image_crop_rejects_an_unrendered_route() {
     let error = crop_capture_region_image(
         "story-key/missing",
         image::RgbaImage::new(10, 10),
-        gpui::size(px(10.), px(10.)),
+        gpui_kit::size(px(10.), px(10.)),
     )
     .expect_err("missing route should fail");
 

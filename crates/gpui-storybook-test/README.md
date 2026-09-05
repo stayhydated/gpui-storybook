@@ -2,7 +2,7 @@
 
 `gpui-storybook-test` is the headless developer-tooling crate for GPUI
 Storybook. It discovers `inventory` story registrations, creates a fresh
-`gpui::HeadlessAppContext` for each portable story, applies typed controls,
+`gpui_kit::HeadlessAppContext` for each portable story, applies typed controls,
 renders PNGs with the current platform headless renderer, and runs visual
 baseline or capture-matrix jobs.
 

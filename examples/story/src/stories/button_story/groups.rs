@@ -1,10 +1,10 @@
-use gpui::{
-    Axis, Context, IntoElement, ParentElement as _, Styled as _, prelude::FluentBuilder as _,
-};
-use gpui_component::{
+use gpui_kit::component::{
     Disableable as _, Selectable as _,
     button::{Button, ButtonGroup},
     checkbox::Checkbox,
+};
+use gpui_kit::{
+    Axis, Context, IntoElement, ParentElement as _, Styled as _, prelude::FluentBuilder as _,
 };
 use gpui_storybook::section;
 

@@ -128,7 +128,7 @@ Wrap important controls with stable semantic targets so an MCP client can
 discover and activate them without screen coordinates:
 
 ```rust
-use gpui::InteractiveElement as _;
+use gpui_kit::InteractiveElement as _;
 use gpui_storybook::StorybookElementExt as _;
 
 Button::new("execute-request")

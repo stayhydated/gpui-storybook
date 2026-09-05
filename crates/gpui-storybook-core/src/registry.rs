@@ -6,7 +6,7 @@ use std::borrow::Borrow;
 /// Documentation and control metadata captured at story registration time.
 ///
 /// This is deliberately static: a story's localized title, description, and
-/// control defaults can depend on a live [`gpui::App`] and therefore belong to
+/// control defaults can depend on a live [`gpui_kit::App`] and therefore belong to
 /// a live story instance. The static catalog uses this value for source
 /// documentation and control shape metadata that macros can obtain without
 /// constructing a story.
@@ -230,7 +230,8 @@ pub struct StoryEntry {
     pub name: StoryName,
     pub section: Option<StorySectionName>,
     pub section_order: Option<usize>,
-    pub create_fn: fn(&mut ::gpui::Window, &mut ::gpui::App) -> ::gpui::Entity<StoryContainer>,
+    pub create_fn:
+        fn(&mut ::gpui_kit::Window, &mut ::gpui_kit::App) -> ::gpui_kit::Entity<StoryContainer>,
     pub crate_name: &'static str,
     pub crate_dir: &'static str,
     pub file: &'static str,
@@ -274,7 +275,10 @@ impl StoryEntry {
         name: &'static str,
         section: Option<&'static str>,
         section_order: Option<usize>,
-        create_fn: fn(&mut ::gpui::Window, &mut ::gpui::App) -> ::gpui::Entity<StoryContainer>,
+        create_fn: fn(
+            &mut ::gpui_kit::Window,
+            &mut ::gpui_kit::App,
+        ) -> ::gpui_kit::Entity<StoryContainer>,
         source: StoryRegistrationSource,
     ) -> Self {
         let section = match section {
@@ -338,7 +342,7 @@ inventory::collect!(StoryEntry);
 
 /// Entry type for init function registration
 pub struct InitEntry {
-    pub init_fn: fn(&mut ::gpui::App),
+    pub init_fn: fn(&mut ::gpui_kit::App),
     pub fn_name: &'static str,
     pub file: &'static str,
     pub line: u32,
@@ -354,9 +358,9 @@ mod tests {
     };
 
     fn unused_create_fn(
-        _: &mut ::gpui::Window,
-        _: &mut ::gpui::App,
-    ) -> ::gpui::Entity<StoryContainer> {
+        _: &mut ::gpui_kit::Window,
+        _: &mut ::gpui_kit::App,
+    ) -> ::gpui_kit::Entity<StoryContainer> {
         unreachable!("story creation is not used in this test");
     }
 

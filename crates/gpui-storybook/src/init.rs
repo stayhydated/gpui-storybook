@@ -2,7 +2,7 @@ use super::*;
 
 pub(super) struct StorybookInitialized;
 
-impl ::gpui::Global for StorybookInitialized {}
+impl ::gpui_kit::Global for StorybookInitialized {}
 
 #[cfg(all(feature = "mcp", any(target_os = "linux", target_os = "macos")))]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -63,9 +63,9 @@ where
 /// combination, runtime `storybook.toml`, preference override, embedded
 /// localization setup, or one-time initialization contract is invalid.
 pub fn init<L>(
-    cx: &mut ::gpui::App,
+    cx: &mut ::gpui_kit::App,
     mut options: StorybookOptions<L>,
-) -> Result<::gpui::Task<StorybookReady>, StorybookInitError>
+) -> Result<::gpui_kit::Task<StorybookReady>, StorybookInitError>
 where
     L: Language,
 {

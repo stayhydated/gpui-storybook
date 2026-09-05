@@ -9,7 +9,7 @@ use crate::{
     controls::ControlValue,
     presentation::StoryViewportPreset,
 };
-use gpui::{
+use gpui_kit::{
     Action, App, Keystroke, Modifiers, MouseDownEvent, MouseMoveEvent, MouseUpEvent, PlatformInput,
     ScrollDelta, ScrollWheelEvent, TouchPhase, Window, point, px,
 };

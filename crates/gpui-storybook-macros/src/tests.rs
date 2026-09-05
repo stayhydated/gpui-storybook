@@ -190,7 +190,7 @@ fn component_story_controls_store_defaults_and_overlay_live_values() {
         #[storybook(example = WelcomeCard::example())]
         pub struct WelcomeCard {
             #[storybook(control(category = "Content"))]
-            headline: gpui::SharedString,
+            headline: gpui_kit::SharedString,
             #[storybook(control)]
             selected: bool,
             items: Vec<String>,

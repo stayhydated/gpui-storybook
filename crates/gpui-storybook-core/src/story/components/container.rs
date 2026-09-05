@@ -64,7 +64,7 @@ pub trait Story: Focusable + Render + StoryControls + Sized {
     /// as an input. Stories opt in explicitly so actions owned by child
     /// controls or the surrounding Storybook shell are never inferred as
     /// story actions.
-    fn action_scope_focus_handle(&self, _cx: &App) -> Option<gpui::FocusHandle> {
+    fn action_scope_focus_handle(&self, _cx: &App) -> Option<gpui_kit::FocusHandle> {
         None
     }
 
@@ -235,12 +235,12 @@ impl StoryContainer {
             .unwrap_or_else(|| self.display_title(cx))
     }
 
-    pub fn width(mut self, width: gpui::Pixels) -> Self {
+    pub fn width(mut self, width: gpui_kit::Pixels) -> Self {
         self.width = Some(width);
         self
     }
 
-    pub fn height(mut self, height: gpui::Pixels) -> Self {
+    pub fn height(mut self, height: gpui_kit::Pixels) -> Self {
         self.height = Some(height);
         self
     }
@@ -263,7 +263,7 @@ impl StoryContainer {
 
     /// Returns the explicit story-root focus handle used by the Actions
     /// workbench, when the story exposes one.
-    pub fn action_scope_focus_handle(&self) -> Option<gpui::FocusHandle> {
+    pub fn action_scope_focus_handle(&self) -> Option<gpui_kit::FocusHandle> {
         self.action_scope_focus_handle.clone()
     }
 
@@ -293,7 +293,7 @@ impl StoryContainer {
     pub fn recreate_for_scenario(
         &mut self,
         window: &mut Window,
-        cx: &mut gpui::Context<Self>,
+        cx: &mut gpui_kit::Context<Self>,
     ) -> bool {
         let Some(recreate) = self.recreate else {
             return false;

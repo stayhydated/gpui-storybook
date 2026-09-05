@@ -4,22 +4,22 @@ use super::{
     runner::{InteractionRunner, resolve_story_point, schedule_postcondition_check},
 };
 use crate::capture_region::{StorybookElementExt as _, capture_story_view_with_scroll};
-use gpui::{
+use gpui_kit::component::h_flex;
+use gpui_kit::{
     AppContext as _, Context, Focusable, InteractiveElement as _, IntoElement, KeyDownEvent,
     ParentElement as _, Render, StatefulInteractiveElement as _, Styled as _, div,
 };
-use gpui_component::h_flex;
 use std::sync::atomic::AtomicBool;
 
 /// Sets the harness counter to a caller-provided value.
-#[derive(gpui::Action, Clone, Debug, Deserialize, Eq, schemars::JsonSchema, PartialEq)]
+#[derive(gpui_kit::Action, Clone, Debug, Deserialize, Eq, schemars::JsonSchema, PartialEq)]
 #[action(namespace = storybook_interaction_test)]
 struct SetCounter {
     value: usize,
 }
 
 struct InteractionHarness {
-    focus_handle: gpui::FocusHandle,
+    focus_handle: gpui_kit::FocusHandle,
     text: String,
     clicks: usize,
     hovered: bool,
@@ -29,7 +29,7 @@ struct InteractionHarness {
 }
 
 impl Focusable for InteractionHarness {
-    fn focus_handle(&self, _: &App) -> gpui::FocusHandle {
+    fn focus_handle(&self, _: &App) -> gpui_kit::FocusHandle {
         self.focus_handle.clone()
     }
 }
@@ -74,7 +74,7 @@ impl Render for InteractionHarness {
 }
 
 struct DynamicTargetHarness {
-    focus_handle: gpui::FocusHandle,
+    focus_handle: gpui_kit::FocusHandle,
     target_visible: bool,
     target_on_right: bool,
     target_clicks: usize,
@@ -82,7 +82,7 @@ struct DynamicTargetHarness {
 }
 
 impl Focusable for DynamicTargetHarness {
-    fn focus_handle(&self, _: &App) -> gpui::FocusHandle {
+    fn focus_handle(&self, _: &App) -> gpui_kit::FocusHandle {
         self.focus_handle.clone()
     }
 }
@@ -156,7 +156,7 @@ fn dynamic_target_story_snapshot() -> StorySnapshot {
 async fn run_dynamic_target_interaction(
     target_visible: bool,
     request_id: u64,
-    cx: &mut gpui::TestAppContext,
+    cx: &mut gpui_kit::TestAppContext,
 ) -> (StoryInteractionSnapshot, usize, usize, bool) {
     let (window, harness, receiver, pending) = cx.update(|cx| {
         let mut harness = None;
@@ -398,9 +398,9 @@ fn postcondition_validation_rejects_ambiguous_or_unbounded_assertions() {
 
 #[test]
 fn points_resolve_from_fresh_logical_bounds() {
-    let bounds = gpui::Bounds {
+    let bounds = gpui_kit::Bounds {
         origin: point(px(10.0), px(20.0)),
-        size: gpui::size(px(200.0), px(100.0)),
+        size: gpui_kit::size(px(200.0), px(100.0)),
     };
     assert_eq!(
         resolve_story_point(
@@ -464,7 +464,7 @@ fn interaction_wire_types_are_closed_and_tagged() {
     assert_eq!(keystroke.key_char.as_deref(), Some(text.as_str()));
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn action_discovery_and_batch_preparation_use_registered_schemas(cx: &mut App) {
     assert!(!automation_action_is_visible("zed::NoAction"));
     assert!(!automation_action_is_visible("zed::Unbind"));
@@ -509,8 +509,10 @@ fn action_discovery_and_batch_preparation_use_registered_schemas(cx: &mut App) {
     ));
 }
 
-#[gpui::test]
-async fn postcondition_retries_a_missing_value_until_it_is_rendered(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+async fn postcondition_retries_a_missing_value_until_it_is_rendered(
+    cx: &mut gpui_kit::TestAppContext,
+) {
     let (window, harness, receiver, progress, pending) = cx.update(|cx| {
         let mut harness = None;
         let window = cx
@@ -591,8 +593,8 @@ async fn postcondition_retries_a_missing_value_until_it_is_rendered(cx: &mut gpu
     assert!(!pending.load(Ordering::SeqCst));
 }
 
-#[gpui::test]
-async fn postcondition_timeout_preserves_dispatched_progress(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+async fn postcondition_timeout_preserves_dispatched_progress(cx: &mut gpui_kit::TestAppContext) {
     let (window, receiver, progress, pending) = cx.update(|cx| {
         let window = cx
             .open_window(Default::default(), |_, cx| {
@@ -659,9 +661,9 @@ async fn postcondition_timeout_preserves_dispatched_progress(cx: &mut gpui::Test
     assert!(!pending.load(Ordering::SeqCst));
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 async fn executor_dispatches_unicode_actions_pointer_and_frame_waits_in_process(
-    cx: &mut gpui::TestAppContext,
+    cx: &mut gpui_kit::TestAppContext,
 ) {
     let (window, harness, receiver, pending) = cx.update(|cx| {
         let mut harness = None;
@@ -783,9 +785,9 @@ async fn executor_dispatches_unicode_actions_pointer_and_frame_waits_in_process(
     });
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 async fn semantic_target_can_be_revealed_before_its_step_is_dispatched(
-    cx: &mut gpui::TestAppContext,
+    cx: &mut gpui_kit::TestAppContext,
 ) {
     let (snapshot, target_clicks, decoy_clicks, pending) =
         run_dynamic_target_interaction(false, 14, cx).await;
@@ -796,8 +798,8 @@ async fn semantic_target_can_be_revealed_before_its_step_is_dispatched(
     assert!(!pending);
 }
 
-#[gpui::test]
-async fn semantic_target_uses_its_latest_bounds_at_dispatch(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+async fn semantic_target_uses_its_latest_bounds_at_dispatch(cx: &mut gpui_kit::TestAppContext) {
     let (snapshot, target_clicks, decoy_clicks, pending) =
         run_dynamic_target_interaction(true, 15, cx).await;
 
@@ -807,8 +809,8 @@ async fn semantic_target_uses_its_latest_bounds_at_dispatch(cx: &mut gpui::TestA
     assert!(!pending);
 }
 
-#[gpui::test]
-async fn executor_rejects_an_unrendered_route_without_dispatch(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+async fn executor_rejects_an_unrendered_route_without_dispatch(cx: &mut gpui_kit::TestAppContext) {
     let (window, receiver, progress, pending) = cx.update(|cx| {
         let window = cx
             .open_window(Default::default(), |_, cx| {
@@ -878,8 +880,8 @@ async fn executor_rejects_an_unrendered_route_without_dispatch(cx: &mut gpui::Te
     assert!(!pending.load(Ordering::SeqCst));
 }
 
-#[gpui::test]
-async fn capture_failure_reports_partial_dispatch_without_retry(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+async fn capture_failure_reports_partial_dispatch_without_retry(cx: &mut gpui_kit::TestAppContext) {
     let (window, harness, receiver, progress, pending) = cx.update(|cx| {
         let mut harness = None;
         let window = cx

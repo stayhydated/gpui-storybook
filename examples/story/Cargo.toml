@@ -29,8 +29,7 @@ performance = [ "gpui-storybook/performance" ]
 es-fluent = { workspace = true }
 es-fluent-lang = { workspace = true }
 es-fluent-manager-embedded = { workspace = true }
-gpui = { workspace = true }
-gpui-component = { workspace = true }
+gpui-kit = { workspace = true }
 gpui-es-fluent = { workspace = true }
 gpui_platform = { workspace = true }
 gpui-storybook = { workspace = true }

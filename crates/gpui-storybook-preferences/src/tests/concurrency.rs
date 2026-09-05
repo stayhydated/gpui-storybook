@@ -63,9 +63,9 @@ async fn concurrent_writes_leave_one_complete_typed_document() {
     ));
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 async fn gpui_tokio_runs_json_repository_work_without_blocking_the_foreground(
-    cx: &mut gpui::TestAppContext,
+    cx: &mut gpui_kit::TestAppContext,
 ) {
     cx.executor().allow_parking();
 

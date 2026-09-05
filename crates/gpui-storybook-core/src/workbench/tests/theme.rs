@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn theme_header_stays_fixed_while_color_items_scroll() {
     let mut app = TestAppContext::single();
-    app.update(gpui_component::init);
+    app.update(gpui_kit::init);
     let window = app.open_window(size(px(400.), px(600.)), |window, cx| {
         let state = cx.new(|cx| WorkbenchState::new(None, cx));
         StoryWorkbench::new(state, WorkbenchTab::Theme, window, cx)

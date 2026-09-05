@@ -1,9 +1,9 @@
 use super::*;
 
-#[gpui::test]
+#[gpui_kit::test]
 fn external_story_recreation_rebinds_control_editor_subscriptions(cx: &mut TestAppContext) {
     let window = cx.update(|cx| {
-        gpui_component::init(cx);
+        gpui_kit::init(cx);
         cx.open_window(Default::default(), |window, cx| {
             cx.new(|cx| RecreatedControlWorkbenchFixture::new(window, cx))
         })
@@ -94,7 +94,7 @@ fn external_story_recreation_rebinds_control_editor_subscriptions(cx: &mut TestA
         1
     );
 
-    let tint = gpui::Hsla {
+    let tint = gpui_kit::Hsla {
         h: 0.5,
         s: 0.6,
         l: 0.4,

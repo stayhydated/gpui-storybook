@@ -111,11 +111,11 @@ fn exit_after_capture(exit_code: i32, cx: &mut App) {
 }
 
 pub fn story_snapshots_from_containers(
-    stories: &[gpui::Entity<StoryContainer>],
+    stories: &[gpui_kit::Entity<StoryContainer>],
     cx: &impl Borrow<App>,
 ) -> Vec<StorySnapshot> {
     fn collect(
-        story: &gpui::Entity<StoryContainer>,
+        story: &gpui_kit::Entity<StoryContainer>,
         snapshots: &mut Vec<StorySnapshot>,
         cx: &impl Borrow<App>,
     ) {
@@ -172,7 +172,7 @@ pub(crate) fn set_capture_target_size(
 ) {
     let scale_factor = window.scale_factor().max(f32::EPSILON);
     let size = target_size.map(|(width, height)| {
-        gpui::size(
+        gpui_kit::size(
             px(width as f32 / scale_factor),
             px(height as f32 / scale_factor),
         )
@@ -203,9 +203,9 @@ pub(crate) fn ensure_capture_target_visible(
 }
 
 pub(super) fn expanded_window_size(
-    window_size: gpui::Size<gpui::Pixels>,
-    story_region: gpui::Bounds<gpui::Pixels>,
-) -> Option<gpui::Size<gpui::Pixels>> {
+    window_size: gpui_kit::Size<gpui_kit::Pixels>,
+    story_region: gpui_kit::Bounds<gpui_kit::Pixels>,
+) -> Option<gpui_kit::Size<gpui_kit::Pixels>> {
     let required_width =
         (f32::from(story_region.origin.x) + f32::from(story_region.size.width)).max(0.0);
     let required_height =
@@ -215,7 +215,7 @@ pub(super) fn expanded_window_size(
     if width == f32::from(window_size.width) && height == f32::from(window_size.height) {
         None
     } else {
-        Some(gpui::size(px(width), px(height)))
+        Some(gpui_kit::size(px(width), px(height)))
     }
 }
 
@@ -305,7 +305,7 @@ fn crop_story_capture_image(
 #[cfg(feature = "capture")]
 pub(super) fn image_crop_rect(
     bounds: Bounds<Pixels>,
-    window_size: gpui::Size<Pixels>,
+    window_size: gpui_kit::Size<Pixels>,
     image: &image::RgbaImage,
 ) -> Option<(u32, u32, u32, u32)> {
     let window_width = f32::from(window_size.width);

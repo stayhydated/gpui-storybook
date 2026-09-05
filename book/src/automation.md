@@ -179,7 +179,7 @@ Import the Storybook element extension trait and give the visible child a
 stable GPUI ID:
 
 ```rust
-use gpui::InteractiveElement as _;
+use gpui_kit::InteractiveElement as _;
 use gpui_storybook::StorybookElementExt as _;
 
 Button::new("execute-request")

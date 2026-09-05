@@ -1,13 +1,13 @@
-use gpui::{
-    Action, App, AppContext as _, Context, Entity, Focusable, InteractiveElement as _, IntoElement,
-    ParentElement as _, Render, StatefulInteractiveElement as _, Styled as _, Subscription, Window,
-    div, px,
-};
-use gpui_component::{
+use gpui_kit::component::{
     ActiveTheme as _, IndexPath, h_flex,
     input::{Input, InputState},
     select::{Select, SelectEvent, SelectState},
     v_flex,
+};
+use gpui_kit::{
+    Action, App, AppContext as _, Context, Entity, Focusable, InteractiveElement as _, IntoElement,
+    ParentElement as _, Render, StatefulInteractiveElement as _, Styled as _, Subscription, Window,
+    div, px,
 };
 use gpui_storybook::{
     ControlValue, StoryInteractionPostcondition, StoryInteractionStep, StoryModifiers,
@@ -37,7 +37,7 @@ struct AutomationFixtureState<'a> {
 #[derive(gpui_storybook::StoryControls)]
 #[gpui_storybook::story(crate::StorySection::Automation)]
 pub struct InteractionStory {
-    action_scope_focus_handle: gpui::FocusHandle,
+    action_scope_focus_handle: gpui_kit::FocusHandle,
     input: Entity<InputState>,
     select: Entity<SelectState<Vec<&'static str>>>,
     #[storybook(control(category = "Fixture"))]
@@ -148,13 +148,13 @@ impl gpui_storybook::Story for InteractionStory {
         })
     }
 
-    fn action_scope_focus_handle(&self, _: &App) -> Option<gpui::FocusHandle> {
+    fn action_scope_focus_handle(&self, _: &App) -> Option<gpui_kit::FocusHandle> {
         Some(self.action_scope_focus_handle.clone())
     }
 }
 
 impl Focusable for InteractionStory {
-    fn focus_handle(&self, cx: &App) -> gpui::FocusHandle {
+    fn focus_handle(&self, cx: &App) -> gpui_kit::FocusHandle {
         self.input.focus_handle(cx)
     }
 }

@@ -1,4 +1,4 @@
-use gpui::{
+use gpui_kit::{
     Action, AnyElement, AnyView, App, AppContext as _, Axis, Bounds, ClickEvent, Div,
     DragMoveEvent, Empty, Entity, EntityId, EventEmitter, Focusable, Hsla, InteractiveElement as _,
     IntoElement, ParentElement, Pixels, Point, Render, RenderOnce, ScrollHandle, SharedString,
@@ -15,11 +15,11 @@ type StoryRecreateFn = fn(
 ) -> (
     AnyView,
     Option<Rc<dyn ControlTarget>>,
-    gpui::FocusHandle,
-    Option<gpui::FocusHandle>,
+    gpui_kit::FocusHandle,
+    Option<gpui_kit::FocusHandle>,
 );
 
-use gpui_component::{
+use gpui_kit::component::{
     ActiveTheme as _, ElementExt as _, IconName, Sizable as _,
     button::{Button, ButtonVariants as _},
     dock::{
@@ -62,7 +62,7 @@ struct DragStoryCanvasResize {
 }
 
 impl Render for DragStoryCanvasResize {
-    fn render(&mut self, _: &mut Window, _: &mut gpui::Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _: &mut Window, _: &mut gpui_kit::Context<Self>) -> impl IntoElement {
         Empty
     }
 }
@@ -76,20 +76,20 @@ struct StoryCanvasResizeDrag {
 }
 
 pub struct StoryContainer {
-    focus_handle: gpui::FocusHandle,
-    action_scope_focus_handle: Option<gpui::FocusHandle>,
+    focus_handle: gpui_kit::FocusHandle,
+    action_scope_focus_handle: Option<gpui_kit::FocusHandle>,
     pub name: SharedString,
     pub group: Option<SharedString>,
     pub section: Option<SharedString>,
     pub title_bg: Option<Hsla>,
     pub description: SharedString,
     pub(crate) variants: Vec<Entity<StoryContainer>>,
-    pub(crate) variant_group: Option<gpui::WeakEntity<StoryContainer>>,
+    pub(crate) variant_group: Option<gpui_kit::WeakEntity<StoryContainer>>,
     scroll_handle: ScrollHandle,
     story_scroll_handle: ScrollHandle,
-    width: Option<gpui::Pixels>,
-    height: Option<gpui::Pixels>,
-    tab_group: Option<gpui::WeakEntity<TabGroup>>,
+    width: Option<gpui_kit::Pixels>,
+    height: Option<gpui_kit::Pixels>,
+    tab_group: Option<gpui_kit::WeakEntity<TabGroup>>,
     story: Option<AnyView>,
     control_target: Option<Rc<dyn ControlTarget>>,
     presentation: StoryPresentation,
@@ -97,8 +97,8 @@ pub struct StoryContainer {
     canvas_bounds: Option<Bounds<Pixels>>,
     canvas_stage_bounds: Option<Bounds<Pixels>>,
     canvas_resize_drag: Option<StoryCanvasResizeDrag>,
-    automation_size: Option<gpui::Size<gpui::Pixels>>,
-    workbench_state: Option<gpui::WeakEntity<crate::workbench::WorkbenchState>>,
+    automation_size: Option<gpui_kit::Size<gpui_kit::Pixels>>,
+    workbench_state: Option<gpui_kit::WeakEntity<crate::workbench::WorkbenchState>>,
     pub story_klass: Option<SharedString>,
     registration_metadata: Option<RegisteredStoryMetadata>,
     pub story_key: Option<SharedString>,

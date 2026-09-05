@@ -10,20 +10,20 @@ use crate::{
     title_bar::sidebar_toggle_button,
     workbench::{StoryWorkbench, WorkbenchState, WorkbenchTab},
 };
-use gpui::prelude::{
-    Context, FluentBuilder as _, InteractiveElement as _, IntoElement, ParentElement as _, Render,
-    Styled as _,
-};
-use gpui::{
-    AnyElement, App, AppContext as _, ClickEvent, Entity, Pixels, SharedString, Subscription,
-    Window, div, px, relative,
-};
-use gpui_component::{
+use gpui_kit::component::{
     ActiveTheme as _, ElementExt as _, Side, h_flex,
     input::{Input, InputEvent, InputState},
     resizable::{h_resizable, resizable_panel},
     sidebar::{Sidebar, SidebarGroup, SidebarMenu, SidebarMenuItem},
     v_flex,
+};
+use gpui_kit::prelude::{
+    Context, FluentBuilder as _, InteractiveElement as _, IntoElement, ParentElement as _, Render,
+    Styled as _,
+};
+use gpui_kit::{
+    AnyElement, App, AppContext as _, ClickEvent, Entity, Pixels, SharedString, Subscription,
+    Window, div, px, relative,
 };
 use std::{
     borrow::Borrow,

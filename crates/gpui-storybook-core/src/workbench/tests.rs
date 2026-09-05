@@ -1,5 +1,5 @@
 use super::*;
-use gpui::{ScrollDelta, ScrollWheelEvent, TestAppContext, VisualTestContext, point};
+use gpui_kit::{ScrollDelta, ScrollWheelEvent, TestAppContext, VisualTestContext, point};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[derive(Action, Clone, Default, Eq, PartialEq)]
@@ -14,7 +14,7 @@ struct StoryAction;
 #[action(namespace = storybook_action_scope_test)]
 struct NestedInputAction;
 
-gpui::actions!(
+gpui_kit::actions!(
     workbench_action_reset_test,
     [
         #[derive(Eq)]

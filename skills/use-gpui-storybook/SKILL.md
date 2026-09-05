@@ -25,7 +25,7 @@ description: >-
    integration.
 3. Keep the story-bearing library linked from the binary so inventory
    registrations are retained.
-4. Build native apps with `gpui_platform::application()` and the facade's
+4. Build native apps with `gpui_kit::application()` and the facade's
    embedded assets.
 5. Create a stable, binary-specific `ConsumerId`, call
    `gpui_storybook::init`, await readiness, and only then open the standard

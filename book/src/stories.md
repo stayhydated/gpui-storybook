@@ -11,7 +11,7 @@ Use `#[story]` when the preview needs a GPUI entity, focus handle, actions, or
 custom wrapper UI:
 
 ```rust
-use gpui::{
+use gpui_kit::{
     App, AppContext as _, Context, Entity, FocusHandle, Focusable,
     InteractiveElement as _, IntoElement, ParentElement as _, Render, Window, div,
 };
@@ -72,7 +72,7 @@ Use `ComponentStory` when Storybook can construct the component and provide
 the focusable wrapper:
 
 ```rust
-use gpui::{App, IntoElement, RenderOnce, SharedString, Window};
+use gpui_kit::{App, IntoElement, RenderOnce, SharedString, Window};
 
 #[derive(IntoElement, gpui_storybook::ComponentStory)]
 #[storybook(
@@ -103,7 +103,7 @@ impl RenderOnce for WelcomeCard {
 `ComponentStory` accepts a non-generic struct. If `example = ...` is omitted,
 the generated wrapper constructs the component with `Default::default()`.
 `title` and `description` accept expressions evaluated with
-`cx: &gpui::App` in scope, so metadata can call
+`cx: &gpui_kit::App` in scope, so metadata can call
 `gpui_storybook::localize_message(cx, ...)`.
 
 ## Expose live controls
@@ -117,7 +117,7 @@ struct ButtonStory {
     disabled: bool,
     #[storybook(control(min = 0.0, max = 32.0, step = 1.0))]
     padding: f32,
-    focus_handle: gpui::FocusHandle,
+    focus_handle: gpui_kit::FocusHandle,
 }
 ```
 
@@ -167,7 +167,7 @@ but before preference loading begins:
 
 ```rust
 #[gpui_storybook::story_init]
-fn register_icons(cx: &mut gpui::App) {
+fn register_icons(cx: &mut gpui_kit::App) {
     // Register application assets or other GPUI globals.
 }
 ```
@@ -239,7 +239,7 @@ For a component-derived story, expose an expression that returns the same
 vector:
 
 ```rust
-#[derive(gpui_storybook::ComponentStory, gpui::IntoElement)]
+#[derive(gpui_storybook::ComponentStory, gpui_kit::IntoElement)]
 #[storybook(
     example = WelcomeCard::example(),
     scenarios = WelcomeCard::scenarios(),

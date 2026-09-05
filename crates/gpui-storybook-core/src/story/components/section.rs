@@ -163,7 +163,7 @@ impl ParentElement for StorySection {
 }
 
 impl Styled for StorySection {
-    fn style(&mut self) -> &mut gpui::StyleRefinement {
+    fn style(&mut self) -> &mut gpui_kit::StyleRefinement {
         self.base.style()
     }
 }
