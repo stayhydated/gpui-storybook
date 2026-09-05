@@ -54,11 +54,11 @@ gpui-storybook-preferences = { path = "crates/gpui-storybook-preferences", versi
 gpui-storybook-test = { path = "crates/gpui-storybook-test", version = "0.5.0" }
 gpui-storybook-toml = { path = "crates/gpui-storybook-toml", version = "0.5.0" }
 gpui_platform = { branch = "linux-headless-renderer", features = [
-  "font-kit",
-  "x11",
-  "wayland",
-  "runtime_shaders",
-], git = "https://github.com/stayhydated/zed" }
+    "font-kit",
+    "x11",
+    "wayland",
+    "runtime_shaders",
+], git = "https://github.com/stayhydated/zed", package = "gpui-pre-platform" }
 gpui_tokio = { branch = "linux-headless-renderer", git = "https://github.com/stayhydated/zed" }
 gpui_wgpu = { branch = "linux-headless-renderer", features = [
   "font-kit",
@@ -102,6 +102,8 @@ web-sys = { features = [ "Location", "Window" ], version = "0.3" }
 
 [patch.crates-io]
 gpui-pre = { branch = "linux-headless-renderer", git = "https://github.com/stayhydated/zed" }
+gpui-pre-platform = { branch = "linux-headless-renderer", git = "https://github.com/stayhydated/zed" }
+gpui-pre-web = { branch = "linux-headless-renderer", git = "https://github.com/stayhydated/zed" }
 
 [workspace.lints.rust]
 future_incompatible = "deny"

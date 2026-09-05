@@ -13,3 +13,5 @@ gpui-storybook = { path = "../../.." }
 
 [patch.crates-io]
 gpui-pre = { branch = "linux-headless-renderer", git = "https://github.com/stayhydated/zed" }
+gpui-pre-platform = { branch = "linux-headless-renderer", git = "https://github.com/stayhydated/zed" }
+gpui-pre-web = { branch = "linux-headless-renderer", git = "https://github.com/stayhydated/zed" }
