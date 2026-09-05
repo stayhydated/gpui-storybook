@@ -2991,7 +2991,7 @@ dependencies = [
 [[package]]
 name = "gpui-es-fluent"
 version = "0.1.0"
-source = "git+https://github.com/stayhydated/gpui-es-fluent?rev=00f7482e9627833a675731339c1db6d0e1151b0d#00f7482e9627833a675731339c1db6d0e1151b0d"
+source = "git+https://github.com/stayhydated/gpui-es-fluent?rev=fab092a1d04f71fae011ac589cd080d3c6c842c1#fab092a1d04f71fae011ac589cd080d3c6c842c1"
 dependencies = [
  "es-fluent",
  "es-fluent-manager-embedded",

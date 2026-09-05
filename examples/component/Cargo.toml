@@ -19,7 +19,6 @@ es-fluent-manager-embedded = { workspace = true }
 gpui-kit = { workspace = true }
 gpui-es-fluent = { workspace = true }
 gpui-storybook = { workspace = true }
-gpui_platform = { workspace = true }
 reqwest_client = { workspace = true }
 rust-embed = { workspace = true }
 strum = { workspace = true }

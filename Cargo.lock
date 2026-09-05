@@ -789,7 +789,7 @@ dependencies = [
  "bitflags 2.13.1",
  "cexpr",
  "clang-sys",
- "itertools 0.11.0",
+ "itertools 0.13.0",
  "log",
  "prettyplease 0.2.37",
  "proc-macro2",
@@ -4089,7 +4089,7 @@ dependencies = [
  "log",
  "presser",
  "thiserror 2.0.20",
- "windows 0.58.0",
+ "windows 0.62.2",
 ]
 
 [[package]]
@@ -4207,7 +4207,7 @@ dependencies = [
 [[package]]
 name = "gpui-es-fluent"
 version = "0.1.0"
-source = "git+https://github.com/stayhydated/gpui-es-fluent?rev=00f7482e9627833a675731339c1db6d0e1151b0d#00f7482e9627833a675731339c1db6d0e1151b0d"
+source = "git+https://github.com/stayhydated/gpui-es-fluent?rev=fab092a1d04f71fae011ac589cd080d3c6c842c1#fab092a1d04f71fae011ac589cd080d3c6c842c1"
 dependencies = [
  "es-fluent",
  "es-fluent-manager-embedded",
@@ -4610,7 +4610,6 @@ dependencies = [
  "es-fluent-manager-embedded",
  "gpui-es-fluent",
  "gpui-kit",
- "gpui-pre-platform",
  "gpui-storybook",
  "reqwest_client",
  "rust-embed",
@@ -5378,7 +5377,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.58.0",
+ "windows-core 0.62.2",
 ]
 
 [[package]]
