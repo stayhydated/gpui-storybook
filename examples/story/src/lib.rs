@@ -1,4 +1,4 @@
-use gpui_kit::Application;
+use gpui_kit::App;
 use gpui_storybook::{ConsumerId, StorybookOptions, StorybookWindow};
 
 extern crate gpui_kit as gpui;
@@ -34,75 +34,73 @@ fn storybook_options() -> Result<StorybookOptions<Languages>, gpui_storybook::Co
     Ok(options)
 }
 
-pub fn run_storybook(app: Application) {
-    app.run(move |app_cx| {
-        let options = match storybook_options() {
-            Ok(options) => options,
-            Err(error) => {
-                tracing::error!(error = %error, "invalid story example consumer id");
-                app_cx.quit();
-                return;
-            },
-        };
-        let readiness = match gpui_storybook::init(app_cx, options) {
-            Ok(readiness) => readiness,
-            Err(error) => {
-                tracing::error!(error = %error, "failed to initialize story example Storybook");
-                app_cx.quit();
-                return;
-            },
-        };
+pub fn launch_storybook(app_cx: &mut App) {
+    let options = match storybook_options() {
+        Ok(options) => options,
+        Err(error) => {
+            tracing::error!(error = %error, "invalid story example consumer id");
+            app_cx.quit();
+            return;
+        },
+    };
+    let readiness = match gpui_storybook::init(app_cx, options) {
+        Ok(readiness) => readiness,
+        Err(error) => {
+            tracing::error!(error = %error, "failed to initialize story example Storybook");
+            app_cx.quit();
+            return;
+        },
+    };
 
-        #[cfg(not(target_family = "wasm"))]
-        {
-            let http_client = std::sync::Arc::new(reqwest_client::ReqwestClient::new());
-            app_cx.set_http_client(http_client);
-        }
+    #[cfg(not(target_family = "wasm"))]
+    {
+        let http_client = std::sync::Arc::new(reqwest_client::ReqwestClient::new());
+        app_cx.set_http_client(http_client);
+    }
 
-        app_cx
-            .spawn(async move |cx| {
-                let ready = readiness.await;
-                tracing::info!(
+    app_cx
+        .spawn(async move |cx| {
+            let ready = readiness.await;
+            tracing::info!(
+                persistence_status = ?ready.persistence_status,
+                diagnostics = ?ready.diagnostics,
+                "story example preferences are ready"
+            );
+            if !ready.diagnostics.is_empty() {
+                tracing::warn!(
                     persistence_status = ?ready.persistence_status,
                     diagnostics = ?ready.diagnostics,
-                    "story example preferences are ready"
+                    "story example initialized with preference diagnostics"
                 );
-                if !ready.diagnostics.is_empty() {
-                    tracing::warn!(
-                        persistence_status = ?ready.persistence_status,
-                        diagnostics = ?ready.diagnostics,
-                        "story example initialized with preference diagnostics"
+            }
+
+            cx.update(|app_cx| {
+                if let Some(state) = gpui_storybook::try_preference_state(app_cx) {
+                    tracing::info!(
+                        color_scheme_source = ?state.resolved.color_scheme.source,
+                        theme_source = ?state.resolved.theme.source,
+                        language_source = ?state.resolved.language.source,
+                        resolution_diagnostic_count = state.resolution_diagnostics.len(),
+                        "story example preference state applied"
                     );
                 }
+                app_cx.activate(true);
 
-                cx.update(|app_cx| {
-                    if let Some(state) = gpui_storybook::try_preference_state(app_cx) {
-                        tracing::info!(
-                            color_scheme_source = ?state.resolved.color_scheme.source,
-                            theme_source = ?state.resolved.theme.source,
-                            language_source = ?state.resolved.language.source,
-                            resolution_diagnostic_count = state.resolution_diagnostics.len(),
-                            "story example preference state applied"
+                gpui_storybook::create_storybook_window(
+                    &format!("{} - Stories", env!("CARGO_PKG_NAME")),
+                    move |window, cx| {
+                        let stories = gpui_storybook::generate_stories(window, cx);
+                        assert!(
+                            !stories.is_empty(),
+                            "story example Storybook requires linked stories"
                         );
-                    }
-                    app_cx.activate(true);
-
-                    gpui_storybook::create_storybook_window(
-                        &format!("{} - Stories", env!("CARGO_PKG_NAME")),
-                        move |window, cx| {
-                            let stories = gpui_storybook::generate_stories(window, cx);
-                            assert!(
-                                !stories.is_empty(),
-                                "story example Storybook requires linked stories"
-                            );
-                            StorybookWindow::new(stories)
-                        },
-                        app_cx,
-                    );
-                });
-            })
-            .detach();
-    });
+                        StorybookWindow::new(stories)
+                    },
+                    app_cx,
+                );
+            });
+        })
+        .detach();
 }
 
 #[cfg(test)]

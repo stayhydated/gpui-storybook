@@ -9,5 +9,7 @@ fn main() {
         )
         .init();
 
-    gpui_storybook_example_story::run_storybook(gpui_kit::application().with_assets(Assets));
+    gpui_kit::application()
+        .with_assets(Assets)
+        .run(gpui_storybook_example_story::launch_storybook);
 }

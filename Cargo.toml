@@ -30,6 +30,7 @@ version = "0.5.0"
 anyhow = "1.0"
 base64 = "0.22"
 clap = "4.6"
+console_error_panic_hook = "0.1"
 component-shape-mcp = { git = "https://github.com/stayhydated/component-shape", rev = "e5bc2ce77179840ccc7b5ca013e722d4ca9cdf9d", version = "0.2.0" }
 darling = "0.24"
 derive_more = "2.1"
