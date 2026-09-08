@@ -651,9 +651,9 @@ fn window_mode_selection_updates_saved_state(cx: &mut App) {
 #[gpui_kit::test]
 async fn failed_reopen_can_retry_with_an_available_repository(cx: &mut gpui_kit::TestAppContext) {
     cx.executor().allow_parking();
-    cx.update(gpui_tokio::init);
+    cx.update(crate::tokio_runtime::init);
     let repository_task = cx.update(|cx| {
-        gpui_tokio::Tokio::spawn(cx, async {
+        crate::tokio_runtime::spawn(cx, async {
             PreferenceRepository::open(RepositoryOptions::disabled(
                 gpui_storybook_preferences::ConsumerId::new("retry-runtime-test")
                     .expect("valid retry consumer"),
@@ -716,7 +716,7 @@ async fn startup_retry_reloads_existing_intent_without_overwriting_it(
     cx: &mut gpui_kit::TestAppContext,
 ) {
     cx.executor().allow_parking();
-    cx.update(gpui_tokio::init);
+    cx.update(crate::tokio_runtime::init);
     let consumer = gpui_storybook_preferences::ConsumerId::new("startup-retry-runtime-test")
         .expect("valid retry consumer");
     let repository_options = RepositoryOptions::disabled(consumer);
@@ -728,7 +728,7 @@ async fn startup_retry_reloads_existing_intent_without_overwriting_it(
     let expected_for_setup = expected.clone();
     let options_for_setup = repository_options.clone();
     let repository_task = cx.update(|cx| {
-        gpui_tokio::Tokio::spawn(cx, async move {
+        crate::tokio_runtime::spawn(cx, async move {
             let repository = PreferenceRepository::open(options_for_setup)
                 .await
                 .expect("disabled repository opens")
@@ -743,7 +743,7 @@ async fn startup_retry_reloads_existing_intent_without_overwriting_it(
     let repository = repository_task.await.expect("repository task should join");
     let repository_for_load = repository.clone();
     let retry_load = cx.update(|cx| {
-        gpui_tokio::Tokio::spawn(cx, async move {
+        crate::tokio_runtime::spawn(cx, async move {
             load_preferences(repository_options, Some(repository_for_load)).await
         })
     });
@@ -777,7 +777,7 @@ async fn startup_retry_reloads_existing_intent_without_overwriting_it(
     });
 
     let stored_task = cx.update(|cx| {
-        gpui_tokio::Tokio::spawn(cx, async move {
+        crate::tokio_runtime::spawn(cx, async move {
             repository
                 .load()
                 .await
@@ -796,7 +796,7 @@ async fn reopen_merges_one_local_edit_over_every_loaded_preference(
     cx: &mut gpui_kit::TestAppContext,
 ) {
     cx.executor().allow_parking();
-    cx.update(gpui_tokio::init);
+    cx.update(crate::tokio_runtime::init);
     let directory = std::env::temp_dir().join(format!(
         "gpui-storybook-core-{}-{}",
         std::process::id(),
@@ -812,7 +812,7 @@ async fn reopen_merges_one_local_edit_over_every_loaded_preference(
     let baseline_for_setup = baseline.clone();
     let options_for_setup = repository_options.clone();
     let repository_task = cx.update(|cx| {
-        gpui_tokio::Tokio::spawn(cx, async move {
+        crate::tokio_runtime::spawn(cx, async move {
             let repository = PreferenceRepository::open(options_for_setup)
                 .await
                 .expect("persistent repository opens")
@@ -864,7 +864,7 @@ async fn reopen_merges_one_local_edit_over_every_loaded_preference(
         .expect("save completion should be reported")
         .expect("merged preferences should be stored");
     let stored_task = cx.update(|cx| {
-        gpui_tokio::Tokio::spawn(cx, async move {
+        crate::tokio_runtime::spawn(cx, async move {
             PreferenceRepository::open(options_for_verification)
                 .await
                 .expect("merged repository should reopen")
@@ -893,11 +893,11 @@ async fn reload_merges_in_flight_edits_over_loaded_untouched_fields(
     cx: &mut gpui_kit::TestAppContext,
 ) {
     cx.executor().allow_parking();
-    cx.update(gpui_tokio::init);
+    cx.update(crate::tokio_runtime::init);
     let baseline = non_default_preferences();
     let baseline_for_setup = baseline.clone();
     let repository_task = cx.update(|cx| {
-        gpui_tokio::Tokio::spawn(cx, async move {
+        crate::tokio_runtime::spawn(cx, async move {
             let repository = PreferenceRepository::open(RepositoryOptions::disabled(
                 gpui_storybook_preferences::ConsumerId::new("reload-merge-runtime-test")
                     .expect("valid reload merge consumer"),
@@ -962,7 +962,7 @@ async fn reload_merges_in_flight_edits_over_loaded_untouched_fields(
         .expect("save completion should be reported")
         .expect("merged preferences should be stored");
     let stored_task = cx.update(|cx| {
-        gpui_tokio::Tokio::spawn(cx, async move {
+        crate::tokio_runtime::spawn(cx, async move {
             repository
                 .load()
                 .await

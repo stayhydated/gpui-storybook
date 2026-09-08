@@ -177,8 +177,8 @@ fresh headless GPUI context per case, applies typed controls and presentation,
 captures root or substory regions, expands viewport/theme/language/control
 matrices, checks explicit visual-baseline policies, and optionally enforces GPUI
 draw and dirty-to-present budgets. On native targets, each fresh context
-installs `gpui_tokio` before the core runtime and linked `#[story_init]` hooks,
-matching facade initialization. Stories without typed controls report an empty
+installs the Storybook Tokio runtime before the core runtime and linked
+`#[story_init]` hooks, matching facade initialization. Stories without typed controls report an empty
 control snapshot; non-empty control maps still fail. Matrix IDs encode every
 axis independently, and generated request IDs use a bounded digest for control
 data while reports retain the complete typed values. A custom

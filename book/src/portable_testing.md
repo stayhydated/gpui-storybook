@@ -10,7 +10,7 @@ GPUI profiler samples and budgets:
 
 ```toml
 [dev-dependencies]
-gpui-storybook-test = { version = "0.5", features = ["performance"] }
+gpui-storybook-test = { version = "0.6", features = ["performance"] }
 ```
 
 Keep the crate that contains the story registrations linked from the test
@@ -34,9 +34,10 @@ assert_eq!(report.story.key, "my-stories-ButtonStory");
 ```
 
 Every request gets a new app, window, story entity, and set of GPUI globals.
-On native targets, the fresh app installs `gpui_tokio` before the core runtime
-and linked `#[story_init]` hooks, so those hooks can call
-`gpui_tokio::Tokio::spawn` or `gpui_tokio::Tokio::handle`.
+On native targets, the fresh app installs the Storybook Tokio runtime before the
+core runtime and linked `#[story_init]` hooks, so those hooks can call
+`gpui_storybook::tokio_runtime::spawn` or
+`gpui_storybook::tokio_runtime::handle`.
 Use `runner.open(request)` when a test needs to update the live app, set a
 control, advance the test clock, or inspect a runtime story snapshot before
 capturing. A story without a typed control target reports an empty control

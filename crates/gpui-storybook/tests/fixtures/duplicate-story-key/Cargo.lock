@@ -3318,7 +3318,7 @@ checksum = "41f3ea75672348f37d94472e579f5979ee19b744d0fa5aaadc2fe129ccafa80b"
 
 [[package]]
 name = "gpui-storybook"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "gpui-es-fluent",
  "gpui-kit",
@@ -3326,7 +3326,6 @@ dependencies = [
  "gpui-storybook-macros",
  "gpui-storybook-preferences",
  "gpui-storybook-toml",
- "gpui_tokio",
  "inventory",
  "libc",
  "thiserror 2.0.20",
@@ -3337,14 +3336,14 @@ dependencies = [
 
 [[package]]
 name = "gpui-storybook-components"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "gpui-kit",
 ]
 
 [[package]]
 name = "gpui-storybook-core"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "base64",
@@ -3357,7 +3356,6 @@ dependencies = [
  "gpui-kit",
  "gpui-storybook-components",
  "gpui-storybook-preferences",
- "gpui_tokio",
  "gtk",
  "inventory",
  "koruma",
@@ -3383,7 +3381,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-storybook-macros"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "darling",
  "heck 0.5.0",
@@ -3394,7 +3392,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-storybook-preferences"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "fluent-langneg",
  "schemars",
@@ -3411,7 +3409,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-storybook-toml"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "gpui-storybook-preferences",
  "serde",
@@ -3552,17 +3550,6 @@ dependencies = [
  "schemars",
  "serde",
  "smol_str",
-]
-
-[[package]]
-name = "gpui_tokio"
-version = "0.1.0"
-source = "git+https://github.com/stayhydated/zed?branch=linux-headless-renderer#500067632e7c04dc3593651cefcb0f42ef2458b9"
-dependencies = [
- "anyhow",
- "gpui-pre",
- "gpui_util",
- "tokio",
 ]
 
 [[package]]

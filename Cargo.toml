@@ -24,7 +24,7 @@ publish = true
 readme = "README.md"
 repository = "https://github.com/stayhydated/gpui-storybook"
 rust-version = "1.98"
-version = "0.5.0"
+version = "0.6.0"
 
 [workspace.dependencies]
 anyhow = "1.0"
@@ -45,26 +45,22 @@ frame-capture = { git = "https://github.com/stayhydated/frame-capture", rev = "0
 gpui-core = { branch = "linux-headless-renderer", git = "https://github.com/stayhydated/zed", package = "gpui-pre", version = "0.3.3" }
 gpui-kit = "0.6.0"
 gpui-es-fluent = { git = "https://github.com/stayhydated/gpui-es-fluent", rev = "fab092a1d04f71fae011ac589cd080d3c6c842c1", version = "0.1.0" }
-gpui-storybook = { path = "crates/gpui-storybook", version = "0.5.0" }
-gpui-storybook-components = { path = "crates/gpui-storybook-components", version = "0.5.0" }
-gpui-storybook-core = { path = "crates/gpui-storybook-core", version = "0.5.0" }
-gpui-storybook-launch = { path = "crates/gpui-storybook-launch", version = "0.5.0" }
-gpui-storybook-macros = { path = "crates/gpui-storybook-macros", version = "0.5.0" }
-gpui-storybook-mcp = { path = "crates/gpui-storybook-mcp", version = "0.5.0" }
-gpui-storybook-preferences = { path = "crates/gpui-storybook-preferences", version = "0.5.0" }
-gpui-storybook-test = { path = "crates/gpui-storybook-test", version = "0.5.0" }
-gpui-storybook-toml = { path = "crates/gpui-storybook-toml", version = "0.5.0" }
+gpui-storybook = { path = "crates/gpui-storybook", version = "0.6.0" }
+gpui-storybook-components = { path = "crates/gpui-storybook-components", version = "0.6.0" }
+gpui-storybook-core = { path = "crates/gpui-storybook-core", version = "0.6.0" }
+gpui-storybook-launch = { path = "crates/gpui-storybook-launch", version = "0.6.0" }
+gpui-storybook-macros = { path = "crates/gpui-storybook-macros", version = "0.6.0" }
+gpui-storybook-mcp = { path = "crates/gpui-storybook-mcp", version = "0.6.0" }
+gpui-storybook-preferences = { path = "crates/gpui-storybook-preferences", version = "0.6.0" }
+gpui-storybook-test = { path = "crates/gpui-storybook-test", version = "0.6.0" }
+gpui-storybook-toml = { path = "crates/gpui-storybook-toml", version = "0.6.0" }
 gpui_platform = { branch = "linux-headless-renderer", features = [
     "font-kit",
     "x11",
     "wayland",
     "runtime_shaders",
-], git = "https://github.com/stayhydated/zed", package = "gpui-pre-platform" }
-gpui_tokio = { branch = "linux-headless-renderer", git = "https://github.com/stayhydated/zed" }
-gpui_wgpu = { branch = "linux-headless-renderer", features = [
-  "font-kit",
-  "test-support",
-], git = "https://github.com/stayhydated/zed", version = "0.1.0" }
+], git = "https://github.com/stayhydated/zed", package = "gpui-pre-platform", version = "0.3.3" }
+gpui_wgpu = { features = [ "font-kit" ], package = "gpui-pre-wgpu", version = "=0.3.3" }
 heck = "0.5"
 image = { default-features = false, features = [ "png" ], version = "0.25" }
 insta = "1.48"

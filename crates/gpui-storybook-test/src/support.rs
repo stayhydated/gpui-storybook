@@ -88,7 +88,7 @@ pub(super) fn apply_builtin_theme(theme: &ThemeCase, window: &mut Window, app: &
 
 pub(super) fn initialize_portable_story_app(app: &mut App) -> Result<(), StorybookTestError> {
     #[cfg(not(target_family = "wasm"))]
-    gpui_tokio::init(app);
+    gpui_storybook_core::tokio_runtime::init(app);
     init_story_runtime(app).map_err(|error| StorybookTestError::RuntimeInitialization {
         message: error.to_string(),
     })?;

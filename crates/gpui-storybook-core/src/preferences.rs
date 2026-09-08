@@ -30,7 +30,7 @@ where
 {
     #[cfg(not(target_family = "wasm"))]
     {
-        let task = gpui_tokio::Tokio::spawn(cx, future);
+        let task = crate::tokio_runtime::spawn(cx, future);
         cx.spawn(async move |_cx| task.await.map_err(|_| ()))
     }
 

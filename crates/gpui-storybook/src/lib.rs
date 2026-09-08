@@ -109,6 +109,12 @@ pub use preferences::{
     ThemeId, ThemeIdError, ThemeResolution, ThemeSource, UnsupportedValueSource,
 };
 
+/// Native Tokio task access for linked `#[story_init]` hooks.
+#[cfg(not(target_family = "wasm"))]
+pub mod tokio_runtime {
+    pub use gpui_storybook_core::tokio_runtime::{handle, spawn};
+}
+
 pub use gpui_es_fluent::try_localize_message as localize_message;
 pub use gpui_storybook_core::catalog::{
     StaticControlKind, StaticControlSpec, StoryCatalog, StoryCatalogEntry, StoryCatalogExportError,

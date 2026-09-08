@@ -159,7 +159,7 @@ where
         .transpose()?;
 
     #[cfg(not(target_family = "wasm"))]
-    gpui_tokio::init(cx);
+    gpui_storybook_core::tokio_runtime::init(cx);
     gpui_storybook_core::story::init(cx).map_err(|error| {
         tracing::error!(error = %error, error_debug = ?error, "failed to initialize Storybook localization");
         StorybookInitError::CoreInitialization {

@@ -134,7 +134,7 @@ documentation](https://docs.rs/gpui-storybook/). Use the public-integration
 [`gpui-storybook-test`](../gpui-storybook-test/README.md) crate and the
 [portable-testing guide](../../book/src/portable_testing.md) for fresh headless
 stories, capture matrices, visual baselines, and frame budgets. Native portable
-contexts install `gpui_tokio` before the core runtime and linked
+contexts install the Storybook Tokio runtime before the core runtime and linked
 `#[story_init]` hooks, matching facade initialization. Stories without typed
 controls report an empty control snapshot; non-empty control maps still fail.
 Matrix IDs encode every axis independently, and generated request IDs use a

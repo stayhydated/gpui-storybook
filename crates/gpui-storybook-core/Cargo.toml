@@ -40,7 +40,7 @@ schemars = { workspace = true }
 serde = { features = [ "derive" ], workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
-tokio = { features = [ "sync" ], workspace = true }
+tokio = { features = [ "rt-multi-thread", "sync" ], workspace = true }
 tracing = { workspace = true }
 unic-langid = { features = [ "serde" ], workspace = true }
 url = { workspace = true }
@@ -53,9 +53,6 @@ base64 = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
 libc = { workspace = true }
-
-[target.'cfg(not(target_family = "wasm"))'.dependencies]
-gpui_tokio = { workspace = true }
 
 [build-dependencies]
 es-fluent-build = { workspace = true }

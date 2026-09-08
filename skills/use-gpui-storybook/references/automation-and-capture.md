@@ -246,8 +246,9 @@ story-bearing crate linked so inventory discovery retains its registrations.
 Each request creates a fresh `HeadlessAppContext`, initializes the core runtime
 and linked `story_init` hooks, constructs one registered story, applies typed
 controls and presentation, and captures the rendered root or substory region.
-On native targets, `gpui_tokio` is installed before the core runtime and hooks,
-so hooks can use `gpui_tokio::Tokio::spawn` or `gpui_tokio::Tokio::handle`.
+On native targets, the Storybook Tokio runtime is installed before the core
+runtime and hooks, so hooks can use `gpui_storybook::tokio_runtime::spawn` or
+`gpui_storybook::tokio_runtime::handle`.
 Matrix IDs encode each axis independently. Generated request IDs use a bounded
 digest for serialized controls while structured reports retain the complete
 typed values, and `output_dir` filenames preserve distinct case labels. Stories

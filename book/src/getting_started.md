@@ -14,7 +14,7 @@ You need:
 - compatible revisions of GPUI, GPUI Component, and the Fluent integration
   crates.
 
-GPUI Storybook version 0.5 targets Rust 1.98 and edition 2024.
+GPUI Storybook version 0.6 targets Rust 1.98 and edition 2024.
 
 ## Add the Storybook package dependencies
 

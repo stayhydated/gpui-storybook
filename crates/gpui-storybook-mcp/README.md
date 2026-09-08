@@ -34,7 +34,7 @@ native image renderer and does not require the Linux Sway launcher.
 
 ```toml
 [dependencies]
-gpui-storybook = { version = "0.5", features = ["mcp"] }
+gpui-storybook = { version = "0.6", features = ["mcp"] }
 ```
 
 The default MCP surface can list and open stories, read/set/reset the active
