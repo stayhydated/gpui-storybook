@@ -269,8 +269,9 @@ in verification, and expose `Update` only through a deliberate acceptance
 workflow. With the `performance` feature, require enough native GPUI profiler
 samples before enforcing draw or dirty-to-present p95 and maximum budgets.
 
-The current GPUI platform supplies Metal headless rendering on macOS and the
-Linux headless renderer on Linux and FreeBSD. Treat renderer, fonts, assets,
+The published GPUI platform supplies Metal headless rendering on macOS. Use
+this repository's `linux-headless-renderer` branch with the `stayhydated/zed`
+fork for Linux and FreeBSD headless capture. Treat renderer, fonts, assets,
 and CI hardware as part of the baseline or timing environment; keep
 platform-specific accepted output where rasterization differs.
 
