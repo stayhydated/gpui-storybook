@@ -9,9 +9,10 @@ baseline or capture-matrix jobs.
 The crate is intended for debug tools, CI runners, and integration tests. A
 fresh context is created for every capture, so story entities and story-local
 globals are isolated from adjacent cases. On native targets, the runner installs
-`gpui_tokio` before initializing the core runtime and invoking linked
-`#[story_init]` hooks, so hooks can use `gpui_tokio::Tokio::spawn` or
-`gpui_tokio::Tokio::handle` as they do under the facade. The `capture` feature
+its Tokio bridge before initializing the core runtime and invoking linked
+`#[story_init]` hooks. Hooks can use
+`gpui_storybook_test::tokio_bridge::Tokio::handle(cx)` to spawn work on that
+case's runtime. The `capture` feature
 is enabled by default. Enable `performance` to collect GPUI's window profiler
 histograms and enforce draw and dirty-to-present budgets:
 
