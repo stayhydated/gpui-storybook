@@ -46,7 +46,7 @@ unic-langid = { features = [ "serde" ], workspace = true }
 url = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-gtk = { version = "0.18" }
+gtk = { version = "0.19" }
 
 [target.'cfg(target_family = "wasm")'.dependencies]
 base64 = { workspace = true }

@@ -1,6 +1,8 @@
 use std::collections::HashSet;
 
-use fluent_langneg::{NegotiationStrategy, negotiate_languages};
+use fluent_langneg::{
+    LanguageIdentifier as NegotiationLanguageIdentifier, NegotiationStrategy, negotiate_languages,
+};
 use strum::IntoStaticStr;
 
 use crate::{
@@ -437,15 +439,45 @@ fn resolve_language(
         );
     }
 
+    let requested = detected
+        .candidates
+        .iter()
+        .filter_map(|language| {
+            language
+                .to_string()
+                .parse::<NegotiationLanguageIdentifier>()
+                .ok()
+        })
+        .collect::<Vec<_>>();
+    let available = supported
+        .available
+        .iter()
+        .filter_map(|language| {
+            language
+                .to_string()
+                .parse::<NegotiationLanguageIdentifier>()
+                .ok()
+                .map(|identifier| (identifier, language))
+        })
+        .collect::<Vec<_>>();
+    let available_identifiers = available
+        .iter()
+        .map(|(identifier, _)| identifier.clone())
+        .collect::<Vec<_>>();
     let negotiated = negotiate_languages(
-        &detected.candidates,
-        &supported.available,
+        &requested,
+        &available_identifiers,
         None,
         NegotiationStrategy::Lookup,
     );
-    if let Some(language) = negotiated.first() {
+    if let Some(language) = negotiated.first().and_then(|identifier| {
+        available
+            .iter()
+            .find(|(available, _)| available == *identifier)
+            .map(|(_, language)| *language)
+    }) {
         return LanguageResolution {
-            language: (*language).clone(),
+            language: language.clone(),
             source: LanguageSource::System,
         };
     }
