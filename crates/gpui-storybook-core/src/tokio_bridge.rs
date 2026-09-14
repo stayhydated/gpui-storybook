@@ -1,8 +1,17 @@
-//! Tokio runtime shared by the stories in one headless app context.
+//! Tokio runtime shared by one Storybook GPUI app context.
 
-use gpui_kit::{App, Global};
-use std::io;
+use gpui_kit::{App, AppContext, Global, Task};
+use std::{future::Future, io};
 use tokio::runtime::{Builder, Handle, Runtime};
+use tokio::task::JoinError;
+
+struct AbortOnDrop(tokio::task::AbortHandle);
+
+impl Drop for AbortOnDrop {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
+}
 
 struct GlobalTokio {
     runtime: Option<Runtime>,
@@ -43,10 +52,28 @@ pub fn init_from_handle(app: &mut App, handle: Handle) {
     });
 }
 
-/// Access to the Tokio runtime installed for a headless story app.
+/// Access to the Tokio runtime installed for a Storybook app.
 pub struct Tokio;
 
 impl Tokio {
+    /// Spawns work on Tokio and cancels it if the returned GPUI task is dropped.
+    pub fn spawn<C, F, R>(app: &C, future: F) -> Task<Result<R, JoinError>>
+    where
+        C: AppContext,
+        F: Future<Output = R> + Send + 'static,
+        R: Send + 'static,
+    {
+        app.read_global(|runtime: &GlobalTokio, app| {
+            let task = runtime.handle.spawn(future);
+            let cancel = AbortOnDrop(task.abort_handle());
+            app.background_spawn(async move {
+                let result = task.await;
+                drop(cancel);
+                result
+            })
+        })
+    }
+
     /// Returns the runtime handle for work started by a story init hook.
     pub fn handle(app: &App) -> Handle {
         app.global::<GlobalTokio>().handle.clone()

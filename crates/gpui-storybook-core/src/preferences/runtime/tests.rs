@@ -1,4 +1,5 @@
 use super::*;
+use crate::tokio_bridge as gpui_tokio;
 use es_fluent::{FluentMessage, FluentMessageLookup};
 use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::{AppContext as _, Entity, px};
@@ -651,7 +652,7 @@ fn window_mode_selection_updates_saved_state(cx: &mut App) {
 #[gpui_kit::test]
 async fn failed_reopen_can_retry_with_an_available_repository(cx: &mut gpui_kit::TestAppContext) {
     cx.executor().allow_parking();
-    cx.update(gpui_tokio::init);
+    cx.update(gpui_tokio::init).expect("Tokio runtime starts");
     let repository_task = cx.update(|cx| {
         gpui_tokio::Tokio::spawn(cx, async {
             PreferenceRepository::open(RepositoryOptions::disabled(
@@ -716,7 +717,7 @@ async fn startup_retry_reloads_existing_intent_without_overwriting_it(
     cx: &mut gpui_kit::TestAppContext,
 ) {
     cx.executor().allow_parking();
-    cx.update(gpui_tokio::init);
+    cx.update(gpui_tokio::init).expect("Tokio runtime starts");
     let consumer = gpui_storybook_preferences::ConsumerId::new("startup-retry-runtime-test")
         .expect("valid retry consumer");
     let repository_options = RepositoryOptions::disabled(consumer);
@@ -796,7 +797,7 @@ async fn reopen_merges_one_local_edit_over_every_loaded_preference(
     cx: &mut gpui_kit::TestAppContext,
 ) {
     cx.executor().allow_parking();
-    cx.update(gpui_tokio::init);
+    cx.update(gpui_tokio::init).expect("Tokio runtime starts");
     let directory = std::env::temp_dir().join(format!(
         "gpui-storybook-core-{}-{}",
         std::process::id(),
@@ -893,7 +894,7 @@ async fn reload_merges_in_flight_edits_over_loaded_untouched_fields(
     cx: &mut gpui_kit::TestAppContext,
 ) {
     cx.executor().allow_parking();
-    cx.update(gpui_tokio::init);
+    cx.update(gpui_tokio::init).expect("Tokio runtime starts");
     let baseline = non_default_preferences();
     let baseline_for_setup = baseline.clone();
     let repository_task = cx.update(|cx| {

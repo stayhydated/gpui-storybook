@@ -223,7 +223,7 @@ mod report;
 mod runner;
 mod support;
 #[cfg(not(target_family = "wasm"))]
-pub mod tokio_bridge;
+pub use gpui_storybook_core::tokio_bridge;
 
 pub use discovery::{
     PortableStoryMetadata, StoryDescriptor, discover_stories, discover_stories_checked,
