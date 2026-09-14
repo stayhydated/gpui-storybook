@@ -18,7 +18,7 @@ histograms and enforce draw and dirty-to-present budgets:
 
 ```toml
 [dev-dependencies]
-gpui-storybook-test = { version = "0.5", features = ["performance"] }
+gpui-storybook-test = { version = "0.6", features = ["performance"] }
 ```
 
 The smallest runner looks up a registered story and saves one PNG:
