@@ -42,7 +42,7 @@ es-fluent-manager-core = "0.19.0"
 es-fluent-manager-embedded = "0.19.0"
 fluent-langneg = "=0.14.2"
 frame-capture = "0.2.0"
-gpui-core = { branch = "linux-headless-renderer", git = "https://github.com/stayhydated/zed", package = "gpui-pre", version = "=0.3.3" }
+gpui-core = { package = "gpui-pre", version = "=0.3.5" }
 gpui-kit = "0.6.1"
 gpui-es-fluent = "0.2.0"
 gpui-storybook = { path = "crates/gpui-storybook", version = "0.6.0" }
@@ -54,14 +54,13 @@ gpui-storybook-mcp = { path = "crates/gpui-storybook-mcp", version = "0.6.0" }
 gpui-storybook-preferences = { path = "crates/gpui-storybook-preferences", version = "0.6.0" }
 gpui-storybook-test = { path = "crates/gpui-storybook-test", version = "0.6.0" }
 gpui-storybook-toml = { path = "crates/gpui-storybook-toml", version = "0.6.0" }
-gpui_platform = { branch = "linux-headless-renderer", features = [
+gpui_platform = { features = [
     "font-kit",
     "x11",
     "wayland",
     "runtime_shaders",
-], git = "https://github.com/stayhydated/zed", package = "gpui-pre-platform", version = "=0.3.3" }
-gpui_tokio = { branch = "linux-headless-renderer", git = "https://github.com/stayhydated/zed" }
-gpui_wgpu = { package = "gpui-pre-wgpu", features = [ "font-kit" ], version = "=0.3.3" }
+], package = "gpui-pre-platform", version = "=0.3.5" }
+gpui_wgpu = { package = "gpui-pre-wgpu", features = [ "font-kit" ], version = "=0.3.5" }
 heck = "0.5"
 image = { default-features = false, features = [ "png" ], version = "0.25" }
 insta = "1.48"
@@ -72,7 +71,7 @@ libc = "0.2"
 prettyplease = "0.3"
 proc-macro2 = "1.0"
 quote = "1.0"
-reqwest_client = { branch = "linux-headless-renderer", git = "https://github.com/stayhydated/zed" }
+reqwest_client = { package = "gpui-pre-reqwest-client", version = "=0.3.5" }
 rmcp = "3.3"
 rust-embed = "8.12"
 schemars = "1.2.2"
@@ -97,11 +96,6 @@ url = "2.5"
 wasm-bindgen = "0.2"
 web = { path = "web" }
 web-sys = { features = [ "Location", "Window" ], version = "0.3" }
-
-[patch.crates-io]
-gpui-pre = { branch = "linux-headless-renderer", git = "https://github.com/stayhydated/zed" }
-gpui-pre-platform = { branch = "linux-headless-renderer", git = "https://github.com/stayhydated/zed" }
-gpui-pre-web = { branch = "linux-headless-renderer", git = "https://github.com/stayhydated/zed" }
 
 [workspace.lints.rust]
 future_incompatible = "deny"

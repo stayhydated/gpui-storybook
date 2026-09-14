@@ -61,7 +61,8 @@ The callback also receives the live story entity for custom presentation setup.
 Use `RunnerConfig::asset_source` when stories load embedded fonts, icons, or
 images.
 
-The runner uses GPUI's current-platform headless renderer: Metal on macOS and
-the Linux headless renderer on Linux and FreeBSD. Other targets fail with the
-typed renderer-unavailable error. Keep renderer- and font-specific baselines
-when CI spans platforms whose raster output differs.
+The runner uses GPUI's current-platform headless renderer. The published
+`gpui-pre` 0.3.5 stack supports Metal capture on macOS. Use the repository's
+`linux-renderer` branch with the `stayhydated/zed` fork for Linux and FreeBSD
+headless capture. Keep renderer- and font-specific baselines when CI spans
+platforms whose raster output differs.
