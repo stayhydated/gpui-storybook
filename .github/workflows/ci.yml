@@ -22,7 +22,7 @@ jobs:
         uses: stayhydated/es-fluent/crates/es-fluent-cli@94efb551ede72c9e7da4bbdf97d5eecb5ea09982
         with:
           path: .
-          all: true
+          all_locales: true
 
   test:
     name: test (${{ matrix.os }})
