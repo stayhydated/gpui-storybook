@@ -59,12 +59,9 @@ gpui_platform = { branch = "linux-headless-renderer", features = [
     "x11",
     "wayland",
     "runtime_shaders",
-], git = "https://github.com/stayhydated/zed", package = "gpui-pre-platform" }
+], git = "https://github.com/stayhydated/zed", package = "gpui-pre-platform", version = "=0.3.3" }
 gpui_tokio = { branch = "linux-headless-renderer", git = "https://github.com/stayhydated/zed" }
-gpui_wgpu = { branch = "linux-headless-renderer", features = [
-  "font-kit",
-  "test-support",
-], git = "https://github.com/stayhydated/zed", version = "0.1.0" }
+gpui_wgpu = { package = "gpui-pre-wgpu", features = [ "font-kit" ], version = "=0.3.3" }
 heck = "0.5"
 image = { default-features = false, features = [ "png" ], version = "0.25" }
 insta = "1.48"

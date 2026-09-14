@@ -29,7 +29,7 @@ gpui_platform = { features = [
   "wayland",
   "x11",
 ], workspace = true }
-gpui_wgpu = { features = [ "font-kit", "test-support" ], workspace = true }
+gpui_wgpu = { features = [ "font-kit" ], workspace = true }
 image = { workspace = true }
 inventory = { workspace = true }
 serde = { features = [ "derive" ], workspace = true }
