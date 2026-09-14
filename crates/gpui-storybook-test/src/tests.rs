@@ -1,9 +1,46 @@
 use super::*;
+#[cfg(target_os = "linux")]
+use gpui_kit::AppContext as _;
 #[cfg(not(target_family = "wasm"))]
 use std::sync::atomic::{AtomicBool, Ordering};
 
 #[cfg(not(target_family = "wasm"))]
 static TOKIO_STORY_INIT_RAN: AtomicBool = AtomicBool::new(false);
+
+#[cfg(target_os = "linux")]
+struct RendererProbe;
+
+#[cfg(target_os = "linux")]
+impl gpui_kit::Render for RendererProbe {
+    fn render(
+        &mut self,
+        _window: &mut Window,
+        _cx: &mut gpui_kit::Context<Self>,
+    ) -> impl gpui_kit::IntoElement {
+        gpui_kit::div()
+    }
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn headless_renderer_captures_a_window() {
+    let text_system = Arc::new(gpui_wgpu::CosmicTextSystem::new("IBM Plex Sans"));
+    let mut context = HeadlessAppContext::with_platform(
+        text_system,
+        Arc::new(()),
+        gpui_platform::current_headless_renderer,
+    );
+    let window = context
+        .open_window(size(px(64.0), px(48.0)), |_, app| {
+            app.new(|_| RendererProbe)
+        })
+        .expect("headless window opens");
+    let image = context
+        .capture_screenshot(window.into())
+        .expect("headless window captures");
+    assert!(image.width() > 0);
+    assert!(image.height() > 0);
+}
 
 #[cfg(not(target_family = "wasm"))]
 fn tokio_story_init(app: &mut App) {
