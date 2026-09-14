@@ -343,9 +343,9 @@ dependencies = [
 
 [[package]]
 name = "async-compression"
-version = "0.4.46"
+version = "0.4.47"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4f10dafd0c8d2e51ae9a748805777613ed0bbe17bf586b76c8311f45c020a32f"
+checksum = "ef217a77a86a6e3dab9a5b3c81dc445b603fe743a90c1cb10a2f2144628d8cfa"
 dependencies = [
  "compression-codecs",
  "compression-core",
@@ -557,7 +557,8 @@ dependencies = [
 [[package]]
 name = "attribute-dsl"
 version = "0.2.0"
-source = "git+https://github.com/stayhydated/attribute-dsl?rev=503bebaa926e750005e80b03ee4a801052b79d47#503bebaa926e750005e80b03ee4a801052b79d47"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "118ba8d18025376ad3d22d745ee7a6edb0adce34f26cfdb7eb3b2dd429f36a5d"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1194,9 +1195,9 @@ checksum = "1d07550c9036bf2ae0c684c4297d503f838287c83c53686d05370d0e139ae570"
 
 [[package]]
 name = "compression-codecs"
-version = "0.4.41"
+version = "0.4.42"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "58a6d0db8759036a783bc7c3f7a07f8cef3bf9470eb1db3bc86e8bcd1c5d0fe8"
+checksum = "257c7085cbb71be72d8fb97edff08b03d86d5d9f2222b9cc34a6bec87093bc10"
 dependencies = [
  "bzip2",
  "compression-core",
@@ -1875,8 +1876,9 @@ dependencies = [
 
 [[package]]
 name = "es-fluent"
-version = "0.18.1"
-source = "git+https://github.com/stayhydated/es-fluent?rev=94efb551ede72c9e7da4bbdf97d5eecb5ea09982#94efb551ede72c9e7da4bbdf97d5eecb5ea09982"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fa834e517e697c8f3b238a2ef56c270e7342e14403bb412ac593f28ef8ac67ef"
 dependencies = [
  "es-fluent-derive",
  "es-fluent-manager-core",
@@ -1888,8 +1890,9 @@ dependencies = [
 
 [[package]]
 name = "es-fluent-build"
-version = "0.18.1"
-source = "git+https://github.com/stayhydated/es-fluent?rev=94efb551ede72c9e7da4bbdf97d5eecb5ea09982#94efb551ede72c9e7da4bbdf97d5eecb5ea09982"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea082ef4444522045bb7e4b35e5a22801b3344156d7b2328cfddc764d302e740"
 dependencies = [
  "es-fluent-shared",
  "es-fluent-toml",
@@ -1897,8 +1900,9 @@ dependencies = [
 
 [[package]]
 name = "es-fluent-derive"
-version = "0.18.1"
-source = "git+https://github.com/stayhydated/es-fluent?rev=94efb551ede72c9e7da4bbdf97d5eecb5ea09982#94efb551ede72c9e7da4bbdf97d5eecb5ea09982"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bf95bce64eb6e581591efb0e10f77557500f13fa21205f06804a892b466aff60"
 dependencies = [
  "darling",
  "es-fluent-derive-core",
@@ -1910,8 +1914,9 @@ dependencies = [
 
 [[package]]
 name = "es-fluent-derive-core"
-version = "0.18.1"
-source = "git+https://github.com/stayhydated/es-fluent?rev=94efb551ede72c9e7da4bbdf97d5eecb5ea09982#94efb551ede72c9e7da4bbdf97d5eecb5ea09982"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "980efec2cc0660d6acfbc13e79852314156e21e03bebdd2e76719d5e77f9451f"
 dependencies = [
  "bon",
  "darling",
@@ -1930,8 +1935,9 @@ dependencies = [
 
 [[package]]
 name = "es-fluent-manager-core"
-version = "0.18.1"
-source = "git+https://github.com/stayhydated/es-fluent?rev=94efb551ede72c9e7da4bbdf97d5eecb5ea09982#94efb551ede72c9e7da4bbdf97d5eecb5ea09982"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "70f3817851b0000be9551f462e191d98f51c15f73c33b8145c39bde76bc233d1"
 dependencies = [
  "es-fluent-shared",
  "fluent-bundle",
@@ -1949,8 +1955,9 @@ dependencies = [
 
 [[package]]
 name = "es-fluent-manager-embedded"
-version = "0.18.1"
-source = "git+https://github.com/stayhydated/es-fluent?rev=94efb551ede72c9e7da4bbdf97d5eecb5ea09982#94efb551ede72c9e7da4bbdf97d5eecb5ea09982"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d39430820179df9a79fa2563ab0ec4bd3eda32ac9a4ddf4118930c890d421294"
 dependencies = [
  "es-fluent",
  "es-fluent-manager-core",
@@ -1962,8 +1969,9 @@ dependencies = [
 
 [[package]]
 name = "es-fluent-manager-macros"
-version = "0.18.1"
-source = "git+https://github.com/stayhydated/es-fluent?rev=94efb551ede72c9e7da4bbdf97d5eecb5ea09982#94efb551ede72c9e7da4bbdf97d5eecb5ea09982"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0011e776fb56ce7b3c8c234e0e0f4f9a08e3f0766c60be207251cce82f4b4119"
 dependencies = [
  "es-fluent-derive-core",
  "es-fluent-shared",
@@ -1978,8 +1986,9 @@ dependencies = [
 
 [[package]]
 name = "es-fluent-shared"
-version = "0.18.1"
-source = "git+https://github.com/stayhydated/es-fluent?rev=94efb551ede72c9e7da4bbdf97d5eecb5ea09982#94efb551ede72c9e7da4bbdf97d5eecb5ea09982"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "00e737b3b5e6efdc6b1530ee9c7a1072f9f62092b08be50713f10f9ab3c67876"
 dependencies = [
  "anyhow",
  "camino",
@@ -2001,8 +2010,9 @@ dependencies = [
 
 [[package]]
 name = "es-fluent-toml"
-version = "0.18.1"
-source = "git+https://github.com/stayhydated/es-fluent?rev=94efb551ede72c9e7da4bbdf97d5eecb5ea09982#94efb551ede72c9e7da4bbdf97d5eecb5ea09982"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aa83f4354f6ad2ba31106dede29e239e4c199a6e8dee5c2c4604373cf1fb71e2"
 dependencies = [
  "bon",
  "es-fluent-shared",
@@ -2923,8 +2933,9 @@ dependencies = [
 
 [[package]]
 name = "gpui-es-fluent"
-version = "0.1.0"
-source = "git+https://github.com/stayhydated/gpui-es-fluent?rev=fab092a1d04f71fae011ac589cd080d3c6c842c1#fab092a1d04f71fae011ac589cd080d3c6c842c1"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a5b876738a05571b96aafa96b3b62ccac92a41c8520c5212a6b984dc524eb45e"
 dependencies = [
  "es-fluent",
  "es-fluent-manager-embedded",
@@ -3033,9 +3044,9 @@ dependencies = [
 
 [[package]]
 name = "gpui-pre-collections"
-version = "0.3.4"
+version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e3c8b0623a1a129d503d16dc38f8e51f5dd82e1e381dd19ea86054b983859cfc"
+checksum = "626a09f683ff6f3b2f708341bdcea9d479af5b14a6a2fccec9cff935ec0751b7"
 dependencies = [
  "gpui-pre-util",
  "indexmap",
@@ -3044,9 +3055,9 @@ dependencies = [
 
 [[package]]
 name = "gpui-pre-macros"
-version = "0.3.4"
+version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e29384b3145f0143a17187b35339779398fe4c1d4534320d6a05594248a49965"
+checksum = "5be2db7b5097b4d523b2bce933604bcc5acdaf679bb9a150e8299e6c07efc29c"
 dependencies = [
  "heck 0.5.0",
  "proc-macro-crate",
@@ -3121,9 +3132,9 @@ dependencies = [
 
 [[package]]
 name = "gpui-pre-sum-tree"
-version = "0.3.4"
+version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3c48ce7d9baabc52be67165433a11874b5286125d8e19edf1a8415f5735f478"
+checksum = "4855718e82630d29198b515d2b027361ef63dd19b6021cefe945789dcff82372"
 dependencies = [
  "gpui-pre-ztracing",
  "heapless",
@@ -3134,9 +3145,9 @@ dependencies = [
 
 [[package]]
 name = "gpui-pre-util"
-version = "0.3.4"
+version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bd91e2d2ac036e4bd496543cc4ae9b5108430a43a65bdaeecb79ef9e2e43e80b"
+checksum = "e973148165346c0f9b3f5072b321d7c2f33807c93daea67fe298c005c0e0c2a8"
 dependencies = [
  "anyhow",
  "log",
@@ -3169,9 +3180,9 @@ dependencies = [
 
 [[package]]
 name = "gpui-pre-zlog"
-version = "0.3.4"
+version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "24609786bd3dd9291b440a97ad700003827bbf55b69223038253ea0b401b3c36"
+checksum = "98352858fac3d4d05b46d6014ad04bad313652a691d4e21dc55fa96fb4acb7cf"
 dependencies = [
  "anyhow",
  "chrono",
@@ -3181,9 +3192,9 @@ dependencies = [
 
 [[package]]
 name = "gpui-pre-ztracing"
-version = "0.3.4"
+version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b59bfae633cc76bd10488b931308f04e3b916b211d3cb76b0e401eca7cf4ea5"
+checksum = "5d63a3c7276875b4d7e6d3961e92a138e9233e86a591bf318f2e54df4ad58102"
 dependencies = [
  "gpui-pre-zlog",
  "gpui-pre-ztracing-macro",
@@ -3193,9 +3204,9 @@ dependencies = [
 
 [[package]]
 name = "gpui-pre-ztracing-macro"
-version = "0.3.4"
+version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "70a09e0bf58aede45b8e7eed6e8d5d6552381c431014d62b349b0133008737bd"
+checksum = "84e2a5ff79002223edfcfa76c6f9f79f4f60f6ec545ccc27832f12bd46348b39"
 
 [[package]]
 name = "gpui-storybook"
@@ -4334,8 +4345,9 @@ checksum = "e2db585e1d738fc771bf08a151420d3ed193d9d895a36df7f6f8a9456b911ddc"
 
 [[package]]
 name = "koruma"
-version = "0.11.0"
-source = "git+https://github.com/stayhydated/koruma?rev=b462d649a26289ad98ca6959ac4cea37739ed8d3#b462d649a26289ad98ca6959ac4cea37739ed8d3"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f028ff8fd349ae8e15454de2e6cd67abe535df03ab29047a394072b771ac9642"
 dependencies = [
  "koruma-core",
  "koruma-derive",
@@ -4343,13 +4355,15 @@ dependencies = [
 
 [[package]]
 name = "koruma-core"
-version = "0.11.0"
-source = "git+https://github.com/stayhydated/koruma?rev=b462d649a26289ad98ca6959ac4cea37739ed8d3#b462d649a26289ad98ca6959ac4cea37739ed8d3"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ab59524f67339dde4265cfcb38fe34571708aea0098712f48dcdbcabfb4824d"
 
 [[package]]
 name = "koruma-derive"
-version = "0.11.0"
-source = "git+https://github.com/stayhydated/koruma?rev=b462d649a26289ad98ca6959ac4cea37739ed8d3#b462d649a26289ad98ca6959ac4cea37739ed8d3"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe81be49b49ccdd4969e502450ea5b35340571a00ca8e2ceaf87018920e6f08b"
 dependencies = [
  "heck 0.5.0",
  "koruma-derive-core",
@@ -4361,8 +4375,9 @@ dependencies = [
 
 [[package]]
 name = "koruma-derive-core"
-version = "0.11.0"
-source = "git+https://github.com/stayhydated/koruma?rev=b462d649a26289ad98ca6959ac4cea37739ed8d3#b462d649a26289ad98ca6959ac4cea37739ed8d3"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4abbbbd1696a155f08e9adba60499fdaef0dcaede6a8dc58d6f1c96e86b90ddb"
 dependencies = [
  "attribute-dsl",
  "heck 0.5.0",
@@ -6053,9 +6068,9 @@ dependencies = [
 
 [[package]]
 name = "quinn"
-version = "0.11.11"
+version = "0.11.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c1a41e437b6bbd489372cd4971de128e85c855f56c57f283d20ff016cf7c0a8"
+checksum = "4051e23e9185c255a7e33ef59cdbca87a22d359052eecd22fc6b901fb37d9d11"
 dependencies = [
  "bytes",
  "cfg_aliases",
@@ -6073,9 +6088,9 @@ dependencies = [
 
 [[package]]
 name = "quinn-proto"
-version = "0.11.17"
+version = "0.11.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "04759210543be93709136e28212294a659ef5001836ff4eab4d663e4529bba83"
+checksum = "a9746dbde176634f4f2f1faf2404e30a31b2bc1e9cafb5329c95d8177a18c9fc"
 dependencies = [
  "bytes",
  "getrandom 0.4.3",
@@ -6640,9 +6655,9 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.23.44"
+version = "0.23.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6725596c3f2c3a0aef021139e145d4eafe314a6623e4680ca83852b2c67ab2ba"
+checksum = "0d41d731c7d2f962d1ccc364cec258de3c0e93b38c2fb3ba97ac74513048d634"
 dependencies = [
  "once_cell",
  "ring",

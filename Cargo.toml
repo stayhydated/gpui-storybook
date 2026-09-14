@@ -35,16 +35,16 @@ component-shape-mcp = "0.3.0"
 darling = "0.24"
 derive_more = "2.1"
 dioxus = { default-features = false, version = "0.7" }
-es-fluent = { git = "https://github.com/stayhydated/es-fluent", rev = "94efb551ede72c9e7da4bbdf97d5eecb5ea09982", version = "0.18.1" }
-es-fluent-build = { git = "https://github.com/stayhydated/es-fluent", rev = "94efb551ede72c9e7da4bbdf97d5eecb5ea09982", version = "0.18.1" }
-es-fluent-lang = { git = "https://github.com/stayhydated/es-fluent", rev = "94efb551ede72c9e7da4bbdf97d5eecb5ea09982", version = "0.18.1" }
-es-fluent-manager-core = { git = "https://github.com/stayhydated/es-fluent", rev = "94efb551ede72c9e7da4bbdf97d5eecb5ea09982", version = "0.18.1" }
-es-fluent-manager-embedded = { git = "https://github.com/stayhydated/es-fluent", rev = "94efb551ede72c9e7da4bbdf97d5eecb5ea09982", version = "0.18.1" }
+es-fluent = "0.19.0"
+es-fluent-build = "0.19.0"
+es-fluent-lang = "0.19.0"
+es-fluent-manager-core = "0.19.0"
+es-fluent-manager-embedded = "0.19.0"
 fluent-langneg = "=0.14.2"
-frame-capture = { git = "https://github.com/stayhydated/frame-capture", rev = "07c8834f3436dd46ea81ddc5554bbd917a5efe44", version = "0.1.0" }
+frame-capture = "0.2.0"
 gpui-core = { branch = "linux-headless-renderer", git = "https://github.com/stayhydated/zed", package = "gpui-pre", version = "=0.3.3" }
 gpui-kit = "0.6.1"
-gpui-es-fluent = { git = "https://github.com/stayhydated/gpui-es-fluent", rev = "fab092a1d04f71fae011ac589cd080d3c6c842c1", version = "0.1.0" }
+gpui-es-fluent = "0.2.0"
 gpui-storybook = { path = "crates/gpui-storybook", version = "0.6.0" }
 gpui-storybook-components = { path = "crates/gpui-storybook-components", version = "0.6.0" }
 gpui-storybook-core = { path = "crates/gpui-storybook-core", version = "0.6.0" }
@@ -67,7 +67,7 @@ image = { default-features = false, features = [ "png" ], version = "0.25" }
 insta = "1.48"
 inventory = "0.3"
 itertools = "0.15"
-koruma = { git = "https://github.com/stayhydated/koruma", rev = "b462d649a26289ad98ca6959ac4cea37739ed8d3", version = "0.11.0" }
+koruma = "0.12.0"
 libc = "0.2"
 prettyplease = "0.3"
 proc-macro2 = "1.0"
