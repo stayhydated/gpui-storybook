@@ -9,15 +9,16 @@ baseline or capture-matrix jobs.
 The crate is intended for debug tools, CI runners, and integration tests. A
 fresh context is created for every capture, so story entities and story-local
 globals are isolated from adjacent cases. On native targets, the runner installs
-`gpui_tokio` before initializing the core runtime and invoking linked
-`#[story_init]` hooks, so hooks can use `gpui_tokio::Tokio::spawn` or
-`gpui_tokio::Tokio::handle` as they do under the facade. The `capture` feature
+its Tokio bridge before initializing the core runtime and invoking linked
+`#[story_init]` hooks. Hooks can use
+`gpui_storybook_test::tokio_bridge::Tokio::handle(cx)` to spawn work on that
+case's runtime. The `capture` feature
 is enabled by default. Enable `performance` to collect GPUI's window profiler
 histograms and enforce draw and dirty-to-present budgets:
 
 ```toml
 [dev-dependencies]
-gpui-storybook-test = { version = "0.5", features = ["performance"] }
+gpui-storybook-test = { version = "0.6", features = ["performance"] }
 ```
 
 The smallest runner looks up a registered story and saves one PNG:
@@ -60,7 +61,8 @@ The callback also receives the live story entity for custom presentation setup.
 Use `RunnerConfig::asset_source` when stories load embedded fonts, icons, or
 images.
 
-The runner uses GPUI's current-platform headless renderer: Metal on macOS and
-the Linux headless renderer on Linux and FreeBSD. Other targets fail with the
-typed renderer-unavailable error. Keep renderer- and font-specific baselines
-when CI spans platforms whose raster output differs.
+The runner uses GPUI's current-platform headless renderer. The published
+`gpui-pre` 0.3.5 stack supports Metal capture on macOS. Use the repository's
+`linux-headless-renderer` branch with the `stayhydated/zed` fork for Linux and FreeBSD
+headless capture. Keep renderer- and font-specific baselines when CI spans
+platforms whose raster output differs.

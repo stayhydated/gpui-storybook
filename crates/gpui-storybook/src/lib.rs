@@ -122,6 +122,8 @@ pub use gpui_storybook_core::registry::{
 };
 #[cfg(feature = "inspector")]
 pub use gpui_storybook_core::story_inspector::StoryInspectorState;
+#[cfg(not(target_family = "wasm"))]
+pub use gpui_storybook_core::tokio_bridge;
 pub use gpui_storybook_core::{
     assets::Assets,
     automation::{

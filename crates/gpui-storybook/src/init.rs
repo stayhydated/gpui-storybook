@@ -39,7 +39,7 @@ where
 
 /// Initializes Storybook and starts loading one consumer's local preferences.
 ///
-/// The facade installs the GPUI Tokio runtime, component and Storybook state,
+/// The facade installs the Storybook Tokio runtime, component and Storybook state,
 /// localization, story registrations, the live scenario controller, and
 /// optional external automation hooks. Await the returned task before opening
 /// the first window so saved theme and language intent is applied before the
@@ -159,7 +159,12 @@ where
         .transpose()?;
 
     #[cfg(not(target_family = "wasm"))]
-    gpui_tokio::init(cx);
+    gpui_storybook_core::tokio_bridge::init(cx).map_err(|error| {
+        tracing::error!(error = %error, "failed to initialize Storybook Tokio runtime");
+        StorybookInitError::CoreInitialization {
+            category: "tokio_runtime".to_owned(),
+        }
+    })?;
     gpui_storybook_core::story::init(cx).map_err(|error| {
         tracing::error!(error = %error, error_debug = ?error, "failed to initialize Storybook localization");
         StorybookInitError::CoreInitialization {

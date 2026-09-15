@@ -29,7 +29,7 @@ gpui_platform = { features = [
   "wayland",
   "x11",
 ], workspace = true }
-gpui_wgpu = { features = [ "font-kit", "test-support" ], workspace = true }
+gpui_wgpu = { features = [ "font-kit" ], workspace = true }
 image = { workspace = true }
 inventory = { workspace = true }
 serde = { features = [ "derive" ], workspace = true }
@@ -38,7 +38,7 @@ sha2 = { workspace = true }
 thiserror = { workspace = true }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
-gpui_tokio = { workspace = true }
+tokio = { features = [ "full" ], workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
