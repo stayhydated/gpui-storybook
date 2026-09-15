@@ -1,8 +1,5 @@
 # Story authoring
 
-Read this reference when adding registrations, metadata, sections, substories,
-or one-time setup.
-
 ## Choose a registration
 
 Use `#[gpui_storybook::story(...)]` when the preview owns GPUI state, a focus
@@ -51,9 +48,10 @@ interaction focus belongs to a nested input or another child component. The
 workbench queries and dispatches only through the explicit root scope; a story
 without one exposes no inferred actions.
 
-Use `examples/story/src/stories/actions_scenarios_story.rs` as the complete
-reference for Buttons, contextual key bindings, Actions-tab dispatch, and
-story-owned scenarios sharing one GPUI command model.
+The upstream
+[`ActionsAndScenariosStory`](https://github.com/stayhydated/gpui-storybook/blob/master/examples/story/src/stories/actions_scenarios_story.rs)
+shows Buttons, contextual key bindings, Actions-tab dispatch, and scenarios
+sharing one GPUI command model.
 
 ## Add live controls
 

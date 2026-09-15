@@ -1,5 +1,10 @@
 # Explicit story example
 
+[![CI](https://github.com/stayhydated/gpui-storybook/actions/workflows/ci.yml/badge.svg)](https://github.com/stayhydated/gpui-storybook/actions/workflows/ci.yml)
+[![Codecov](https://codecov.io/github/stayhydated/gpui-storybook/graph/badge.svg)](https://codecov.io/github/stayhydated/gpui-storybook)
+[![Book](https://img.shields.io/badge/book-online-blue)](https://stayhydated.github.io/gpui-storybook/book/)
+[![crates.io](https://img.shields.io/crates/v/gpui-storybook.svg)](https://crates.io/crates/gpui-storybook)
+
 This package demonstrates the `#[story]` workflow for previews that own GPUI
 state, focus, actions, or custom wrapper UI.
 
@@ -48,11 +53,7 @@ editing actions do not leak into the Actions tab.
 navigation entry. Choose them from the workbench's **Variant** select; the
 gallery displays one at a time, and dock mode opens each choice in its own tab.
 Controls are opt-in; fields without `#[storybook(control...)]` remain story-only
-state. See [Write stories](../../book/src/stories.md) for the registration
-contract and [Use the workbench](../../book/src/workbench.md) for controls,
-theme editing, action/keymap diagnostics, performance telemetry, and optional
-inspection, and [Automation and
-capture](../../book/src/automation.md) for MCP usage.
+state.
 
 Export the linked static registration catalog without starting GPUI:
 
@@ -85,8 +86,7 @@ GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1 \
 cargo run -p gpui-storybook-example-story --features mcp
 ```
 
-Install `gpui-storybook-launch` and place it before the Cargo command as
-documented in the automation guide. The application remains on GPUI's normal
+On Linux, place `gpui-storybook-launch --` before the Cargo command. The application remains on GPUI's normal
 Wayland backend and receives compositor-driven frame callbacks. On macOS, use
 the Cargo command directly; GPUI's native image renderer supplies capture. The
 `mcp` feature is unsupported on Windows.

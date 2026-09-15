@@ -1,5 +1,10 @@
 # gpui-storybook-test
 
+[![CI](https://github.com/stayhydated/gpui-storybook/actions/workflows/ci.yml/badge.svg)](https://github.com/stayhydated/gpui-storybook/actions/workflows/ci.yml)
+[![Codecov](https://codecov.io/github/stayhydated/gpui-storybook/graph/badge.svg)](https://codecov.io/github/stayhydated/gpui-storybook)
+[![Book](https://img.shields.io/badge/book-online-blue)](https://stayhydated.github.io/gpui-storybook/book/)
+[![crates.io](https://img.shields.io/crates/v/gpui-storybook-test.svg)](https://crates.io/crates/gpui-storybook-test)
+
 `gpui-storybook-test` is the headless developer-tooling crate for GPUI
 Storybook. It discovers `inventory` story registrations, creates a fresh
 `gpui_kit::HeadlessAppContext` for each portable story, applies typed controls,
@@ -12,27 +17,28 @@ globals are isolated from adjacent cases. On native targets, the runner installs
 its Tokio bridge before initializing the core runtime and invoking linked
 `#[story_init]` hooks. Hooks can use
 `gpui_storybook_test::tokio_bridge::Tokio::handle(cx)` to spawn work on that
-case's runtime. The `capture` feature
-is enabled by default. Enable `performance` to collect GPUI's window profiler
-histograms and enforce draw and dirty-to-present budgets:
+case's runtime. The `capture` feature is enabled by default. Enable
+`performance` to collect GPUI window profiler histograms and enforce draw and
+dirty-to-present budgets.
 
-```toml
-[dev-dependencies]
-gpui-storybook-test = { version = "0.6", features = ["performance"] }
-```
+## Capture a story
 
 The smallest runner looks up a registered story and saves one PNG:
 
-```rust,no_run
-use gpui_storybook_test::{CaptureRequest, HeadlessStoryRunner};
+```rust
+use gpui_storybook_test::{CaptureRequest, HeadlessStoryRunner, StorybookTestError};
 
-let runner = HeadlessStoryRunner::default();
-let mut request = CaptureRequest::new("my-stories-ButtonStory");
-request.output_path = Some("target/storybook/button.png".into());
-let report = runner.capture(request)?;
-println!("captured {}", report.output_path.unwrap().display());
-# Ok::<(), gpui_storybook_test::StorybookTestError>(())
+fn main() -> Result<(), StorybookTestError> {
+    let runner = HeadlessStoryRunner::default();
+    let mut request = CaptureRequest::new("my-stories-ButtonStory");
+    request.output_path = Some("target/storybook/button.png".into());
+    let report = runner.capture(request)?;
+    println!("captured {}", report.output_path.unwrap().display());
+    Ok(())
+}
 ```
+
+## Matrices and baselines
 
 `BaselineStore` keeps comparison and update operations explicit: use
 `BaselinePolicy::Check` in verification jobs and `BaselinePolicy::Update` only
@@ -51,6 +57,8 @@ verification when an application needs a custom route surface. Stories without
 a typed control target produce an empty control snapshot. Supplying a non-empty
 control map to such a story remains a typed `ControlsUnavailable` failure.
 
+## Application configuration
+
 Built-in `light`, `dark`, `Default Light`, and `Default Dark` theme names use
 GPUI Component's `Theme::change` automatically. Other theme and language
 adapters are application-owned: install a `RunnerConfig::case_configurator`
@@ -60,6 +68,8 @@ names a theme or language requiring an adapter without that callback fails as
 The callback also receives the live story entity for custom presentation setup.
 Use `RunnerConfig::asset_source` when stories load embedded fonts, icons, or
 images.
+
+## Platform support
 
 The runner uses GPUI's current-platform headless renderer. The published
 `gpui-pre` 0.3.5 stack supports Metal capture on macOS. Use the repository's

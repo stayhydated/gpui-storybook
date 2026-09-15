@@ -1,5 +1,10 @@
 # Component story example
 
+[![CI](https://github.com/stayhydated/gpui-storybook/actions/workflows/ci.yml/badge.svg)](https://github.com/stayhydated/gpui-storybook/actions/workflows/ci.yml)
+[![Codecov](https://codecov.io/github/stayhydated/gpui-storybook/graph/badge.svg)](https://codecov.io/github/stayhydated/gpui-storybook)
+[![Book](https://img.shields.io/badge/book-online-blue)](https://stayhydated.github.io/gpui-storybook/book/)
+[![crates.io](https://img.shields.io/crates/v/gpui-storybook.svg)](https://crates.io/crates/gpui-storybook)
+
 This package demonstrates `#[derive(ComponentStory)]` for components that can
 render from example data while Storybook supplies the focusable wrapper.
 
@@ -33,11 +38,6 @@ live values on each render while leaving unmarked component fields out of the
 control registry. Component stories that declare the same visible title, group,
 and section share one navigation entry; the workbench **Variant** select chooses
 the concrete wrapper, and dock mode keeps each selected wrapper in its own tab.
-See [Write stories](../../book/src/stories.md) for
-the derive contract, [Use the workbench](../../book/src/workbench.md) for live
-editing, viewport settings, action/keymap diagnostics, and performance
-telemetry, and [Getting
-started](../../book/src/getting_started.md) for setup.
 
 `WelcomeCard` also passes `scenarios = WelcomeCard::scenarios()` to the derive.
 Its named scenario proves that component-generated wrappers use the same fresh
@@ -58,8 +58,7 @@ interaction surface.
 Named and paired capture dimensions target the selected component story region;
 the gallery or dock chrome remains mounted around that region. On Linux, run
 MCP and startup-capture sessions through `gpui-storybook-launch` and Sway's
-wlroots headless backend as described in the automation guide; the normal
-application remains Wayland-backed. On macOS, launch Cargo directly and use
+wlroots headless backend; the application remains Wayland-backed. On macOS, launch Cargo directly and use
 GPUI's native image renderer. Component stories can import
 `StorybookElementExt` and mark important children with `.storybook_target()`
 for stable MCP discovery and clicking, then attach Serde-serializable state

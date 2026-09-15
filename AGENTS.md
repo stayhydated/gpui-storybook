@@ -1,288 +1,88 @@
-# AGENTS.md
-
-This is the working guide for contributors and coding agents in the
-`gpui-storybook` workspace.
-
-Use it to decide:
-
-1. where to start,
-2. whether a crate or surface is user-facing, public integration, or internal,
-3. which docs, examples, skill guidance, tests, snapshots, and fixtures must
-   change together,
-4. which validation command should run before handoff.
-
-For most application-facing code and docs, start with `crates/gpui-storybook`.
-Use `book/src/SUMMARY.md` for user-guide routing and `web/src/lib.rs` for the
-public catalog.
-
-Reach for the example apps when you need to understand or demonstrate the two
-supported registration styles:
-
-- `examples/story` for explicit `#[story]` plus `Story` implementations.
-- `examples/component` for `#[derive(ComponentStory)]` on the component itself.
-
-`CLAUDE.md` delegates to this file. Keep it as a pointer unless that agent needs separate, repository-specific routing.
-
-## Quick Decision Flow
-
-Before editing, classify the change:
-
-1. **Find the surface in the workspace map.** Use its audience label to decide
-   how much public explanation the change needs.
-2. **Choose the right source of truth.** Public workflows belong in READMEs,
-   `book/src`, examples, and `skills/use-gpui-storybook`; API and internal
-   behavior belong in Rustdocs, source-local comments, tests, and snapshots.
-3. **Sync workflow changes.** If story registration, `storybook.toml`
-   semantics, dock behavior, MCP/capture behavior, macro expansion behavior,
-   locale wiring, or public usage guidance changes, update the relevant public
-   docs and skill guidance in the same change.
-4. **Validate narrowly.** Run the smallest command that proves the edited
-   behavior or documentation surface is still sound.
-
-## Audience Labels
-
-These labels describe the crate or surface itself, not the documentation file
-being edited:
-
-- **User-facing**: normal entry points for application developers adopting storybook in their app or component workspace.
-- **Public integration**: public crates meant for deeper customization, proc-macro usage, or runtime and config integration. These are usually not the default starting point.
-- **Internal**: implementation detail crates and workspace plumbing that most consumers should not depend on directly.
-
-## Documentation Placement
-
-Treat the root `README.md`, crate-level `README.md` files, `book/src`, example
-READMEs under `examples/`, and `skills/use-gpui-storybook/SKILL.md` as
-user-facing documentation.
-
-Even README files for public-integration or internal crates should explain:
-
-- who the crate is for,
-- what it does,
-- what most users should use instead when applicable.
-
-Keep user-facing documentation example-first. Prefer Rust or TOML snippets over
-prose-only explanations when showing behavior changes.
-
-Keep durable internal behavior close to the implementation: Rustdocs for public
-API contracts and crate responsibilities, source-local comments for non-obvious
-details, and tests, snapshots, or fixtures for executable behavior. Keep this
-`AGENTS.md` limited to repository-wide routing and synchronization rules.
-
-Keep maintainer-only details out of `skills/use-gpui-storybook`; that skill is
-public application-developer guidance.
-
-## Synchronization Rules
-
-When a substantive change modifies a public workflow, story registration
-behavior, `storybook.toml` semantics, dock behavior, MCP/capture behavior,
-locale wiring, macro expansion behavior, or other user-visible runtime behavior:
-
-1. Update the root `README.md`.
-2. Update `crates/gpui-storybook/README.md` for top-level usage guidance.
-3. Update affected public-integration crate READMEs when their direct API or
-   contract changed.
-4. Update the matching example README when the change affects one registration style.
-5. Update `skills/use-gpui-storybook/SKILL.md` when public usage guidance changes.
-6. Update matching `book/src` chapters and the catalog copy in `web/src/lib.rs`
-   when they describe the changed workflow.
-7. Update Rustdocs for changed public APIs, macro contracts, crate responsibilities, or internal behavior formerly described only in prose docs.
-8. Update tests, `insta` snapshots, example code, or fixture crates when they
-   are the executable source of truth.
-
-Keep the root `README.md` and `crates/gpui-storybook/README.md` aligned for
-top-level usage guidance.
-
-Keep `examples/story/README.md` aligned with explicit `#[story]` workflow
-changes.
-
-Keep `examples/component/README.md` aligned with `#[derive(ComponentStory)]`
-workflow changes.
-
-Keep `crates/gpui-storybook-toml/README.md`, both example `storybook.toml`
-files, root `README.md`, `crates/gpui-storybook/README.md`, and the skill
-aligned when `group`, `allow`, `disable_story`, or runtime config resolution
-behavior changes.
-
-Keep `crates/gpui-storybook-macros/README.md`, macro Rustdocs, macro tests, and
-snapshots aligned when `#[story]`, `#[derive(ComponentStory)]`,
-`#[derive(Substory)]`, `#[storybook(...)]`, or `#[story_init]` expansion
-behavior changes.
-
-Keep `crates/gpui-storybook-mcp/README.md`, root `README.md`,
-`crates/gpui-storybook/README.md`, examples, core automation/capture Rustdocs,
-and the skill aligned when MCP tools, capture environment variables, route keys,
-or screenshot behavior changes.
-
-Keep `crates/gpui-storybook-test/README.md`, root `README.md`, the test and
-automation book chapters, examples, and the skill aligned when portable-story
-setup, visual baselines, capture matrices, or performance budgets change.
-
-Keep `crates/gpui-storybook-core/i18n.toml`, `examples/*/i18n.toml`,
-`examples/*/i18n/*/*.ftl`, Rust locale code, examples, and docs aligned when
-locale setup or message keys change.
-
-Build `web/public/book`, `web/public/llms*`, `web/public/gpui-demo`, and
-`web/dist` through `cargo xtask`; edit `book/src`, `web/src`, and
-`examples/story` as their sources.
-
-## Workspace Map
-
-### Main User-Facing Entry Points
-
-- `crates/gpui-storybook`
-  Audience: **User-facing**
-  Docs: [README](crates/gpui-storybook/README.md), crate Rustdocs
-  Role: workspace facade, default entry point, and public home for `init`, `generate_stories`, window helpers, story discovery and filtering, and optional macro re-exports.
-
-- `examples/story`
-  Audience: **User-facing**
-  Docs: [README](examples/story/README.md)
-  Role: executable example of the explicit `#[story]` plus `Story` trait workflow.
-
-- `examples/component`
-  Audience: **User-facing**
-  Docs: [README](examples/component/README.md)
-  Role: executable example of component-attached registration with `#[derive(ComponentStory)]`.
-
-- `skills/use-gpui-storybook`
-  Audience: **User-facing**
-  Docs: [SKILL.md](skills/use-gpui-storybook/SKILL.md)
-  Role: public application-developer guidance for setup, story registration, `storybook.toml`, gallery or dock mode, locale wiring, and MCP automation/capture.
-
-### Public Integration Crates
-
-- `crates/gpui-storybook-core`
-  Audience: **Public integration**
-  Docs: [README](crates/gpui-storybook-core/README.md), crate Rustdocs
-  Role: UI runtime for gallery, dock workspace, story containers, title bar, themes, locale wiring, assets, and window shell behavior. Most applications should start with `gpui-storybook` instead.
-
-- `crates/gpui-storybook-macros`
-  Audience: **Public integration**
-  Docs: [README](crates/gpui-storybook-macros/README.md), macro Rustdocs, `insta` snapshots
-  Role: proc macros for `#[story]`, `#[derive(ComponentStory)]`,
-  `#[derive(Substory)]`, and `#[story_init]`. Most users should depend on the
-  facade crate instead of this crate directly.
-
-- `crates/gpui-storybook-toml`
-  Audience: **Public integration**
-  Docs: [README](crates/gpui-storybook-toml/README.md), crate Rustdocs, unit tests
-  Role: loader and schema boundary for crate-local `storybook.toml` discovery config. Most applications consume this indirectly through `gpui-storybook`.
-
-- `crates/gpui-storybook-mcp`
-  Audience: **Public integration**
-  Docs: [README](crates/gpui-storybook-mcp/README.md), crate Rustdocs
-  Role: Linux and macOS MCP tools, stdio serving, environment-driven capture
-  startup, and capture launch helpers exposed through the facade crate's `mcp`
-  feature; Windows is unsupported.
-
-- `crates/gpui-storybook-launch`
-  Audience: **Public integration**
-  Docs: [README](crates/gpui-storybook-launch/README.md), crate Rustdocs
-  Role: standalone Linux-only headless Sway lifecycle wrapper used by MCP and
-  startup-capture hosts; macOS and Windows are unsupported.
-
-- `crates/gpui-storybook-test`
-  Audience: **Public integration**
-  Docs: [README](crates/gpui-storybook-test/README.md), crate Rustdocs
-  Role: fresh-context portable story execution, headless PNG capture, visual
-  baselines, capture matrices, and opt-in GPUI performance budgets for tests
-  and CI. Applications use it as a development dependency.
-
-### Internal Crates
-
-- `crates/gpui-storybook-components`
-  Audience: **Internal**
-  Docs: [README](crates/gpui-storybook-components/README.md), crate Rustdocs
-  Role: shared dock-sidebar UI pieces such as `StorySidebarItem` and `StoryDrag` used by the runtime. This is primarily an implementation detail of `gpui-storybook-core`.
-
-- `crates/gpui-storybook-preferences`
-  Audience: **Internal**
-  Docs: [README](crates/gpui-storybook-preferences/README.md), crate Rustdocs
-  Role: typed consumer-scoped Storybook preference intent, atomic JSON documents, Rust-derived JSON Schema, project-local/temporary/disabled storage modes, invalid-file recovery, injected system detectors, and deterministic theme/language resolution. Application code uses the `gpui-storybook` facade.
-
-### Documentation, Demo, and Publishing
-
-- `book/src`
-  Audience: **User-facing**
-  Role: mdBook source for setup, story registration, configuration,
-  preferences, and automation.
-
-- `examples/story/examples/demo.rs`
-  Audience: **User-facing**
-  Role: native and nightly Trunk entry point for the full searchable Storybook
-  gallery from the `examples/story` package.
-
-- `web`
-  Audience: **User-facing**
-  Role: Dioxus catalog for the book, GPUI demo, API docs, and source.
-
-- `xtask`
-  Audience: **Internal**
-  Role: book, `llms.txt`, GPUI demo, and Pages-site build orchestration.
-
-## Validation and Editing Rules
-
-### Validation After Changes
-
-- `justfile` is the local command index; start with `just --list` when choosing
-  repository-wide validation.
-- Run the narrowest command that proves the edited behavior works for the
-  affected crate, docs, example, or storybook surface.
-- Use `just fmt`, `just check`, `just clippy`, `just test`, `just test-docs`,
-  `just cov`, or a more specific command when the change spans multiple surfaces.
-  `just check` and `just clippy` exclude both example packages; `just test`
-  matches CI's workspace test scope. `just cov` measures publishable crates and
-  excludes example applications and publication tooling.
-- Use `cargo xtask build book` and `cargo xtask build llms-txt` for book
-  changes, `cargo xtask build gpui-demo` for the nightly Wasm demo, and
-  `cargo xtask build web` for the catalog. `just web-build` assembles all
-  publication artifacts.
-- CI also runs an es-fluent FTL check, `cargo fmt --check`,
-  `cargo clippy --workspace --all-features`,
-  `cargo doc --workspace --all-features --no-deps --locked`,
-  `cargo package --workspace --list`, workspace coverage uploaded to Codecov,
-  the full all-feature workspace test suite on Rust stable Linux, the
-  all-feature workspace outside the Linux-only launcher crate on macOS, the
-  default-feature workspace outside the unsupported MCP and launcher crates on
-  Windows, and a cargo-machete action.
-- Use `cargo test -p gpui-storybook-preferences --locked` for focused changes
-  to typed preference values, JSON/schema repository behavior, invalid-file
-  recovery, system detectors, or theme/language resolution.
-- Use `cargo test -p gpui-storybook-test --all-features --locked` for focused
-  changes to portable story execution, visual comparison, capture matrices, or
-  performance budgets.
-- If validation cannot be run, state why and what remains unvalidated.
-- Do not claim a change works unless it was validated or the remaining risk is
-  explicitly documented.
-
-### When Editing Docs
-
-- Keep READMEs user-facing and task-oriented.
-- Keep internal implementation details in Rustdocs, source comments, tests, and snapshots.
-- Prefer example snippets over prose-only explanations.
-- Sync the root `README.md`, affected crate `README.md` files, example
-  `README.md` files, Rustdocs, and `skills/use-gpui-storybook` when the workflow changed.
-
-### When Editing Story Registration or Discovery
-
-- Keep `#[story]` and `#[derive(ComponentStory)]` flows consistent in docs unless the change is intentionally specific to one flow.
-- Update both example apps when a shared registration concept changes.
-- Keep `disable_story` semantics aligned with the registered story type names described in the macro and TOML docs.
-- Update root `README.md`, `crates/gpui-storybook/README.md`, macro docs, TOML
-  docs, tests, examples, and the skill when group filtering or runtime config
-  resolution behavior changes.
-
-### When Editing Runtime UI or Dock Behavior
-
-- Keep gallery and dock terminology consistent across docs.
-- Update `crates/gpui-storybook-core` Rustdocs when panel flow, grouping, persistence, or window setup changes.
-- Update `crates/gpui-storybook-components/README.md` and Rustdocs when shared dock-sidebar primitives change materially.
-
-### When Editing Tests and Fixtures
-
-- For proc-macro expansion changes, update the inline tests in
-  `crates/gpui-storybook-macros/src/lib.rs` and matching snapshots under
-  `crates/gpui-storybook-macros/src/snapshots/`.
-- For duplicate story-key diagnostics, keep
-  `crates/gpui-storybook/tests/duplicate_story_key.rs` aligned with the
-  `crates/gpui-storybook/tests/fixtures/duplicate-story-key` fixture crate.
+# Working in gpui-storybook
+
+Start with `crates/gpui-storybook` for application-facing changes and
+`just --list` for workspace commands. The executable examples show the two
+registration styles: `examples/story` uses `#[story]` with `Story`, while
+`examples/component` uses `#[derive(ComponentStory)]`.
+
+## Where changes belong
+
+| Surface | Audience and responsibility |
+|---|---|
+| `crates/gpui-storybook` | Application facade: initialization, discovery, filtering, and public re-exports |
+| `crates/gpui-storybook-core` | Runtime integration: gallery, dock, workbench, story containers, preferences UI, and automation |
+| `crates/gpui-storybook-macros` | Public macro syntax and generated registrations, controls, and substory keys |
+| `crates/gpui-storybook-toml` | Public configuration schema, loading, and filters |
+| `crates/gpui-storybook-mcp` | Linux/macOS MCP tools, stdio serving, and capture launch helpers |
+| `crates/gpui-storybook-launch` | Standalone Linux command that owns the headless Sway lifecycle |
+| `crates/gpui-storybook-test` | Public test integration: fresh story contexts, captures, matrices, baselines, and frame budgets |
+| `crates/gpui-storybook-components` | Internal sidebar and drag components used by the runtime |
+| `crates/gpui-storybook-preferences` | Internal typed persistence, system detection, and preference resolution |
+| `examples/story`, `examples/component` | Executable application examples and registration fixtures |
+| `book/src` | Application user guide; navigate through `SUMMARY.md` |
+| `skills/use-gpui-storybook` | Application integration guidance for coding agents |
+| `web/src/lib.rs` | Public catalog and site routes |
+| `xtask` | Book, LLM text, demo, and site build orchestration |
+
+Keep API contracts in Rustdocs and implementation details beside the source,
+tests, snapshots, or fixtures that establish them. The book and integration
+skill serve application developers.
+
+## Keep related surfaces aligned
+
+Update the public descriptions that cover changed behavior: root and facade
+READMEs, the affected crate README, matching book sections, examples, and the
+integration skill's relevant reference. Update `web/src/lib.rs` when its catalog
+copy describes that behavior.
+
+Keep READMEs focused on purpose, usage, and relevant constraints. Use CI,
+Codecov, book, and crates.io badges for their destinations; leave installation
+instructions and book or API navigation to those linked surfaces.
+
+- **Registration and controls:** keep macro Rustdocs,
+  `crates/gpui-storybook-macros/src/tests.rs`, and its `src/snapshots/` aligned.
+  Update both example styles when a shared registration concept changes.
+- **Duplicate keys:** keep
+  `crates/gpui-storybook/tests/duplicate_story_key.rs` aligned with
+  `crates/gpui-storybook/tests/fixtures/duplicate-story-key`.
+- **Configuration:** synchronize TOML field semantics and runtime selection with
+  both example `storybook.toml` files. `disable_story` matches registered type
+  names; display titles and route keys are separate identities.
+- **Runtime and dock behavior:** update the owning core Rustdocs and runtime
+  tests. Update the components README when shared sidebar primitives change.
+- **Automation and capture:** keep MCP schemas, core automation/capture
+  contracts, examples, and the automation skill reference aligned.
+- **Portable tests:** keep the test crate README, portable-testing and automation
+  book sections, examples, and automation skill reference aligned when capture
+  matrices, baseline policy, context setup, or frame budgets change.
+- **Localization:** keep Rust locale code, core and example `i18n.toml` files,
+  affected FTL catalogs, and locale setup instructions aligned when message keys
+  or locale wiring change.
+
+Build publication artifacts through `cargo xtask`: the sources are `book/src`,
+`web/src`, and `examples/story`. The generated book, LLM text, demo, and site
+outputs are not independent editing surfaces.
+
+## Validate the changed surface
+
+Choose the narrowest relevant check and report its result, including any
+unexecuted or failed checks.
+
+| Change | Validation |
+|---|---|
+| Markdown | `rumdl check` with the edited paths |
+| Book or LLM text | `cargo xtask build book` and `cargo xtask build llms-txt` |
+| Macro expansion | `cargo test -p gpui-storybook-macros --locked` |
+| Preference storage or resolution | `cargo test -p gpui-storybook-preferences --locked` |
+| Portable runner | `cargo test -p gpui-storybook-test --all-features --locked` |
+| Public Rust API docs | `cargo doc --workspace --all-features --no-deps --locked` on Linux |
+| GPUI demo | `cargo xtask build gpui-demo` |
+| Catalog | `cargo xtask build web` |
+
+`just fmt` formats Rust, TOML, and Markdown. `just check` and `just clippy`
+exclude the two example packages; `just test` includes them. `just web-build`
+assembles all publication artifacts.
+
+CI tests all features on Linux. On macOS it excludes the Linux-only launcher;
+on Windows it uses default features and excludes the launcher and MCP crate.
+Use the matching platform scope when reproducing those jobs.

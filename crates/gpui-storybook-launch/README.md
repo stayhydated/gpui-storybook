@@ -1,5 +1,10 @@
 # gpui-storybook-launch
 
+[![CI](https://github.com/stayhydated/gpui-storybook/actions/workflows/ci.yml/badge.svg)](https://github.com/stayhydated/gpui-storybook/actions/workflows/ci.yml)
+[![Codecov](https://codecov.io/github/stayhydated/gpui-storybook/graph/badge.svg)](https://codecov.io/github/stayhydated/gpui-storybook)
+[![Book](https://img.shields.io/badge/book-online-blue)](https://stayhydated.github.io/gpui-storybook/book/)
+[![crates.io](https://img.shields.io/crates/v/gpui-storybook-launch.svg)](https://crates.io/crates/gpui-storybook-launch)
+
 `gpui-storybook-launch` runs a command inside a private Sway session on Linux,
 using wlroots' headless backend and the Pixman software renderer. This supplies
 the compositor-driven frame callbacks required by GPUI Storybook MCP and
@@ -8,10 +13,9 @@ startup-capture sessions without touching the physical display.
 This crate and command support Linux only. macOS and Windows are unsupported
 and produce a compile-time error instead of bypassing the compositor lifecycle.
 
-Install the command once, then place Storybook environment variables before it:
+Place Storybook environment variables before the launcher command:
 
 ```sh
-cargo install gpui-storybook-launch
 GPUI_STORYBOOK_MCP_STDIO=1 \
 GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1 \
 gpui-storybook-launch -- cargo run -p my-storybook --features mcp

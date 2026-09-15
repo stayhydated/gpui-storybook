@@ -1,143 +1,79 @@
 # gpui-storybook
 
-`gpui-storybook` is the public facade for adding a searchable Storybook window
-to a GPUI application. It exposes initialization, the runtime-selectable gallery
-and dock window, story registration, typed controls, the live controls, theme,
-inspect, and actions workbench, typed preferences, localization support, and
-optional GPUI Inspector and Linux/macOS MCP integrations.
+[![CI](https://github.com/stayhydated/gpui-storybook/actions/workflows/ci.yml/badge.svg)](https://github.com/stayhydated/gpui-storybook/actions/workflows/ci.yml)
+[![Codecov](https://codecov.io/github/stayhydated/gpui-storybook/graph/badge.svg)](https://codecov.io/github/stayhydated/gpui-storybook)
+[![Book](https://img.shields.io/badge/book-online-blue)](https://stayhydated.github.io/gpui-storybook/book/)
+[![crates.io](https://img.shields.io/crates/v/gpui-storybook.svg)](https://crates.io/crates/gpui-storybook)
 
-Most applications should use this crate rather than the lower-level workspace
-crates.
+GPUI Storybook previews components in a searchable gallery or dock workspace.
+Register stateful stories or derive previews from components, then edit typed
+controls, inspect actions, and run repeatable scenarios without navigating the
+rest of your application.
 
-## Features
+## Register a preview
 
-| Feature | Default | Purpose |
-|---|---:|---|
-| `macros` | Yes | Re-export `#[story]`, `#[story_init]`, `StoryControls`, `ComponentStory`, and `Substory` |
-| `inspector` | No | Add the GPUI Inspector button, UI, and story-root metadata |
-| `mcp` | No | On Linux and macOS, add MCP tools, opt-in in-process interaction, and PNG capture support |
-| `performance` | No | Add GPUI window timing histograms and the debug frame overlay to the workbench |
-
-Initialization is asynchronous: call `gpui_storybook::init`, await the returned
-readiness task, and only then create the first story window.
-
-Create the window with `create_storybook_window` and `StorybookWindow::new`.
-The title-bar **Layout** select switches between Gallery and Dock workspace at
-runtime and saves `StorybookWindowMode` in the consumer preference document.
-Set top-level `window_mode = "gallery"` or `window_mode = "dock"` in the
-active `storybook.toml` when the binary needs a configured initial mode. Use
-`StorybookWindow::with_mode` for a per-window initial mode; it takes precedence
-over TOML, which takes precedence over the saved preference. The selector
-remains available and saves later user choices.
-
-Both the gallery and dock workspace include a right-side workbench. Derive
-`StoryControls` on explicit story structs, or mark fields on a
-`ComponentStory`, to get live field editors and reset behavior. Only fields
-marked with `#[storybook(control...)]` are registered:
+Use `#[story]` for a preview that owns GPUI state, focus, or action handlers.
+Use `ComponentStory` when an existing component can render from example data:
 
 ```rust
-#[derive(gpui_storybook::StoryControls)]
-struct ButtonStory {
+#[derive(gpui_kit::IntoElement, gpui_storybook::ComponentStory)]
+#[storybook(
+    title = "Welcome Card",
+    section = "Components",
+    example = WelcomeCard::example(),
+)]
+pub struct WelcomeCard {
     #[storybook(control)]
-    disabled: bool,
+    title: gpui_kit::SharedString,
+    #[storybook(control)]
+    highlighted: bool,
 }
 ```
 
-Duplicate visible titles within one group and section share a navigation entry.
-Use the workbench's **Variant** select to choose the concrete story. The gallery
-renders that member alone, and the dock workspace gives each selected member an
-independent tab.
+The component supplies `RenderOnce` and the `example()` constructor. Storybook
+creates its focusable wrapper and uses the example's values as control reset
+defaults. For explicit stories, implement `Story`, `Render`, and `Focusable`,
+then derive `StoryControls`. Only fields marked with `#[storybook(control)]`
+become live editors.
 
-Implement `Story::scenarios()` for explicit stories, or pass
-`scenarios = Component::scenarios()` to `ComponentStory`, to publish reusable
-named interaction flows. The Scenarios workbench tab and MCP list/run tools use
-the same executor. Every scenario recreates its concrete story before applying
-controls, presentation, steps, exact semantic postconditions, and optional
-capture. Normal `gpui_storybook::init` installs the live in-process runner, so
-**Run fresh** works in a standard `cargo run`; on Linux and macOS, the `mcp`
-feature adds remote tools and capture support to that same controller. The
-sticky Scenarios toolbar's **Reset** action recreates the story at its
-constructor defaults and clears the last run result without executing a
-scenario.
+Initialize through the `gpui-storybook` facade, await preference readiness, and
+open a window with `create_storybook_window` and `StorybookWindow::new`. Keep
+the crate containing registrations linked from the binary.
 
-`static_story_catalog()` and the JSON export helpers read linked registration
-metadata without constructing a story or opening GPUI. The deterministic output
-contains stable keys, section/source provenance, declaration Rustdocs, and
-static control kinds, labels, bounds, and options. Localized runtime copy and
-constructor-derived defaults remain in the live catalog.
+## Explore stories
 
-The preview canvas stays centered inside a visible frame. **Mobile**, **Tablet**,
-and **Desktop** use locked preset dimensions; **Responsive** exposes resize
-handles and starts from the dimensions of the fixed preset selected immediately
-before it. The canvas remains centered within the visible main pane as the
-sidebars change width or visibility; dedicated left and right panel icons sit in
-the top bar immediately before the appearance settings button. Responsive
-frames keep a small, symmetric resize gutter so every edge and corner handle
-remains reachable, including when the frame is larger than the visible pane.
+The title-bar **Layout** selector switches between **Gallery** and **Dock
+workspace** and saves the choice per binary. Stories with the same title, group,
+and section share a navigation entry; **Variant** selects a concrete preview.
+Dock mode keeps selected variants in separate tabs.
 
-The Theme tab edits every serialized theme color in memory. Native debug builds
-can watch a consumer theme directory by setting `STORYBOOK_THEME_DIR` before
-launch; Wasm supports in-app editing without filesystem watching. Choosing a
-named base theme also activates its registered light or dark appearance, while
-Storybook remembers the theme in the opposite slot for later appearance
-changes.
+The workbench provides:
 
-The Inspect tab always shows the selected story's key and source. With
-`inspector` enabled, it also opens GPUI Component's Inspector and publishes the
-selected story's key, title, source, and control keys to that Inspector.
+- **Controls** for live field values and reset behavior;
+- **Scenarios** for named interaction flows that start from a fresh story;
+- **Theme** for session color edits and import/export;
+- **Inspect** for the active story key and source location;
+- **Actions** for commands and key bindings on an explicit story action scope.
 
-The Actions tab follows the selected story's opt-in
-`Story::action_scope_focus_handle` and lists default-buildable actions,
-documentation, argument schemas, and effective key bindings on that explicit
-page/component root. Actions from nested inputs and the Storybook shell/root
-stay out of the list. Dispatch targets the same scope even while the workbench
-is focused; stories without a scope expose no inferred actions. The sticky
-Actions toolbar's **Reset** action recreates the active story before the next
-dispatch. With `performance` enabled, the Perf tab shows frame and input-latency
-percentiles and controls GPUI's debug frame overlay.
+Mobile, Tablet, and Desktop presets size the preview. Responsive mode provides
+resize handles. Appearance, language, and layout preferences are scoped to a
+stable `ConsumerId` for each Storybook binary.
 
-The explicit example's
-[`ActionsAndScenariosStory`](../../examples/story/src/stories/actions_scenarios_story.rs)
-shows Buttons, contextual shortcuts, the Actions tab, and scenarios dispatching
-the same GPUI commands.
+## Optional features
 
-The `mcp` feature supports Linux and macOS; enabling it on Windows produces a
-compile-time error. With `mcp` enabled, set both `GPUI_STORYBOOK_MCP_STDIO=1` and
-`GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1` to advertise generic focus, keyboard,
-registered-action, story-relative pointer, scroll, frame-wait, and atomic
-post-interaction capture tools. The interaction gate is separate because a
-story action can have arbitrary application effects. Typed controls remain the
-preferred reproducible input contract. Wrap important controls with
-`StorybookElementExt::storybook_target()` so their GPUI IDs become stable keys
-and MCP can list their live bounds and use `storybook_click_target` or a
-`click_target` step without screen coordinates. Wrap Serde-serializable rendered
-state with `StorybookElementExt::storybook_value(&state)` so
-`storybook_read_value` and `storybook_wait_for_value` can inspect application
-postconditions without a screenshot. Storybook derives a readable label from the ID; the
-`_as` variants accept explicit keys and labels for opaque elements or localized
-copy. MCP route, target, value, and control inputs use the explicit
-`story_key`, `target_key`, `value_key`, and `control_key` field names. Initial
-tool calls wait for the standard live host with a bounded startup deadline.
-Capture dimensions size
-the story region without replacing the surrounding gallery or dock layout. On
-Linux, install `gpui-storybook-launch`; `storybook_capture_launch_env` emits
-that Sway-backed command so the normal Wayland application can run without a
-physical display. On macOS, the tool emits a direct Cargo command and GPUI's
-native image renderer supplies capture. The returned PNG is cropped to the
-story region and excludes the mounted Storybook chrome. Closing MCP stdin
-terminates the GUI process and lets the Linux launcher stop its compositor.
+| Feature | Default | Purpose |
+|---|---:|---|
+| `macros` | Yes | Re-export story registration and control derives |
+| `inspector` | No | Open GPUI Inspector with story-root metadata |
+| `performance` | No | Show GPUI frame timing histograms and the debug overlay |
+| `mcp` | No | Expose Linux/macOS MCP tools, interaction, and PNG capture |
 
-See the [getting-started guide](../../book/src/getting_started.md), [story
-guide](../../book/src/stories.md), [workbench guide](../../book/src/workbench.md),
-the [automation guide](../../book/src/automation.md), and [API
-documentation](https://docs.rs/gpui-storybook/). Use the public-integration
-[`gpui-storybook-test`](../gpui-storybook-test/README.md) crate and the
-[portable-testing guide](../../book/src/portable_testing.md) for fresh headless
-stories, capture matrices, visual baselines, and frame budgets. Native portable
-contexts install Storybook's Tokio bridge before the core runtime and linked
-`#[story_init]` hooks, matching facade initialization. Stories without typed
-controls report an empty control snapshot; non-empty control maps still fail.
-Matrix IDs encode every axis independently, and generated request IDs use a
-bounded digest for control data while reports retain the complete typed values.
-A custom `RunnerConfig::route_capture` callback owns verification and cropping
-for application-defined substory surfaces.
+MCP clients can discover stable routes, set typed controls, inspect rendered
+values, and capture story regions. Generic interaction requires
+`GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1`; batches report partial failures and
+are never retried automatically. Linux sessions use the Sway-backed
+`gpui-storybook-launch` command. macOS sessions launch directly through Cargo.
+
+Use `gpui-storybook-test` for isolated story tests, capture matrices, explicit
+visual-baseline checks, and optional frame budgets. Each case constructs a fresh
+GPUI context; capture support depends on the platform renderer.

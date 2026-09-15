@@ -9,10 +9,9 @@ linked and enabled story plus the right-side workbench.
 You need:
 
 - an existing GPUI application or workspace;
-- a native application entry point built with `gpui_platform`;
+- a native application entry point built with `gpui_kit::application()`;
 - embedded Fluent resources and a typed language enum;
-- compatible revisions of GPUI, GPUI Component, and the Fluent integration
-  crates.
+- compatible versions of GPUI Kit and the Fluent integration crates.
 
 GPUI Storybook version 0.6 targets Rust 1.98 and edition 2024.
 
@@ -27,10 +26,9 @@ look like this:
 es-fluent.workspace = true
 es-fluent-lang.workspace = true
 es-fluent-manager-embedded.workspace = true
-gpui.workspace = true
+gpui-kit.workspace = true
 gpui-es-fluent.workspace = true
 gpui-storybook.workspace = true
-gpui_platform.workspace = true
 rust-embed.workspace = true
 strum.workspace = true
 tracing.workspace = true
@@ -41,7 +39,7 @@ es-fluent-build.workspace = true
 
 Use explicit versions or Git revisions instead when the application does not
 inherit workspace dependencies. Keep all GPUI-related crates on compatible
-revisions.
+versions.
 
 Forward the opt-in Inspector feature from the Storybook binary when that
 development surface is useful:

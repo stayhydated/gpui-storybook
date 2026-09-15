@@ -1,5 +1,10 @@
 # gpui-storybook-macros
 
+[![CI](https://github.com/stayhydated/gpui-storybook/actions/workflows/ci.yml/badge.svg)](https://github.com/stayhydated/gpui-storybook/actions/workflows/ci.yml)
+[![Codecov](https://codecov.io/github/stayhydated/gpui-storybook/graph/badge.svg)](https://codecov.io/github/stayhydated/gpui-storybook)
+[![Book](https://img.shields.io/badge/book-online-blue)](https://stayhydated.github.io/gpui-storybook/book/)
+[![crates.io](https://img.shields.io/crates/v/gpui-storybook-macros.svg)](https://crates.io/crates/gpui-storybook-macros)
+
 `gpui-storybook-macros` implements GPUI Storybook's registration macros:
 
 - `#[story]` registers a stateful story.
@@ -52,7 +57,3 @@ Both registration macros attach declaration Rustdocs and static marked-control
 metadata to the inventory entry. `gpui_storybook::static_story_catalog()` can
 export those keys, source locations, docs, editor kinds, bounds, and options
 without constructing the generated or explicit story.
-
-See [Write stories](../../book/src/stories.md) for supported patterns and
-[Use the workbench](../../book/src/workbench.md) for runtime behavior, and
-[docs.rs](https://docs.rs/gpui-storybook-macros/) for the macro API.

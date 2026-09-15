@@ -1,5 +1,10 @@
 # gpui-storybook-core
 
+[![CI](https://github.com/stayhydated/gpui-storybook/actions/workflows/ci.yml/badge.svg)](https://github.com/stayhydated/gpui-storybook/actions/workflows/ci.yml)
+[![Codecov](https://codecov.io/github/stayhydated/gpui-storybook/graph/badge.svg)](https://codecov.io/github/stayhydated/gpui-storybook)
+[![Book](https://img.shields.io/badge/book-online-blue)](https://stayhydated.github.io/gpui-storybook/book/)
+[![crates.io](https://img.shields.io/crates/v/gpui-storybook-core.svg)](https://crates.io/crates/gpui-storybook-core)
+
 `gpui-storybook-core` provides the gallery, dock workspace, story containers,
 the runtime layout selector, window-scoped controls/theme/inspect/actions
 workbench, optional GPUI Inspector integration, preview presentation state,
@@ -11,6 +16,8 @@ Application developers should normally depend on
 configuration discovery, story generation, and optional macro and MCP
 re-exports. Depend on this crate directly only when building a custom Storybook
 runtime integration.
+
+## Runtime shell
 
 The standard shell owns one automation command receiver while it swaps Gallery
 and Dock workspace views. Its title-bar **Layout** select saves a typed
@@ -47,6 +54,8 @@ Storybook shell, and unrelated component actions therefore stay outside the
 story catalog. Bindings and dispatch use that same action scope; a story without
 one exposes no inferred actions. The facade re-exports the application-facing
 parts.
+
+## Automation and scenarios
 
 `StoryScenario` keeps named steps, initial controls and presentation, exact
 semantic postconditions, and optional capture with its owning story. Scenario
@@ -85,14 +94,11 @@ On Linux, the MCP integration runs non-interactive automation through the
 application path. macOS uses GPUI's native image renderer. Windows does not
 support the MCP feature.
 
+## Theme editing
+
 In native debug builds, `STORYBOOK_THEME_DIR` selects the consumer-owned custom
 theme directory watched by the runtime. With no override, the runtime watches
 its bundled theme directory. Wasm retains in-memory editing without filesystem
 watching. Selecting a named base theme activates the theme's matching light or
 dark appearance immediately and preserves the opposite theme slot for later
 appearance changes.
-
-See the [automation guide](../../book/src/automation.md), [workbench
-guide](../../book/src/workbench.md), [user
-guide](../../book/src/introduction.md), and [API
-documentation](https://docs.rs/gpui-storybook-core/).
