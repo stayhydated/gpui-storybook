@@ -81,6 +81,8 @@ pub mod story_inspector;
 pub mod storybook_window_ui;
 pub mod theme_workbench;
 pub mod title_bar;
+#[cfg(not(target_family = "wasm"))]
+pub mod tokio_bridge;
 mod web_fonts;
 mod window_options;
 pub mod workbench;

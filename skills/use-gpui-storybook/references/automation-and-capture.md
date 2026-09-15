@@ -246,8 +246,9 @@ story-bearing crate linked so inventory discovery retains its registrations.
 Each request creates a fresh `HeadlessAppContext`, initializes the core runtime
 and linked `story_init` hooks, constructs one registered story, applies typed
 controls and presentation, and captures the rendered root or substory region.
-On native targets, `gpui_tokio` is installed before the core runtime and hooks,
-so hooks can use `gpui_tokio::Tokio::spawn` or `gpui_tokio::Tokio::handle`.
+On native targets, Storybook's Tokio bridge is installed before the core runtime
+and hooks. Hooks can use `gpui_storybook_test::tokio_bridge::Tokio::spawn` or
+`gpui_storybook_test::tokio_bridge::Tokio::handle`.
 Matrix IDs encode each axis independently. Generated request IDs use a bounded
 digest for serialized controls while structured reports retain the complete
 typed values, and `output_dir` filenames preserve distinct case labels. Stories
@@ -268,8 +269,9 @@ in verification, and expose `Update` only through a deliberate acceptance
 workflow. With the `performance` feature, require enough native GPUI profiler
 samples before enforcing draw or dirty-to-present p95 and maximum budgets.
 
-The current GPUI platform supplies Metal headless rendering on macOS and the
-Linux headless renderer on Linux and FreeBSD. Treat renderer, fonts, assets,
+The published GPUI platform supplies Metal headless rendering on macOS. Use
+this repository's `linux-headless-renderer` branch with the `stayhydated/zed`
+fork for Linux and FreeBSD headless capture. Treat renderer, fonts, assets,
 and CI hardware as part of the baseline or timing environment; keep
 platform-specific accepted output where rasterization differs.
 

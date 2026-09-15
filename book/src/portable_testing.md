@@ -10,7 +10,7 @@ GPUI profiler samples and budgets:
 
 ```toml
 [dev-dependencies]
-gpui-storybook-test = { version = "0.5", features = ["performance"] }
+gpui-storybook-test = { version = "0.6", features = ["performance"] }
 ```
 
 Keep the crate that contains the story registrations linked from the test
@@ -34,9 +34,9 @@ assert_eq!(report.story.key, "my-stories-ButtonStory");
 ```
 
 Every request gets a new app, window, story entity, and set of GPUI globals.
-On native targets, the fresh app installs `gpui_tokio` before the core runtime
-and linked `#[story_init]` hooks, so those hooks can call
-`gpui_tokio::Tokio::spawn` or `gpui_tokio::Tokio::handle`.
+On native targets, the fresh app installs its Tokio bridge before the core
+runtime and linked `#[story_init]` hooks. Those hooks can use
+`gpui_storybook_test::tokio_bridge::Tokio::handle` to spawn async work.
 Use `runner.open(request)` when a test needs to update the live app, set a
 control, advance the test clock, or inspect a runtime story snapshot before
 capturing. A story without a typed control target reports an empty control
@@ -122,9 +122,9 @@ comparing either pixels or frame timing.
 
 ## Platform expectations
 
-The runner asks `gpui_platform` for the current headless renderer. The current
-GPUI stack supplies Metal headless rendering on macOS and the Linux headless
-renderer on Linux and FreeBSD; unsupported targets return a typed
-renderer-unavailable error. Visual baselines are renderer- and font-sensitive,
-so keep separate accepted images when CI spans platforms with materially
-different output.
+The runner asks `gpui_platform` for the current headless renderer. The published
+`gpui-pre` 0.3.5 stack supplies Metal headless rendering on macOS. For Linux
+and FreeBSD headless capture, use the repository's `linux-headless-renderer` branch,
+which depends on the `stayhydated/zed` renderer fork. Visual baselines are
+renderer- and font-sensitive, so keep separate accepted images when CI spans
+platforms with materially different output.

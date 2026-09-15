@@ -7,7 +7,7 @@ static TOKIO_STORY_INIT_RAN: AtomicBool = AtomicBool::new(false);
 
 #[cfg(not(target_family = "wasm"))]
 fn tokio_story_init(app: &mut App) {
-    let _handle = gpui_tokio::Tokio::handle(app);
+    let _handle = tokio_bridge::Tokio::handle(app);
     TOKIO_STORY_INIT_RAN.store(true, Ordering::SeqCst);
 }
 
