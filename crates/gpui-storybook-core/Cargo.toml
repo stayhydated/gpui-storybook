@@ -22,6 +22,7 @@ performance = [ "dep:gpui-core", "gpui-core/profiler" ]
 
 [dependencies]
 anyhow = { workspace = true }
+base64 = { workspace = true }
 derive_more = { features = [ "as_ref", "display", "from" ], workspace = true }
 es-fluent = { workspace = true }
 es-fluent-manager-core = { workspace = true }
@@ -48,9 +49,6 @@ url = { workspace = true }
 [target.'cfg(target_os = "linux")'.dependencies]
 gtk = { version = "0.19" }
 
-[target.'cfg(target_family = "wasm")'.dependencies]
-base64 = { workspace = true }
-
 [target.'cfg(unix)'.dependencies]
 libc = { workspace = true }
 
@@ -65,6 +63,7 @@ gpui-kit = { features = [ "test-support" ], workspace = true }
 strum.workspace = true
 tempfile.workspace = true
 tokio = { features = [ "rt" ], workspace = true }
+ttf-parser = { workspace = true }
 
 [lints]
 workspace = true
