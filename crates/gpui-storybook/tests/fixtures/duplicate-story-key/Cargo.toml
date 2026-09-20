@@ -8,10 +8,5 @@ publish = false
 rust-version = "1.98"
 
 [dependencies]
-gpui-kit = "0.6.0"
+gpui-kit = "0.6.4"
 gpui-storybook = { path = "../../.." }
-
-[patch.crates-io]
-gpui-pre = { branch = "linux-headless-renderer", git = "https://github.com/stayhydated/zed" }
-gpui-pre-platform = { branch = "linux-headless-renderer", git = "https://github.com/stayhydated/zed" }
-gpui-pre-web = { branch = "linux-headless-renderer", git = "https://github.com/stayhydated/zed" }

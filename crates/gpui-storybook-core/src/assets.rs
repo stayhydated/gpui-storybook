@@ -8,7 +8,7 @@ pub use gpui_kit::assets::Assets as ComponentAssets;
 #[cfg(target_family = "wasm")]
 thread_local! {
     static COMPONENT_ASSETS: ComponentAssets = ComponentAssets::new(
-        "https://raw.githubusercontent.com/longbridge/gpui-kit/v0.6.0/crates/assets"
+        "https://raw.githubusercontent.com/longbridge/gpui-kit/v0.6.4/crates/assets"
     );
 }
 

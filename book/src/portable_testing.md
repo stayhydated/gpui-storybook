@@ -122,8 +122,8 @@ comparing either pixels or frame timing.
 ## Platform expectations
 
 The runner asks `gpui_platform` for the current headless renderer. The published
-`gpui-pre` 0.3.5 stack supplies Metal headless rendering on macOS. For Linux
-and FreeBSD headless capture, use the repository's `linux-headless-renderer` branch,
-which depends on the `stayhydated/zed` renderer fork. Visual baselines are
-renderer- and font-sensitive, so keep separate accepted images when CI spans
-platforms with materially different output.
+`gpui-pre` 0.3.5 stack supplies Metal headless rendering on macOS. Linux and
+FreeBSD headless rendering is not in the pinned release yet, so capture stays
+behind the `capture` feature until a gpui-pre release supplies it. Visual
+baselines are renderer- and font-sensitive, so keep separate accepted images
+when CI spans platforms with materially different output.

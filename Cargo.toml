@@ -43,7 +43,7 @@ es-fluent-manager-embedded = "0.19.0"
 fluent-langneg = "=0.14.2"
 frame-capture = "0.2.0"
 gpui-core = { package = "gpui-pre", version = "=0.3.5" }
-gpui-kit = "0.6.1"
+gpui-kit = "0.6.4"
 gpui-es-fluent = "0.2.0"
 gpui-storybook = { path = "crates/gpui-storybook", version = "0.6.1" }
 gpui-storybook-components = { path = "crates/gpui-storybook-components", version = "0.6.1" }
@@ -78,9 +78,9 @@ schemars = "1.2.2"
 serde = "1.0"
 serde_json = "1.0"
 sha2 = "0.11"
-stayhydated-dioxus = { git = "https://github.com/stayhydated/shared", rev = "809946144fe13b04a57ba17677c4c699143f4786" }
-stayhydated-site = { git = "https://github.com/stayhydated/shared", rev = "809946144fe13b04a57ba17677c4c699143f4786" }
-stayhydated-xtask = { git = "https://github.com/stayhydated/shared", rev = "809946144fe13b04a57ba17677c4c699143f4786" }
+stayhydated-dioxus = { git = "https://github.com/stayhydated/shared", rev = "95347afe0081cbb4aabbb668dbf5289b471e848c" }
+stayhydated-site = { git = "https://github.com/stayhydated/shared", rev = "95347afe0081cbb4aabbb668dbf5289b471e848c" }
+stayhydated-xtask = { git = "https://github.com/stayhydated/shared", rev = "95347afe0081cbb4aabbb668dbf5289b471e848c" }
 strum = "0.28"
 syn = "3.0"
 sys-locale = "=0.3.2"
