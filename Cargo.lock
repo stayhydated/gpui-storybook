@@ -4779,7 +4779,7 @@ checksum = "84e2a5ff79002223edfcfa76c6f9f79f4f60f6ec545ccc27832f12bd46348b39"
 
 [[package]]
 name = "gpui-storybook"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "es-fluent",
  "gpui-es-fluent",
@@ -4800,14 +4800,14 @@ dependencies = [
 
 [[package]]
 name = "gpui-storybook-components"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "gpui-kit",
 ]
 
 [[package]]
 name = "gpui-storybook-core"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "anyhow",
  "base64 0.23.1",
@@ -4836,13 +4836,14 @@ dependencies = [
  "thiserror 2.0.20",
  "tokio",
  "tracing",
+ "ttf-parser",
  "unic-langid",
  "url",
 ]
 
 [[package]]
 name = "gpui-storybook-example-component"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "es-fluent",
  "es-fluent-build",
@@ -4860,7 +4861,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-storybook-example-story"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "console_error_panic_hook",
  "es-fluent",
@@ -4884,14 +4885,14 @@ dependencies = [
 
 [[package]]
 name = "gpui-storybook-launch"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "tempfile",
 ]
 
 [[package]]
 name = "gpui-storybook-macros"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "darling 0.24.1",
  "heck 0.5.0",
@@ -4904,7 +4905,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-storybook-mcp"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "component-shape-mcp",
  "frame-capture",
@@ -4919,7 +4920,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-storybook-preferences"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "fluent-langneg 0.14.2",
  "gpui-kit",
@@ -4937,7 +4938,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-storybook-test"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "anyhow",
  "gpui-kit",
@@ -4957,7 +4958,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-storybook-toml"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "gpui-storybook-preferences",
  "serde",
@@ -11296,7 +11297,7 @@ dependencies = [
 
 [[package]]
 name = "web"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "dioxus",
  "stayhydated-dioxus",
@@ -12531,7 +12532,7 @@ checksum = "ec7a2a501ed189703dba8b08142f057e887dfc4b2cc4db2d343ac6376ba3e0b9"
 
 [[package]]
 name = "xtask"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "anyhow",
  "clap",

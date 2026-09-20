@@ -128,11 +128,7 @@ icons immediately before the top-bar appearance settings button to toggle those
 sidebars. Responsive reserves a small, symmetric resize gutter that keeps every
 handle reachable, even when the frame is larger than the visible pane.
 
-The **Inspect** tab shows the active story key with a copy button. Select the
-source location to open the story file with the system's configured application.
-With `inspector` enabled, choose **Open GPUI Inspector** to inspect the rendered
-element tree. Each Storybook window owns its own selection, preview settings,
-and controls.
+Each Storybook window owns its own selection, preview settings, and controls.
 
 ## Run story scenarios
 
@@ -192,7 +188,7 @@ not appear in GPUI's available-action list. Use typed story scenarios or the
 automation action step when a specific argument payload is part of the example.
 
 See
-[`ActionsAndScenariosStory`](../../examples/story/src/stories/actions_scenarios_story.rs)
+[`ActionsAndScenariosStory`](https://github.com/stayhydated/gpui-storybook/blob/master/examples/story/src/stories/actions_scenarios_story.rs)
 for a complete example where Buttons, contextual shortcuts, Actions-tab
 dispatch, and two reusable scenarios share the same three GPUI actions and
 rendered semantic state.
@@ -233,16 +229,17 @@ The directory is watched for create, modify, and remove events. The environment
 override is the complete custom-theme directory for that process; when it is
 unset, Storybook watches its bundled theme directory.
 
-Wasm supports immediate in-app control and theme edits. Watching external files
-in Wasm requires a separate development-server bridge.
+Wasm supports in-app control and theme edits. Use a native debug build to watch
+a theme directory.
 
 ## Inspect a story root
 
-The **Inspect** tab provides the story key and source location by default. Build
-with the `inspector` feature, then choose **Open GPUI Inspector** or use GPUI
-Component's Inspector keyboard shortcut. The story root publishes its stable
-key, title, source location, and available control keys through a custom
-inspector state. The Inspector strip and Storybook workbench can remain open
+The **Inspect** tab shows the active story key with a copy button. Select the
+source location to open the story file with the system's configured application.
+
+Build with `inspector`, then choose **Open GPUI Inspector** to inspect the
+rendered element tree. The story root exposes its key, title, source location,
+and control keys. The Inspector strip and Storybook workbench can remain open
 together.
 
 ## Verify the result

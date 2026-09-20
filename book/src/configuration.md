@@ -141,11 +141,7 @@ Registration, filtering, preferences, and MCP routes are the same in both
 window modes. Both modes include the Controls, Theme, Inspect, and Actions
 workbench tabs. The opt-in `performance` feature adds the Perf tab; the opt-in
 `inspector` feature adds GPUI Inspector activation and story-root metadata.
-Gallery mode renders the workbench as a third resizable
-region.
-
-Dock mode installs it as an open, collapsible right dock. The saved layout
-includes its width, visibility, and selected tab. Layouts created before the
-workbench schema are replaced with the current three-region default. Choose
-**Reset layout** in the title bar to restore the left story sidebar, center
-story tabs, and right workbench.
+Gallery mode places the workbench in a third resizable region. Dock mode uses
+a collapsible right dock and saves its width, visibility, and selected tab.
+Choose **Reset layout** in the title bar to restore the left story sidebar,
+center story tabs, and right workbench.

@@ -1,24 +1,34 @@
 # gpui-storybook-toml
 
-`gpui-storybook-toml` parses a crate-local `storybook.toml`, exposes its typed
-initial window mode and launch presentation overrides, and evaluates its group
-and story filters. It is a public integration crate for tools that need the
-configuration schema without the GPUI runtime.
+[![Codecov: gpui-storybook-toml][codecov-badge]][codecov]
+[![crates.io: gpui-storybook-toml][crate-badge]][crate]
 
-The facade crate selects the active runtime configuration and applies it during
-initialization and story generation. Most applications should depend on
-[`gpui-storybook`](../gpui-storybook/README.md) and configure it with:
+`gpui-storybook-toml` provides the typed `storybook.toml` schema, loader, and
+filter evaluation for tools that need configuration without the GPUI runtime.
+The [`gpui-storybook` facade][facade] selects the active configuration and
+applies it during initialization and story discovery.
+
+## Example
 
 ```toml
 group = "UI Kit"
 window_mode = "dock"
 allow = ["UI Kit", "Shared"]
 disable_story = ["ExperimentalCardStory"]
+
+[overrides]
+color_scheme = "dark"
+theme = "Default Dark"
+language = "en"
 ```
 
-`window_mode` accepts `"gallery"` or `"dock"`. The facade uses it as the
-initial mode when a window does not supply `StorybookWindow::with_mode`; the
-title-bar selector can still change and save the user's later choice.
+`group` is required when the file exists. An omitted `allow` includes the
+file's own normalized group; `["*"]` includes every group, while `[]` includes
+none. `disable_story` matches registered Rust type names rather than display
+titles or automation keys.
 
-See [Configure Storybook](../../book/src/configuration.md) for field semantics
-and [docs.rs](https://docs.rs/gpui-storybook-toml/) for the loader API.
+[codecov-badge]: https://codecov.io/github/stayhydated/gpui-storybook/branch/master/graph/badge.svg?component=gpui-storybook-toml
+[codecov]: https://codecov.io/github/stayhydated/gpui-storybook
+[crate-badge]: https://img.shields.io/crates/v/gpui-storybook-toml.svg?label=gpui-storybook-toml
+[crate]: https://crates.io/crates/gpui-storybook-toml
+[facade]: https://crates.io/crates/gpui-storybook

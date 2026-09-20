@@ -1,8 +1,5 @@
 # Automation and capture
 
-Read this reference when enabling MCP, selecting routes, launching captures, or
-diagnosing automation.
-
 ## Enable automation
 
 On Linux or macOS, forward the facade feature:
@@ -34,16 +31,18 @@ private Sway executable. The launch-env tool emits this launcher command on
 Linux. On macOS, it emits Cargo directly and GPUI's native image renderer owns
 capture.
 
-### Verify raw stdio in this repository
+### Verify raw stdio with the upstream example
 
-Use the explicit story example for a safe end-to-end check. Run that Cargo
-command through the launcher:
+From a checkout of `stayhydated/gpui-storybook`, use the explicit story example
+for an end-to-end check. On Linux, run it through the launcher:
 
 ```bash
 GPUI_STORYBOOK_MCP_STDIO=1 \
 GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1 \
 gpui-storybook-launch -- cargo run -p gpui-storybook-example-story --features mcp
 ```
+
+On macOS, omit `gpui-storybook-launch --` and run Cargo directly.
 
 The stable route
 `gpui-storybook-example-story-InteractionStory` is an inert fixture with a
@@ -270,8 +269,8 @@ workflow. With the `performance` feature, require enough native GPUI profiler
 samples before enforcing draw or dirty-to-present p95 and maximum budgets.
 
 The published GPUI platform supplies Metal headless rendering on macOS. Use
-this repository's `linux-headless-renderer` branch with the `stayhydated/zed`
-fork for Linux and FreeBSD headless capture. Treat renderer, fonts, assets,
+the `linux-headless-renderer` branch of `stayhydated/gpui-storybook` with the
+`stayhydated/zed` fork for Linux and FreeBSD headless capture. Treat renderer, fonts, assets,
 and CI hardware as part of the baseline or timing environment; keep
 platform-specific accepted output where rasterization differs.
 

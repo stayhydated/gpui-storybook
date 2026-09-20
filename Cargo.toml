@@ -24,7 +24,7 @@ publish = true
 readme = "README.md"
 repository = "https://github.com/stayhydated/gpui-storybook"
 rust-version = "1.98"
-version = "0.6.0"
+version = "0.6.1"
 
 [workspace.dependencies]
 anyhow = "1.0"
@@ -45,15 +45,15 @@ frame-capture = "0.2.0"
 gpui-core = { package = "gpui-pre", version = "=0.3.5" }
 gpui-kit = "0.6.1"
 gpui-es-fluent = "0.2.0"
-gpui-storybook = { path = "crates/gpui-storybook", version = "0.6.0" }
-gpui-storybook-components = { path = "crates/gpui-storybook-components", version = "0.6.0" }
-gpui-storybook-core = { path = "crates/gpui-storybook-core", version = "0.6.0" }
-gpui-storybook-launch = { path = "crates/gpui-storybook-launch", version = "0.6.0" }
-gpui-storybook-macros = { path = "crates/gpui-storybook-macros", version = "0.6.0" }
-gpui-storybook-mcp = { path = "crates/gpui-storybook-mcp", version = "0.6.0" }
-gpui-storybook-preferences = { path = "crates/gpui-storybook-preferences", version = "0.6.0" }
-gpui-storybook-test = { path = "crates/gpui-storybook-test", version = "0.6.0" }
-gpui-storybook-toml = { path = "crates/gpui-storybook-toml", version = "0.6.0" }
+gpui-storybook = { path = "crates/gpui-storybook", version = "0.6.1" }
+gpui-storybook-components = { path = "crates/gpui-storybook-components", version = "0.6.1" }
+gpui-storybook-core = { path = "crates/gpui-storybook-core", version = "0.6.1" }
+gpui-storybook-launch = { path = "crates/gpui-storybook-launch", version = "0.6.1" }
+gpui-storybook-macros = { path = "crates/gpui-storybook-macros", version = "0.6.1" }
+gpui-storybook-mcp = { path = "crates/gpui-storybook-mcp", version = "0.6.1" }
+gpui-storybook-preferences = { path = "crates/gpui-storybook-preferences", version = "0.6.1" }
+gpui-storybook-test = { path = "crates/gpui-storybook-test", version = "0.6.1" }
+gpui-storybook-toml = { path = "crates/gpui-storybook-toml", version = "0.6.1" }
 gpui_platform = { features = [
     "font-kit",
     "x11",
@@ -90,6 +90,7 @@ tokio = "1.53"
 toml = "1.1"
 tracing = "0.1"
 tracing-subscriber = "0.3"
+ttf-parser = "0.25"
 unic-langid = "0.9"
 unicode-segmentation = "1.13"
 url = "2.5"

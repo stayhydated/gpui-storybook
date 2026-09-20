@@ -1,127 +1,68 @@
 ---
 name: use-gpui-storybook
 description: >-
-  Integrate or troubleshoot GPUI Storybook in application repositories. Use
-  when Codex needs to add a Storybook binary; register previews with #[story],
-  #[derive(ComponentStory)], #[derive(Substory)], or #[story_init]; configure
-  storybook.toml groups, filters, or launch overrides; choose gallery or dock
-  mode; add typed story controls or use the controls/theme/action workbench,
-  opt-in performance telemetry, and opt-in Inspector integration;
-  wire the typed es-fluent locale adapter and preference startup; enable MCP
-  tools, opt-in in-process interaction, or PNG capture; or diagnose missing
-  stories, unstable routes, preference readiness, control failures,
-  scenario failures, interaction failures, visual baseline failures, or capture
-  failures.
+  Integrate or troubleshoot GPUI Storybook in application repositories. Use for
+  story registration, typed controls and scenarios, storybook.toml, preference
+  and locale startup, MCP automation, PNG capture, and portable visual tests.
 ---
 
 # Integrate GPUI Storybook
 
-## Workflow
+## Start from the application
 
-1. Inspect the application package manifest, Storybook entry point, locale
-   module, `storybook.toml`, section types, and existing component patterns.
-2. Use the `gpui-storybook` facade. Reach for `-core`, `-macros`, `-toml`,
-   or `-mcp` directly only when the application intentionally owns a lower-level
-   integration.
-3. Keep the story-bearing library linked from the binary so inventory
-   registrations are retained.
-4. Build native apps with `gpui_kit::application()` and the facade's
-   embedded assets.
-5. Create a stable, binary-specific `ConsumerId`, call
-   `gpui_storybook::init`, await readiness, and only then open the standard
-   runtime-selectable window.
-6. Update the manifest, entry point, locale assets, story modules, and
-   `storybook.toml` together when the requested workflow crosses those
-   surfaces.
-7. Preserve the application's error handling, localization, section naming,
-   feature-forwarding, and GPUI component conventions.
+Inspect the package manifest, Storybook entry point, locale module,
+`storybook.toml`, and existing stories. Use the `gpui-storybook` facade unless
+the application owns a lower-level runtime or tooling integration. Preserve its
+error handling, localization, section naming, and feature forwarding.
 
-## Load only the needed reference
+Keep the story-bearing library linked from the binary so inventory
+registrations are retained. Build native applications with
+`gpui_kit::application()` and the facade's embedded assets. Create a stable,
+binary-specific `ConsumerId`, call `gpui_storybook::init`, await readiness, and
+then open the window.
 
-- Read [setup and configuration](references/setup-and-configuration.md) when
-  adding the binary, locale adapter, preferences, gallery/dock mode, or
-  `storybook.toml`.
-- Read [story authoring](references/story-authoring.md) when adding or changing
-  registrations, metadata, controls, sections, substories, or one-time setup.
-- Read [automation and capture](references/automation-and-capture.md) when
-  enabling MCP, selecting routes, launching captures, adding portable headless
-  tests or visual baselines, or troubleshooting automation.
+## Choose the relevant reference
 
-## Non-negotiable contracts
+- [Setup and configuration](references/setup-and-configuration.md): binary
+  startup, locale adapter, preferences, gallery/dock mode, optional workbench
+  features, and `storybook.toml`.
+- [Story authoring](references/story-authoring.md): registration style,
+  metadata, typed controls, action scopes, scenarios, sections, and substories.
+- [Automation and capture](references/automation-and-capture.md): MCP tools,
+  platform launch commands, semantic interaction, captures, portable tests,
+  visual baselines, and automation failures.
 
-- Await preference readiness before the first window.
-- Treat display labels and stable route keys as separate values.
-- Keep control metadata and values on the typed story entity; use
-  `StoryControls` and `#[storybook(control...)]` rather than a second value model.
-- Treat duplicate-title stories in one group and section as concrete variants
-  behind one navigation entry. The workbench **Variant** select owns member
-  choice; gallery mode renders one member and dock mode opens members as
-  independent tabs.
-- Keep reusable interaction in `Story::scenarios()` or a component derive's
-  `scenarios = ...` expression. Scenario runs recreate the story and use the
-  shared executor; do not resume or retry partial runs.
-- Match `disable_story` against the registered type name, not the display title
-  or package-qualified key.
-- Use `create_storybook_window` with `StorybookWindow::new`; let the title-bar
-  **Layout** select persist Gallery or Dock workspace. Use top-level
-  `storybook.toml` `window_mode` for a binary's launch-specific initial mode,
-  or `with_mode` for a per-window choice. Precedence is `with_mode`, TOML, then
-  the saved preference.
-- Forward optional package features explicitly when users launch with
-  `--features inspector` or `--features performance`, and forward the
-  `--features mcp` integration only for Linux or macOS Storybook binaries.
-- Use the Actions workbench tab for GPUI actions exposed through the selected
-  story's opt-in `Story::action_scope_focus_handle`. Track that handle on the
-  handler-owning root and keep it separate from nested input focus. The tab
-  excludes child-control and Storybook shell/root actions and dispatches back
-  to the explicit scope. Enable `performance` only when the Storybook binary should
-  compile GPUI's profiler and expose window histograms plus the debug frame
-  overlay.
-- Send logs to standard error during MCP stdio sessions.
-- Retain the MCP automation handle for the host lifetime. Tool completion
-  does not request shutdown; stdin, cancellation, or application policy ends
-  the host explicitly.
-- Treat MCP and startup capture as Linux/macOS features; Windows is unsupported.
-  Run Linux sessions through `gpui-storybook-launch`; keep the application on
-  its normal Wayland platform backend and use `GPUI_STORYBOOK_SWAY` for a
-  private Sway executable. Launch macOS sessions directly through Cargo and use
-  GPUI's native image renderer.
-- Require `GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1` before generic focus,
-  keyboard, action, semantic-target, pointer, scroll, or frame-wait automation.
-  Keep typed controls as the preferred reproducible input, then wrap important
-  visible controls with `StorybookElementExt::storybook_target()` so stable
-  route-local GPUI IDs become semantic keys before falling back to coordinates.
-- Wrap machine-readable rendered state with
-  `StorybookElementExt::storybook_value(&state)` and use
-  `storybook_read_value` or bounded `storybook_wait_for_value` calls for
-  postconditions. Use the `_as` variants
-  when keys or labels must be explicit. Reserve capture for assertions about
-  visual presentation.
-- Use `story_key`, `target_key`, `value_key`, and `control_key` in MCP inputs.
-  Let the initial tool call await the standard host instead of polling an empty
-  story catalog.
-- Treat interaction batches as potentially destructive and non-idempotent.
-  Rediscover runtime actions after each launch and never retry partial batches
-  automatically.
-- Treat paired dimensions and named viewports as story-region capture sizes;
-  keep the gallery or dock chrome mounted around that region.
-- Use `gpui-storybook-test` for isolated test and CI cases. Keep story
-  registrations linked, pass the application's assets and initialization, make
-  baseline check versus update policy explicit, and require a case configurator
-  for non-built-in named themes or named language axes. Treat a missing control
-  target as an empty snapshot unless the case supplies controls. Let a custom
-  `RunnerConfig::route_capture` callback own verification and cropping for an
-  application-defined substory surface.
-- Keep fixed viewport frames centered and locked. Responsive mode alone is
-  resizable and inherits the immediately previous fixed preset's dimensions.
-- Keep viewport state scoped to each Storybook window.
-- Make named theme selection activate the theme's matching light or dark
-  appearance while preserving the opposite saved theme slot. Selecting `System`
-  appearance resumes device-driven transitions between those slots.
-- Keep the canvas centered within the visible main pane as the story-navigation
-  and workbench sidebars change; expose left and right panel icons immediately
-  before the top-bar appearance settings button for toggling those panels. Keep
-  a symmetric gutter around Responsive frames so resize handles remain reachable
-  when the frame exceeds the visible pane.
-- Prefer current public APIs and examples; do not add compatibility wrappers for
-  older pre-1.0 shapes unless the user requires them.
+## Preserve the integration contracts
+
+- Await preference readiness before constructing the first window.
+- Keep display labels separate from stable route keys. `disable_story` matches
+  the registered type name.
+- Keep control metadata and values on the typed story entity. Only marked
+  fields become controls; component defaults come from the configured example.
+- Use `StorybookWindow::new` with `create_storybook_window`. Initial layout
+  precedence is per-window `with_mode`, active TOML `window_mode`, then the
+  saved preference. The title-bar selector can change and save the later choice.
+- Keep preview and selection state scoped to the Storybook window. Duplicate
+  titles within one group and section are concrete variants behind one
+  navigation entry; dock mode opens selected members in independent tabs.
+- Expose Actions-tab commands through `Story::action_scope_focus_handle` on the
+  handler-owning root. Keep that handle separate from nested input focus.
+- Keep reusable flows in `Story::scenarios()` or the component derive's
+  `scenarios` expression. Every run recreates the story; never resume or
+  automatically retry a partial input sequence.
+- Forward `inspector`, `performance`, and `mcp` only when needed by the
+  requested integration. MCP supports Linux and macOS; Linux sessions use
+  `gpui-storybook-launch`, and macOS sessions launch directly through Cargo.
+- Send MCP logs to standard error and retain its automation handle for the host
+  lifetime. Generic remote input requires
+  `GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1` and can invoke application effects.
+- Use typed controls and semantic targets for reproducible input. Expose
+  rendered state through `storybook_value` for bounded postcondition checks;
+  use PNG captures for visual assertions.
+- Use `gpui-storybook-test` for isolated cases. Keep baseline checking and
+  acceptance explicit, and supply assets, initialization, and theme/language
+  adapters required by the application.
+
+After edits, build the affected Storybook package with the requested features.
+Exercise the changed route, control, scenario, or capture when the target
+platform is available. Report checks that could not run and their limits.

@@ -46,11 +46,13 @@ and the workbench remain shared between both layouts. The active
 `storybook.toml` can set `window_mode = "gallery"` or `window_mode = "dock"`
 for a launch-specific initial layout.
 
-## Continue
+## Next steps
 
-1. [Set up a Storybook binary](getting_started.md).
-2. [Register stateful or component stories](stories.md).
-3. [Edit controls, themes, and preview settings](workbench.md).
-4. [Configure grouping, filtering, and launch overrides](configuration.md).
-5. [Understand saved and resolved preferences](preferences.md).
-6. [Enable MCP automation or PNG capture](automation.md).
+Start by [setting up a Storybook binary](getting_started.md), then
+[register a story](stories.md). Once it renders, choose the workflow you need:
+
+- [Edit controls, themes, and preview settings](workbench.md).
+- [Run portable tests and compare visual baselines](portable_testing.md).
+- [Configure grouping, filtering, and launch overrides](configuration.md).
+- [Understand saved and resolved preferences](preferences.md).
+- [Enable MCP automation or PNG capture](automation.md).
