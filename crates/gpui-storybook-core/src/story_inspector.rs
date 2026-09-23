@@ -36,21 +36,23 @@ impl StoryInspectorState {
 }
 
 pub fn init(cx: &mut App) {
-    cx.register_inspector_element(|_, state: &StoryInspectorState, _, cx| {
-        v_flex()
-            .p_3()
-            .gap_2()
-            .border_t_1()
-            .border_color(cx.theme().border)
-            .child("Storybook")
-            .child(format!("Key: {}", state.key))
-            .child(format!("Title: {}", state.title))
-            .child(format!("Source: {}", state.source))
-            .child(if state.controls.is_empty() {
-                "Controls: none".to_owned()
-            } else {
-                format!("Controls: {}", state.controls.join(", "))
-            })
+    cx.register_inspector_element(|_, _cx| {
+        |_, state: &StoryInspectorState, _, cx| {
+            v_flex()
+                .p_3()
+                .gap_2()
+                .border_t_1()
+                .border_color(cx.theme().border)
+                .child("Storybook")
+                .child(format!("Key: {}", state.key))
+                .child(format!("Title: {}", state.title))
+                .child(format!("Source: {}", state.source))
+                .child(if state.controls.is_empty() {
+                    "Controls: none".to_owned()
+                } else {
+                    format!("Controls: {}", state.controls.join(", "))
+                })
+        }
     });
 }
 

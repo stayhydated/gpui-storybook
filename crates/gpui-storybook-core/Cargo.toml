@@ -13,12 +13,12 @@ readme = "README.md"
 include = [ "src/**/*", "assets/**/*", "build.rs", "i18n.toml" ]
 
 [package.metadata.cargo-machete]
-ignored = [ "gpui-core", "gpui_platform" ]
+ignored = [ "gpui", "gpui_platform" ]
 
 [features]
 capture = [ "dep:gpui_platform", "dep:image", "gpui-kit/test-support", "gpui_platform/test-support" ]
 inspector = [ "gpui-kit/inspector" ]
-performance = [ "dep:gpui-core", "gpui-core/profiler" ]
+performance = [ "dep:gpui", "gpui/profiler" ]
 
 [dependencies]
 anyhow = { workspace = true }
@@ -27,7 +27,7 @@ derive_more = { features = [ "as_ref", "display", "from" ], workspace = true }
 es-fluent = { workspace = true }
 es-fluent-manager-core = { workspace = true }
 es-fluent-manager-embedded = { workspace = true }
-gpui-core = { optional = true, workspace = true }
+gpui = { optional = true, workspace = true }
 gpui-kit = { workspace = true }
 gpui-es-fluent = { workspace = true }
 gpui-storybook-components = { workspace = true }
