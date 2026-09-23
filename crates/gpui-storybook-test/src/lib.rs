@@ -5,8 +5,6 @@
 //! constructing it inside each operation keeps story state isolated while
 //! still allowing the real story registration functions to run.
 
-extern crate gpui_kit as gpui;
-
 mod baseline;
 mod matrix;
 mod performance;

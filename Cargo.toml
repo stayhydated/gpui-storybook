@@ -72,7 +72,7 @@ prettyplease = "0.3"
 proc-macro2 = "1.0"
 quote = "1.0"
 reqwest_client = { package = "gpui-pre-reqwest-client", version = "=0.3.5" }
-rmcp = "3.3"
+rmcp = "3.4.1"
 rust-embed = "8.12"
 schemars = "1.2.2"
 serde = "1.0"
