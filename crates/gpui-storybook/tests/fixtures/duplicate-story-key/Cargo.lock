@@ -556,9 +556,9 @@ dependencies = [
 
 [[package]]
 name = "attribute-dsl"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "118ba8d18025376ad3d22d745ee7a6edb0adce34f26cfdb7eb3b2dd429f36a5d"
+checksum = "4ba4ae4c97f89eaa9121d345c22dd5d8475486cf08e105b08a07ba6524e110f9"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -586,7 +586,7 @@ dependencies = [
  "num-traits",
  "pastey",
  "rayon",
- "thiserror 2.0.20",
+ "thiserror 2.0.21",
  "v_frame",
  "y4m",
 ]
@@ -1877,9 +1877,9 @@ dependencies = [
 
 [[package]]
 name = "es-fluent"
-version = "0.19.0"
+version = "0.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa834e517e697c8f3b238a2ef56c270e7342e14403bb412ac593f28ef8ac67ef"
+checksum = "1617f24be48e14ffa747ad6835c2efcd0b271ee9da6ea62e9b6091af8d476f80"
 dependencies = [
  "es-fluent-derive",
  "es-fluent-manager-core",
@@ -1891,9 +1891,9 @@ dependencies = [
 
 [[package]]
 name = "es-fluent-build"
-version = "0.19.0"
+version = "0.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea082ef4444522045bb7e4b35e5a22801b3344156d7b2328cfddc764d302e740"
+checksum = "b07171df8f1165e4dc8c26181d28950226c6b58c37308315f8fa4fc47f648319"
 dependencies = [
  "es-fluent-shared",
  "es-fluent-toml",
@@ -1901,9 +1901,9 @@ dependencies = [
 
 [[package]]
 name = "es-fluent-derive"
-version = "0.19.0"
+version = "0.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf95bce64eb6e581591efb0e10f77557500f13fa21205f06804a892b466aff60"
+checksum = "6dcecd08d4535773bca64a1702b8c99bf333cfd21429f9fd970b77aa60b2e3f3"
 dependencies = [
  "darling",
  "es-fluent-derive-core",
@@ -1915,9 +1915,9 @@ dependencies = [
 
 [[package]]
 name = "es-fluent-derive-core"
-version = "0.19.0"
+version = "0.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "980efec2cc0660d6acfbc13e79852314156e21e03bebdd2e76719d5e77f9451f"
+checksum = "718c4a5935fc53706f038f08113655cfb08980483fafcc3e2ef6fe46097b7bc9"
 dependencies = [
  "bon",
  "darling",
@@ -1930,15 +1930,15 @@ dependencies = [
  "quote",
  "strum",
  "syn 3.0.6",
- "thiserror 2.0.20",
+ "thiserror 2.0.21",
  "toml 1.1.6+spec-1.1.0",
 ]
 
 [[package]]
 name = "es-fluent-manager-core"
-version = "0.19.0"
+version = "0.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "70f3817851b0000be9551f462e191d98f51c15f73c33b8145c39bde76bc233d1"
+checksum = "0dee3cea1a083dc926f575af00d5d8aade7f9fb54ed5b622da35210fd8eb50c0"
 dependencies = [
  "es-fluent-shared",
  "fluent-bundle",
@@ -1956,9 +1956,9 @@ dependencies = [
 
 [[package]]
 name = "es-fluent-manager-embedded"
-version = "0.19.0"
+version = "0.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d39430820179df9a79fa2563ab0ec4bd3eda32ac9a4ddf4118930c890d421294"
+checksum = "699d3aaf09850c891cdf187646e5ae0ca5145f3c47c4c02b33a441cdfa891f91"
 dependencies = [
  "es-fluent",
  "es-fluent-manager-core",
@@ -1970,9 +1970,9 @@ dependencies = [
 
 [[package]]
 name = "es-fluent-manager-macros"
-version = "0.19.0"
+version = "0.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0011e776fb56ce7b3c8c234e0e0f4f9a08e3f0766c60be207251cce82f4b4119"
+checksum = "6a6e3fa32ff71162adce96703067b180a5ad2b8f3cb1d40baef8827eca589bf1"
 dependencies = [
  "es-fluent-derive-core",
  "es-fluent-shared",
@@ -1987,9 +1987,9 @@ dependencies = [
 
 [[package]]
 name = "es-fluent-shared"
-version = "0.19.0"
+version = "0.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "00e737b3b5e6efdc6b1530ee9c7a1072f9f62092b08be50713f10f9ab3c67876"
+checksum = "f4d906787a52194d2cce06f918392eae2d0cfff2dc22410a2cd36f065b9333a3"
 dependencies = [
  "anyhow",
  "camino",
@@ -2004,23 +2004,23 @@ dependencies = [
  "serde",
  "strum",
  "syn 3.0.6",
- "thiserror 2.0.20",
+ "thiserror 2.0.21",
  "toml 1.1.6+spec-1.1.0",
  "unic-langid",
 ]
 
 [[package]]
 name = "es-fluent-toml"
-version = "0.19.0"
+version = "0.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa83f4354f6ad2ba31106dede29e239e4c199a6e8dee5c2c4604373cf1fb71e2"
+checksum = "573701d4f1f8a5c0120680f0823350393011fe5751912658fe215c6346c6f881"
 dependencies = [
  "bon",
  "es-fluent-shared",
  "fs-err",
  "path-slash",
  "serde",
- "thiserror 2.0.20",
+ "thiserror 2.0.21",
  "toml 1.1.6+spec-1.1.0",
  "unic-langid",
 ]
@@ -2234,7 +2234,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "54f0d287c53ffd184d04d8677f590f4ac5379785529e5e08b1c8083acdd5c198"
 dependencies = [
  "memchr",
- "thiserror 2.0.20",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
@@ -2817,7 +2817,7 @@ dependencies = [
  "hashbrown 0.16.1",
  "log",
  "presser",
- "thiserror 2.0.20",
+ "thiserror 2.0.21",
  "windows 0.62.2",
 ]
 
@@ -2937,9 +2937,9 @@ dependencies = [
 
 [[package]]
 name = "gpui-es-fluent"
-version = "0.2.0"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a5b876738a05571b96aafa96b3b62ccac92a41c8520c5212a6b984dc524eb45e"
+checksum = "9b919a05661cd742ac987194abd34b51d5124a35aac7a1371901df15ad1c03d2"
 dependencies = [
  "es-fluent",
  "es-fluent-manager-embedded",
@@ -3035,7 +3035,7 @@ dependencies = [
  "spin 0.10.1",
  "strum",
  "taffy",
- "thiserror 2.0.20",
+ "thiserror 2.0.21",
  "ttf-parser",
  "url",
  "usvg 0.46.0",
@@ -3495,7 +3495,7 @@ dependencies = [
  "gpui-storybook-toml",
  "inventory",
  "libc",
- "thiserror 2.0.20",
+ "thiserror 2.0.21",
  "toml 1.1.6+spec-1.1.0",
  "tracing",
  "unic-langid",
@@ -3531,7 +3531,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
- "thiserror 2.0.20",
+ "thiserror 2.0.21",
  "tokio",
  "tracing",
  "unic-langid",
@@ -3568,7 +3568,7 @@ dependencies = [
  "strum",
  "sys-locale",
  "tempfile",
- "thiserror 2.0.20",
+ "thiserror 2.0.21",
  "tokio",
  "tracing",
  "unic-langid",
@@ -4400,9 +4400,9 @@ checksum = "e2db585e1d738fc771bf08a151420d3ed193d9d895a36df7f6f8a9456b911ddc"
 
 [[package]]
 name = "koruma"
-version = "0.12.0"
+version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f028ff8fd349ae8e15454de2e6cd67abe535df03ab29047a394072b771ac9642"
+checksum = "1b19dc28bbbba0c67042c04e93a291d3f4eae289a7cb66532865555c03bf6093"
 dependencies = [
  "koruma-core",
  "koruma-derive",
@@ -4410,15 +4410,15 @@ dependencies = [
 
 [[package]]
 name = "koruma-core"
-version = "0.12.0"
+version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ab59524f67339dde4265cfcb38fe34571708aea0098712f48dcdbcabfb4824d"
+checksum = "16423611346e5e0d79466f82bab27d39ccd6cc0ee93fca7dd737500c696739d9"
 
 [[package]]
 name = "koruma-derive"
-version = "0.12.0"
+version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fe81be49b49ccdd4969e502450ea5b35340571a00ca8e2ceaf87018920e6f08b"
+checksum = "f7ff8ee7491ffd4f57ccd014d01b3ae32590eb8230f0130aa7b5836129e6dab9"
 dependencies = [
  "heck 0.5.0",
  "koruma-derive-core",
@@ -4430,9 +4430,9 @@ dependencies = [
 
 [[package]]
 name = "koruma-derive-core"
-version = "0.12.0"
+version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4abbbbd1696a155f08e9adba60499fdaef0dcaede6a8dc58d6f1c96e86b90ddb"
+checksum = "3a75cacb3a3cb26f6ebd1b0f0361695a5c2360d4bfe90a3b393c5bb863802fd2"
 dependencies = [
  "attribute-dsl",
  "heck 0.5.0",
@@ -4551,9 +4551,9 @@ checksum = "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981"
 
 [[package]]
 name = "libredox"
-version = "0.1.24"
+version = "0.1.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6480ccc157a1389bb2e4891b24751b0f798ba640d22386f23143fbcc89da195a"
+checksum = "61ff90caf6077a803a240f62fdbe88645a890bbca49ef8174c3cb0404362171d"
 dependencies = [
  "libc",
 ]
@@ -4945,7 +4945,7 @@ dependencies = [
  "once_cell",
  "rustc-hash 1.1.0",
  "spirv",
- "thiserror 2.0.20",
+ "thiserror 2.0.21",
  "unicode-ident",
 ]
 
@@ -6162,7 +6162,7 @@ dependencies = [
  "rustc-hash 2.1.3",
  "rustls",
  "socket2",
- "thiserror 2.0.20",
+ "thiserror 2.0.21",
  "tokio",
  "tracing",
  "web-time",
@@ -6184,7 +6184,7 @@ dependencies = [
  "rustls",
  "rustls-pki-types",
  "slab",
- "thiserror 2.0.20",
+ "thiserror 2.0.21",
  "tinyvec",
  "tracing",
  "web-time",
@@ -6352,7 +6352,7 @@ dependencies = [
  "rand 0.9.5",
  "rand_chacha 0.9.0",
  "simd_helpers",
- "thiserror 2.0.20",
+ "thiserror 2.0.21",
  "v_frame",
  "wasm-bindgen",
 ]
@@ -6474,7 +6474,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "60dc65c0ff1a7ae1294b0c67b9f14baf70b644404010370171787bfac1038fc0"
 dependencies = [
  "libredox",
- "thiserror 2.0.20",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
@@ -7624,7 +7624,7 @@ version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ed071c670382e85fc2f48ae706492d8c338f4f89bf72520d32f8abfe880aade"
 dependencies = [
- "thiserror 2.0.20",
+ "thiserror 2.0.21",
  "windows 0.61.3",
  "windows-version",
 ]
@@ -7673,11 +7673,11 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "2.0.20"
+version = "2.0.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ec86235f5fcc2a73650310756d2ac5b138a5780bbbdfae3eeccec992c435ba4f"
+checksum = "09e52cb86a36cede5cb101bf8908837b3e4c6e5e59fe7fd85c23fb56200d189e"
 dependencies = [
- "thiserror-impl 2.0.20",
+ "thiserror-impl 2.0.21",
 ]
 
 [[package]]
@@ -7693,9 +7693,9 @@ dependencies = [
 
 [[package]]
 name = "thiserror-impl"
-version = "2.0.20"
+version = "2.0.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc04cd3e1236dd4a98afca4569f2deb3f120e5422a4023be2cb683f8486292af"
+checksum = "fe5197923287db20a58125f0bc85c062f7f2c892de97b18c356f9efb14b28524"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -8713,7 +8713,7 @@ dependencies = [
  "raw-window-handle",
  "rustc-hash 1.1.0",
  "smallvec",
- "thiserror 2.0.20",
+ "thiserror 2.0.21",
  "wgpu-core-deps-apple",
  "wgpu-core-deps-emscripten",
  "wgpu-core-deps-wasm",
@@ -8802,7 +8802,7 @@ dependencies = [
  "raw-window-metal",
  "renderdoc-sys",
  "smallvec",
- "thiserror 2.0.20",
+ "thiserror 2.0.21",
  "wasm-bindgen",
  "wayland-sys",
  "web-sys",
@@ -8930,7 +8930,7 @@ checksum = "3a4df73e95feddb9ec1a7e9c2ca6323b8c97d5eeeff78d28f1eccdf19c882b24"
 dependencies = [
  "parking_lot",
  "rayon",
- "thiserror 2.0.20",
+ "thiserror 2.0.21",
  "windows 0.61.3",
  "windows-future 0.2.1",
 ]

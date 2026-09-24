@@ -603,9 +603,9 @@ dependencies = [
 
 [[package]]
 name = "attribute-dsl"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "118ba8d18025376ad3d22d745ee7a6edb0adce34f26cfdb7eb3b2dd429f36a5d"
+checksum = "4ba4ae4c97f89eaa9121d345c22dd5d8475486cf08e105b08a07ba6524e110f9"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1442,9 +1442,9 @@ dependencies = [
 
 [[package]]
 name = "component-shape"
-version = "0.3.0"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ea38a119114527b93dc7d44518df0b66dc7cfa7bde6d664ca10cbcb62944300"
+checksum = "07d4385ec5d1efc21aa0277a1cbb00cec0e422202fb5d92df05fc6a64a938735"
 dependencies = [
  "derive_more",
  "heck 0.5.0",
@@ -1455,9 +1455,9 @@ dependencies = [
 
 [[package]]
 name = "component-shape-mcp"
-version = "0.3.0"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b6d31f0e8b684c67df05b3a07713e94207d971456238148ab09a2b4e7e5d73c"
+checksum = "b32545e15f1aac48627714d6d39e3a14e50804506af4aca269bb8fe34ba9945e"
 dependencies = [
  "component-shape",
  "component-shape-mcp-macros",
@@ -1471,9 +1471,9 @@ dependencies = [
 
 [[package]]
 name = "component-shape-mcp-macros"
-version = "0.3.0"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a2e1dd79fd66459527e0eaf77d9b5d98960353ca512a35cdfe8463b33536d3f6"
+checksum = "701f6cb8ce839dce3ecdc046e0904b6b0cc247a6f3639b543517a5183456638d"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
@@ -2971,9 +2971,9 @@ dependencies = [
 
 [[package]]
 name = "es-fluent"
-version = "0.19.0"
+version = "0.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa834e517e697c8f3b238a2ef56c270e7342e14403bb412ac593f28ef8ac67ef"
+checksum = "1617f24be48e14ffa747ad6835c2efcd0b271ee9da6ea62e9b6091af8d476f80"
 dependencies = [
  "es-fluent-derive",
  "es-fluent-manager-core",
@@ -2985,9 +2985,9 @@ dependencies = [
 
 [[package]]
 name = "es-fluent-build"
-version = "0.19.0"
+version = "0.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea082ef4444522045bb7e4b35e5a22801b3344156d7b2328cfddc764d302e740"
+checksum = "b07171df8f1165e4dc8c26181d28950226c6b58c37308315f8fa4fc47f648319"
 dependencies = [
  "es-fluent-shared",
  "es-fluent-toml",
@@ -2995,9 +2995,9 @@ dependencies = [
 
 [[package]]
 name = "es-fluent-derive"
-version = "0.19.0"
+version = "0.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf95bce64eb6e581591efb0e10f77557500f13fa21205f06804a892b466aff60"
+checksum = "6dcecd08d4535773bca64a1702b8c99bf333cfd21429f9fd970b77aa60b2e3f3"
 dependencies = [
  "darling 0.24.1",
  "es-fluent-derive-core",
@@ -3009,9 +3009,9 @@ dependencies = [
 
 [[package]]
 name = "es-fluent-derive-core"
-version = "0.19.0"
+version = "0.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "980efec2cc0660d6acfbc13e79852314156e21e03bebdd2e76719d5e77f9451f"
+checksum = "718c4a5935fc53706f038f08113655cfb08980483fafcc3e2ef6fe46097b7bc9"
 dependencies = [
  "bon",
  "darling 0.24.1",
@@ -3030,9 +3030,9 @@ dependencies = [
 
 [[package]]
 name = "es-fluent-lang"
-version = "0.19.0"
+version = "0.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed48eaf19f9526cff2af607423ea25d32736c285bc211e1abac066845d214748"
+checksum = "2b0285fbd08914e80a1eb83f1d223b918d50ea76467203467dd5cf6b4947c19e"
 dependencies = [
  "es-fluent-lang-macro",
  "es-fluent-manager-core",
@@ -3047,9 +3047,9 @@ dependencies = [
 
 [[package]]
 name = "es-fluent-lang-macro"
-version = "0.19.0"
+version = "0.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c47ffb7378982be47025a86ae84e4f5c20e34df64aba4eb989a4d8562be78a51"
+checksum = "51489d0e9773c4cbf22caf17222c7d76ffa43fea1dda538587ccb4e67a76a4d2"
 dependencies = [
  "es-fluent-derive-core",
  "es-fluent-toml",
@@ -3062,9 +3062,9 @@ dependencies = [
 
 [[package]]
 name = "es-fluent-manager-core"
-version = "0.19.0"
+version = "0.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "70f3817851b0000be9551f462e191d98f51c15f73c33b8145c39bde76bc233d1"
+checksum = "0dee3cea1a083dc926f575af00d5d8aade7f9fb54ed5b622da35210fd8eb50c0"
 dependencies = [
  "es-fluent-shared",
  "fluent-bundle",
@@ -3082,9 +3082,9 @@ dependencies = [
 
 [[package]]
 name = "es-fluent-manager-embedded"
-version = "0.19.0"
+version = "0.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d39430820179df9a79fa2563ab0ec4bd3eda32ac9a4ddf4118930c890d421294"
+checksum = "699d3aaf09850c891cdf187646e5ae0ca5145f3c47c4c02b33a441cdfa891f91"
 dependencies = [
  "es-fluent",
  "es-fluent-manager-core",
@@ -3096,9 +3096,9 @@ dependencies = [
 
 [[package]]
 name = "es-fluent-manager-macros"
-version = "0.19.0"
+version = "0.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0011e776fb56ce7b3c8c234e0e0f4f9a08e3f0766c60be207251cce82f4b4119"
+checksum = "6a6e3fa32ff71162adce96703067b180a5ad2b8f3cb1d40baef8827eca589bf1"
 dependencies = [
  "es-fluent-derive-core",
  "es-fluent-shared",
@@ -3113,9 +3113,9 @@ dependencies = [
 
 [[package]]
 name = "es-fluent-shared"
-version = "0.19.0"
+version = "0.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "00e737b3b5e6efdc6b1530ee9c7a1072f9f62092b08be50713f10f9ab3c67876"
+checksum = "f4d906787a52194d2cce06f918392eae2d0cfff2dc22410a2cd36f065b9333a3"
 dependencies = [
  "anyhow",
  "camino",
@@ -3137,9 +3137,9 @@ dependencies = [
 
 [[package]]
 name = "es-fluent-toml"
-version = "0.19.0"
+version = "0.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa83f4354f6ad2ba31106dede29e239e4c199a6e8dee5c2c4604373cf1fb71e2"
+checksum = "573701d4f1f8a5c0120680f0823350393011fe5751912658fe215c6346c6f881"
 dependencies = [
  "bon",
  "es-fluent-shared",
@@ -3498,9 +3498,9 @@ dependencies = [
 
 [[package]]
 name = "frame-capture"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c0c960bdd63f6f9c61a3ff69155d5d7c87039c4efecde46377ad3608bc245eb3"
+checksum = "bb4dd31ade6c70583ba304110158eb963d25a50a8d8e1ae3d2f283c9d50ad9f3"
 dependencies = [
  "bon",
  "derive_more",
@@ -3514,9 +3514,9 @@ dependencies = [
 
 [[package]]
 name = "frame-capture-macros"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0585a82d57c3feda65849e83cfe38b19e5741692efb606f10b49fdd2d2b5fa28"
+checksum = "b59e15c10eab45d734d7323c1c8ff8cdfd27f3137a2800620f6f0455e43e3243"
 dependencies = [
  "darling 0.24.1",
  "frame-capture-toml",
@@ -3529,9 +3529,9 @@ dependencies = [
 
 [[package]]
 name = "frame-capture-toml"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "061021370fab4f143c57aaf1cef56faf7a20209ff59f9b29cc1aead29c9c5fdf"
+checksum = "e7d7b737de4f78e8aa60354f5382339a30fdb0b21b4c27ad057ade71a7862ccf"
 dependencies = [
  "serde",
  "thiserror 2.0.20",
@@ -4184,9 +4184,9 @@ dependencies = [
 
 [[package]]
 name = "gpui-es-fluent"
-version = "0.2.0"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a5b876738a05571b96aafa96b3b62ccac92a41c8520c5212a6b984dc524eb45e"
+checksum = "9b919a05661cd742ac987194abd34b51d5124a35aac7a1371901df15ad1c03d2"
 dependencies = [
  "es-fluent",
  "es-fluent-manager-embedded",
@@ -6073,9 +6073,9 @@ checksum = "a4933f3f57a8e9d9da04db23fb153356ecaf00cbd14aee46279c33dc80925c37"
 
 [[package]]
 name = "koruma"
-version = "0.12.0"
+version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f028ff8fd349ae8e15454de2e6cd67abe535df03ab29047a394072b771ac9642"
+checksum = "1b19dc28bbbba0c67042c04e93a291d3f4eae289a7cb66532865555c03bf6093"
 dependencies = [
  "koruma-core",
  "koruma-derive",
@@ -6083,15 +6083,15 @@ dependencies = [
 
 [[package]]
 name = "koruma-core"
-version = "0.12.0"
+version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ab59524f67339dde4265cfcb38fe34571708aea0098712f48dcdbcabfb4824d"
+checksum = "16423611346e5e0d79466f82bab27d39ccd6cc0ee93fca7dd737500c696739d9"
 
 [[package]]
 name = "koruma-derive"
-version = "0.12.0"
+version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fe81be49b49ccdd4969e502450ea5b35340571a00ca8e2ceaf87018920e6f08b"
+checksum = "f7ff8ee7491ffd4f57ccd014d01b3ae32590eb8230f0130aa7b5836129e6dab9"
 dependencies = [
  "heck 0.5.0",
  "koruma-derive-core",
@@ -6103,9 +6103,9 @@ dependencies = [
 
 [[package]]
 name = "koruma-derive-core"
-version = "0.12.0"
+version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4abbbbd1696a155f08e9adba60499fdaef0dcaede6a8dc58d6f1c96e86b90ddb"
+checksum = "3a75cacb3a3cb26f6ebd1b0f0361695a5c2360d4bfe90a3b393c5bb863802fd2"
 dependencies = [
  "attribute-dsl",
  "heck 0.5.0",
