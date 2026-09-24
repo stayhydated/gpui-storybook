@@ -51,14 +51,31 @@ impl StorySidebar {
         let Some(dock_area) = dock_area.upgrade() else {
             return;
         };
-        let concrete_story = story
-            .read(cx)
-            .variants
-            .first()
-            .cloned()
-            .unwrap_or_else(|| story.clone());
+        let workbench_state = workbench_state(&dock_area.downgrade());
+        // Reveal the member already active for a grouped story instead of
+        // resetting to its first variant, so the canvas matches the workbench
+        // and the Scenarios tab.
+        let concrete_story = workbench_state
+            .as_ref()
+            .and_then(|state| state.read(cx).active_story())
+            .filter(|active| {
+                active == &story
+                    || story
+                        .read(cx)
+                        .variants
+                        .iter()
+                        .any(|variant| variant == active)
+            })
+            .unwrap_or_else(|| {
+                story
+                    .read(cx)
+                    .variants
+                    .first()
+                    .cloned()
+                    .unwrap_or_else(|| story.clone())
+            });
         let story_key = concrete_story.read(cx).story_key_label().map(str::to_owned);
-        if let Some(workbench_state) = workbench_state(&dock_area.downgrade()) {
+        if let Some(workbench_state) = &workbench_state {
             workbench_state.update(cx, |state, cx| {
                 state.set_active_story(Some(story.clone()), cx);
             });

@@ -105,12 +105,32 @@ impl WorkbenchState {
     }
 
     /// Select a gallery or dock story, choosing its first variant when grouped.
+    ///
+    /// Re-selecting a variant group keeps the member that is already active for
+    /// that group, so navigating back to a grouped story does not silently
+    /// switch to its first variant. Selecting a concrete member always selects
+    /// that member.
     pub fn set_active_story(
         &mut self,
         story: Option<Entity<StoryContainer>>,
         cx: &mut Context<Self>,
     ) {
-        let (group, active_story) = Self::resolve_story(story, cx);
+        let selects_group = story
+            .as_ref()
+            .is_some_and(|story| !story.read(cx).variants.is_empty());
+        let (group, first_member) = Self::resolve_story(story, cx);
+        let active_story = if selects_group {
+            self.active_story
+                .clone()
+                .filter(|current| {
+                    group
+                        .as_ref()
+                        .is_some_and(|group| group.read(cx).variants.contains(current))
+                })
+                .or(first_member)
+        } else {
+            first_member
+        };
         self.active_group = group;
         self.active_story = active_story;
         self.apply_presentation(cx);
