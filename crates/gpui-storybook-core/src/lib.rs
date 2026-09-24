@@ -54,8 +54,6 @@
 //! `PersistenceStatus` reports storage activity only; locale failures remain
 //! retryable diagnostics.
 
-extern crate gpui_kit as gpui;
-
 pub mod actions;
 pub mod app_menus;
 pub mod assets;

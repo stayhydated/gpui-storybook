@@ -3,7 +3,7 @@ name: ci
 on:
   pull_request:
   push:
-    branches: [master, linux-headless-renderer]
+    branches: [master]
 
 permissions:
   contents: read
@@ -21,7 +21,7 @@ jobs:
       - name: Install Linux dependencies
         uses: ./.github/actions/install-linux-deps
       - name: Check FTL files
-        uses: stayhydated/es-fluent/crates/es-fluent-cli@es-fluent-cli-v0.19.0
+        uses: stayhydated/es-fluent/crates/es-fluent-cli@es-fluent-cli-v0.20.3
         with:
           path: .
           all_locales: true
@@ -52,7 +52,7 @@ jobs:
         if: runner.os == 'Linux'
         uses: ./.github/actions/install-linux-deps
         with:
-          sway: ${{ github.ref == 'refs/heads/linux-headless-renderer' || github.head_ref == 'linux-headless-renderer' }}
+          sway: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
 
       - name: Run Linux tests with every feature
         if: runner.os == 'Linux'
@@ -74,7 +74,7 @@ jobs:
           --exclude gpui-storybook-mcp
 
       - name: Smoke test Storybook capture through headless Sway
-        if: runner.os == 'Linux' && (github.ref == 'refs/heads/linux-headless-renderer' || github.head_ref == 'linux-headless-renderer')
+        if: runner.os == 'Linux' && github.event_name == 'push' && github.ref == 'refs/heads/master'
         shell: bash
         run: |
           cargo build -p gpui-storybook-example-story --features mcp --locked

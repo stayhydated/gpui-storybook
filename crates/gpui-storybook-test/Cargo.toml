@@ -10,16 +10,16 @@ repository.workspace = true
 readme = "README.md"
 
 [package.metadata.cargo-machete]
-ignored = [ "gpui-core" ]
+ignored = [ "gpui" ]
 
 [features]
 capture = [ "gpui-storybook-core/capture" ]
 default = [ "capture" ]
-performance = [ "dep:gpui-core", "gpui-core/profiler" ]
+performance = [ "dep:gpui", "gpui/profiler" ]
 
 [dependencies]
 anyhow = { workspace = true }
-gpui-core = { optional = true, workspace = true }
+gpui = { optional = true, workspace = true }
 gpui-kit = { features = [ "test-support" ], workspace = true }
 gpui-storybook-core = { workspace = true }
 gpui_platform = { features = [

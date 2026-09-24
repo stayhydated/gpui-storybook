@@ -54,12 +54,11 @@ runner fails the case instead of attaching an unapplied label to a capture.
 
 `CaptureMatrix` expands the Cartesian product of stories, root or substory
 routes, viewports, canvas backgrounds, themes, languages, and named typed-control
-sets. Stable case IDs drive output paths, baseline paths, and structured
-reports. Each matrix axis is encoded before the case ID is joined. Generated
-request IDs use a bounded digest for serialized controls while reports retain
-the complete typed values, and `output_dir` encodes each complete case ID as one
-filename component so distinct values and labels remain distinct without
-creating unbounded control filenames:
+sets. Stable case IDs identify each combination in output paths, baselines,
+and structured reports. Distinct axis values and labels get distinct filenames;
+control maps use bounded digests in request IDs and retain their complete typed
+values in reports. This matrix captures one story at two viewports in light and
+dark presentation:
 
 ```rust,no_run
 use gpui_storybook_test::{
@@ -123,8 +122,8 @@ comparing either pixels or frame timing.
 ## Platform expectations
 
 The runner asks `gpui_platform` for the current headless renderer. The published
-`gpui-pre` 0.3.5 stack supplies Metal headless rendering on macOS. For Linux
-and FreeBSD headless capture, use the repository's `linux-headless-renderer` branch,
-which depends on the `stayhydated/zed` renderer fork. Visual baselines are
-renderer- and font-sensitive, so keep separate accepted images when CI spans
-platforms with materially different output.
+`gpui-pre` 0.3.5 stack supplies Metal headless rendering on macOS. Linux and
+FreeBSD headless rendering is not in the pinned release yet, so capture stays
+behind the `capture` feature until a gpui-pre release supplies it. Visual
+baselines are renderer- and font-sensitive, so keep separate accepted images
+when CI spans platforms with materially different output.

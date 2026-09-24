@@ -1,5 +1,3 @@
-extern crate gpui_kit as gpui;
-
 pub mod components;
 pub mod i18n;
 

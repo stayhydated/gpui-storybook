@@ -1,6 +1,3 @@
-#[cfg(test)]
-extern crate gpui_kit as gpui;
-
 use gpui_storybook::{Assets, ConsumerId, StorybookOptions, StorybookWindow};
 use gpui_storybook_example_component::i18n::{self, Languages};
 

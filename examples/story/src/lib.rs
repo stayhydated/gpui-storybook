@@ -1,8 +1,6 @@
 use gpui_kit::App;
 use gpui_storybook::{ConsumerId, StorybookOptions, StorybookWindow};
 
-extern crate gpui_kit as gpui;
-
 pub mod i18n;
 pub mod stories;
 

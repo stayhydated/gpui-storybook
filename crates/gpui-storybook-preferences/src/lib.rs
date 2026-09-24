@@ -14,9 +14,6 @@
 //! persistent path. Persistent, temporary, and disabled modes make filesystem
 //! behavior explicit; only persistent mode accepts a JSON path override.
 
-#[cfg(test)]
-extern crate gpui_kit as gpui;
-
 mod detection;
 mod repository;
 mod resolution;

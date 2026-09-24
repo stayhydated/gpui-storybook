@@ -1,8 +1,5 @@
 # Setup and configuration
 
-Read this reference when adding or changing a Storybook binary, locale adapter,
-preferences, window mode, or `storybook.toml`.
-
 ## Startup sequence
 
 Use the facade's startup order:
@@ -96,7 +93,13 @@ changed Rust types or component source require recompilation.
 For consumer theme development in a native debug build, set
 `STORYBOOK_THEME_DIR` before launch. The path becomes the process's complete
 custom-theme directory and is watched for external changes. Wasm keeps in-app
-theme edits but needs a separate development bridge for filesystem changes.
+theme edits; use a native debug build for filesystem watching.
+
+Fixed Mobile, Tablet, and Desktop presets lock the centered preview to their
+named dimensions. Responsive mode alone exposes resize handles and starts from
+the immediately previous fixed preset. Keep a symmetric resize gutter so handles
+remain reachable as the preview exceeds the visible pane. The top-bar panel
+icons toggle story navigation and the workbench without changing that centering.
 
 ## Configuration rules
 

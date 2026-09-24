@@ -79,8 +79,6 @@
 //! as diagnostics and are retried on later window activation without falsifying
 //! storage state.
 
-extern crate gpui_kit as gpui;
-
 #[cfg(all(feature = "mcp", not(any(target_os = "linux", target_os = "macos"))))]
 compile_error!(
     "the `gpui-storybook/mcp` feature supports Linux and macOS; Windows and other targets are unsupported"

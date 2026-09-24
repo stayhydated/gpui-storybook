@@ -253,7 +253,7 @@ Scenario keys must be unique within their story. Titles, descriptions, and
 step names are display copy; automation selects the stable story and scenario
 keys.
 
-## Export static autodocs
+## Export static story metadata
 
 `#[story]` and `#[derive(ComponentStory)]` capture declaration Rustdocs and the
 static shape of marked controls in each inventory registration. A tooling binary
@@ -276,7 +276,7 @@ and choices. Localized titles and descriptions plus constructor-derived control
 defaults require a live `App`, so query the runtime catalog and controls when
 those values matter.
 
-## Add captureable sections inside a story
+## Capture sections inside a story
 
 Derive `Substory` for stable section routes:
 

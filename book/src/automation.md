@@ -225,8 +225,7 @@ Value keys, like target keys, must be unique within a story or substory route.
 Call `.storybook_value_as(key, label, value)` when the element does not expose
 an ID or when the label needs explicit wording.
 
-The common click-and-wait flow uses two focused calls. The click is dispatched
-once and is never retried by the wait:
+For a click-and-wait flow, call `storybook_click_target` first:
 
 ```json
 {
@@ -234,6 +233,9 @@ once and is never retried by the wait:
   "target_key": "pointer-target"
 }
 ```
+
+Then call `storybook_wait_for_value`. It reads fresh state without retrying the
+click:
 
 ```json
 {
@@ -386,7 +388,7 @@ For example:
 my-app-storybook-ButtonStory
 ```
 
-A captureable section appends its substory key:
+A captured section appends its substory key:
 
 ```text
 my-app-storybook-ButtonStory/with-progress

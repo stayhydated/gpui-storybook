@@ -1,11 +1,15 @@
 # gpui-storybook-preferences
 
-`gpui-storybook-preferences` is the typed storage and resolution engine behind
-GPUI Storybook preferences. It owns consumer-scoped documents, persistence
-modes, the saved Gallery/Dock window-mode enum, system detection, fallback
-resolution, and diagnostics.
+[![crates.io: gpui-storybook-preferences][crate-badge]][crate]
 
-Application developers should configure preferences through
-[`StorybookOptions`](https://docs.rs/gpui-storybook/latest/gpui_storybook/struct.StorybookOptions.html)
-from the `gpui-storybook` facade. See [Preferences](../../book/src/preferences.md)
-for the user-facing behavior.
+`gpui-storybook-preferences` is the typed persistence and resolution engine for
+GPUI Storybook preferences. It owns consumer-scoped documents, explicit
+persistence modes, system detection, saved intent, effective presentation, and
+diagnostics.
+
+Application developers configure this behavior through `StorybookOptions` from
+the [`gpui-storybook` facade][facade].
+
+[crate-badge]: https://img.shields.io/crates/v/gpui-storybook-preferences.svg?label=gpui-storybook-preferences
+[crate]: https://crates.io/crates/gpui-storybook-preferences
+[facade]: https://crates.io/crates/gpui-storybook
