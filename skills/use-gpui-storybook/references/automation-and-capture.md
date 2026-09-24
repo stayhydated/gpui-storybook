@@ -268,9 +268,12 @@ in verification, and expose `Update` only through a deliberate acceptance
 workflow. With the `performance` feature, require enough native GPUI profiler
 samples before enforcing draw or dirty-to-present p95 and maximum budgets.
 
-The published GPUI platform supplies Metal headless rendering on macOS. Linux
-and FreeBSD headless rendering is not in the pinned gpui-pre release yet, so the
-capture path stays behind the `capture` feature until upstream supplies it.
+In the published `gpui-pre` 0.3.6 stack, `current_headless_renderer` returns a
+renderer on macOS only; other targets get `None` and `render_to_image` bails
+with `render_to_image not implemented for this platform`. Linux capture needs an
+upstream headless renderer that is not in this pinned release, and the
+repository no longer carries a local fork for it. The capture path stays behind
+the `capture` feature until upstream supplies one.
 Treat renderer, fonts, assets, and CI hardware as part of the baseline or timing
 environment; keep platform-specific accepted output where rasterization differs.
 
