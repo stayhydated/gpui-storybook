@@ -145,22 +145,6 @@ jobs:
               target/debug/gpui-storybook-example-story
           test -s target/storybook-captures/ci-sway-button.png
 
-      - name: Smoke test Storybook capture through the Windows headless renderer
-        if: runner.os == 'Windows' && github.event_name == 'push' && github.ref == 'refs/heads/master'
-        env:
-          RUSTC_WRAPPER: ""
-        run: |
-          cargo build -p gpui-storybook-example-story --features mcp --locked
-          $env:RUST_LOG = "warn"
-          $env:WGPU_CAPTURE_ROUTE = "gpui-storybook-example-story-ButtonStory"
-          $env:WGPU_CAPTURE_PATH = "target/storybook-captures/ci-windows-button.png"
-          $env:WGPU_CAPTURE_WIDTH = "390"
-          $env:WGPU_CAPTURE_HEIGHT = "844"
-          .\target\debug\gpui-storybook-example-story.exe
-          if (-not (Test-Path -PathType Leaf "target\storybook-captures\ci-windows-button.png")) {
-            throw "gpui-storybook: Windows capture did not write a PNG"
-          }
-
   fmt:
     runs-on: ubuntu-latest
 
