@@ -55,7 +55,6 @@ use panel::{
     ControlEditor, ScenarioRunState, SelectControlOption, SelectViewport, StoryVariantOption,
     StoryWorkbenchPanelState, story_source_url,
 };
-pub(crate) use state::WorkbenchEvent;
 pub use state::{WorkbenchState, WorkbenchTab};
 
 /// Right-side developer workbench for controls, themes, inspection, actions,

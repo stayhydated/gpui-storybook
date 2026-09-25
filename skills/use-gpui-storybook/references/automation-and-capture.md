@@ -79,7 +79,7 @@ JSON object per line in this order:
 
 Read the matching response ID before closing standard input. Use each entry's
 advertised `inputSchema` when constructing later calls.
-The first tool call waits up to 30 seconds for the gallery or dock to publish
+The first tool call waits up to 30 seconds for the gallery to publish
 its story catalog and attach the live automation host.
 
 Set `GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1` only when the client should receive
@@ -87,9 +87,9 @@ generic in-process interaction tools. The value must be exactly `1`; otherwise
 the tools are omitted. This capability can trigger any effect reachable from a
 story action or input handler, so use an inert fixture or a safe backend.
 
-The standard `Gallery::view` and `StoryWorkspace::view` constructors attach
+The standard `Gallery::view` constructor attaches
 the controller installed by `gpui_storybook::init`.
-Their `view_with_automation` variants carry the supplied controller into the
+Its `view_with_automation` variant carries the supplied controller into the
 Scenarios workbench even when it is not installed as the default global.
 Retain the MCP automation state across calls until the transport or
 application host is explicitly stopped.
@@ -140,7 +140,7 @@ element ID as its key and derives the label; use
 
 Capture requests also accept `responsive`, `mobile`, `tablet`, or `desktop` as
 a `viewport`. Explicit paired width and height take precedence. The live
-gallery or dock chrome remains mounted for layout, while the returned PNG is
+gallery chrome remains mounted for layout, while the returned PNG is
 cropped to the story region and excludes that chrome. The launch-env tool
 accepts the same named presets when dimensions are omitted. Treat the returned
 `pixel_width` and `pixel_height` as authoritative; viewport text rendered by a
@@ -233,14 +233,14 @@ a private Wayland runtime, waits for headless Sway, and then runs Cargo. On
 macOS, it invokes Cargo directly. It does not inline the capture or MCP
 variables.
 
-Captures exclude gallery or dock chrome. A substory route crops to its section.
+Captures exclude gallery chrome. A substory route crops to its section.
 Paired dimensions target the story region rather than collapsing the complete
 window. Use returned pixel dimensions as the rendered source of truth.
 
 ## Portable headless tests
 
 Use `gpui-storybook-test` when a test or CI job should run a story without the
-gallery, dock shell, MCP process, or external compositor lifecycle. Keep the
+gallery shell, MCP process, or external compositor lifecycle. Keep the
 story-bearing crate linked so inventory discovery retains its registrations.
 Each request creates a fresh `HeadlessAppContext`, initializes the core runtime
 and linked `story_init` hooks, constructs one registered story, applies typed

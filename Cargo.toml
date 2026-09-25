@@ -2,7 +2,6 @@
 default-members = [ "examples/story" ]
 members = [
   "crates/gpui-storybook",
-  "crates/gpui-storybook-components",
   "crates/gpui-storybook-core",
   "crates/gpui-storybook-macros",
   "crates/gpui-storybook-mcp",
@@ -46,7 +45,6 @@ gpui = { package = "gpui-pre", version = "=0.3.6" }
 gpui-kit = "0.6.6"
 gpui-es-fluent = "0.2.2"
 gpui-storybook = { path = "crates/gpui-storybook", version = "0.6.1" }
-gpui-storybook-components = { path = "crates/gpui-storybook-components", version = "0.6.1" }
 gpui-storybook-core = { path = "crates/gpui-storybook-core", version = "0.6.1" }
 gpui-storybook-launch = { path = "crates/gpui-storybook-launch", version = "0.6.1" }
 gpui-storybook-macros = { path = "crates/gpui-storybook-macros", version = "0.6.1" }

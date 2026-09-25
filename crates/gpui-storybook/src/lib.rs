@@ -3,7 +3,7 @@
 //! Most applications should depend on this crate rather than the lower-level
 //! runtime, macro, or TOML crates. It re-exports the standard runtime shell,
 //! typed controls and workbench state, story traits, locale helpers, the
-//! runtime-selectable Gallery/Dock window, and, with the default `macros`
+//! gallery window, and, with the default `macros`
 //! feature, the story registration macros.
 //! The Inspect workbench tab always shows the active story key and source.
 //! Enable the opt-in `inspector` feature for its GPUI Component Inspector
@@ -34,7 +34,7 @@
 //! [`init`] and `generate_stories` load crate-local `storybook.toml` files for
 //! discovered story crates and select a runtime config by matching the running
 //! binary name against registered story crate names. Initialization applies
-//! its initial `window_mode` and launch-only preference overrides; story
+//! launch-only preference overrides; story
 //! generation applies `allow` and `disable_story` filtering, then materializes
 //! sorted [`StoryContainer`] values. A story crate config's `group` becomes the
 //! sidebar's outer group; a story's declared section remains the nested label.
@@ -69,8 +69,8 @@
 //! typed [`StorybookOptions`] to [`init`] and await readiness before creating a
 //! story window.
 //!
-//! [`PreferenceState::saved`] retains durable user intent, including the
-//! Gallery/Dock window mode, `System` choices, and independent light/dark theme
+//! [`PreferenceState::saved`] retains durable user intent, including `System`
+//! choices and independent light/dark theme
 //! slots. Choosing a named theme also activates its matching appearance while
 //! preserving the opposite slot.
 //! [`PreferenceState::resolved`] reports effective values and their sources
@@ -103,8 +103,8 @@ pub use preferences::{
     PreferenceDiagnostic, PreferenceOverrides, PreferenceState, PreferredColorScheme,
     PreferredLanguage, PreferredLanguageMode, PreferredScrollbar, RecoveryDiagnostic,
     RecoveryReason, ResolutionDiagnostic, ResolvedPreferences, StorybookInitError,
-    StorybookOptions, StorybookPreferences, StorybookReady, StorybookWindowMode, SystemColorScheme,
-    ThemeId, ThemeIdError, ThemeResolution, ThemeSource, UnsupportedValueSource,
+    StorybookOptions, StorybookPreferences, StorybookReady, SystemColorScheme, ThemeId,
+    ThemeIdError, ThemeResolution, ThemeSource, UnsupportedValueSource,
 };
 
 pub use gpui_es_fluent::try_localize_message as localize_message;
@@ -114,7 +114,6 @@ pub use gpui_storybook_core::catalog::{
     static_story_catalog, static_story_catalog_json, static_story_catalog_json_pretty,
     write_static_catalog_json, write_static_catalog_json_pretty,
 };
-pub use gpui_storybook_core::dock_gallery::{StoryWorkspace, register_story_panels};
 pub use gpui_storybook_core::registry::{
     RegisteredStoryMetadata, StoryAutodoc, StoryKey, StoryName, StorySectionName,
 };

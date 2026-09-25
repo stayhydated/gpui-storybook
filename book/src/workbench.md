@@ -3,9 +3,8 @@
 The right-side workbench edits the selected story instance, previews the active
 theme, shows its key and source location, and inspects selected-story GPUI
 actions without rebuilding the application.
-It is available in both the gallery and dock workspace; grouped stories expose
-a **Variant** select so edits target one concrete variant. Gallery mode renders
-only that member, while dock mode opens selected members as independent tabs.
+Grouped stories expose a **Variant** select so edits target one concrete
+variant.
 
 Enable and forward the opt-in Inspector feature to add the **Open GPUI
 Inspector** button and story-root metadata:
@@ -246,10 +245,8 @@ together.
 
 Open a controlled story and change one value. Only that story instance should
 rerender, **Reset** should restore its example value, and switching the
-**Variant** select should replace the preview and displayed controls. In dock
-mode, select two variants and verify that each remains available in its own tab,
-then close and reopen the application to verify that workbench width, visibility,
-and selected tab restore with the layout.
+**Variant** select should replace the preview and displayed controls, with each
+variant remaining available in the sidebar.
 
 Live edits change serialized values and theme data. Changed Rust types or
 component source still require recompilation.

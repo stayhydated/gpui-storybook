@@ -160,12 +160,6 @@ appearance or language values before saved preferences load. Handle
 `StorybookInitError` instead of using `expect` in an application that needs
 graceful startup recovery.
 
-Use the title-bar **Layout** select to switch between Gallery and Dock
-workspace. The consumer-scoped preference makes that selection the initial
-layout on the next launch. Set top-level `window_mode = "gallery"` or
-`window_mode = "dock"` in the active `storybook.toml` when the binary needs a
-configured initial layout instead.
-
 ## Run the binary
 
 Run the package that owns the entry point:

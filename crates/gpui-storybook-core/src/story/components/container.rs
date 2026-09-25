@@ -140,6 +140,7 @@ impl StoryContainer {
             scenarios: Vec::new(),
             recreate: None,
             recreation_generation: 0,
+            workbench_focus_subscription: None,
         }
     }
 
@@ -188,6 +189,7 @@ impl StoryContainer {
             story.description_fn = Some(Box::new(S::description));
             story.scenarios = scenarios;
             story.recreate = Some(recreate_story::<S>);
+            story.track_workbench_focus(window, cx);
             story
         })
     }
@@ -276,6 +278,39 @@ impl StoryContainer {
         self.recreation_generation
     }
 
+    /// Makes this story the workbench's active story when it, or a descendant,
+    /// gains focus.
+    ///
+    /// Panel activation already updates the workbench when this story becomes
+    /// its group's displayed tab. In a dock with several panes, more than one
+    /// story can be displayed at once, so clicking into a story that is already
+    /// its group's active tab produced no activation edge; focus is the signal
+    /// that the user moved to it.
+    fn track_workbench_focus(&mut self, window: &mut Window, cx: &mut gpui_kit::Context<Self>) {
+        let focus_handle = self.focus_handle.clone();
+        self.workbench_focus_subscription =
+            Some(cx.on_focus_in(&focus_handle, window, |story, window, cx| {
+                story.activate_workbench(window, cx)
+            }));
+    }
+
+    fn activate_workbench(&mut self, window: &mut Window, cx: &mut gpui_kit::Context<Self>) {
+        let Some(state) = self
+            .workbench_state
+            .as_ref()
+            .and_then(gpui_kit::WeakEntity::upgrade)
+        else {
+            return;
+        };
+        let story = cx.entity();
+        // Defer past this story's own update: `set_active_story` applies
+        // presentation back to the story, which cannot re-enter the active
+        // `update` that is running the focus listener.
+        window.defer(cx, move |_window, cx| {
+            state.update(cx, |state, cx| state.set_active_story(Some(story), cx));
+        });
+    }
+
     /// Recreates the concrete story entity and all runtime adapters used by it.
     ///
     /// Scenario runs use this seam before applying their initial controls and
@@ -314,6 +349,7 @@ impl StoryContainer {
         self.action_scope_focus_handle = action_scope_focus_handle;
         self.story_scroll_handle = ScrollHandle::new();
         self.canvas_resize_drag = None;
+        self.track_workbench_focus(window, cx);
         self.recreation_generation = self
             .recreation_generation
             .checked_add(1)

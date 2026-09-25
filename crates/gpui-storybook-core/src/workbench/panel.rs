@@ -145,15 +145,6 @@ impl StoryWorkbench {
         this
     }
 
-    pub(crate) fn selected_tab_from_panel(info: &PanelInfo) -> WorkbenchTab {
-        let PanelInfo::Panel(value) = info else {
-            return WorkbenchTab::default();
-        };
-        serde_json::from_value::<StoryWorkbenchPanelState>(value.clone())
-            .unwrap_or_default()
-            .selected_tab
-    }
-
     pub(super) fn active_story(&self, cx: &App) -> Option<Entity<StoryContainer>> {
         self.state.read(cx).active_story()
     }

@@ -32,7 +32,6 @@ struct AppliedTheme {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum PreferenceEdit {
-    WindowMode(StorybookWindowMode),
     ColorScheme(PreferredColorScheme),
     Theme {
         scheme: SystemColorScheme,
@@ -45,7 +44,6 @@ enum PreferenceEdit {
 impl PreferenceEdit {
     fn apply_to(&self, preferences: &mut StorybookPreferences) {
         match self {
-            Self::WindowMode(value) => preferences.window_mode = *value,
             Self::ColorScheme(value) => preferences.color_scheme = *value,
             Self::Theme { scheme, theme } => match scheme {
                 SystemColorScheme::Light => preferences.light_theme = theme.clone(),
@@ -59,7 +57,6 @@ impl PreferenceEdit {
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 struct PreferenceEdits {
-    window_mode: Option<StorybookWindowMode>,
     color_scheme: Option<PreferredColorScheme>,
     light_theme: Option<Option<ThemeId>>,
     dark_theme: Option<Option<ThemeId>>,
@@ -69,8 +66,7 @@ struct PreferenceEdits {
 
 impl PreferenceEdits {
     fn is_empty(&self) -> bool {
-        self.window_mode.is_none()
-            && self.color_scheme.is_none()
+        self.color_scheme.is_none()
             && self.light_theme.is_none()
             && self.dark_theme.is_none()
             && self.language.is_none()
@@ -79,7 +75,6 @@ impl PreferenceEdits {
 
     fn record(&mut self, edit: PreferenceEdit) {
         match edit {
-            PreferenceEdit::WindowMode(value) => self.window_mode = Some(value),
             PreferenceEdit::ColorScheme(value) => self.color_scheme = Some(value),
             PreferenceEdit::Theme { scheme, theme } => match scheme {
                 SystemColorScheme::Light => self.light_theme = Some(theme),
@@ -91,9 +86,6 @@ impl PreferenceEdits {
     }
 
     fn apply_to(&self, preferences: &mut StorybookPreferences) {
-        if let Some(value) = self.window_mode {
-            preferences.window_mode = value;
-        }
         if let Some(value) = self.color_scheme {
             preferences.color_scheme = value;
         }
@@ -112,9 +104,6 @@ impl PreferenceEdits {
     }
 
     fn coalesce(&mut self, newer: Self) {
-        if newer.window_mode.is_some() {
-            self.window_mode = newer.window_mode;
-        }
         if newer.color_scheme.is_some() {
             self.color_scheme = newer.color_scheme;
         }
@@ -562,10 +551,6 @@ where
 
     fn select_scrollbar(&mut self, value: PreferredScrollbar, cx: &mut App) {
         self.optimistic_change(PreferenceEdit::Scrollbar(value), cx);
-    }
-
-    fn select_window_mode(&mut self, value: StorybookWindowMode, cx: &mut App) {
-        self.optimistic_change(PreferenceEdit::WindowMode(value), cx);
     }
 
     fn window_appearance_changed(&mut self, window: &mut Window, cx: &mut App) {

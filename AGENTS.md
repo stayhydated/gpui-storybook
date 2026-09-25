@@ -10,13 +10,12 @@ registration styles: `examples/story` uses `#[story]` with `Story`, while
 | Surface | Audience and responsibility |
 |---|---|
 | `crates/gpui-storybook` | Application facade: initialization, discovery, filtering, and public re-exports |
-| `crates/gpui-storybook-core` | Runtime integration: gallery, dock, workbench, story containers, preferences UI, and automation |
+| `crates/gpui-storybook-core` | Runtime integration: gallery, workbench, story containers, preferences UI, and automation |
 | `crates/gpui-storybook-macros` | Public macro syntax and generated registrations, controls, and substory keys |
 | `crates/gpui-storybook-toml` | Public configuration schema, loading, and filters |
 | `crates/gpui-storybook-mcp` | Linux/macOS MCP tools, stdio serving, and capture launch helpers |
 | `crates/gpui-storybook-launch` | Standalone Linux command that owns the headless Sway lifecycle |
 | `crates/gpui-storybook-test` | Public test integration: fresh story contexts, captures, matrices, baselines, and frame budgets |
-| `crates/gpui-storybook-components` | Internal sidebar and drag components used by the runtime |
 | `crates/gpui-storybook-preferences` | Internal typed persistence, system detection, and preference resolution |
 | `examples/story`, `examples/component` | Executable application examples and registration fixtures |
 | `book/src` | Application user guide; navigate through `SUMMARY.md` |
@@ -48,8 +47,7 @@ instructions and book or API navigation to those linked surfaces.
 - **Configuration:** synchronize TOML field semantics and runtime selection with
   both example `storybook.toml` files. `disable_story` matches registered type
   names; display titles and route keys are separate identities.
-- **Runtime and dock behavior:** update the owning core Rustdocs and runtime
-  tests. Update the components README when shared sidebar primitives change.
+- **Runtime behavior:** update the owning core Rustdocs and runtime tests.
 - **Automation and capture:** keep MCP schemas, core automation/capture
   contracts, examples, and the automation skill reference aligned.
 - **Portable tests:** keep the test crate README, portable-testing and automation

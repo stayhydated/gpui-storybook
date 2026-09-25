@@ -7,8 +7,8 @@ Storybook supplies the focusable wrapper.
 ## Overview
 
 The example covers literal, computed, and localized metadata; typed controls
-whose reset values come from `example = ...`; grouped variants; runtime
-Gallery/Dock selection; and component-owned scenarios. It also shows how
+whose reset values come from `example = ...`; grouped variants; and
+component-owned scenarios. It also shows how
 components expose stable semantic targets and serialized values to automation.
 
 The `inspector`, `performance`, and `mcp` features forward the corresponding

@@ -5,8 +5,8 @@
 [![Book][book-badge]][book]
 [![crates.io: gpui-storybook][gpui-storybook-badge]][gpui-storybook-crate]
 
-GPUI Storybook gives application developers a searchable gallery and dock
-workspace for developing, inspecting, and exercising GPUI components outside
+GPUI Storybook gives application developers a searchable gallery
+for developing, inspecting, and exercising GPUI components outside
 the rest of their application.
 
 ## Overview

@@ -92,7 +92,6 @@ pub(super) fn supported_languages() -> SupportedLanguages {
 
 pub(super) fn saved_preferences() -> StorybookPreferences {
     StorybookPreferences {
-        window_mode: StorybookWindowMode::Dock,
         color_scheme: PreferredColorScheme::System,
         light_theme: Some(theme("light-paper")),
         dark_theme: Some(theme("dark-ocean")),

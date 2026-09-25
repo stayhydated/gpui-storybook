@@ -9,7 +9,7 @@ standard initialization and discovery flow should use [`gpui-storybook`][facade]
 
 ## Overview
 
-The crate owns gallery and dock layouts, story containers, controls and
+The crate owns the gallery layout, story containers, controls and
 workbench state, theme and preference UI, viewport presentation, localization,
 and the shared automation controller. Its optional `capture`, `inspector`, and
 `performance` features expose the corresponding lower-level runtime surfaces.

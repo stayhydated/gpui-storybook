@@ -2,8 +2,8 @@ use gpui_kit::{
     Action, AnyElement, AnyView, App, AppContext as _, Axis, Bounds, ClickEvent, Div,
     DragMoveEvent, Empty, Entity, EntityId, EventEmitter, Focusable, Hsla, InteractiveElement as _,
     IntoElement, ParentElement, Pixels, Point, Render, RenderOnce, ScrollHandle, SharedString,
-    Size, StatefulInteractiveElement as _, StyleRefinement, Styled, Window, div, hsla,
-    prelude::FluentBuilder as _, px, rems, size,
+    Size, StatefulInteractiveElement as _, StyleRefinement, Styled, Subscription, Window, div,
+    hsla, prelude::FluentBuilder as _, px, rems, size,
 };
 
 use serde::{Deserialize, Serialize};
@@ -24,7 +24,7 @@ use gpui_kit::component::{
     button::{Button, ButtonVariants as _},
     dock::{
         BasePanel, Panel, PanelControl, PanelEvent, PanelId, PanelInfo, PanelState, TabGroup,
-        TitleStyle, panel_handle,
+        TitleStyle,
     },
     group_box::{GroupBox, GroupBoxVariants as _},
     h_flex,
@@ -115,6 +115,7 @@ pub struct StoryContainer {
     scenarios: Vec<StoryScenario>,
     recreate: Option<StoryRecreateFn>,
     recreation_generation: u64,
+    workbench_focus_subscription: Option<Subscription>,
 }
 
 mod container;
@@ -126,7 +127,6 @@ mod section;
 
 pub use container::{ContainerEvent, Story, parse_story_group_klass};
 pub use metadata::StoryState;
-pub use panel::reveal_story_panel;
 pub use section::{
     ShowPanelInfo, StorySection, StorySectionBase, StorySectionTitle, Substory, section,
 };

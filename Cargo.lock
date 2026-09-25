@@ -4785,13 +4785,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "gpui-storybook-components"
-version = "0.6.1"
-dependencies = [
- "gpui-kit",
-]
-
-[[package]]
 name = "gpui-storybook-core"
 version = "0.6.1"
 dependencies = [
@@ -4806,7 +4799,6 @@ dependencies = [
  "gpui-kit",
  "gpui-pre",
  "gpui-pre-platform",
- "gpui-storybook-components",
  "gpui-storybook-preferences",
  "gtk",
  "image",

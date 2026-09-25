@@ -37,8 +37,8 @@ pub use resolution::{
 pub use value::{
     ConsumerId, ConsumerIdError, LanguageTag, LanguageTagError, MAX_CONSUMER_ID_LEN,
     MAX_LANGUAGE_TAG_LEN, MAX_THEME_ID_LEN, PreferenceRecord, PreferredColorScheme,
-    PreferredLanguage, PreferredLanguageMode, PreferredScrollbar, StorybookPreferences,
-    StorybookWindowMode, ThemeId, ThemeIdError,
+    PreferredLanguage, PreferredLanguageMode, PreferredScrollbar, StorybookPreferences, ThemeId,
+    ThemeIdError,
 };
 
 #[cfg(test)]

@@ -12,7 +12,6 @@ applies it during initialization and story discovery.
 
 ```toml
 group = "UI Kit"
-window_mode = "dock"
 allow = ["UI Kit", "Shared"]
 disable_story = ["ExperimentalCardStory"]
 

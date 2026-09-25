@@ -30,7 +30,6 @@ es-fluent-manager-embedded = { workspace = true }
 gpui = { optional = true, workspace = true }
 gpui-kit = { workspace = true }
 gpui-es-fluent = { workspace = true }
-gpui-storybook-components = { workspace = true }
 gpui-storybook-preferences = { workspace = true }
 gpui_platform = { optional = true, workspace = true }
 image = { optional = true, workspace = true }

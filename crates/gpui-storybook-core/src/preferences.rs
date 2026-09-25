@@ -17,7 +17,7 @@ use gpui_storybook_preferences::{
     PreferenceRepository, PreferredColorScheme, PreferredLanguage, PreferredScrollbar,
     RecoveryDiagnostic, RepositoryOpenError, RepositoryOptions, ResolutionDiagnostic,
     ResolutionOverrides, ResolvePreferencesError, ResolvedPreferences, StorybookPreferences,
-    StorybookWindowMode, SupportedLanguages, SystemColorScheme, ThemeId, resolve_preferences,
+    SupportedLanguages, SystemColorScheme, ThemeId, resolve_preferences,
 };
 use unic_langid::LanguageIdentifier;
 
@@ -130,7 +130,6 @@ pub(crate) trait PreferenceRuntime: 'static {
     fn select_theme(&mut self, scheme: SystemColorScheme, theme: ThemeId, cx: &mut App);
     fn select_language(&mut self, value: PreferredLanguage, cx: &mut App);
     fn select_scrollbar(&mut self, value: PreferredScrollbar, cx: &mut App);
-    fn select_window_mode(&mut self, value: StorybookWindowMode, cx: &mut App);
     fn window_appearance_changed(&mut self, window: &mut Window, cx: &mut App);
     fn window_activated(&mut self, window: &mut Window, cx: &mut App);
     #[cfg(not(target_family = "wasm"))]
@@ -155,7 +154,7 @@ pub(crate) use api::available_locales;
 pub(crate) use api::theme_registry_changed;
 pub use api::{
     initialize, retry_preferences, select_color_scheme, select_language, select_scrollbar,
-    select_theme, select_window_mode, try_state, window_activated, window_appearance_changed,
+    select_theme, try_state, window_activated, window_appearance_changed,
 };
 pub(crate) use resolution::explicit_language;
 pub use resolution::{color_scheme, repository_options};

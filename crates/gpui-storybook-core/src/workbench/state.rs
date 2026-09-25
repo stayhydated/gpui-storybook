@@ -14,10 +14,6 @@ pub enum WorkbenchTab {
     Performance,
 }
 
-pub(crate) enum WorkbenchEvent {
-    OpenVariant(Entity<StoryContainer>),
-}
-
 impl WorkbenchTab {
     pub(super) fn index(self) -> usize {
         match self {
@@ -190,10 +186,8 @@ impl WorkbenchState {
                 .any(|member| member == &story)
         });
         if belongs_to_group || self.active_group.as_ref() == Some(&story) {
-            let variant = story.clone();
             self.active_story = Some(story);
             self.apply_presentation(cx);
-            cx.emit(WorkbenchEvent::OpenVariant(variant));
             cx.notify();
         }
     }
@@ -363,5 +357,3 @@ impl WorkbenchState {
         Ok(())
     }
 }
-
-impl EventEmitter<WorkbenchEvent> for WorkbenchState {}

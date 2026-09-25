@@ -88,8 +88,8 @@ sort alphabetically.
 
 Registrations with the same visible title, group, and section become concrete
 variants behind one navigation entry. Give each a concise description so the
-workbench **Variant** select has distinct option labels. Gallery mode renders
-the selected member, and dock mode opens selected members as independent tabs.
+workbench **Variant** select has distinct option labels. The gallery renders
+the selected member.
 
 Use `#[gpui_storybook::story_init]` for application setup that runs once after
 the core runtime is installed and before preference readiness begins.
