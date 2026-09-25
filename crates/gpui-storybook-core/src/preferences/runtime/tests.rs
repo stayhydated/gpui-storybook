@@ -114,7 +114,6 @@ fn load_configured_test_theme(cx: &mut App) {
 
 fn non_default_preferences() -> StorybookPreferences {
     StorybookPreferences {
-        window_mode: StorybookWindowMode::Dock,
         color_scheme: PreferredColorScheme::Light,
         light_theme: Some(ThemeId::new("Solarized Light").expect("valid light theme")),
         dark_theme: Some(ThemeId::new("Solarized Dark").expect("valid dark theme")),
@@ -264,7 +263,6 @@ fn theme_registry_change_reapplies_the_same_effective_theme_once(cx: &mut App) {
 fn preference_edits_coalesce_latest_values_without_replacing_untouched_fields() {
     let baseline = non_default_preferences();
     let mut edits = PreferenceEdits::default();
-    edits.record(PreferenceEdit::WindowMode(StorybookWindowMode::Gallery));
     edits.record(PreferenceEdit::ColorScheme(PreferredColorScheme::Dark));
     edits.record(PreferenceEdit::Language(PreferredLanguage::Explicit(
         LanguageTag::new("en-US").expect("valid regional English tag"),
@@ -277,7 +275,6 @@ fn preference_edits_coalesce_latest_values_without_replacing_untouched_fields() 
 
     let mut merged = baseline.clone();
     edits.apply_to(&mut merged);
-    assert_eq!(merged.window_mode, StorybookWindowMode::Gallery);
     assert_eq!(merged.color_scheme, PreferredColorScheme::System);
     assert_eq!(merged.light_theme, None);
     assert_eq!(
@@ -623,29 +620,6 @@ fn scrollbar_selection_updates_saved_and_resolved_state(cx: &mut App) {
     assert_eq!(runtime.state.saved.scrollbar, PreferredScrollbar::Always);
     assert_eq!(runtime.state.resolved.scrollbar, PreferredScrollbar::Always);
     assert_eq!(Theme::global(cx).scrollbar_mode, ScrollbarMode::Always);
-}
-
-#[gpui_kit::test]
-fn window_mode_selection_updates_saved_state(cx: &mut App) {
-    init_test_runtime(cx);
-    let mut runtime = Runtime::new(
-        test_options(
-            SystemColorScheme::Light,
-            ResolutionOverrides::default(),
-            successful_callback(),
-        ),
-        cx,
-    )
-    .expect("runtime resolves");
-    runtime.save_in_flight = true;
-
-    runtime.select_window_mode(StorybookWindowMode::Dock, cx);
-
-    assert_eq!(runtime.state.saved.window_mode, StorybookWindowMode::Dock);
-    assert_eq!(
-        runtime.pending_edits.window_mode,
-        Some(StorybookWindowMode::Dock)
-    );
 }
 
 #[gpui_kit::test]

@@ -146,39 +146,6 @@ impl Panel for StoryContainer {
     }
 }
 
-pub fn reveal_story_panel(
-    story: &Entity<StoryContainer>,
-    window: &mut Window,
-    cx: &mut App,
-) -> bool {
-    let (is_active, tab_group) = {
-        let story = story.read(cx);
-        (story.is_active, story.tab_group.clone())
-    };
-
-    if is_active {
-        return true;
-    }
-
-    let Some(tab_group) = tab_group.and_then(|tab| tab.upgrade()) else {
-        return false;
-    };
-
-    let panel = panel_handle(story.clone());
-    tab_group.update(cx, |tab_group, cx| {
-        let Some(ix) = tab_group
-            .panels()
-            .iter()
-            .position(|candidate| candidate.panel_id(cx) == panel.panel_id(cx))
-        else {
-            return;
-        };
-        tab_group.select_tab(ix, window, cx);
-    });
-
-    true
-}
-
 impl EventEmitter<PanelEvent> for StoryContainer {}
 impl Focusable for StoryContainer {
     fn focus_handle(&self, _: &App) -> gpui_kit::FocusHandle {

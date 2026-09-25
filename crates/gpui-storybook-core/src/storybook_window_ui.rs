@@ -1,26 +1,10 @@
-use gpui_kit::{AnyElement, App, Entity, Global, IntoElement, MenuItem, Window};
-use gpui_storybook_preferences::StorybookWindowMode;
+use gpui_kit::{AnyElement, App, Entity, IntoElement, MenuItem, Window};
 
 use crate::story::StoryContainer;
 use std::rc::Rc;
 
 pub type AppMenuItemsBuilder = Rc<dyn Fn(&App) -> Vec<MenuItem>>;
 pub type TitleBarItemsBuilder = Rc<dyn Fn(&mut Window, &mut App) -> AnyElement>;
-
-struct ConfiguredStorybookWindowMode(StorybookWindowMode);
-
-impl Global for ConfiguredStorybookWindowMode {}
-
-/// Installs the launch-specific window mode selected by the facade config.
-#[doc(hidden)]
-pub fn set_configured_storybook_window_mode(mode: StorybookWindowMode, cx: &mut App) {
-    cx.set_global(ConfiguredStorybookWindowMode(mode));
-}
-
-pub(crate) fn configured_storybook_window_mode(cx: &App) -> Option<StorybookWindowMode> {
-    cx.try_global::<ConfiguredStorybookWindowMode>()
-        .map(|configured| configured.0)
-}
 
 #[derive(Clone, Default)]
 pub struct StorybookWindowUi {
@@ -55,15 +39,12 @@ impl StorybookWindowUi {
 
 /// Stories and window-level presentation used by [`create_storybook_window`].
 ///
-/// Construct this in the window callback after generating stories. The active
-/// `storybook.toml` mode takes precedence over the saved consumer preference;
-/// [`Self::with_mode`] takes precedence over both.
+/// Construct this in the window callback after generating stories.
 ///
 /// [`create_storybook_window`]: crate::story::create_storybook_window
 pub struct StorybookWindow {
     pub(crate) stories: Vec<Entity<StoryContainer>>,
     pub(crate) ui: StorybookWindowUi,
-    pub(crate) mode: Option<StorybookWindowMode>,
 }
 
 impl StorybookWindow {
@@ -72,23 +53,12 @@ impl StorybookWindow {
         Self {
             stories,
             ui: StorybookWindowUi::default(),
-            mode: None,
         }
     }
 
     /// Adds application-owned menu and title-bar content.
     pub fn with_ui(mut self, ui: StorybookWindowUi) -> Self {
         self.ui = ui;
-        self
-    }
-
-    /// Selects a launch-specific initial window mode.
-    ///
-    /// This takes precedence over `storybook.toml` and the saved consumer
-    /// preference. The title-bar selector remains available and saves later
-    /// user choices.
-    pub fn with_mode(mut self, mode: StorybookWindowMode) -> Self {
-        self.mode = Some(mode);
         self
     }
 }
@@ -115,11 +85,8 @@ mod tests {
         );
         assert!(ui.title_bar_items.is_some());
 
-        let wrapper = StorybookWindow::new(Vec::new())
-            .with_ui(ui)
-            .with_mode(StorybookWindowMode::Dock);
+        let wrapper = StorybookWindow::new(Vec::new()).with_ui(ui);
         assert!(wrapper.stories.is_empty());
-        assert_eq!(wrapper.mode, Some(StorybookWindowMode::Dock));
         assert!(wrapper.ui.app_menu_items.is_some());
         assert!(wrapper.ui.title_bar_items.is_some());
     }

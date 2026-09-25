@@ -3,7 +3,7 @@
 `gpui-storybook-test` runs registered stories in fresh
 `gpui_kit::HeadlessAppContext` instances. Use it for story-isolated integration
 tests, PNG capture, visual baselines, capture matrices, and optional GPUI frame
-budgets without opening the gallery or dock shell.
+budgets without opening the gallery shell.
 
 Add it as a development dependency. Enable `performance` only when tests need
 GPUI profiler samples and budgets:

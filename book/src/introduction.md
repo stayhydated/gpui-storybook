@@ -9,7 +9,7 @@ roots, switch appearance and language, and capture stable story routes.
 
 A Storybook binary can provide:
 
-- a searchable gallery and a dock workspace selected at runtime;
+- a searchable gallery with a centered story canvas;
 - stateful stories with their own interaction focus, explicit root action
   scope, and lifecycle;
 - component stories generated from example data;
@@ -37,14 +37,11 @@ expression. Storybook generates the wrapper entity.
 Both styles produce the same searchable story metadata and stable automation
 keys. You can mix them in one binary.
 
-## Choose a window mode
+## Open the Storybook window
 
-Open the standard Storybook window, then use its title-bar **Layout** select to
-switch between the focused Gallery and the panel-based Dock workspace.
-Storybook saves the typed mode per consumer; story registration, configuration,
-and the workbench remain shared between both layouts. The active
-`storybook.toml` can set `window_mode = "gallery"` or `window_mode = "dock"`
-for a launch-specific initial layout.
+Open the standard Storybook window to browse stories, edit live controls, and
+inspect the selected story. Story registration, configuration, and the
+workbench are shared across the window.
 
 ## Next steps
 

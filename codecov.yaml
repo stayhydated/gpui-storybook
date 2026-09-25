@@ -9,11 +9,6 @@ component_management:
       paths:
         - crates/gpui-storybook/**
 
-    - component_id: gpui-storybook-components
-      name: "gpui-storybook-components"
-      paths:
-        - crates/gpui-storybook-components/**
-
     - component_id: gpui-storybook-core
       name: "gpui-storybook-core"
       paths:

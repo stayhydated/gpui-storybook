@@ -79,20 +79,6 @@ fn grouped_story_select_targets_one_concrete_variant(cx: &mut TestAppContext) {
     assert_eq!(variant_count, 2);
 }
 
-#[test]
-fn persisted_panel_state_restores_the_selected_tab() {
-    let info = PanelInfo::panel(
-        serde_json::to_value(StoryWorkbenchPanelState {
-            selected_tab: WorkbenchTab::Theme,
-        })
-        .expect("panel state serializes"),
-    );
-    assert_eq!(
-        StoryWorkbench::selected_tab_from_panel(&info),
-        WorkbenchTab::Theme
-    );
-}
-
 #[gpui_kit::test]
 fn window_scoped_states_keep_preview_independent(cx: &mut App) {
     let first = cx.new(|cx| WorkbenchState::new(None, cx));

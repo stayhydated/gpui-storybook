@@ -6,7 +6,7 @@ previews that own GPUI state, focus, actions, lifecycle, or custom wrapper UI.
 ## Overview
 
 The example covers typed `StoryControls`, stable `Substory` routes, grouped
-variants, runtime Gallery/Dock selection, scoped workbench actions, declared
+variants, scoped workbench actions, declared
 scenarios, static catalog export, and semantic automation targets and values.
 `InteractionStory` is the inert fixture for MCP input and structured-state
 checks, while `ActionsAndScenariosStory` demonstrates one command model shared

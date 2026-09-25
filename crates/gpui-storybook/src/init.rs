@@ -45,10 +45,8 @@ where
 /// the first window so saved theme and language intent is applied before the
 /// first frame.
 ///
-/// The active runtime `storybook.toml` may provide an initial window mode and
-/// launch-only preference overrides. A per-window
-/// [`StorybookWindow::with_mode`] value takes precedence over the TOML mode,
-/// which takes precedence over the saved window preference. Values supplied
+/// The active runtime `storybook.toml` may provide launch-only preference
+/// overrides. Values supplied
 /// through [`StorybookOptions::with_overrides`] take precedence field by field
 /// over TOML preference overrides, and deterministic automation profiles take
 /// precedence over both.
@@ -77,10 +75,6 @@ where
     }
 
     let init_context = load_init_context()?;
-    let configured_window_mode = init_context
-        .runtime_config
-        .as_ref()
-        .and_then(|config| config.window_mode);
     if let Some(runtime_config) = init_context.runtime_config.as_ref() {
         apply_toml_preference_overrides(&mut options.overrides, runtime_config)?;
     }
@@ -171,9 +165,6 @@ where
             category: "embedded_localization".to_owned(),
         }
     })?;
-    if let Some(mode) = configured_window_mode {
-        gpui_storybook_core::storybook_window_ui::set_configured_storybook_window_mode(mode, cx);
-    }
     let global_init_count = inventory::iter::<__registry::InitEntry>().count();
     if global_init_count > 0 {
         tracing::info!("Discovered {} global init function(s)", global_init_count);

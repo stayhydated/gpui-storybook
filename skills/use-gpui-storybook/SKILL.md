@@ -24,7 +24,7 @@ then open the window.
 ## Choose the relevant reference
 
 - [Setup and configuration](references/setup-and-configuration.md): binary
-  startup, locale adapter, preferences, gallery/dock mode, optional workbench
+  startup, locale adapter, preferences, optional workbench
   features, and `storybook.toml`.
 - [Story authoring](references/story-authoring.md): registration style,
   metadata, typed controls, action scopes, scenarios, sections, and substories.
@@ -39,12 +39,10 @@ then open the window.
   the registered type name.
 - Keep control metadata and values on the typed story entity. Only marked
   fields become controls; component defaults come from the configured example.
-- Use `StorybookWindow::new` with `create_storybook_window`. Initial layout
-  precedence is per-window `with_mode`, active TOML `window_mode`, then the
-  saved preference. The title-bar selector can change and save the later choice.
+- Use `StorybookWindow::new` with `create_storybook_window`.
 - Keep preview and selection state scoped to the Storybook window. Duplicate
   titles within one group and section are concrete variants behind one
-  navigation entry; dock mode opens selected members in independent tabs.
+  navigation entry.
 - Expose Actions-tab commands through `Story::action_scope_focus_handle` on the
   handler-owning root. Keep that handle separate from nested input focus.
 - Keep reusable flows in `Story::scenarios()` or the component derive's

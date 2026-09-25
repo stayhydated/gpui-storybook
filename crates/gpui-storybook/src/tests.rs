@@ -142,7 +142,6 @@ fn with_temp_dir(test_fn: impl FnOnce(&Path)) {
 fn runtime_config(allow: &[&str]) -> gpui_storybook_toml::StorybookToml {
     gpui_storybook_toml::StorybookToml {
         group: "storybook-app".into(),
-        window_mode: None,
         allow: Some(allow.iter().map(|group| (*group).to_string()).collect()),
         disable_story: Vec::new(),
         overrides: gpui_storybook_toml::StorybookPreferenceOverrides::default(),
@@ -541,17 +540,10 @@ fn config_loading_handles_valid_missing_and_invalid_files() {
 
         assert_eq!(load_storybook_config(&entry), None);
 
-        std::fs::write(
-            dir.join("storybook.toml"),
-            "group = \"Temp\"\nwindow_mode = \"dock\"\n",
-        )
-        .expect("valid config should be written");
+        std::fs::write(dir.join("storybook.toml"), "group = \"Temp\"\n")
+            .expect("valid config should be written");
         let config = load_storybook_config(&entry).expect("valid config should load");
         assert_eq!(config.group, "Temp");
-        assert_eq!(
-            config.window_mode,
-            Some(gpui_storybook_toml::StorybookWindowMode::Dock)
-        );
 
         std::fs::write(dir.join("storybook.toml"), "invalid = true\n")
             .expect("invalid config should be written");

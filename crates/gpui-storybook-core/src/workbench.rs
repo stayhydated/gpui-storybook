@@ -31,8 +31,8 @@ use gpui_kit::component::{
 use gpui_kit::{
     Action, AnyElement, App, AppContext as _, ClipboardItem, Context, Entity, EntityId,
     EventEmitter, FocusHandle, Focusable, InteractiveElement as _, IntoElement, KeyBinding,
-    ParentElement as _, Pixels, Render, SharedString, Size, Styled as _, Subscription, Window, div,
-    prelude::FluentBuilder as _, px, size,
+    ParentElement as _, Pixels, Render, ScrollHandle, ScrollWheelEvent, SharedString, Size,
+    Styled as _, Subscription, Window, div, point, prelude::FluentBuilder as _, px, size,
 };
 use serde::{Deserialize, Serialize};
 #[cfg(not(target_family = "wasm"))]
@@ -55,7 +55,6 @@ use panel::{
     ControlEditor, ScenarioRunState, SelectControlOption, SelectViewport, StoryVariantOption,
     StoryWorkbenchPanelState, story_source_url,
 };
-pub(crate) use state::WorkbenchEvent;
 pub use state::{WorkbenchState, WorkbenchTab};
 
 /// Right-side developer workbench for controls, themes, inspection, actions,
@@ -66,6 +65,7 @@ pub struct StoryWorkbench {
     variant_select: Entity<SelectState<Vec<StoryVariantOption>>>,
     variant_options: Vec<StoryVariantOption>,
     selected_tab: WorkbenchTab,
+    tab_scroll_handle: ScrollHandle,
     editor_story: Option<(EntityId, u64)>,
     editors: BTreeMap<String, ControlEditor>,
     editor_subscriptions: Vec<Subscription>,

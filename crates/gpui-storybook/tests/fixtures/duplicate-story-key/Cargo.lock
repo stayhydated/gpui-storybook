@@ -1748,13 +1748,12 @@ dependencies = [
 
 [[package]]
 name = "encoding_rs"
-version = "0.8.41"
+version = "0.8.42"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b5ef0006ac9ab233c38522f5ae99cae3625151de8f706cacee1cba4b8e2832a"
+checksum = "8e985e0451871ad22fb8d2b6b076e2028a502a0d3950998c2c5c0a4f9b5d9679"
 dependencies = [
  "cfg-if",
  "core_detect",
- "multiversion",
  "multiversion_no_op",
  "rustversion",
  "scopeguard",
@@ -3485,7 +3484,7 @@ checksum = "a1bb25850ad31b88bbdef454afb93ec4cdb81f5e200ba5b3f1a0368111780d2c"
 
 [[package]]
 name = "gpui-storybook"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "gpui-es-fluent",
  "gpui-kit",
@@ -3502,15 +3501,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "gpui-storybook-components"
-version = "0.6.1"
-dependencies = [
- "gpui-kit",
-]
-
-[[package]]
 name = "gpui-storybook-core"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "anyhow",
  "base64 0.23.1",
@@ -3521,7 +3513,6 @@ dependencies = [
  "es-fluent-manager-embedded",
  "gpui-es-fluent",
  "gpui-kit",
- "gpui-storybook-components",
  "gpui-storybook-preferences",
  "gtk",
  "inventory",
@@ -3548,7 +3539,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-storybook-macros"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "darling",
  "heck 0.5.0",
@@ -3559,7 +3550,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-storybook-preferences"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "fluent-langneg 0.14.2",
  "schemars",
@@ -3576,9 +3567,8 @@ dependencies = [
 
 [[package]]
 name = "gpui-storybook-toml"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
- "gpui-storybook-preferences",
  "serde",
  "toml 1.1.6+spec-1.1.0",
 ]
@@ -3888,15 +3878,16 @@ dependencies = [
 
 [[package]]
 name = "hyper-util"
-version = "0.1.20"
+version = "0.1.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "96547c2556ec9d12fb1578c4eaf448b04993e7fb79cbaad930a656880a6bdfa0"
+checksum = "ddc03d96684f9226b8a787cdb71488417b53ab5ea8fdb1dac946cb9431cc8bff"
 dependencies = [
  "bytes",
  "futures-channel",
  "futures-util",
  "http",
  "http-body",
+ "httparse",
  "hyper",
  "libc",
  "pin-project-lite",
@@ -4894,27 +4885,6 @@ checksum = "bb85c154ba489f01b25c0d36ae69a87e4a1c73a72631fc6c0eb6dde34a73e44b"
 dependencies = [
  "num-traits",
  "pxfm",
-]
-
-[[package]]
-name = "multiversion"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4ca4bea16ffc3f443cf7d866912118196bfef4c6a1556ca00f9f9b00bb43f7c"
-dependencies = [
- "multiversion-macros",
-]
-
-[[package]]
-name = "multiversion-macros"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d416831a7317ef4b08bee00b69cbbb9c8763da7959a7026244d6266869f9c83"
-dependencies = [
- "proc-macro2",
- "quote",
- "rustversion",
- "syn 3.0.6",
 ]
 
 [[package]]
@@ -9861,18 +9831,18 @@ checksum = "6df3dc4292935e51816d896edcd52aa30bc297907c26167fec31e2b0c6a32524"
 
 [[package]]
 name = "zerocopy"
-version = "0.8.57"
+version = "0.8.58"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d35102a9f36d089ccae9e4c6802bc118be4487b80aaffc0ab4e0cf5ce92d2873"
+checksum = "c17e8fafad82b542ff3717217ecdc736231b59e387768c9630123b4ce4d2db44"
 dependencies = [
  "zerocopy-derive",
 ]
 
 [[package]]
 name = "zerocopy-derive"
-version = "0.8.57"
+version = "0.8.58"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "146c01f5ab44258da43cf276c74a2763db2ff3969c9c652c3f2de07041d0b2bc"
+checksum = "595f56e044df4f46a0c9a626f65c3d99eb8488f7e8a8baa12dd76326d9710bf2"
 dependencies = [
  "proc-macro2",
  "quote",

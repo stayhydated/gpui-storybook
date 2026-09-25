@@ -41,17 +41,9 @@ by `_I18N_MODULE`.
 ## Window selection
 
 Use `create_storybook_window` and return `StorybookWindow::new(stories)` from
-its callback. The title-bar **Layout** select switches between Gallery and Dock
-workspace at runtime and saves the typed `StorybookWindowMode` for the consumer.
-Set top-level `window_mode = "dock"` in the active `storybook.toml` when the
-binary needs that initial layout. Use
-`StorybookWindow::with_mode(StorybookWindowMode::Dock)` for a per-window initial
-selection. Precedence is `with_mode`, TOML, then the saved preference; the
-selector remains available and saves later choices.
-
-Both modes include the right workbench. Gallery uses a third resizable region.
-Dock mode persists the right dock's width, visibility, and selected tab; use
-**Reset layout** in the title bar to restore the current default layout.
+its callback. The window hosts a searchable gallery, a centered story canvas,
+and the resizable right workbench. Use **Reset layout** in the title bar to
+restore the current default layout.
 
 The Actions tab reads the selected story's opt-in
 `Story::action_scope_focus_handle`, excludes nested-control and Storybook
@@ -75,8 +67,7 @@ inspector = ["gpui-storybook/inspector"]
 ```
 
 The workbench edits controls on the active concrete variant. Its **Variant**
-select switches duplicate-title members; gallery mode renders one member and
-dock mode opens members in independent tabs. Viewport, selection, and
+select switches duplicate-title members. Viewport, selection, and
 action/performance inspection state belong to that Storybook window.
 Theme edits are session overrides on the process-global GPUI Component
 theme: they rebuild derived tokens and refresh open windows without changing
@@ -107,7 +98,6 @@ Put `storybook.toml` beside the story crate's `Cargo.toml`:
 
 ```toml
 group = "UI Kit"
-window_mode = "dock"
 allow = ["UI Kit", "Shared"]
 disable_story = ["ExperimentalCardStory"]
 
@@ -120,7 +110,6 @@ language = "en"
 Apply these semantics:
 
 - `group` is required when the file exists.
-- `window_mode` accepts `"gallery"` or `"dock"` as the initial layout.
 - Omitted `allow` includes only the file's own normalized group.
 - `allow = ["*"]` includes every group.
 - `allow = []` includes no groups.
@@ -128,8 +117,6 @@ Apply these semantics:
 - Component registrations use the component type, not the generated wrapper.
 - The active runtime config belongs to the registered story package whose name
   matches the running binary.
-- A per-window `with_mode` value wins over `window_mode`, which wins over the
-  saved consumer preference.
 - Programmatic overrides win field by field over TOML.
 - MCP deterministic overrides win over programmatic and TOML values.
 - Overrides change resolved presentation without rewriting saved intent.

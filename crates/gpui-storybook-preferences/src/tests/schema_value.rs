@@ -29,18 +29,6 @@ fn preference_json_schema_is_derived_from_the_typed_document() {
         "#/$defs/StorybookPreferences"
     );
     assert_eq!(schema["$defs"]["StorybookPreferences"]["type"], "object");
-    assert_eq!(
-        schema["$defs"]["StorybookPreferences"]["properties"]["window_mode"]["$ref"],
-        "#/$defs/StorybookWindowMode"
-    );
-    assert_eq!(
-        schema["$defs"]["StorybookWindowMode"]["oneOf"][0]["const"],
-        "gallery"
-    );
-    assert_eq!(
-        schema["$defs"]["StorybookWindowMode"]["oneOf"][1]["const"],
-        "dock"
-    );
     assert_eq!(schema["$defs"]["ConsumerId"]["type"], "string");
     for field in ["light_theme", "dark_theme"] {
         assert_eq!(
@@ -143,26 +131,8 @@ fn typed_values_normalize_and_reject_invalid_storage_tokens() {
     assert_eq!(PreferredScrollbar::Hover.token(), "hover");
     assert_eq!(PreferredScrollbar::Always.token(), "always");
     assert_eq!("always".parse(), Ok(PreferredScrollbar::Always));
-    assert_eq!(StorybookWindowMode::Gallery.token(), "gallery");
-    assert_eq!(StorybookWindowMode::Dock.token(), "dock");
-    assert_eq!("dock".parse(), Ok(StorybookWindowMode::Dock));
-    assert!("Dock".parse::<StorybookWindowMode>().is_err());
     assert_eq!(PersistenceMode::Temporary.token(), "temporary");
     assert_eq!("disabled".parse(), Ok(PersistenceMode::Disabled));
-}
-
-#[test]
-fn omitted_window_mode_defaults_to_gallery() {
-    let mut value = serde_json::to_value(saved_preferences()).expect("preferences serialize");
-    value
-        .as_object_mut()
-        .expect("preferences serialize as an object")
-        .remove("window_mode");
-
-    let preferences: StorybookPreferences =
-        serde_json::from_value(value).expect("window mode may be omitted");
-
-    assert_eq!(preferences.window_mode, StorybookWindowMode::Gallery);
 }
 
 #[test]

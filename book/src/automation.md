@@ -3,7 +3,7 @@
 On Linux or macOS, enable the `mcp` feature to inspect and open stories from
 another process or to capture the rendered story region as a PNG. The feature
 is unsupported on Windows and produces a compile-time error there. The standard
-gallery and dock views attach the automation controller installed by
+gallery view attaches the automation controller installed by
 `gpui_storybook::init`.
 
 ## Enable MCP support
@@ -116,7 +116,7 @@ JSON object per line in this order:
 Read the matching response ID before closing standard input. Use each entry's
 advertised `inputSchema` when constructing later calls. Closing standard input
 terminates the GPUI application; the launcher then stops Sway.
-The first tool call waits up to 30 seconds for the standard gallery or dock to
+The first tool call waits up to 30 seconds for the standard gallery to
 publish its story catalog and attach the live automation host, so clients do
 not need a startup polling loop.
 
@@ -306,8 +306,8 @@ Both normalized coordinates must be finite and in `0.0..=1.0`. Use
 from the current route origin. The executor resolves fresh bounds after route
 opening and story-region sizing, rejects points beyond those bounds, and
 translates them to window coordinates. Semantic targets provide the stable
-selector path; neither interaction mode can target the gallery sidebar, dock
-panels, title bar, or global screen.
+selector path; neither interaction mode can target the gallery sidebar, the
+workbench, the title bar, or the global screen.
 
 A batch allows at most 64 steps, up to 64 binding strings in each `keystrokes`
 step, 4 KiB across UTF-8 `text` values and keystroke syntax, 120 explicitly
@@ -467,12 +467,11 @@ selection. It also accepts a named viewport when paired dimensions are omitted.
 
 ## Understand capture bounds and size
 
-Captures contain the story view, excluding the gallery sidebar and header or
-the dock workspace chrome. Substory routes crop to the registered section
-region.
+Captures contain the story view, excluding the gallery sidebar and header.
+Substory routes crop to the registered section region.
 
 Width and height target the captured story region. Storybook adjusts the host
-window around the existing gallery or dock chrome so sidebars, headers, and the
+window around the existing gallery chrome so sidebars, headers, and the
 workbench remain mounted, then crops that chrome from the returned PNG. Display
 scaling or compositor behavior can change the rendered result, so treat the
 returned `pixel_width` and `pixel_height` as authoritative. Viewport text
@@ -491,8 +490,8 @@ automatically.
 | Symptom | Action |
 |---|---|
 | Route not found | Discover the base key with `storybook_list_stories`, inspect the substory definition, and check filtering |
-| Automation startup times out | Ensure the initialized application constructs a standard `Gallery` or `StoryWorkspace` within 30 seconds |
-| No live host is attached | Await initialization and construct a standard `Gallery` or `StoryWorkspace` view |
+| Automation startup times out | Ensure the initialized application constructs a standard `Gallery` within 30 seconds |
+| No live host is attached | Await initialization and construct a standard `Gallery` view |
 | Width or height is rejected | Set both dimensions to positive integers |
 | A control is rejected | Read the current control specs and use the advertised type, bounds, and options |
 | Automation is busy | Wait for the active capture or mutation to complete; requests are not queued |

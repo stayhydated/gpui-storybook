@@ -3,8 +3,8 @@
 [![Codecov: gpui-storybook][codecov-badge]][codecov]
 [![crates.io: gpui-storybook][crate-badge]][crate]
 
-`gpui-storybook` is the application-facing facade for building searchable GPUI
-component galleries and dock workspaces with typed controls, scoped actions,
+`gpui-storybook` is the application-facing facade for building a searchable
+GPUI component gallery with typed controls, scoped actions,
 themes, viewports, and repeatable scenarios.
 
 ## Overview
@@ -12,7 +12,7 @@ themes, viewports, and repeatable scenarios.
 - Register stateful previews with `#[story]`, derive component previews with
   `ComponentStory`, and organize stable substory routes with `Substory`.
 - Initialize preferences and localization once, await readiness, and construct
-  a runtime-selectable `StorybookWindow`.
+  a `StorybookWindow`.
 - Enable `mcp` for Linux/macOS live automation and capture, `inspector` for GPUI
   Inspector integration, or `performance` for frame telemetry.
 

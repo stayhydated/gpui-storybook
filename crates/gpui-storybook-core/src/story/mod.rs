@@ -12,7 +12,7 @@ pub use self::window::create_storybook_window;
 pub use components::parse_story_group_klass;
 pub use components::{
     ContainerEvent, Story, StoryContainer, StorySection, StorySectionBase, StorySectionTitle,
-    StoryState, Substory, reveal_story_panel, section,
+    StoryState, Substory, section,
 };
 pub use init::init;
 pub use scenarios::{StoryScenario, StoryScenarioSnapshot, StoryScenarioStep};

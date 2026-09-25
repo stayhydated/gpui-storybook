@@ -82,17 +82,6 @@ pub fn select_scrollbar(value: PreferredScrollbar, cx: &mut App) {
     }
 }
 
-/// Applies a Storybook window mode and queues persistence.
-///
-/// This is a no-op when the facade preference runtime is not installed.
-pub fn select_window_mode(value: StorybookWindowMode, cx: &mut App) {
-    if cx.try_global::<StorybookPreferencesGlobal>().is_some() {
-        cx.update_global::<StorybookPreferencesGlobal, _>(|runtime, cx| {
-            runtime.0.select_window_mode(value, cx);
-        });
-    }
-}
-
 /// Retries loading preferences after startup failure or saving dirty intent.
 ///
 /// This is a no-op when the facade preference runtime is not installed.

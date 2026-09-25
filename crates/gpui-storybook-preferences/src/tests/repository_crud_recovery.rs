@@ -49,7 +49,6 @@ async fn json_repository_supports_typed_crud_reopen_and_generated_schema() {
     assert_eq!(document.get("format_version"), None);
     assert_eq!(document.get("created_at_millis"), None);
     assert_eq!(document.get("updated_at_millis"), None);
-    assert_eq!(document["preferences"]["window_mode"], "dock");
     assert_eq!(document["preferences"]["color_scheme"], "system");
     assert_eq!(document["preferences"]["language"]["mode"], "explicit");
     assert_eq!(document["preferences"]["language"]["tag"], "fr");

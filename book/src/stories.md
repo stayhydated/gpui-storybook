@@ -157,8 +157,8 @@ section in navigation. See [Configure Storybook](configuration.md).
 
 Stories with the same visible title, group, and section share one navigation
 entry. Give each concrete story a distinct, concise description; the workbench
-uses it as the **Variant** select label. Gallery mode renders one selected
-member, while dock mode keeps selected members in independent tabs.
+uses it as the **Variant** select label. The gallery renders the selected
+member.
 
 ## Run one-time setup
 

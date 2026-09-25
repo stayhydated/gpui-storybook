@@ -8,7 +8,7 @@
 //! Tools can navigate stable routes, read/set/reset the selected story's typed
 //! controls, read or wait for route-local structured application values, apply
 //! a serialized control map before capture, and use named or explicit viewport
-//! dimensions. Facade-created controllers wait for the standard gallery or dock
+//! dimensions. Facade-created controllers wait for the standard gallery
 //! to publish and attach before handling the first tool call.
 //! These operations reuse the core `ControlSpec` and `ControlValue` contracts.
 //! Generic actions, focused semantic target clicks, keyboard, pointer, frame
