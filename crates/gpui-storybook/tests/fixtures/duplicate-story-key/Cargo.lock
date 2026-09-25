@@ -3484,7 +3484,7 @@ checksum = "a1bb25850ad31b88bbdef454afb93ec4cdb81f5e200ba5b3f1a0368111780d2c"
 
 [[package]]
 name = "gpui-storybook"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "gpui-es-fluent",
  "gpui-kit",
@@ -3502,7 +3502,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-storybook-core"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "anyhow",
  "base64 0.23.1",
@@ -3539,7 +3539,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-storybook-macros"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "darling",
  "heck 0.5.0",
@@ -3550,7 +3550,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-storybook-preferences"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "fluent-langneg 0.14.2",
  "schemars",
@@ -3567,9 +3567,8 @@ dependencies = [
 
 [[package]]
 name = "gpui-storybook-toml"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
- "gpui-storybook-preferences",
  "serde",
  "toml 1.1.6+spec-1.1.0",
 ]
