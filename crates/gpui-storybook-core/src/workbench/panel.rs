@@ -125,6 +125,7 @@ impl StoryWorkbench {
             variant_select,
             variant_options: Vec::new(),
             selected_tab,
+            tab_scroll_handle: ScrollHandle::new(),
             editor_story: None,
             editors: BTreeMap::new(),
             editor_subscriptions: Vec::new(),
@@ -524,5 +525,32 @@ impl StoryWorkbench {
         self.state.update(cx, |state, cx| {
             state.set_viewport(action.viewport, cx);
         });
+    }
+
+    /// Scroll the workbench tab strip horizontally with a vertical wheel.
+    ///
+    /// The tab bar locks its scroll axis, so a vertical wheel over the strip
+    /// would otherwise do nothing. Translate the dominant vertical delta onto
+    /// the strip's horizontal offset so the tabs stay reachable on a mouse
+    /// without a horizontal wheel.
+    pub(super) fn scroll_tabs(
+        &mut self,
+        event: &ScrollWheelEvent,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let delta = event.delta.pixel_delta(window.line_height());
+        if delta.y == px(0.) || delta.y.abs() <= delta.x.abs() {
+            return;
+        }
+        let offset = self.tab_scroll_handle.offset().x;
+        let limit = -self.tab_scroll_handle.max_offset().x;
+        let next = (offset + delta.y).max(limit).min(px(0.));
+        if next == offset {
+            return;
+        }
+        self.tab_scroll_handle.set_offset(point(next, px(0.)));
+        cx.stop_propagation();
+        cx.notify();
     }
 }

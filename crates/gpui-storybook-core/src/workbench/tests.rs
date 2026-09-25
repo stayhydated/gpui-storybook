@@ -432,4 +432,5 @@ mod actions;
 mod controls;
 mod scenarios;
 mod state;
+mod tabs;
 mod theme;

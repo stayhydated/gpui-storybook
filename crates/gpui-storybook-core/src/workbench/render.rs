@@ -108,23 +108,57 @@ impl Render for StoryWorkbench {
                     ),
             )
             .child(
-                TabBar::new("workbench-tabs")
-                    .selected_index(self.selected_tab.index())
-                    .on_click(cx.listener(|this, index, _, cx| {
-                        this.selected_tab = WorkbenchTab::from_index(*index);
-                        cx.emit(PanelEvent::LayoutChanged);
-                        cx.notify();
-                    }))
-                    .child(Tab::new().label("Controls"))
-                    .child(Tab::new().label("Theme"))
-                    .child(Tab::new().label("Inspect"))
-                    .child(Tab::new().label("Actions"))
-                    .child(Tab::new().label("Scenarios"))
-                    .when(cfg!(feature = "performance"), |this| {
-                        #[cfg(feature = "performance")]
-                        let this = this.child(Tab::new().label("Perf"));
-                        this
-                    }),
+                div()
+                    .relative()
+                    .w_full()
+                    .min_w_0()
+                    .debug_selector(|| "workbench-tabs-scroll".to_owned())
+                    .on_scroll_wheel(cx.listener(Self::scroll_tabs))
+                    .child(
+                        TabBar::new("workbench-tabs")
+                            .track_scroll(&self.tab_scroll_handle)
+                            .selected_index(self.selected_tab.index())
+                            .on_click(cx.listener(|this, index, _, cx| {
+                                this.selected_tab = WorkbenchTab::from_index(*index);
+                                cx.emit(PanelEvent::LayoutChanged);
+                                cx.notify();
+                            }))
+                            .child(
+                                Tab::new()
+                                    .debug_selector(|| "workbench-tab-controls".to_owned())
+                                    .label("Controls"),
+                            )
+                            .child(
+                                Tab::new()
+                                    .debug_selector(|| "workbench-tab-theme".to_owned())
+                                    .label("Theme"),
+                            )
+                            .child(
+                                Tab::new()
+                                    .debug_selector(|| "workbench-tab-inspect".to_owned())
+                                    .label("Inspect"),
+                            )
+                            .child(
+                                Tab::new()
+                                    .debug_selector(|| "workbench-tab-actions".to_owned())
+                                    .label("Actions"),
+                            )
+                            .child(
+                                Tab::new()
+                                    .debug_selector(|| "workbench-tab-scenarios".to_owned())
+                                    .label("Scenarios"),
+                            )
+                            .when(cfg!(feature = "performance"), |this| {
+                                #[cfg(feature = "performance")]
+                                let this = this.child(
+                                    Tab::new()
+                                        .debug_selector(|| "workbench-tab-performance".to_owned())
+                                        .label("Perf"),
+                                );
+                                this
+                            }),
+                    )
+                    .horizontal_scrollbar(&self.tab_scroll_handle),
             )
             .when_some(self.last_error.clone(), |this, error| {
                 this.child(
