@@ -268,14 +268,14 @@ in verification, and expose `Update` only through a deliberate acceptance
 workflow. With the `performance` feature, require enough native GPUI profiler
 samples before enforcing draw or dirty-to-present p95 and maximum budgets.
 
-In the published `gpui-pre` 0.3.6 stack, `current_headless_renderer` returns a
-renderer on macOS only; every other target gets `None` and `render_to_image`
-bails with `render_to_image not implemented for this platform`. Windows has a
-DirectX CPU-readback path, but it needs a real window rather than the runner's
-headless context. Capture is therefore macOS-only for the pinned release, the
-Linux smoke test is marked `continue-on-error`, and the capture path stays
-behind the `capture` feature until upstream supplies a portable headless
-renderer.
+In the pinned `gpui-pre` 0.3.7 stack, `current_headless_renderer` returns a
+Metal renderer on macOS and a Wgpu renderer on Linux, so runner captures run on
+both. Windows gets `Ok(None)`; its DirectX renderer reaches `render_to_image`
+only through a real window, outside the runner's headless context. Linux
+application captures are not implemented for Linux windows, so drive them
+through the runner instead. The `mcp` feature remains Linux and macOS, and the
+Linux capture smoke test stays `continue-on-error` because it drives the
+application window path.
 Treat renderer, fonts, assets, and CI hardware as part of the baseline or timing
 environment; keep platform-specific accepted output where rasterization differs.
 

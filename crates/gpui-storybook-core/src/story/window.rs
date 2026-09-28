@@ -1,4 +1,4 @@
-use gpui_kit::component::{Root, v_flex};
+use gpui_kit::component::v_flex;
 use gpui_kit::{
     AnyView, App, AppContext as _, Context, Entity, FocusHandle, Focusable,
     InteractiveElement as _, IntoElement, ParentElement as _, Render, SharedString, Styled as _,
@@ -27,14 +27,16 @@ where
     let title = SharedString::from(title.to_owned());
 
     cx.spawn(async move |cx| {
-        let window = cx.open_window(options, |window, cx| {
-            let spec = create_window(window, cx);
-            let shell = cx.new(|cx| StorybookShell::new(title.clone(), spec, window, cx));
-            let focus_handle = shell.focus_handle(cx);
-            window.defer(cx, move |window, cx| {
-                focus_handle.focus(window, cx);
-            });
-            cx.new(|cx| Root::new(shell, window, cx))
+        let (window, _shell) = cx.update(|cx| {
+            gpui_kit::open_window(options, cx, |window, cx| {
+                let spec = create_window(window, cx);
+                let shell = cx.new(|cx| StorybookShell::new(title.clone(), spec, window, cx));
+                let focus_handle = shell.focus_handle(cx);
+                window.defer(cx, move |window, cx| {
+                    focus_handle.focus(window, cx);
+                });
+                shell
+            })
         })?;
 
         window.update(cx, |_, window, _| {
@@ -198,25 +200,15 @@ impl Focusable for StoryRoot {
 }
 
 impl Render for StoryRoot {
-    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let sheet_layer = Root::render_sheet_layer(window, cx);
-        let dialog_layer = Root::render_dialog_layer(window, cx);
-        let notification_layer = Root::render_notification_layer(window, cx);
-
+    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
         div().id("story-root").size_full().child(
-            v_flex()
-                .size_full()
-                .child(self.title_bar.clone())
-                .child(
-                    div()
-                        .track_focus(&self.focus_handle)
-                        .flex_1()
-                        .overflow_hidden()
-                        .child(self.view.clone()),
-                )
-                .children(sheet_layer)
-                .children(dialog_layer)
-                .children(notification_layer),
+            v_flex().size_full().child(self.title_bar.clone()).child(
+                div()
+                    .track_focus(&self.focus_handle)
+                    .flex_1()
+                    .overflow_hidden()
+                    .child(self.view.clone()),
+            ),
         )
     }
 }

@@ -122,17 +122,22 @@ comparing either pixels or frame timing.
 ## Platform expectations
 
 The runner asks `gpui_platform` for the current headless renderer. In the
-published `gpui-pre` 0.3.6 stack, `current_headless_renderer` returns a renderer
-on macOS only, so an explicit headless runner capture runs there. Every other
-target gets `None`, and the pinned release's `render_to_image` bails with
-`render_to_image not implemented for this platform`. On Windows the DirectX
-renderer can copy a window render target to a CPU image, but that path needs a
-real window, so it is not reachable from the runner's headless context.
+pinned `gpui-pre` 0.3.7 stack, `current_headless_renderer` returns a Metal
+renderer on macOS and a Wgpu renderer on Linux, so an explicit headless runner
+capture runs on both. Windows gets `Ok(None)`, and its DirectX renderer reaches
+`render_to_image` only through a real window, which the runner's headless
+context does not create.
 
-Capture is therefore a macOS-only feature of the pinned release, and the
-repository no longer carries a Linux fork that extended it. The Linux capture
-smoke test is marked `continue-on-error` because of that gap. Capture stays
-behind the `capture` feature until a published gpui-pre release supplies a
-headless renderer on more targets. Visual baselines are renderer- and
-font-sensitive, so keep separate accepted images when CI spans platforms with
-materially different output.
+Headless capture therefore follows one path per platform:
+
+| Platform | Portable runner capture | Application capture |
+|---|---|---|
+| macOS | Metal headless renderer | Metal window renderer |
+| Linux | Wgpu headless renderer (gpui-pre 0.3.7) | Not implemented for Linux windows; use the runner |
+| Windows | Not available (`Ok(None)`) | DirectX window readback on an unshown window |
+
+The `mcp` feature keeps its Linux and macOS contract, and the Linux capture
+smoke test stays `continue-on-error` because it drives the application window
+path rather than the runner. Visual baselines are renderer- and font-sensitive,
+so keep separate accepted images when CI spans platforms with materially
+different output.

@@ -73,6 +73,10 @@ jobs:
           --exclude gpui-storybook-launch
           --exclude gpui-storybook-mcp
 
+      # The application window path has no Linux renderer in the pinned
+      # gpui-pre stack, so this smoke test cannot gate the release. Linux
+      # headless capture is available through the portable runner, which uses
+      # the Wgpu platform renderer.
       - name: Smoke test Storybook capture through headless Sway
         if: runner.os == 'Linux' && github.event_name == 'push' && github.ref == 'refs/heads/master'
         shell: bash
