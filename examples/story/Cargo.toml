@@ -48,6 +48,9 @@ tracing-subscriber = { features = [ "env-filter" ], workspace = true }
 console_error_panic_hook = { workspace = true }
 wasm-bindgen = { workspace = true }
 
+[target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
+gpui-storybook-test = { workspace = true }
+
 [build-dependencies]
 es-fluent-build = { workspace = true }
 

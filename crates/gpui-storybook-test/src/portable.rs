@@ -1,13 +1,18 @@
 use super::*;
 
 /// A fresh executable story and its isolated headless app context.
+///
+/// Field order is load-bearing: `context` must drop last. `HeadlessAppContext`
+/// shuts the app down on drop and runs GPUI's leak detector, so the `story`
+/// entity handle has to be released first or teardown panics with leaked
+/// handles under `leak-detection`.
 pub struct PortableStory {
-    pub(super) context: HeadlessAppContext,
     pub(super) window: WindowHandle<StoryContainer>,
     pub(super) story: Entity<StoryContainer>,
     pub(super) descriptor: StoryDescriptor,
     pub(super) case: CaptureCase,
     pub(super) route_capture: Option<RouteCapture>,
+    pub(super) context: HeadlessAppContext,
 }
 
 impl fmt::Debug for PortableStory {

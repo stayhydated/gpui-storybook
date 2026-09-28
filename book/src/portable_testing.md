@@ -136,6 +136,14 @@ Headless capture therefore follows one path per platform:
 | Linux | Wgpu headless renderer (gpui-pre 0.3.7) | Not implemented for Linux windows; use the runner |
 | Windows | Not available (`Ok(None)`) | DirectX window readback on an unshown window |
 
+The runner owns its offscreen window and renderer inside a fresh
+`HeadlessAppContext`, so captures need no display server, compositor, launcher,
+or session runtime; a plain `cargo test` works with `DISPLAY` and
+`WAYLAND_DISPLAY` unset. Linux needs a working wgpu adapter: a hardware driver
+or a Mesa software Vulkan/GL driver such as `mesa-vulkan-drivers` and
+`libgl1-mesa-dri`. Sway and `gpui-storybook-launch` belong to the live
+application and MCP path, which is separate from the runner.
+
 The `mcp` feature keeps its Linux and macOS contract, and the Linux capture
 smoke test stays `continue-on-error` because it drives the application window
 path rather than the runner. Visual baselines are renderer- and font-sensitive,
