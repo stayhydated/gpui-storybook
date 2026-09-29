@@ -61,6 +61,20 @@ Build publication artifacts through `cargo xtask`: the sources are `book/src`,
 `web/src`, and `examples/story`. The generated book, LLM text, demo, and site
 outputs are not independent editing surfaces.
 
+## Validate Wayland capture
+
+`just wayland-capture-test` runs the story example's startup-capture
+regression against the Git-pinned GPUI backends. It requires Sway and a working
+Wgpu adapter. The check captures the button story at two sizes in a private
+compositor, decodes the PNGs, and verifies dimensions and rendered content.
+
+The root `[patch.crates-io]` pins `gpui-pre-linux`, `gpui-pre-wgpu`, and
+`gpui-pre-platform` to one Zed fork revision, compatible with `gpui-pre =0.3.7`.
+Keep these revisions and the patch example in `book/src/automation.md` aligned,
+and commit the updated `Cargo.lock`. Consumer applications must apply these
+patches in their own workspace root for Wayland window capture; Cargo patches
+are not inherited from dependencies.
+
 ## Validate the changed surface
 
 Choose the narrowest relevant check and report its result, including any

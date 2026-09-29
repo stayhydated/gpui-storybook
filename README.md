@@ -18,6 +18,10 @@ the rest of their application.
 - Drive live Linux and macOS sessions through MCP, or exercise isolated stories
   with the portable headless test runner.
 
+Linux Wayland window capture uses the GPUI Git patches pinned in this
+workspace's `Cargo.toml`. Applications using Storybook as a dependency must
+apply those patches in their own workspace root.
+
 ## Crates
 
 | Crate | Purpose | Source |

@@ -6,6 +6,28 @@ is unsupported on Windows and produces a compile-time error there. The standard
 gallery view attaches the automation controller installed by
 `gpui_storybook::init`.
 
+## Pin the Wayland capture backends
+
+Linux Wayland window capture uses the Zed fork's image readback support with
+`gpui-pre =0.3.7`. Add these patches to your application's workspace root
+`Cargo.toml` and commit the resolved `Cargo.lock`:
+
+```toml
+[patch.crates-io]
+gpui-pre-linux = { git = "https://github.com/stayhydated/zed", rev = "090c89fc71e054895f42531eec347feab3f22f6f" }
+gpui-pre-platform = { git = "https://github.com/stayhydated/zed", rev = "090c89fc71e054895f42531eec347feab3f22f6f" }
+gpui-pre-wgpu = { git = "https://github.com/stayhydated/zed", rev = "090c89fc71e054895f42531eec347feab3f22f6f" }
+```
+
+Keep all three packages on the same revision. Cargo applies patches from the
+workspace root; adding Storybook as a dependency does not inherit its patches.
+The remaining GPUI packages retain the published snapshot used by `gpui-kit`.
+
+The Storybook checkout verifies startup capture at two sizes through private
+Sway with `just wayland-capture-test`. Install the Linux runtime dependencies
+below before running that check. Portable runner captures also work on Linux
+without a compositor.
+
 ## Enable MCP support
 
 Forward the facade feature from the Storybook package:

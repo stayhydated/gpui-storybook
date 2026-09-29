@@ -19,6 +19,9 @@ themes, viewports, and repeatable scenarios.
 The facade also exposes static registration catalogs for documentation and
 tooling without constructing stories or opening a window.
 
+Linux Wayland window capture requires the GPUI Git patches from the repository
+root `Cargo.toml` in the application's workspace root.
+
 [codecov-badge]: https://codecov.io/github/stayhydated/gpui-storybook/branch/master/graph/badge.svg?component=gpui-storybook
 [codecov]: https://codecov.io/github/stayhydated/gpui-storybook
 [crate-badge]: https://img.shields.io/crates/v/gpui-storybook.svg?label=gpui-storybook

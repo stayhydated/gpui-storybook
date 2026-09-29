@@ -51,6 +51,11 @@ wasm-bindgen = { workspace = true }
 [target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
 gpui-storybook-test = { workspace = true }
 
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+gpui-storybook-launch = { workspace = true }
+image = { workspace = true }
+tempfile = { workspace = true }
+
 [build-dependencies]
 es-fluent-build = { workspace = true }
 

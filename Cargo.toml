@@ -29,8 +29,8 @@ version = "0.6.4"
 anyhow = "1.0"
 base64 = "0.23"
 clap = "4.6"
-console_error_panic_hook = "0.1"
 component-shape-mcp = "0.3.3"
+console_error_panic_hook = "0.1"
 darling = "0.24"
 derive_more = "2.1"
 dioxus = { default-features = false, version = "0.7" }
@@ -42,8 +42,8 @@ es-fluent-manager-embedded = "0.20.3"
 fluent-langneg = "=0.14.2"
 frame-capture = "0.2.2"
 gpui = { package = "gpui-pre", version = "=0.3.7" }
-gpui-kit = "0.7.0"
 gpui-es-fluent = "0.2.3"
+gpui-kit = "0.7.0"
 gpui-storybook = { path = "crates/gpui-storybook", version = "0.6.4" }
 gpui-storybook-core = { path = "crates/gpui-storybook-core", version = "0.6.4" }
 gpui-storybook-launch = { path = "crates/gpui-storybook-launch", version = "0.6.4" }
@@ -53,12 +53,12 @@ gpui-storybook-preferences = { path = "crates/gpui-storybook-preferences", versi
 gpui-storybook-test = { path = "crates/gpui-storybook-test", version = "0.6.4" }
 gpui-storybook-toml = { path = "crates/gpui-storybook-toml", version = "0.6.4" }
 gpui_platform = { features = [
-    "font-kit",
-    "x11",
-    "wayland",
-    "runtime_shaders",
+  "font-kit",
+  "x11",
+  "wayland",
+  "runtime_shaders",
 ], package = "gpui-pre-platform", version = "=0.3.7" }
-gpui_wgpu = { package = "gpui-pre-wgpu", features = [ "font-kit" ], version = "=0.3.7" }
+gpui_wgpu = { features = [ "font-kit" ], package = "gpui-pre-wgpu", version = "=0.3.7" }
 heck = "0.5"
 image = { default-features = false, features = [ "png" ], version = "0.25" }
 insta = "1.48"
@@ -95,6 +95,12 @@ url = "2.5"
 wasm-bindgen = "0.2"
 web = { path = "web" }
 web-sys = { features = [ "Location", "Window" ], version = "0.3" }
+
+# Wayland window capture backends compatible with gpui-pre =0.3.7.
+[patch.crates-io]
+gpui-pre-linux = { git = "https://github.com/stayhydated/zed", rev = "090c89fc71e054895f42531eec347feab3f22f6f" }
+gpui-pre-platform = { git = "https://github.com/stayhydated/zed", rev = "090c89fc71e054895f42531eec347feab3f22f6f" }
+gpui-pre-wgpu = { git = "https://github.com/stayhydated/zed", rev = "090c89fc71e054895f42531eec347feab3f22f6f" }
 
 [workspace.lints.rust]
 future_incompatible = "deny"
