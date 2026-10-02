@@ -19,6 +19,9 @@ through `RunnerConfig`.
 `performance` feature records GPUI profiler samples for draw and
 dirty-to-present budgets.
 
+Baseline comparisons use raw RGBA channels. Channel tolerance affects the
+differing-pixel count; mean absolute error still includes every channel delta.
+
 Capture output depends on the current platform renderer, fonts, assets, and CI
 hardware; keep accepted baselines scoped when those inputs differ.
 

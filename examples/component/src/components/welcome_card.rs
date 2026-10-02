@@ -5,7 +5,7 @@ use gpui_kit::{
 
 #[derive(gpui_storybook::ComponentStory, IntoElement)]
 #[storybook(
-    title = gpui_storybook::localize_message(cx, &crate::StoryItems::Title)
+    title = gpui_storybook::try_localize_message(cx, &crate::StoryItems::Title)
         .unwrap_or_else(|| "Title".into()),
     description = String::from("A quiet editorial card registered without a custom story view"),
     section = crate::StorySection::Intro,

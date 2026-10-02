@@ -35,6 +35,9 @@ then open the window.
 ## Preserve the integration contracts
 
 - Await preference readiness before constructing the first window.
+- Use `gpui_storybook::try_localize_message(cx, &message)` for optional
+  consumer text and handle its `Option<String>`. Storybook's embedded shell
+  locale stays separate from the application's localization context.
 - Keep display labels separate from stable route keys. `disable_story` matches
   the registered type name.
 - Keep control metadata and values on the typed story entity. Only marked

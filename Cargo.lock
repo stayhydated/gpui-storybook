@@ -4931,6 +4931,7 @@ dependencies = [
  "gpui-storybook-core",
  "image",
  "inventory",
+ "proptest",
  "serde",
  "serde_json",
  "sha2 0.11.0",

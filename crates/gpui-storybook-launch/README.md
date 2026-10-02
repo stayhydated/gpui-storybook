@@ -8,12 +8,12 @@ GPUI Storybook MCP and startup capture without using the physical display.
 
 ## Example
 
-Place Storybook environment variables before the launcher and the child command
-after `--`:
+From the GPUI Storybook workspace, place environment variables before the
+launcher and the example's child command after `--`:
 
 ```sh
 GPUI_STORYBOOK_MCP_STDIO=1 \
-gpui-storybook-launch -- cargo run -p my-storybook --features mcp
+gpui-storybook-launch -- cargo run -p gpui-storybook-example-story --features mcp
 ```
 
 The launcher uses `sway` from `PATH` by default. `GPUI_STORYBOOK_SWAY` and the

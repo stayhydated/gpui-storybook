@@ -120,7 +120,7 @@ mod tests {
         assert!(ready.diagnostics.is_empty());
 
         let title = cx.update(|cx| {
-            gpui_storybook::localize_message(
+            gpui_storybook::try_localize_message(
                 cx,
                 &gpui_storybook_example_component::StoryItems::Title,
             )

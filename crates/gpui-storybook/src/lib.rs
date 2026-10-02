@@ -107,7 +107,7 @@ pub use preferences::{
     ThemeIdError, ThemeResolution, ThemeSource, UnsupportedValueSource,
 };
 
-pub use gpui_es_fluent::try_localize_message as localize_message;
+pub use gpui_es_fluent::try_localize_message;
 pub use gpui_storybook_core::catalog::{
     StaticControlKind, StaticControlSpec, StoryCatalog, StoryCatalogEntry, StoryCatalogExportError,
     StoryCatalogSource, export_static_catalog_json, export_static_catalog_json_pretty,
