@@ -3,7 +3,8 @@
 Start with `crates/gpui-storybook` for application-facing changes and
 `just --list` for workspace commands. The executable examples show the two
 registration styles: `examples/story` uses `#[story]` with `Story`, while
-`examples/component` uses `#[derive(ComponentStory)]`.
+`examples/component` uses `#[derive(ComponentStory)]`. Use the pinned toolchain
+in `rust-toolchain.toml` for local validation.
 
 ## Where changes belong
 
@@ -48,6 +49,10 @@ instructions and book or API navigation to those linked surfaces.
   both example `storybook.toml` files. `disable_story` matches registered type
   names; display titles and route keys are separate identities.
 - **Runtime behavior:** update the owning core Rustdocs and runtime tests.
+- **Preference storage:** preserve serialization of admitted disk mutations and
+  cache updates across caller cancellation. Keep repository Rustdocs and
+  `crates/gpui-storybook-preferences/src/tests/cancellation.rs` aligned with this
+  contract.
 - **Automation and capture:** keep MCP schemas, core automation/capture
   contracts, examples, and the automation skill reference aligned.
 - **Portable tests:** keep the test crate README, portable-testing and automation
