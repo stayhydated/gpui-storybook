@@ -58,6 +58,11 @@ instructions and book or API navigation to those linked surfaces.
 - **Portable tests:** keep the test crate README, portable-testing and automation
   book sections, examples, and automation skill reference aligned when capture
   matrices, baseline policy, context setup, or frame budgets change.
+  Pure property tests live in the test crate's `src/properties.rs` and
+  `src/baseline/properties.rs`. Keep buffers and matrix products small, preserve
+  valid unique axis labels while shrinking, and use independent decoding and
+  known-delta metric oracles. Matrix cases sort by encoded ID; arbitrary
+  baseline IDs and control digests do not promise universal injectivity.
 - **Localization:** keep Rust locale code, core and example `i18n.toml` files,
   affected FTL catalogs, and locale setup instructions aligned when message keys
   or locale wiring change.
