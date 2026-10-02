@@ -5,7 +5,7 @@ name = "gpui-storybook-duplicate-fixture"
 version = "0.0.0"
 edition = "2024"
 publish = false
-rust-version = "1.98"
+rust-version = "1.99"
 
 [dependencies]
 gpui-kit = "0.7.0"
