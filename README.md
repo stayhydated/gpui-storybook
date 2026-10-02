@@ -9,6 +9,9 @@ GPUI Storybook gives application developers a searchable gallery
 for developing, inspecting, and exercising GPUI components outside
 the rest of their application.
 
+The workspace requires Rust 1.99 or newer and uses edition 2024. Local validation
+and CI use the pinned Rust 1.99.0 toolchain.
+
 ## Overview
 
 - Register stateful previews with `#[story]` or derive component previews with

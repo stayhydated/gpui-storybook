@@ -41,7 +41,7 @@ fn duplicate_story_keys_fail_to_build() {
         "duplicate story key fixture unexpectedly built successfully"
     );
 
-    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stderr = String::from_utf8_lossy_owned(output.stderr);
     assert!(
         stderr.contains(
             "__gpui_storybook_story_key__gpui-storybook-duplicate-fixture__DuplicateStory"
