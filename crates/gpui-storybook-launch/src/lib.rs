@@ -204,7 +204,9 @@ mod platform {
     }
 
     fn sway_start_error(runtime: &Path, message: String) -> io::Error {
-        let log = fs::read_to_string(runtime.join("sway.log")).unwrap_or_default();
+        let log = fs::read(runtime.join("sway.log"))
+            .map(String::from_utf8_lossy_owned)
+            .unwrap_or_default();
         if log.trim().is_empty() {
             io::Error::other(message)
         } else {
@@ -216,6 +218,38 @@ mod platform {
     mod tests {
         use super::*;
         use std::{os::unix::net::UnixListener, process::Command};
+
+        #[test]
+        fn startup_errors_preserve_available_log_diagnostics() {
+            let runtime = tempfile::tempdir().expect("runtime should be created");
+            let log_path = runtime.path().join("sway.log");
+            let message = "Sway exited before readiness";
+            assert_eq!(
+                sway_start_error(runtime.path(), message.to_owned()).to_string(),
+                message,
+            );
+            for (bytes, expected) in [
+                (b"".as_slice(), message.to_owned()),
+                (b" \n".as_slice(), message.to_owned()),
+                (
+                    b"renderer failed".as_slice(),
+                    format!("{message}\nrenderer failed"),
+                ),
+                (
+                    b"bad \xff log".as_slice(),
+                    format!("{message}\nbad \u{fffd} log"),
+                ),
+                (
+                    b"truncated \xe2\x82".as_slice(),
+                    format!("{message}\ntruncated \u{fffd}"),
+                ),
+            ] {
+                fs::write(&log_path, bytes).expect("log fixture should be written");
+                let error = sway_start_error(runtime.path(), message.to_owned());
+                assert_eq!(error.kind(), io::ErrorKind::Other);
+                assert_eq!(error.to_string(), expected);
+            }
+        }
 
         #[test]
         fn finds_only_wayland_unix_sockets() {
