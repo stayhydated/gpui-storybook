@@ -25,6 +25,7 @@ jobs:
         with:
           path: .
           all_locales: true
+          toolchain: "1.99.0"
 
   test:
     name: test (${{ matrix.os }})
