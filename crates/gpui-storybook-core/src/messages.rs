@@ -26,7 +26,7 @@ pub(crate) enum StorybookMessage {
 }
 
 pub(crate) fn text(cx: &App, message: StorybookMessage) -> String {
-    crate::i18n::localize_message(cx, &message).unwrap_or_else(|| {
+    crate::i18n::try_localize_message(cx, &message).unwrap_or_else(|| {
         tracing::error!(message = ?message, "missing embedded Storybook message");
         String::new()
     })

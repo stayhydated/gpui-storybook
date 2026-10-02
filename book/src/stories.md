@@ -104,7 +104,19 @@ impl RenderOnce for WelcomeCard {
 the generated wrapper constructs the component with `Default::default()`.
 `title` and `description` accept expressions evaluated with
 `cx: &gpui_kit::App` in scope, so metadata can call
-`gpui_storybook::localize_message(cx, ...)`.
+`gpui_storybook::try_localize_message(cx, ...)`. This returns `Option<String>`;
+handle the missing state in the expression. Required application text uses
+`gpui_es_fluent::localize_message(cx, &message)` after initializing the
+application context. Storybook's shell uses its own embedded locale resources.
+
+### Migrate localization calls to 0.7
+
+Rename `gpui_storybook::localize_message` to
+`gpui_storybook::try_localize_message`; retain the existing `Option<String>`
+handling. Lower-level shell consumers rename
+`gpui_storybook_core::i18n::localize_message` to
+`gpui_storybook_core::i18n::try_localize_message`. The shell helper continues to
+use Storybook's separate embedded context and English locale fallback.
 
 ## Expose live controls
 

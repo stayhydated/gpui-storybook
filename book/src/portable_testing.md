@@ -10,7 +10,7 @@ GPUI profiler samples and budgets:
 
 ```toml
 [dev-dependencies]
-gpui-storybook-test = { version = "0.6", features = ["performance"] }
+gpui-storybook-test = { version = "0.7", features = ["performance"] }
 ```
 
 Keep the crate that contains the story registrations linked from the test

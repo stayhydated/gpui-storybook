@@ -17,7 +17,9 @@ themes, viewports, and repeatable scenarios.
   Inspector integration, or `performance` for frame telemetry.
 
 The facade also exposes static registration catalogs for documentation and
-tooling without constructing stories or opening a window.
+tooling without constructing stories or opening a window. Localized consumer
+metadata uses `try_localize_message(cx, &message)` and handles `Option<String>`
+through the application's locale context.
 
 [codecov-badge]: https://codecov.io/github/stayhydated/gpui-storybook/branch/master/graph/badge.svg?component=gpui-storybook
 [codecov]: https://codecov.io/github/stayhydated/gpui-storybook
