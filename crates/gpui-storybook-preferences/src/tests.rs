@@ -1,3 +1,5 @@
+#[cfg(not(target_family = "wasm"))]
+mod cancellation;
 mod collision;
 mod concurrency;
 mod filesystem_safety;

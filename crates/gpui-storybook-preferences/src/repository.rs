@@ -242,13 +242,20 @@ pub struct OpenRepository {
 struct RepositoryInner {
     consumer_id: ConsumerId,
     persistence: PersistenceMode,
-    record: tokio::sync::Mutex<Option<PreferenceRecord>>,
+    record: Arc<tokio::sync::Mutex<Option<PreferenceRecord>>>,
     path: Option<PathBuf>,
     schema_path: Option<PathBuf>,
     _temporary_directory: Option<tempfile::TempDir>,
 }
 
 /// Consumer-scoped typed Storybook preference repository.
+///
+/// Mutations are serialized with reads across clones of this repository.
+/// Cancelling a mutation while it waits for access has no effect. Once a
+/// file-backed mutation is admitted, it retains exclusive access until its disk
+/// operation and any successful cache update finish, even if the caller stops
+/// waiting. Cancellation does not roll it back; a failed disk operation leaves
+/// the cache unchanged.
 #[derive(Clone)]
 pub struct PreferenceRepository {
     inner: Arc<RepositoryInner>,
@@ -402,7 +409,7 @@ impl PreferenceRepository {
             inner: Arc::new(RepositoryInner {
                 consumer_id: options.consumer_id,
                 persistence: options.persistence,
-                record: tokio::sync::Mutex::new(record),
+                record: Arc::new(tokio::sync::Mutex::new(record)),
                 path,
                 schema_path,
                 _temporary_directory: temporary_directory,
@@ -440,15 +447,15 @@ impl PreferenceRepository {
         &self,
         preferences: StorybookPreferences,
     ) -> Result<PreferenceRecord, PreferenceStoreError> {
-        let mut record = self.inner.record.lock().await;
+        let record = Arc::clone(&self.inner.record).lock_owned().await;
         if record.is_some() {
             return Err(PreferenceStoreError::AlreadyExists {
                 consumer_id: self.inner.consumer_id.clone(),
             });
         }
         let created = PreferenceRecord { preferences };
-        self.persist(Some(&created), StoreOperation::Create).await?;
-        *record = Some(created.clone());
+        self.commit(record, Some(created.clone()), StoreOperation::Create)
+            .await?;
         Ok(created)
     }
 
@@ -457,15 +464,15 @@ impl PreferenceRepository {
         &self,
         preferences: StorybookPreferences,
     ) -> Result<PreferenceRecord, PreferenceStoreError> {
-        let mut record = self.inner.record.lock().await;
+        let record = Arc::clone(&self.inner.record).lock_owned().await;
         if record.is_none() {
             return Err(PreferenceStoreError::NotFound {
                 consumer_id: self.inner.consumer_id.clone(),
             });
         }
         let updated = PreferenceRecord { preferences };
-        self.persist(Some(&updated), StoreOperation::Update).await?;
-        *record = Some(updated.clone());
+        self.commit(record, Some(updated.clone()), StoreOperation::Update)
+            .await?;
         Ok(updated)
     }
 
@@ -474,86 +481,109 @@ impl PreferenceRepository {
         &self,
         preferences: StorybookPreferences,
     ) -> Result<PreferenceRecord, PreferenceStoreError> {
-        let mut record = self.inner.record.lock().await;
+        let record = Arc::clone(&self.inner.record).lock_owned().await;
         let updated = PreferenceRecord { preferences };
-        self.persist(Some(&updated), StoreOperation::Upsert).await?;
-        *record = Some(updated.clone());
+        self.commit(record, Some(updated.clone()), StoreOperation::Upsert)
+            .await?;
         Ok(updated)
     }
 
     /// Deletes the consumer record and returns whether a value existed.
     pub async fn delete(&self) -> Result<bool, PreferenceStoreError> {
-        let mut record = self.inner.record.lock().await;
+        let record = Arc::clone(&self.inner.record).lock_owned().await;
         if record.is_none() {
             return Ok(false);
         }
-        self.persist(None, StoreOperation::Delete).await?;
-        *record = None;
+        self.commit(record, None, StoreOperation::Delete).await?;
         Ok(true)
     }
 
-    async fn persist(
+    async fn commit(
         &self,
-        record: Option<&PreferenceRecord>,
+        mut record: tokio::sync::OwnedMutexGuard<Option<PreferenceRecord>>,
+        updated: Option<PreferenceRecord>,
         operation: StoreOperation,
     ) -> Result<(), PreferenceStoreError> {
         let Some(path) = &self.inner.path else {
+            *record = updated;
             return Ok(());
         };
 
         #[cfg(target_family = "wasm")]
         {
-            let _ = record;
-            return Err(PreferenceStoreError::Io {
+            let _ = updated;
+            Err(PreferenceStoreError::Io {
                 operation,
                 path: path.clone(),
                 source: io::Error::new(
                     io::ErrorKind::Unsupported,
                     "file-backed Storybook preferences are unavailable in the browser",
                 ),
-            });
+            })
         }
 
         #[cfg(not(target_family = "wasm"))]
         {
-            let Some(record) = record else {
-                return match tokio::fs::remove_file(path).await {
-                    Ok(()) => Ok(()),
-                    Err(source) if source.kind() == io::ErrorKind::NotFound => Ok(()),
-                    Err(source) => Err(PreferenceStoreError::Io {
-                        operation,
-                        path: path.clone(),
-                        source,
-                    }),
-                };
-            };
-
-            let schema_path = self
-                .inner
-                .schema_path
-                .as_deref()
-                .expect("file-backed repositories always have a schema path");
-            let document = PreferenceDocument::new(
-                self.inner.consumer_id.clone(),
-                schema_path,
-                record.clone(),
-            );
-            let mut bytes = serde_json::to_vec_pretty(&document).map_err(|source| {
-                PreferenceStoreError::Json {
-                    operation,
-                    path: path.clone(),
-                    source,
-                }
-            })?;
-            bytes.push(b'\n');
-            write_atomic(path, bytes)
-                .await
-                .map_err(|source| PreferenceStoreError::Io {
-                    operation,
-                    path: path.clone(),
-                    source,
-                })
+            // Admit at most one blocking job per repository. The worker owns
+            // both the guard and repository (including temporary storage), so
+            // dropping its caller cannot release access before the commit.
+            let repository = self.clone();
+            tokio::task::spawn_blocking(move || {
+                repository.persist(updated.as_ref(), operation)?;
+                *record = updated;
+                Ok(())
+            })
+            .await
+            .map_err(|source| PreferenceStoreError::Io {
+                operation,
+                path: path.clone(),
+                source: io::Error::other(source),
+            })?
         }
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    fn persist(
+        &self,
+        record: Option<&PreferenceRecord>,
+        operation: StoreOperation,
+    ) -> Result<(), PreferenceStoreError> {
+        let path = self
+            .inner
+            .path
+            .as_ref()
+            .expect("only file-backed repositories persist records");
+        let Some(record) = record else {
+            return match std::fs::remove_file(path) {
+                Ok(()) => Ok(()),
+                Err(source) if source.kind() == io::ErrorKind::NotFound => Ok(()),
+                Err(source) => Err(PreferenceStoreError::Io {
+                    operation,
+                    path: path.clone(),
+                    source,
+                }),
+            };
+        };
+
+        let schema_path = self
+            .inner
+            .schema_path
+            .as_deref()
+            .expect("file-backed repositories always have a schema path");
+        let document =
+            PreferenceDocument::new(self.inner.consumer_id.clone(), schema_path, record.clone());
+        let mut bytes =
+            serde_json::to_vec_pretty(&document).map_err(|source| PreferenceStoreError::Json {
+                operation,
+                path: path.clone(),
+                source,
+            })?;
+        bytes.push(b'\n');
+        write_atomic_sync(path, &bytes).map_err(|source| PreferenceStoreError::Io {
+            operation,
+            path: path.clone(),
+            source,
+        })
     }
 }
 
@@ -684,19 +714,22 @@ async fn read_document(
 #[cfg(not(target_family = "wasm"))]
 async fn write_atomic(path: &Path, bytes: Vec<u8>) -> io::Result<()> {
     let path = path.to_path_buf();
-    tokio::task::spawn_blocking(move || {
-        let parent = path
-            .parent()
-            .filter(|parent| !parent.as_os_str().is_empty())
-            .unwrap_or_else(|| Path::new("."));
-        let mut temporary = tempfile::NamedTempFile::new_in(parent)?;
-        temporary.write_all(&bytes)?;
-        temporary.as_file_mut().sync_all()?;
-        temporary.persist(&path).map_err(|error| error.error)?;
-        Ok(())
-    })
-    .await
-    .map_err(io::Error::other)?
+    tokio::task::spawn_blocking(move || write_atomic_sync(&path, &bytes))
+        .await
+        .map_err(io::Error::other)?
+}
+
+#[cfg(not(target_family = "wasm"))]
+fn write_atomic_sync(path: &Path, bytes: &[u8]) -> io::Result<()> {
+    let parent = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let mut temporary = tempfile::NamedTempFile::new_in(parent)?;
+    temporary.write_all(bytes)?;
+    temporary.as_file_mut().sync_all()?;
+    temporary.persist(path).map_err(|error| error.error)?;
+    Ok(())
 }
 
 #[cfg(not(target_family = "wasm"))]
