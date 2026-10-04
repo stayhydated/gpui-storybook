@@ -23,7 +23,7 @@ publish = true
 readme = "README.md"
 repository = "https://github.com/stayhydated/gpui-storybook"
 rust-version = "1.98"
-version = "0.6.4"
+version = "0.6.5"
 
 [workspace.dependencies]
 anyhow = "1.0"
@@ -44,14 +44,14 @@ frame-capture = "0.2.2"
 gpui = { package = "gpui-pre", version = "=0.3.7" }
 gpui-es-fluent = "0.2.3"
 gpui-kit = "0.7.0"
-gpui-storybook = { path = "crates/gpui-storybook", version = "0.6.4" }
-gpui-storybook-core = { path = "crates/gpui-storybook-core", version = "0.6.4" }
-gpui-storybook-launch = { path = "crates/gpui-storybook-launch", version = "0.6.4" }
-gpui-storybook-macros = { path = "crates/gpui-storybook-macros", version = "0.6.4" }
-gpui-storybook-mcp = { path = "crates/gpui-storybook-mcp", version = "0.6.4" }
-gpui-storybook-preferences = { path = "crates/gpui-storybook-preferences", version = "0.6.4" }
-gpui-storybook-test = { path = "crates/gpui-storybook-test", version = "0.6.4" }
-gpui-storybook-toml = { path = "crates/gpui-storybook-toml", version = "0.6.4" }
+gpui-storybook = { path = "crates/gpui-storybook", version = "0.6.5" }
+gpui-storybook-core = { path = "crates/gpui-storybook-core", version = "0.6.5" }
+gpui-storybook-launch = { path = "crates/gpui-storybook-launch", version = "0.6.5" }
+gpui-storybook-macros = { path = "crates/gpui-storybook-macros", version = "0.6.5" }
+gpui-storybook-mcp = { path = "crates/gpui-storybook-mcp", version = "0.6.5" }
+gpui-storybook-preferences = { path = "crates/gpui-storybook-preferences", version = "0.6.5" }
+gpui-storybook-test = { path = "crates/gpui-storybook-test", version = "0.6.5" }
+gpui-storybook-toml = { path = "crates/gpui-storybook-toml", version = "0.6.5" }
 gpui_platform = { features = [
   "font-kit",
   "x11",
