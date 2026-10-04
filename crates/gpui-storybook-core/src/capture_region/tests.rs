@@ -25,15 +25,20 @@ fn resetting_one_story_drops_its_stale_routes_and_keeps_other_stories() {
         viewport_bounds: Some(bounds),
         scroll_handle: None,
     };
-    record_region("story-a".to_owned(), bounds, &story_a_scope);
-    record_region("story-a/old".to_owned(), bounds, &story_a_scope);
+    record_region("story-a".to_owned(), bounds, &story_a_scope, bounds.size);
+    record_region(
+        "story-a/old".to_owned(),
+        bounds,
+        &story_a_scope,
+        bounds.size,
+    );
     record_semantic_value(
         "story-a/old".to_owned(),
         "status".to_owned(),
         "Status".to_owned(),
         serde_json::json!("stale"),
     );
-    record_region("story-b".to_owned(), bounds, &story_b_scope);
+    record_region("story-b".to_owned(), bounds, &story_b_scope, bounds.size);
     record_semantic_value(
         "story-b".to_owned(),
         "status".to_owned(),
@@ -107,7 +112,7 @@ fn scopes_restore_previous_state_and_record_region_bounds() {
             Some("story-key".to_string())
         );
         let scope = current_scope().expect("scope should be active");
-        record_region("story-key".to_string(), bounds, &scope);
+        record_region("story-key".to_string(), bounds, &scope, bounds.size);
     });
     assert!(current_scope().is_none());
 
@@ -140,6 +145,7 @@ fn scrolling_recorded_region_aligns_it_with_viewport() {
             size: gpui_kit::size(px(40.), px(20.)),
         },
         &scope,
+        size(px(100.), px(100.)),
     );
 
     assert!(scroll_capture_region_into_view("story-key/section"));
@@ -224,7 +230,12 @@ fn interaction_targets_are_relative_to_route_and_sorted_by_key() {
         origin: point(px(10.), px(20.)),
         size: gpui_kit::size(px(200.), px(100.)),
     };
-    record_region("story-key".to_string(), route_bounds, &scope);
+    record_region(
+        "story-key".to_string(),
+        route_bounds,
+        &scope,
+        route_bounds.size,
+    );
     record_interaction_target(
         "story-key".to_string(),
         "second".to_string(),
@@ -264,7 +275,7 @@ fn duplicate_interaction_target_keys_are_rejected() {
         origin: point(px(0.), px(0.)),
         size: gpui_kit::size(px(10.), px(10.)),
     };
-    record_region("story-key".to_string(), bounds, &scope);
+    record_region("story-key".to_string(), bounds, &scope, bounds.size);
     record_interaction_target(
         "story-key".to_string(),
         "duplicate".to_string(),
@@ -293,7 +304,12 @@ fn semantic_values_are_structured_and_sorted_by_key() {
         viewport_bounds: None,
         scroll_handle: None,
     };
-    record_region("story-key".to_string(), Bounds::default(), &scope);
+    record_region(
+        "story-key".to_string(),
+        Bounds::default(),
+        &scope,
+        size(px(100.), px(100.)),
+    );
     record_semantic_value(
         "story-key".to_string(),
         "status".to_string(),
@@ -322,7 +338,12 @@ fn duplicate_semantic_value_keys_are_rejected() {
         viewport_bounds: None,
         scroll_handle: None,
     };
-    record_region("story-key".to_string(), Bounds::default(), &scope);
+    record_region(
+        "story-key".to_string(),
+        Bounds::default(),
+        &scope,
+        size(px(100.), px(100.)),
+    );
     record_semantic_value(
         "story-key".to_string(),
         "response".to_string(),
@@ -359,6 +380,7 @@ fn route_image_crop_scales_logical_bounds_to_physical_pixels() {
             size: gpui_kit::size(px(20.), px(10.)),
         },
         &scope,
+        size(px(100.), px(100.)),
     );
     let image = image::RgbaImage::from_pixel(200, 100, image::Rgba([1, 2, 3, 255]));
 

@@ -6,8 +6,8 @@ impl Render for StoryContainer {
         let story_scroll_handle = self.story_scroll_handle.clone();
         let story_key = self.story_key_label().map(str::to_owned);
         let presentation = self.presentation;
-        let is_responsive =
-            presentation.viewport == crate::presentation::StoryViewportPreset::Responsive;
+        let is_responsive = self.automation_size.is_none()
+            && presentation.viewport == crate::presentation::StoryViewportPreset::Responsive;
         let viewport_size = self.viewport_size();
         let automation_size = self.automation_size;
         let background = match presentation.background {

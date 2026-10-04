@@ -1,4 +1,7 @@
 use super::*;
+use std::time::{Duration, Instant};
+
+const CAPTURE_LAYOUT_TIMEOUT: Duration = Duration::from_secs(5);
 
 pub(crate) fn schedule_story_capture(
     request_id: u64,
@@ -9,89 +12,117 @@ pub(crate) fn schedule_story_capture(
     quit_after_capture: bool,
     window: &mut Window,
 ) {
-    if response.is_closed() {
-        return;
+    PendingStoryCapture {
+        request_id,
+        request,
+        story,
+        response,
+        operation,
+        quit_after_capture,
+        deadline: Instant::now() + CAPTURE_LAYOUT_TIMEOUT,
     }
-    window.on_next_frame(move |window, cx| {
-        if response.is_closed() {
-            return;
-        }
-        let resized = match ensure_capture_target_visible(&story.capture_route_id, window) {
-            Ok(resized) => resized,
-            Err(error) => {
-                let result = Err(error);
-                let exit_code = capture_exit_code(&result);
-                let _ = response.send(result);
-                if quit_after_capture {
-                    exit_after_capture(exit_code, cx);
-                }
-                return;
-            },
-        };
-        if resized {
-            window.refresh();
-            window.on_next_frame(move |window, _cx| {
-                prepare_story_capture(
-                    request_id,
-                    request,
-                    story,
-                    response,
-                    operation,
-                    quit_after_capture,
-                    window,
-                )
-            });
-        } else {
-            prepare_story_capture(
-                request_id,
-                request,
-                story,
-                response,
-                operation,
-                quit_after_capture,
-                window,
-            );
-        }
-    });
+    .schedule(window);
 }
 
-fn prepare_story_capture(
+struct PendingStoryCapture {
     request_id: u64,
     request: StoryScreenshotRequest,
     story: StorySnapshot,
     response: oneshot::Sender<Result<StoryCaptureSnapshot, StorybookAutomationError>>,
     operation: AutomationOperationGuard,
     quit_after_capture: bool,
-    window: &mut Window,
-) {
-    if response.is_closed() {
-        return;
-    }
-    if !scroll_capture_region_into_view(&story.capture_route_id) {
-        let result = Err(StorybookAutomationError::CaptureUnavailable {
-            message: format!(
-                "capture route `{}` was not rendered by the current story view",
-                story.capture_route_id
-            ),
-        });
-        let exit_code = capture_exit_code(&result);
-        let _ = response.send(result);
-        if quit_after_capture {
-            std::process::exit(exit_code);
+    deadline: Instant,
+}
+
+impl PendingStoryCapture {
+    fn is_ready(&self, window: &mut Window) -> Result<bool, StorybookAutomationError> {
+        if let Some((width, height)) = validate_capture_target_size(&self.request)? {
+            let scale = window.scale_factor().max(f32::EPSILON);
+            let expected = gpui_kit::size(px(width as f32 / scale), px(height as f32 / scale));
+            let story_key = capture_route_story_key(&self.story.capture_route_id);
+            if capture_region_bounds(story_key).is_none_or(|region| region.bounds.size != expected)
+            {
+                return Ok(false);
+            }
         }
-        return;
+        ensure_capture_target_visible(&self.story.capture_route_id, window).map(|resized| !resized)
     }
 
-    window.refresh();
-    window.on_next_frame(move |window, cx| {
-        let _operation = operation;
-        let result = render_story_capture(request_id, request, story, window);
+    fn schedule(self, window: &mut Window) {
+        if self.response.is_closed() {
+            return;
+        }
+        window.refresh();
+        window.on_next_frame(move |window, cx| {
+            if self.response.is_closed() {
+                return;
+            }
+            match self.is_ready(window) {
+                Ok(true) => self.prepare(window, cx),
+                Ok(false) => self.retry(window, cx),
+                Err(error) => self.fail(error, cx),
+            }
+        });
+    }
+
+    fn retry(self, window: &mut Window, cx: &mut App) {
+        if Instant::now() < self.deadline {
+            self.schedule(window);
+        } else {
+            let error = StorybookAutomationError::CaptureUnavailable {
+                message: format!(
+                    "capture route `{}` did not fit its visible story pane within 5 seconds",
+                    self.story.capture_route_id,
+                ),
+            };
+            self.fail(error, cx);
+        }
+    }
+
+    fn fail(self, error: StorybookAutomationError, cx: &mut App) {
+        let result = Err(error);
         let exit_code = capture_exit_code(&result);
-        let _ = response.send(result);
-        if quit_after_capture {
+        let _ = self.response.send(result);
+        if self.quit_after_capture {
             exit_after_capture(exit_code, cx);
         }
-    });
+    }
+
+    fn prepare(self, window: &mut Window, cx: &mut App) {
+        if !scroll_capture_region_into_view(&self.story.capture_route_id) {
+            let error = StorybookAutomationError::CaptureUnavailable {
+                message: format!(
+                    "capture route `{}` was not rendered by the current story view",
+                    self.story.capture_route_id,
+                ),
+            };
+            self.fail(error, cx);
+            return;
+        }
+
+        window.refresh();
+        window.on_next_frame(move |window, cx| {
+            if self.response.is_closed() {
+                return;
+            }
+            // Scrolling and resizable panels can change the clip on this frame.
+            // Only capture after the final rendered geometry still fits.
+            match self.is_ready(window) {
+                Ok(true) => {
+                    let _operation = self.operation;
+                    let result =
+                        render_story_capture(self.request_id, self.request, self.story, window);
+                    let exit_code = capture_exit_code(&result);
+                    let _ = self.response.send(result);
+                    if self.quit_after_capture {
+                        exit_after_capture(exit_code, cx);
+                    }
+                },
+                Ok(false) => self.retry(window, cx),
+                Err(error) => self.fail(error, cx),
+            }
+        });
+    }
 }
 
 #[cfg(unix)]
@@ -195,7 +226,17 @@ pub(crate) fn ensure_capture_target_visible(
             ),
         }
     })?;
-    let Some(target_window_size) = expanded_window_size(window.bounds().size, region.bounds) else {
+    if region.window_size != window.viewport_size() {
+        // A platform configure can arrive before the corresponding redraw.
+        // Re-read the pane after that frame instead of accumulating resizes
+        // against bounds from the previous window size.
+        return Ok(true);
+    }
+    let Some(target_window_size) = expanded_window_size(
+        window.viewport_size(),
+        region.bounds,
+        region.viewport_bounds,
+    ) else {
         return Ok(false);
     };
     window.resize(target_window_size);
@@ -205,17 +246,14 @@ pub(crate) fn ensure_capture_target_visible(
 pub(super) fn expanded_window_size(
     window_size: gpui_kit::Size<gpui_kit::Pixels>,
     story_region: gpui_kit::Bounds<gpui_kit::Pixels>,
+    viewport: gpui_kit::Bounds<gpui_kit::Pixels>,
 ) -> Option<gpui_kit::Size<gpui_kit::Pixels>> {
-    let required_width =
-        (f32::from(story_region.origin.x) + f32::from(story_region.size.width)).max(0.0);
-    let required_height =
-        (f32::from(story_region.origin.y) + f32::from(story_region.size.height)).max(0.0);
-    let width = f32::from(window_size.width).max(required_width);
-    let height = f32::from(window_size.height).max(required_height);
-    if width == f32::from(window_size.width) && height == f32::from(window_size.height) {
+    let width = window_size.width + (story_region.size.width - viewport.size.width).max(px(0.));
+    let height = window_size.height + (story_region.size.height - viewport.size.height).max(px(0.));
+    if width == window_size.width && height == window_size.height {
         None
     } else {
-        Some(gpui_kit::size(px(width), px(height)))
+        Some(gpui_kit::size(width, height))
     }
 }
 
@@ -283,12 +321,15 @@ fn crop_story_capture_image(
             ),
         }
     })?;
-    let window_size = window.bounds().size;
+    let window_size = window.viewport_size();
     let window_bounds = Bounds {
         origin: point(px(0.), px(0.)),
         size: window_size,
     };
-    let bounds = region.bounds.intersect(&window_bounds);
+    let bounds = region
+        .bounds
+        .intersect(&region.viewport_bounds)
+        .intersect(&window_bounds);
 
     let Some((x, y, width, height)) = image_crop_rect(bounds, window_size, &image) else {
         return Err(StorybookAutomationError::CaptureUnavailable {

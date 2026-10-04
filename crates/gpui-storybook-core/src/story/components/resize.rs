@@ -2,11 +2,13 @@ use super::*;
 
 impl StoryContainer {
     /// Applies viewport and canvas-background presentation to this story.
+    /// Restores preview sizing after an automation capture or interaction.
     ///
     /// Portable runners use this before the first draw so every matrix case
     /// renders the requested presentation rather than merely labeling it.
     pub fn set_presentation(&mut self, presentation: StoryPresentation) {
         self.presentation = presentation;
+        self.automation_size = None;
     }
 
     pub(crate) fn set_responsive_size(&mut self, responsive_size: Option<Size<Pixels>>) {
@@ -29,11 +31,13 @@ impl StoryContainer {
     }
 
     pub(super) fn viewport_size(&self) -> Option<Size<Pixels>> {
-        self.presentation
-            .viewport
-            .dimensions()
-            .map(|(width, height)| size(px(width as f32), px(height as f32)))
-            .or(self.responsive_size)
+        self.automation_size.or_else(|| {
+            self.presentation
+                .viewport
+                .dimensions()
+                .map(|(width, height)| size(px(width as f32), px(height as f32)))
+                .or(self.responsive_size)
+        })
     }
 
     fn begin_canvas_resize(&mut self, start_position: Point<Pixels>) {

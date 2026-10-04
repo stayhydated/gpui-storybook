@@ -6,6 +6,28 @@ is unsupported on Windows and produces a compile-time error there. The standard
 gallery view attaches the automation controller installed by
 `gpui_storybook::init`.
 
+## Pin the Wayland capture backends
+
+Linux Wayland window capture uses the Zed fork's image readback support with
+`gpui-pre =0.3.7`. Add these patches to your application's workspace root
+`Cargo.toml` and commit the resolved `Cargo.lock`:
+
+```toml
+[patch.crates-io]
+gpui-pre-linux = { git = "https://github.com/stayhydated/zed", rev = "090c89fc71e054895f42531eec347feab3f22f6f" }
+gpui-pre-platform = { git = "https://github.com/stayhydated/zed", rev = "090c89fc71e054895f42531eec347feab3f22f6f" }
+gpui-pre-wgpu = { git = "https://github.com/stayhydated/zed", rev = "090c89fc71e054895f42531eec347feab3f22f6f" }
+```
+
+Keep all three packages on the same revision. Cargo applies patches from the
+workspace root; adding Storybook as a dependency does not inherit its patches.
+The remaining GPUI packages retain the published snapshot used by `gpui-kit`.
+
+The Storybook checkout verifies startup capture at desktop, tablet, mobile,
+and custom sizes through private Sway with `just wayland-capture-test`.
+Install the Linux runtime dependencies below before running that check.
+Portable runner captures also work on Linux without a compositor.
+
 ## Enable MCP support
 
 Forward the facade feature from the Storybook package:
@@ -467,16 +489,20 @@ selection. It also accepts a named viewport when paired dimensions are omitted.
 
 ## Understand capture bounds and size
 
-Captures contain the story view, excluding the gallery sidebar and header.
-Substory routes crop to the registered section region.
+Captures contain the story canvas, excluding gallery navigation, the header,
+and the workbench. Substory routes crop to the registered section region.
 
-Width and height target the captured story region. Storybook adjusts the host
-window around the existing gallery chrome so sidebars, headers, and the
-workbench remain mounted, then crops that chrome from the returned PNG. Display
-scaling or compositor behavior can change the rendered result, so treat the
-returned `pixel_width` and `pixel_height` as authoritative. Viewport text
-rendered by a story can describe its logical live-window bounds instead of the
-PNG size.
+Width and height target the story canvas in physical pixels, overriding its
+current preview size. Storybook adjusts the host window around the existing
+gallery chrome so sidebars, headers, and the workbench remain mounted.
+Live and startup captures wait up to five seconds for
+the requested canvas dimensions to fit the visible story pane before cropping
+the PNG. A layout that cannot fit returns `capture_unavailable`.
+Changing the workbench viewport or background restores its preview sizing.
+
+The returned `pixel_width` and `pixel_height` describe the cropped PNG;
+substory images use their section dimensions. Viewport text rendered by a
+story can describe its logical live-window bounds instead of the PNG size.
 
 An interaction capture is part of the same exclusive UI-thread operation. It
 captures the first requested rendered frame after the final step; explicit

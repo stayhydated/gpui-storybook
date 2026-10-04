@@ -133,7 +133,7 @@ Headless capture therefore follows one path per platform:
 | Platform | Portable runner capture | Application capture |
 |---|---|---|
 | macOS | Metal headless renderer | Metal window renderer |
-| Linux | Wgpu headless renderer (gpui-pre 0.3.7) | Not implemented for Linux windows; use the runner |
+| Linux | Wgpu headless renderer (gpui-pre 0.3.7) | Wayland Wgpu window renderer with the workspace's Git patches |
 | Windows | Not available (`Ok(None)`) | DirectX window readback on an unshown window |
 
 The runner owns its offscreen window and renderer inside a fresh
@@ -144,8 +144,9 @@ or a Mesa software Vulkan/GL driver such as `mesa-vulkan-drivers` and
 `libgl1-mesa-dri`. Sway and `gpui-storybook-launch` belong to the live
 application and MCP path, which is separate from the runner.
 
-The `mcp` feature keeps its Linux and macOS contract, and the Linux capture
-smoke test stays `continue-on-error` because it drives the application window
-path rather than the runner. Visual baselines are renderer- and font-sensitive,
-so keep separate accepted images when CI spans platforms with materially
-different output.
+For Wayland application capture, apply the GPUI patches described in
+[Automation and capture](automation.md#pin-the-wayland-capture-backends).
+The `mcp` feature supports Linux and macOS. Linux CI also verifies application
+capture through private Sway at desktop, tablet, mobile, and custom sizes.
+Visual baselines are renderer- and font-sensitive, so keep separate accepted
+images when CI spans platforms with materially different output.

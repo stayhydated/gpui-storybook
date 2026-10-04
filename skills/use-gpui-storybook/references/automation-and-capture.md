@@ -13,6 +13,14 @@ The `mcp` feature is unsupported on Windows and produces a compile-time error
 there. Set `GPUI_STORYBOOK_MCP_STDIO=1` to serve MCP over stdio. Route tracing
 and diagnostic logs to standard error.
 
+For Linux Wayland window capture, copy the three `[patch.crates-io]` entries
+from GPUI Storybook's root `Cargo.toml` into the application's workspace root.
+They pin `gpui-pre-linux`, `gpui-pre-wgpu`, and `gpui-pre-platform` to the same
+Zed fork commit and retain `gpui-pre =0.3.7` for compatibility with `gpui-kit`.
+Commit the resolved `Cargo.lock`; Cargo patches are not inherited from
+dependencies. Verify the pinned path in the Storybook checkout with
+`just wayland-capture-test`.
+
 On Linux, install Sway plus `libgl1-mesa-dri` and `mesa-vulkan-drivers`, then
 install the reusable launcher and run stdio and startup-capture sessions
 through it:
@@ -141,9 +149,13 @@ element ID as its key and derives the label; use
 Capture requests also accept `responsive`, `mobile`, `tablet`, or `desktop` as
 a `viewport`. Explicit paired width and height take precedence. The live
 gallery chrome remains mounted for layout, while the returned PNG is
-cropped to the story region and excludes that chrome. The launch-env tool
-accepts the same named presets when dimensions are omitted. Treat the returned
-`pixel_width` and `pixel_height` as authoritative; viewport text rendered by a
+cropped to the story canvas and excludes that chrome. Live and startup captures
+wait up to five seconds for the requested canvas dimensions to fit the visible
+story pane; a layout that cannot fit returns `capture_unavailable`.
+Changing the workbench viewport or background restores its preview sizing.
+The launch-env tool accepts the same named presets when dimensions are omitted.
+Treat the returned `pixel_width` and `pixel_height` as authoritative; viewport
+text rendered by a
 story can describe its logical live-window bounds instead of the PNG size.
 
 ## Interaction batches
@@ -272,10 +284,9 @@ In the pinned `gpui-pre` 0.3.7 stack, `current_headless_renderer` returns a
 Metal renderer on macOS and a Wgpu renderer on Linux, so runner captures run on
 both. Windows gets `Ok(None)`; its DirectX renderer reaches `render_to_image`
 only through a real window, outside the runner's headless context. Linux
-application captures are not implemented for Linux windows, so drive them
-through the runner instead. The `mcp` feature remains Linux and macOS, and the
-Linux capture smoke test stays `continue-on-error` because it drives the
-application window path.
+Wayland application captures use the Git-patched Wgpu window renderer and
+private Sway. The `mcp` feature supports Linux and macOS; Linux CI verifies
+application capture at desktop, tablet, mobile, and custom sizes.
 Treat renderer, fonts, assets, and CI hardware as part of the baseline or timing
 environment; keep platform-specific accepted output where rasterization differs.
 

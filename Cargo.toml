@@ -23,7 +23,7 @@ publish = true
 readme = "README.md"
 repository = "https://github.com/stayhydated/gpui-storybook"
 rust-version = "1.99"
-version = "0.7.0"
+version = "0.7.1"
 
 [workspace.dependencies]
 anyhow = "1.0"
@@ -44,14 +44,14 @@ frame-capture = "0.2.3"
 gpui = { package = "gpui-pre", version = "=0.3.7" }
 gpui-es-fluent = "0.3.0"
 gpui-kit = "0.7.0"
-gpui-storybook = { path = "crates/gpui-storybook", version = "0.7.0" }
-gpui-storybook-core = { path = "crates/gpui-storybook-core", version = "0.7.0" }
-gpui-storybook-launch = { path = "crates/gpui-storybook-launch", version = "0.7.0" }
-gpui-storybook-macros = { path = "crates/gpui-storybook-macros", version = "0.7.0" }
-gpui-storybook-mcp = { path = "crates/gpui-storybook-mcp", version = "0.7.0" }
-gpui-storybook-preferences = { path = "crates/gpui-storybook-preferences", version = "0.7.0" }
-gpui-storybook-test = { path = "crates/gpui-storybook-test", version = "0.7.0" }
-gpui-storybook-toml = { path = "crates/gpui-storybook-toml", version = "0.7.0" }
+gpui-storybook = { path = "crates/gpui-storybook", version = "0.7.1" }
+gpui-storybook-core = { path = "crates/gpui-storybook-core", version = "0.7.1" }
+gpui-storybook-launch = { path = "crates/gpui-storybook-launch", version = "0.7.1" }
+gpui-storybook-macros = { path = "crates/gpui-storybook-macros", version = "0.7.1" }
+gpui-storybook-mcp = { path = "crates/gpui-storybook-mcp", version = "0.7.1" }
+gpui-storybook-preferences = { path = "crates/gpui-storybook-preferences", version = "0.7.1" }
+gpui-storybook-test = { path = "crates/gpui-storybook-test", version = "0.7.1" }
+gpui-storybook-toml = { path = "crates/gpui-storybook-toml", version = "0.7.1" }
 gpui_platform = { features = [
   "font-kit",
   "x11",
@@ -95,6 +95,12 @@ url = "2.5"
 wasm-bindgen = "0.2"
 web = { path = "web" }
 web-sys = { features = [ "Location", "Window" ], version = "0.3" }
+
+# Wayland window capture backends compatible with gpui-pre =0.3.7.
+[patch.crates-io]
+gpui-pre-linux = { git = "https://github.com/stayhydated/zed", rev = "090c89fc71e054895f42531eec347feab3f22f6f" }
+gpui-pre-platform = { git = "https://github.com/stayhydated/zed", rev = "090c89fc71e054895f42531eec347feab3f22f6f" }
+gpui-pre-wgpu = { git = "https://github.com/stayhydated/zed", rev = "090c89fc71e054895f42531eec347feab3f22f6f" }
 
 [workspace.lints.rust]
 future_incompatible = "deny"

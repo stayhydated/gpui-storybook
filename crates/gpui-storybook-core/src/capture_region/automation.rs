@@ -119,7 +119,12 @@ pub(super) fn with_scope<R>(scope: CaptureScope, f: impl FnOnce() -> R) -> R {
     result
 }
 
-pub(super) fn record_region(route_id: String, bounds: Bounds<Pixels>, scope: &CaptureScope) {
+pub(super) fn record_region(
+    route_id: String,
+    bounds: Bounds<Pixels>,
+    scope: &CaptureScope,
+    window_size: gpui_kit::Size<Pixels>,
+) {
     let viewport_bounds = scope.viewport_bounds.unwrap_or(bounds);
 
     CAPTURE_REGIONS.with_borrow_mut(|registry| {
@@ -128,6 +133,7 @@ pub(super) fn record_region(route_id: String, bounds: Bounds<Pixels>, scope: &Ca
             CaptureRegionBounds {
                 bounds,
                 viewport_bounds,
+                window_size,
                 scroll_handle: scope.scroll_handle.clone(),
             },
         );

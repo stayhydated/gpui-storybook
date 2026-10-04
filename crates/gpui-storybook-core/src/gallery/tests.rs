@@ -288,6 +288,140 @@ fn gallery_selects_by_title_key_and_automation_command(cx: &mut App) {
 }
 
 #[test]
+fn capture_dimensions_override_preview_and_keep_chrome_outside_the_story() {
+    let app = TestAppContext::single();
+    let mut gallery = None;
+    let window = app.update(|cx| {
+        gpui_kit::init(cx);
+        cx.open_window(
+            gpui_kit::WindowOptions {
+                window_bounds: Some(gpui_kit::WindowBounds::Windowed(
+                    gpui_kit::Bounds::centered(None, gpui_kit::size(px(2600.), px(1600.)), cx),
+                )),
+                ..Default::default()
+            },
+            |window, cx| {
+                let view = cx.new(|cx| {
+                    let story = StoryContainer::panel::<ControlledStory>(window, cx);
+                    story.update(cx, |story, _| {
+                        story.set_registration_metadata(RegisteredStoryMetadata::new(
+                            StoryKey::new("crate-ControlledStory"),
+                            StoryName::new("ControlledStory"),
+                            None,
+                            "crate",
+                            "/tmp/crate",
+                            "src/controlled.rs",
+                            1,
+                        ));
+                    });
+                    Gallery::new(vec![story], None, None, window, cx)
+                });
+                gallery = Some(view.clone());
+                cx.new(|cx| {
+                    crate::story::StoryRoot::new(
+                        "Storybook",
+                        view,
+                        StorybookWindowUi::default(),
+                        window,
+                        cx,
+                    )
+                })
+            },
+        )
+        .expect("capture layout window should open")
+    });
+    let gallery = gallery.expect("gallery should be constructed");
+    let mut cx = VisualTestContext::from_window(window.into(), &app);
+    gallery.update(&mut cx, |gallery, cx| {
+        gallery.workbench_state.update(cx, |state, cx| {
+            state.set_viewport(crate::presentation::StoryViewportPreset::Desktop, cx);
+        });
+    });
+
+    let draw = |cx: &mut VisualTestContext| {
+        cx.run_until_parked();
+        cx.update(|window, cx| {
+            _ = window.draw(cx);
+        });
+        cx.run_until_parked();
+        cx.update(|window, cx| {
+            _ = window.draw(cx);
+        });
+    };
+
+    for (viewport, dimensions) in [
+        (crate::presentation::StoryViewportPreset::Desktop, None),
+        (crate::presentation::StoryViewportPreset::Tablet, None),
+        (crate::presentation::StoryViewportPreset::Mobile, None),
+        (
+            crate::presentation::StoryViewportPreset::Mobile,
+            Some((801, 601)),
+        ),
+    ] {
+        let (width, height) = dimensions.or_else(|| viewport.dimensions()).unwrap();
+        cx.update(|window, cx| {
+            gallery.update(cx, |gallery, cx| {
+                gallery
+                    .prepare_capture_current_story(
+                        &StoryScreenshotRequest {
+                            viewport: Some(viewport),
+                            width: dimensions.map(|size| size.0),
+                            height: dimensions.map(|size| size.1),
+                            ..Default::default()
+                        },
+                        window,
+                        cx,
+                    )
+                    .expect("capture request should prepare");
+            });
+        });
+        draw(&mut cx);
+
+        let canvas = cx
+            .debug_bounds("story-canvas")
+            .expect("canvas should render");
+        let region = crate::capture_region::capture_region_bounds("crate-ControlledStory")
+            .expect("story should register capture bounds");
+        assert_eq!(
+            canvas.size,
+            cx.update(|window, _| {
+                let scale = window.scale_factor();
+                gpui_kit::size(px(width as f32 / scale), px(height as f32 / scale))
+            })
+        );
+        assert_eq!(region.bounds, canvas);
+        assert_eq!(region.viewport_bounds, canvas);
+        let workbench = cx
+            .debug_bounds("gallery-right-sidebar")
+            .expect("workbench should remain mounted");
+        assert!(canvas.right() <= workbench.left());
+        assert!(cx.debug_bounds("gallery-left-sidebar").is_some());
+        assert_eq!(cx.debug_bounds("story-canvas-resize-corner"), None);
+    }
+
+    // Workbench edits restore preview dimensions and responsive resize handles.
+    for viewport in [
+        crate::presentation::StoryViewportPreset::Mobile,
+        crate::presentation::StoryViewportPreset::Responsive,
+    ] {
+        gallery.update(&mut cx, |gallery, cx| {
+            gallery.workbench_state.update(cx, |state, cx| {
+                state.set_viewport(viewport, cx);
+            });
+        });
+        draw(&mut cx);
+        assert_eq!(
+            cx.debug_bounds("story-canvas").unwrap().size,
+            gpui_kit::size(px(390.), px(844.))
+        );
+        assert_eq!(
+            cx.debug_bounds("story-canvas-resize-corner").is_some(),
+            viewport == crate::presentation::StoryViewportPreset::Responsive
+        );
+    }
+}
+
+#[test]
 fn sidebar_toggles_keep_responsive_canvas_centered_with_its_resize_gutter() {
     let mut app = TestAppContext::single();
     app.update(gpui_kit::init);

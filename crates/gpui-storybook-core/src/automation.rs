@@ -171,14 +171,20 @@ pub struct StoryCurrentSnapshot {
     pub revision: u64,
 }
 
+/// Capture the story canvas or a registered substory section, excluding gallery chrome.
+///
+/// Paired physical-pixel dimensions override the named viewport and current preview.
+/// Live and startup captures wait up to five seconds for the canvas to fit its
+/// visible story pane, returning [`StorybookAutomationError::CaptureUnavailable`]
+/// if layout cannot settle. Substory PNGs use the section's cropped dimensions.
 #[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[schemars(deny_unknown_fields)]
 pub struct StoryScreenshotRequest {
     /// PNG destination, or the route-derived default when omitted.
     pub output_path: Option<PathBuf>,
-    /// Requested captured story-region width in physical pixels.
+    /// Requested story-canvas width in physical pixels; provide with `height`.
     pub width: Option<u32>,
-    /// Requested captured story-region height in physical pixels.
+    /// Requested story-canvas height in physical pixels; provide with `width`.
     pub height: Option<u32>,
     /// Named viewport used when explicit dimensions are omitted.
     pub viewport: Option<StoryViewportPreset>,

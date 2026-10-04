@@ -52,6 +52,7 @@ pub struct StorySemanticValueSnapshot {
 pub(crate) struct CaptureRegionBounds {
     pub bounds: Bounds<Pixels>,
     pub viewport_bounds: Bounds<Pixels>,
+    pub window_size: gpui_kit::Size<Pixels>,
     pub scroll_handle: Option<ScrollHandle>,
 }
 

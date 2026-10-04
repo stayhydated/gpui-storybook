@@ -20,6 +20,13 @@ The workspace requires Rust 1.99 or newer and uses edition 2024.
 - Drive live Linux and macOS sessions through MCP, or exercise isolated stories
   with the portable headless test runner.
 
+Live captures size the story canvas to desktop, tablet, mobile, or explicit
+pixel dimensions and crop gallery chrome from the PNG.
+
+Linux Wayland window capture uses the GPUI Git patches pinned in this
+workspace's `Cargo.toml`. Applications using Storybook as a dependency must
+apply those patches in their own workspace root.
+
 ## Crates
 
 | Crate | Purpose | Source |
