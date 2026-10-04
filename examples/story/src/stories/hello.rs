@@ -22,7 +22,8 @@ impl Focusable for HelloWorld {
 
 impl gpui_storybook::Story for HelloWorld {
     fn title(cx: &App) -> String {
-        gpui_storybook::localize_message(cx, &StoryItems::Title).unwrap_or_else(|| "Title".into())
+        gpui_storybook::try_localize_message(cx, &StoryItems::Title)
+            .unwrap_or_else(|| "Title".into())
     }
 
     fn new_view(window: &mut Window, cx: &mut App) -> Entity<Self> {
@@ -51,7 +52,7 @@ impl Render for HelloWorld {
             .justify_center()
             .text_center()
             .child(
-                gpui_storybook::localize_message(cx, &StoryItems::Hi)
+                gpui_storybook::try_localize_message(cx, &StoryItems::Hi)
                     .unwrap_or_else(|| "Hi".into()),
             )
     }

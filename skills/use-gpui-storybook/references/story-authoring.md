@@ -24,7 +24,9 @@ pub struct WelcomeCard {
 
 The derive accepts non-generic structs. Without `example`, the wrapper uses
 `Default::default()`. Title and description expressions have
-`cx: &gpui_kit::App` in scope and may call `localize_message`.
+`cx: &gpui_kit::App` in scope and may call
+`gpui_storybook::try_localize_message(cx, &message)`. It returns `Option<String>`;
+handle missing output in the expression, as the executable examples do.
 
 ## Expose story-root actions
 

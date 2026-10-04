@@ -80,15 +80,69 @@ where
     cx.global::<StorybookI18n>().select_language(&locale.into())
 }
 
-/// Localizes a Fluent message with the manager stored in the GPUI app context.
+/// Attempts to localize a message through Storybook's embedded shell context.
+///
+/// Consumer messages use the separate application localization context.
 ///
 /// Returns `None` when localization has not been initialized or the message
 /// cannot be resolved for the active locale.
-pub fn localize_message<T>(cx: &impl Borrow<App>, message: &T) -> Option<String>
+pub fn try_localize_message<T>(cx: &impl Borrow<App>, message: &T) -> Option<String>
 where
     T: es_fluent::FluentMessage + ?Sized,
 {
     cx.borrow()
         .try_global::<StorybookI18n>()?
         .try_localize_message(message)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::messages::StorybookMessage;
+    use es_fluent::{FluentMessage, FluentMessageLookup};
+    use gpui_kit::TestAppContext;
+
+    struct MissingMessage;
+
+    impl FluentMessage for MissingMessage {
+        fn to_fluent_string_with(&self, lookup: &mut FluentMessageLookup<'_>) -> String {
+            lookup(
+                es_fluent::registry::__macro::static_message_key(
+                    "gpui-storybook-core",
+                    es_fluent::registry::__macro::static_domain("gpui-storybook-core"),
+                    es_fluent::registry::__macro::static_entry_id("missing-test-message"),
+                ),
+                None,
+            )
+        }
+    }
+
+    #[test]
+    fn fallible_shell_lookup_preserves_missing_locale_and_context_contracts() {
+        let app = TestAppContext::single();
+        app.update(|cx| {
+            assert_eq!(
+                try_localize_message(cx, &StorybookMessage::Appearance),
+                None
+            );
+            init(cx).expect("embedded shell resources should initialize");
+            assert_eq!(
+                try_localize_message(cx, &StorybookMessage::Appearance),
+                Some("Appearance".to_string())
+            );
+            assert_eq!(try_localize_message(cx, &MissingMessage), None);
+            assert_eq!(
+                gpui_es_fluent::try_localize_message(cx, &StorybookMessage::Appearance),
+                None,
+                "initializing the shell must not install the consumer context"
+            );
+
+            change_locale(cx, "zz".parse::<LanguageIdentifier>().unwrap())
+                .expect("an unavailable shell locale should use English");
+            assert_eq!(
+                try_localize_message(cx, &StorybookMessage::Appearance),
+                Some("Appearance".to_string())
+            );
+        });
+    }
 }

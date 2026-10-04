@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc fe997a3209c7dbf68a316013a221b8205e9003d7a9fc8447640bc274ee5b6a47 # shrinks to story_count = 2, viewport_inputs = [], theme_inputs = [], language_inputs = [], control_inputs = [], selected = true

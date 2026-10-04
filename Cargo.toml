@@ -22,36 +22,36 @@ license = "MIT OR Apache-2.0"
 publish = true
 readme = "README.md"
 repository = "https://github.com/stayhydated/gpui-storybook"
-rust-version = "1.98"
-version = "0.6.5"
+rust-version = "1.99"
+version = "0.7.1"
 
 [workspace.dependencies]
 anyhow = "1.0"
 base64 = "0.23"
 clap = "4.6"
-component-shape-mcp = "0.3.3"
+component-shape-mcp = "0.3.4"
 console_error_panic_hook = "0.1"
 darling = "0.24"
 derive_more = "2.1"
 dioxus = { default-features = false, version = "0.7" }
-es-fluent = "0.20.3"
-es-fluent-build = "0.20.3"
-es-fluent-lang = "0.20.3"
-es-fluent-manager-core = "0.20.3"
-es-fluent-manager-embedded = "0.20.3"
+es-fluent = "0.21.0"
+es-fluent-build = "0.21.0"
+es-fluent-lang = "0.21.0"
+es-fluent-manager-core = "0.21.0"
+es-fluent-manager-embedded = "0.21.0"
 fluent-langneg = "=0.14.2"
-frame-capture = "0.2.2"
+frame-capture = "0.2.3"
 gpui = { package = "gpui-pre", version = "=0.3.7" }
-gpui-es-fluent = "0.2.3"
+gpui-es-fluent = "0.3.0"
 gpui-kit = "0.7.0"
-gpui-storybook = { path = "crates/gpui-storybook", version = "0.6.5" }
-gpui-storybook-core = { path = "crates/gpui-storybook-core", version = "0.6.5" }
-gpui-storybook-launch = { path = "crates/gpui-storybook-launch", version = "0.6.5" }
-gpui-storybook-macros = { path = "crates/gpui-storybook-macros", version = "0.6.5" }
-gpui-storybook-mcp = { path = "crates/gpui-storybook-mcp", version = "0.6.5" }
-gpui-storybook-preferences = { path = "crates/gpui-storybook-preferences", version = "0.6.5" }
-gpui-storybook-test = { path = "crates/gpui-storybook-test", version = "0.6.5" }
-gpui-storybook-toml = { path = "crates/gpui-storybook-toml", version = "0.6.5" }
+gpui-storybook = { path = "crates/gpui-storybook", version = "0.7.1" }
+gpui-storybook-core = { path = "crates/gpui-storybook-core", version = "0.7.1" }
+gpui-storybook-launch = { path = "crates/gpui-storybook-launch", version = "0.7.1" }
+gpui-storybook-macros = { path = "crates/gpui-storybook-macros", version = "0.7.1" }
+gpui-storybook-mcp = { path = "crates/gpui-storybook-mcp", version = "0.7.1" }
+gpui-storybook-preferences = { path = "crates/gpui-storybook-preferences", version = "0.7.1" }
+gpui-storybook-test = { path = "crates/gpui-storybook-test", version = "0.7.1" }
+gpui-storybook-toml = { path = "crates/gpui-storybook-toml", version = "0.7.1" }
 gpui_platform = { features = [
   "font-kit",
   "x11",
@@ -61,10 +61,10 @@ gpui_platform = { features = [
 gpui_wgpu = { features = [ "font-kit" ], package = "gpui-pre-wgpu", version = "=0.3.7" }
 heck = "0.5"
 image = { default-features = false, features = [ "png" ], version = "0.25" }
-insta = "1.48"
+insta = "1.49"
 inventory = "0.3"
 itertools = "0.15"
-koruma = "0.12.2"
+koruma = "0.13.0"
 libc = "0.2"
 prettyplease = "0.3"
 proc-macro2 = "1.0"
@@ -76,9 +76,9 @@ schemars = "1.2.2"
 serde = "1.0"
 serde_json = "1.0"
 sha2 = "0.11"
-stayhydated-dioxus = { git = "https://github.com/stayhydated/shared", rev = "125e20e910e17d23a874399f6b88084830ac679d" }
-stayhydated-site = { git = "https://github.com/stayhydated/shared", rev = "125e20e910e17d23a874399f6b88084830ac679d" }
-stayhydated-xtask = { git = "https://github.com/stayhydated/shared", rev = "125e20e910e17d23a874399f6b88084830ac679d" }
+stayhydated-dioxus = { git = "https://github.com/stayhydated/shared", rev = "d9c54bbb850b58b822458a6a15eb75ba64034a31" }
+stayhydated-site = { git = "https://github.com/stayhydated/shared", rev = "d9c54bbb850b58b822458a6a15eb75ba64034a31" }
+stayhydated-xtask = { git = "https://github.com/stayhydated/shared", rev = "d9c54bbb850b58b822458a6a15eb75ba64034a31" }
 strum = "0.28"
 syn = "3.0"
 sys-locale = "=0.3.2"

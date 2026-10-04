@@ -233,4 +233,7 @@ pub use runner::HeadlessStoryRunner;
 use support::*;
 
 #[cfg(test)]
+mod properties;
+
+#[cfg(test)]
 mod tests;

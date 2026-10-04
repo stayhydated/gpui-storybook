@@ -9,6 +9,8 @@ GPUI Storybook gives application developers a searchable gallery
 for developing, inspecting, and exercising GPUI components outside
 the rest of their application.
 
+The workspace requires Rust 1.99 or newer and uses edition 2024.
+
 ## Overview
 
 - Register stateful previews with `#[story]` or derive component previews with
@@ -31,12 +33,12 @@ apply those patches in their own workspace root.
 | --- | --- | --- |
 | `gpui-storybook` | Application facade, initialization, registration, and public re-exports | [README](crates/gpui-storybook/README.md) |
 | `gpui-storybook-core` | Runtime shell and lower-level integration APIs | [README](crates/gpui-storybook-core/README.md) |
+| `gpui-storybook-example-component` | Executable `ComponentStory` registration examples | [README](examples/component/README.md) |
+| `gpui-storybook-example-story` | Executable stateful `#[story]` registration examples | [README](examples/story/README.md) |
 | `gpui-storybook-launch` | Linux headless Sway launcher for automation sessions | [README](crates/gpui-storybook-launch/README.md) |
 | `gpui-storybook-mcp` | Typed live automation and story-region capture tools | [README](crates/gpui-storybook-mcp/README.md) |
 | `gpui-storybook-test` | Portable capture matrices, visual baselines, and frame budgets | [README](crates/gpui-storybook-test/README.md) |
 | `gpui-storybook-toml` | Typed `storybook.toml` schema and loader | [README](crates/gpui-storybook-toml/README.md) |
-| `gpui-storybook-example-component` | Executable `ComponentStory` registration examples | [README](examples/component/README.md) |
-| `gpui-storybook-example-story` | Executable stateful `#[story]` registration examples | [README](examples/story/README.md) |
 
 [ci-badge]: https://github.com/stayhydated/gpui-storybook/actions/workflows/ci.yml/badge.svg?branch=master
 [ci]: https://github.com/stayhydated/gpui-storybook/actions/workflows/ci.yml

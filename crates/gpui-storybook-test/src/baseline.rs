@@ -369,6 +369,9 @@ fn encode_component(component: &str) -> String {
 }
 
 #[cfg(test)]
+mod properties;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use image::Rgba;

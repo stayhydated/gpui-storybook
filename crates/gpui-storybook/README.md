@@ -17,7 +17,9 @@ themes, viewports, and repeatable scenarios.
   Inspector integration, or `performance` for frame telemetry.
 
 The facade also exposes static registration catalogs for documentation and
-tooling without constructing stories or opening a window.
+tooling without constructing stories or opening a window. Localized consumer
+metadata uses `try_localize_message(cx, &message)` and handles `Option<String>`
+through the application's locale context.
 
 Live captures size the story canvas to a named viewport or explicit pixel
 dimensions and crop gallery chrome from the PNG.
