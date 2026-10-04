@@ -149,9 +149,13 @@ element ID as its key and derives the label; use
 Capture requests also accept `responsive`, `mobile`, `tablet`, or `desktop` as
 a `viewport`. Explicit paired width and height take precedence. The live
 gallery chrome remains mounted for layout, while the returned PNG is
-cropped to the story region and excludes that chrome. The launch-env tool
-accepts the same named presets when dimensions are omitted. Treat the returned
-`pixel_width` and `pixel_height` as authoritative; viewport text rendered by a
+cropped to the story canvas and excludes that chrome. Live and startup captures
+wait up to five seconds for the requested canvas dimensions to fit the visible
+story pane; a layout that cannot fit returns `capture_unavailable`.
+Changing the workbench viewport or background restores its preview sizing.
+The launch-env tool accepts the same named presets when dimensions are omitted.
+Treat the returned `pixel_width` and `pixel_height` as authoritative; viewport
+text rendered by a
 story can describe its logical live-window bounds instead of the PNG size.
 
 ## Interaction batches
@@ -282,7 +286,7 @@ both. Windows gets `Ok(None)`; its DirectX renderer reaches `render_to_image`
 only through a real window, outside the runner's headless context. Linux
 Wayland application captures use the Git-patched Wgpu window renderer and
 private Sway. The `mcp` feature supports Linux and macOS; Linux CI verifies
-application capture at two viewport sizes.
+application capture at desktop, tablet, mobile, and custom sizes.
 Treat renderer, fonts, assets, and CI hardware as part of the baseline or timing
 environment; keep platform-specific accepted output where rasterization differs.
 

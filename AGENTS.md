@@ -65,8 +65,9 @@ outputs are not independent editing surfaces.
 
 `just wayland-capture-test` runs the story example's startup-capture
 regression against the Git-pinned GPUI backends. It requires Sway and a working
-Wgpu adapter. The check captures the button story at two sizes in a private
-compositor, decodes the PNGs, and verifies dimensions and rendered content.
+Wgpu adapter. The check captures the button story at desktop, tablet, mobile,
+and custom sizes in a private compositor, decodes the PNGs, and verifies
+dimensions, rendered content, and exclusion of workbench controls.
 
 The root `[patch.crates-io]` pins `gpui-pre-linux`, `gpui-pre-wgpu`, and
 `gpui-pre-platform` to one Zed fork revision, compatible with `gpui-pre =0.3.7`.

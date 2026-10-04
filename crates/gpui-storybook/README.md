@@ -19,6 +19,9 @@ themes, viewports, and repeatable scenarios.
 The facade also exposes static registration catalogs for documentation and
 tooling without constructing stories or opening a window.
 
+Live captures size the story canvas to a named viewport or explicit pixel
+dimensions and crop gallery chrome from the PNG.
+
 Linux Wayland window capture requires the GPUI Git patches from the repository
 root `Cargo.toml` in the application's workspace root.
 

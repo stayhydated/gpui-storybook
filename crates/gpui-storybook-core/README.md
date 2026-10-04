@@ -18,6 +18,9 @@ Scenario execution, semantic targets and values, navigation, control mutation,
 and capture share the same frame-aware automation model used by the facade,
 MCP integration, and portable test runner.
 
+Live capture waits for the requested canvas dimensions to fit the visible
+story pane, then crops gallery chrome from the PNG.
+
 [codecov-badge]: https://codecov.io/github/stayhydated/gpui-storybook/branch/master/graph/badge.svg?component=gpui-storybook-core
 [codecov]: https://codecov.io/github/stayhydated/gpui-storybook
 [crate-badge]: https://img.shields.io/crates/v/gpui-storybook-core.svg?label=gpui-storybook-core

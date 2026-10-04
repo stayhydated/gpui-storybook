@@ -2,6 +2,7 @@ use super::capture::expanded_window_size;
 #[cfg(feature = "capture")]
 use super::capture::image_crop_rect;
 use super::*;
+use gpui_kit::{Bounds, point};
 
 fn sample_story(key: &str, title: &str) -> StorySnapshot {
     StorySnapshot {
@@ -322,6 +323,10 @@ fn capture_target_size_only_expands_a_clipped_story_region() {
                 origin: gpui_kit::point(px(200.), px(100.)),
                 size: gpui_kit::size(px(400.), px(300.)),
             },
+            Bounds::new(
+                point(px(200.), px(100.)),
+                gpui_kit::size(px(400.), px(300.))
+            ),
         ),
         None
     );
@@ -332,8 +337,28 @@ fn capture_target_size_only_expands_a_clipped_story_region() {
                 origin: gpui_kit::point(px(300.), px(150.)),
                 size: gpui_kit::size(px(600.), px(500.)),
             },
+            Bounds::new(
+                point(px(300.), px(150.)),
+                gpui_kit::size(px(500.), px(450.))
+            ),
         ),
         Some(gpui_kit::size(px(900.), px(650.)))
+    );
+
+    // The story can overlap a workbench even while it fits inside the window.
+    assert_eq!(
+        expanded_window_size(
+            window,
+            Bounds::new(
+                point(px(200.), px(100.)),
+                gpui_kit::size(px(500.), px(400.))
+            ),
+            Bounds::new(
+                point(px(200.), px(100.)),
+                gpui_kit::size(px(300.), px(300.))
+            ),
+        ),
+        Some(gpui_kit::size(px(1000.), px(700.)))
     );
 }
 

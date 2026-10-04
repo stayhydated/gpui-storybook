@@ -147,6 +147,6 @@ application and MCP path, which is separate from the runner.
 For Wayland application capture, apply the GPUI patches described in
 [Automation and capture](automation.md#pin-the-wayland-capture-backends).
 The `mcp` feature supports Linux and macOS. Linux CI also verifies application
-capture through private Sway at two viewport sizes. Visual baselines are
-renderer- and font-sensitive, so keep separate accepted images when CI spans
-platforms with materially different output.
+capture through private Sway at desktop, tablet, mobile, and custom sizes.
+Visual baselines are renderer- and font-sensitive, so keep separate accepted
+images when CI spans platforms with materially different output.

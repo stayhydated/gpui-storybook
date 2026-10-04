@@ -9,7 +9,7 @@ use gpui_storybook_launch::{LaunchCommand, LaunchOptions};
 #[ignore = "requires Sway and a working Wgpu adapter"]
 fn startup_capture_renders_a_story_under_wayland() {
     let directory = tempfile::tempdir().expect("create capture output directory");
-    for (width, height) in [(390, 844), (801, 601)] {
+    for (width, height) in [(390, 844), (768, 1024), (1440, 900), (801, 601)] {
         let path = directory
             .path()
             .join(format!("button-{width}x{height}.png"));
@@ -36,6 +36,14 @@ fn startup_capture_renders_a_story_under_wayland() {
             .expect("decode captured PNG")
             .into_rgba8();
         assert_eq!(image.dimensions(), (width, height));
+        assert!(
+            image
+                .rows()
+                .take(8)
+                .flatten()
+                .all(|pixel| { pixel[0] > 150 && pixel[1] > 150 && pixel[2] > 150 }),
+            "the story's top inset must exclude workbench controls"
+        );
         assert!(
             image
                 .pixels()

@@ -76,7 +76,9 @@ impl Element for CaptureScopeElement {
         let scope = CaptureScope {
             story_key,
             route_id,
-            viewport_bounds: Some(bounds),
+            // Ancestor clips are the actual story pane, even when automation
+            // requests a story larger than that pane's current layout.
+            viewport_bounds: Some(bounds.intersect(&window.content_mask().bounds)),
             scroll_handle: self.scroll_handle.clone().or_else(|| {
                 inherited
                     .as_ref()
@@ -86,7 +88,7 @@ impl Element for CaptureScopeElement {
 
         if let Some(story_key) = self.story_key.clone() {
             reset_capture_regions_for_story(&story_key);
-            record_region(story_key, bounds, &scope);
+            record_region(story_key, bounds, &scope, window.viewport_size());
         }
 
         with_scope(scope, || {
@@ -193,7 +195,7 @@ impl Element for CaptureSubstoryElement {
         {
             let route_id = capture_substory_route_id_with_key(story_key, &self.route_key);
             clear_route_automation_values(&route_id);
-            record_region(route_id.clone(), bounds, &scope);
+            record_region(route_id.clone(), bounds, &scope, window.viewport_size());
             with_scope(
                 CaptureScope {
                     route_id: Some(route_id),
