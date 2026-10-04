@@ -31,7 +31,10 @@ fn startup_capture_renders_a_story_under_wayland() {
         );
         let status = gpui_storybook_launch::run(&command, &LaunchOptions::default())
             .expect("launch Storybook under private Sway");
-        assert!(status.success(), "startup capture failed: {status}");
+        assert!(
+            status.success(),
+            "startup capture at {width}x{height} failed: {status}"
+        );
         let image = image::open(&path)
             .expect("decode captured PNG")
             .into_rgba8();

@@ -14,9 +14,9 @@ Linux Wayland window capture uses the Zed fork's image readback support with
 
 ```toml
 [patch.crates-io]
-gpui-pre-linux = { git = "https://github.com/stayhydated/zed", rev = "090c89fc71e054895f42531eec347feab3f22f6f" }
-gpui-pre-platform = { git = "https://github.com/stayhydated/zed", rev = "090c89fc71e054895f42531eec347feab3f22f6f" }
-gpui-pre-wgpu = { git = "https://github.com/stayhydated/zed", rev = "090c89fc71e054895f42531eec347feab3f22f6f" }
+gpui-pre-linux = { git = "https://github.com/stayhydated/zed", rev = "aec762c917c958fe62219f615aebacaac63ad614" }
+gpui-pre-platform = { git = "https://github.com/stayhydated/zed", rev = "aec762c917c958fe62219f615aebacaac63ad614" }
+gpui-pre-wgpu = { git = "https://github.com/stayhydated/zed", rev = "aec762c917c958fe62219f615aebacaac63ad614" }
 ```
 
 Keep all three packages on the same revision. Cargo applies patches from the
