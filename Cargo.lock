@@ -4437,7 +4437,7 @@ dependencies = [
 [[package]]
 name = "gpui-pre-linux"
 version = "0.3.7"
-source = "git+https://github.com/stayhydated/zed?rev=aec762c917c958fe62219f615aebacaac63ad614#aec762c917c958fe62219f615aebacaac63ad614"
+source = "git+https://github.com/stayhydated/zed?rev=d80c3ebacff25e1f8723dfc7da0720f2dab62ea7#d80c3ebacff25e1f8723dfc7da0720f2dab62ea7"
 dependencies = [
  "accesskit",
  "accesskit_unix",
@@ -4554,7 +4554,7 @@ dependencies = [
 [[package]]
 name = "gpui-pre-platform"
 version = "0.3.7"
-source = "git+https://github.com/stayhydated/zed?rev=aec762c917c958fe62219f615aebacaac63ad614#aec762c917c958fe62219f615aebacaac63ad614"
+source = "git+https://github.com/stayhydated/zed?rev=d80c3ebacff25e1f8723dfc7da0720f2dab62ea7#d80c3ebacff25e1f8723dfc7da0720f2dab62ea7"
 dependencies = [
  "anyhow",
  "console_error_panic_hook",
@@ -4738,7 +4738,7 @@ dependencies = [
 [[package]]
 name = "gpui-pre-wgpu"
 version = "0.3.7"
-source = "git+https://github.com/stayhydated/zed?rev=aec762c917c958fe62219f615aebacaac63ad614#aec762c917c958fe62219f615aebacaac63ad614"
+source = "git+https://github.com/stayhydated/zed?rev=d80c3ebacff25e1f8723dfc7da0720f2dab62ea7#d80c3ebacff25e1f8723dfc7da0720f2dab62ea7"
 dependencies = [
  "anyhow",
  "bytemuck",

@@ -98,9 +98,9 @@ web-sys = { features = [ "Location", "Window" ], version = "0.3" }
 
 # Wayland window capture backends compatible with gpui-pre =0.3.7.
 [patch.crates-io]
-gpui-pre-linux = { git = "https://github.com/stayhydated/zed", rev = "aec762c917c958fe62219f615aebacaac63ad614" }
-gpui-pre-platform = { git = "https://github.com/stayhydated/zed", rev = "aec762c917c958fe62219f615aebacaac63ad614" }
-gpui-pre-wgpu = { git = "https://github.com/stayhydated/zed", rev = "aec762c917c958fe62219f615aebacaac63ad614" }
+gpui-pre-linux = { git = "https://github.com/stayhydated/zed", rev = "d80c3ebacff25e1f8723dfc7da0720f2dab62ea7" }
+gpui-pre-platform = { git = "https://github.com/stayhydated/zed", rev = "d80c3ebacff25e1f8723dfc7da0720f2dab62ea7" }
+gpui-pre-wgpu = { git = "https://github.com/stayhydated/zed", rev = "d80c3ebacff25e1f8723dfc7da0720f2dab62ea7" }
 
 [workspace.lints.rust]
 future_incompatible = "deny"
