@@ -5,6 +5,16 @@ owns navigation and the window lifecycle. The Counter/Notes example shares its
 production views between a desktop application and an Android Activity with
 native tabs and an appearance control.
 
+Android automation is a maintained integration. Its device endpoint, reusable
+GPUI coordinator, computer MCP host, and AndroidX harness participate in the
+workspace's test and release checks.
+
+| Target | Qualification |
+| --- | --- |
+| Android x86_64 | Signed APK and MCP/native lifecycle, input, and capture on the declared API 36 Pixel 7 emulator |
+| Android arm64-v8a | Signed APK build; qualify runtime behavior on the intended device and renderer |
+| iOS arm64 | Target-neutral contract compilation; runtime adoption requires a simulator lifecycle, transport, and capture proof |
+
 ## Choose the integration boundary
 
 | Crate | Application responsibility |
@@ -86,6 +96,13 @@ python3 examples/mobile/verify_native.py --serial emulator-5580
 python3 examples/mobile/native/build.py --sdk "$ANDROID_HOME"
 python3 examples/mobile/native/verify.py --serial emulator-5580
 ```
+
+The workspace command equivalents are `just mobile-build`,
+`just mobile-build arm64-v8a`, `just mobile-host emulator-5580`, and
+`just mobile-test emulator-5580`. Set `ANDROID_HOME` and `ANDROID_NDK_HOME`
+before building. `mobile-test` requires the already running, opted-in example
+on an exclusively owned emulator and builds the AndroidX test APK before its
+native qualification. `mobile-host` keeps MCP stdin/stdout attached until EOF.
 
 The maintained AndroidX UI Automator 2.4.0 test APK uses hash-pinned Maven
 artifacts, native selectors, actual touch/IME input, rotation, pause/resume,

@@ -23,9 +23,9 @@ parser.add_argument("--apk", type=Path, required=True)
 parser.add_argument("--output", type=Path, default=ROOT / "target/android-tools-evidence")
 args = parser.parse_args()
 if not args.serial.startswith("emulator-"):
-    parser.error("these lifecycle experiments require a disposable emulator")
+    parser.error("these lifecycle probes require a disposable emulator")
 args.output.mkdir(parents=True, exist_ok=True)
-binary = HERE / "target/debug/gpui-storybook-android-tools-experiment"
+binary = HERE / "target/debug/gpui-storybook-android-tools"
 report = {"serial": args.serial, "candidates": {}, "retry": {}}
 owned_forwards = []
 

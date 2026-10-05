@@ -20,6 +20,25 @@ check:
 test:
     cargo test --workspace --all-features
 
+# Build the opted-in example with the explicitly configured Android SDK/NDK.
+mobile-build abi="x86_64":
+    python3 examples/mobile/build.py --automation --profile mobile \
+        --sdk "$ANDROID_HOME" --ndk "$ANDROID_NDK_HOME" --abi "{{abi}}"
+
+# Install and launch the example on one selected device, then serve MCP.
+mobile-host serial abi="x86_64":
+    cargo run -p gpui-storybook-mobile-host --locked -- \
+        --serial "{{serial}}" --allow-interaction \
+        --install "target/mobile-example/{{abi}}/storybook.apk" --launch-example
+
+# Verify an already running, opted-in example on an owned emulator.
+mobile-test serial:
+    python3 examples/mobile/verify.py --serial "{{serial}}"
+    STORYBOOK_ANDROID_SERIAL="{{serial}}" cargo test -p gpui-storybook-mobile-host --test android --locked -- --ignored
+    python3 examples/mobile/verify_native.py --serial "{{serial}}"
+    python3 examples/mobile/native/build.py --sdk "$ANDROID_HOME"
+    python3 examples/mobile/native/verify.py --serial "{{serial}}"
+
 cov:
     cargo llvm-cov --workspace \
         --exclude gpui-storybook-example-story \

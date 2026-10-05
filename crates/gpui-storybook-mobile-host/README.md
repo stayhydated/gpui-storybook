@@ -1,6 +1,6 @@
 # GPUI Storybook mobile host
 
-Attach the Storybook MCP server to an explicitly selected Android device.
+The maintained Android MCP host attaches to an explicitly selected device.
 The computer owns direct ADB connections and PNG destinations; the opted-in app
 owns command admission and its retained runtime.
 

@@ -12,6 +12,10 @@ in `rust-toolchain.toml` for local validation.
 |---|---|
 | `crates/gpui-storybook` | Application facade: initialization, discovery, filtering, and public re-exports |
 | `crates/gpui-storybook-core` | Runtime integration: gallery, workbench, story containers, preferences UI, and automation |
+| `crates/gpui-storybook-automation` | Target-neutral automation contracts, validation, backend interface, and device wire protocol |
+| `crates/gpui-storybook-automation-gpui` | Embedded GPUI instrumentation, frame execution, and native device coordination |
+| `crates/gpui-storybook-mobile` | Opt-in device endpoint, session generations, operation admission, and transport shutdown |
+| `crates/gpui-storybook-mobile-host` | Computer-owned ADB transport, APK installation, remote MCP, and atomic PNG capture |
 | `crates/gpui-storybook-macros` | Public macro syntax and generated registrations, controls, and substory keys |
 | `crates/gpui-storybook-toml` | Public configuration schema, loading, and filters |
 | `crates/gpui-storybook-mcp` | Linux/macOS MCP tools, stdio serving, and capture launch helpers |
@@ -19,6 +23,9 @@ in `rust-toolchain.toml` for local validation.
 | `crates/gpui-storybook-test` | Public test integration: fresh story contexts, captures, matrices, baselines, and frame budgets |
 | `crates/gpui-storybook-preferences` | Internal typed persistence, system detection, and preference resolution |
 | `examples/story`, `examples/component` | Executable application examples and registration fixtures |
+| `examples/embedded`, `examples/mobile` | Shared production views, Android native shell, and maintained device qualification |
+| `examples/mobile/native` | Hash-pinned AndroidX native input and lifecycle harness |
+| `examples/mobile/tools` | Isolated, unpublished Android library qualification probes |
 | `book/src` | Application user guide; navigate through `SUMMARY.md` |
 | `skills/use-gpui-storybook` | Application integration guidance for coding agents |
 | `web/src/lib.rs` | Public catalog and site routes |
@@ -55,6 +62,12 @@ instructions and book or API navigation to those linked surfaces.
   contract.
 - **Automation and capture:** keep MCP schemas, core automation/capture
   contracts, examples, and the automation skill reference aligned.
+- **Android automation:** keep neutral wire contracts, device admission, native
+  acknowledgment, owned host cleanup, and capture provenance aligned. Preserve
+  caller-cancellation settlement, fresh endpoint-owned sessions, and typed
+  secondary cleanup errors. Keep the example's build/runtime opt-in explicit.
+  The mobile CI workflow gates release; library probes stay in their separate
+  unpublished workspace.
 - **Portable tests:** keep the test crate README, portable-testing and automation
   book sections, examples, and automation skill reference aligned when capture
   matrices, baseline policy, context setup, or frame budgets change.
@@ -98,6 +111,9 @@ unexecuted or failed checks.
 | Markdown | `rumdl check` with the edited paths |
 | Book or LLM text | `cargo xtask build book` and `cargo xtask build llms-txt` |
 | Macro expansion | `cargo test -p gpui-storybook-macros --locked` |
+| Device wire or admission | `cargo test -p gpui-storybook-automation -p gpui-storybook-mobile --locked` |
+| ADB transport, installation, or capture | `cargo test -p gpui-storybook-mobile-host --all-features --locked` |
+| Embedded device coordinator | `cargo test -p gpui-storybook-automation-gpui -p gpui-storybook-example-embedded --all-features --locked` |
 | Preference storage or resolution | `cargo test -p gpui-storybook-preferences --locked` |
 | Portable runner | `cargo test -p gpui-storybook-test --all-features --locked` |
 | Public Rust API docs | `cargo doc --workspace --all-features --no-deps --locked` on Linux |
@@ -109,5 +125,13 @@ exclude the two example packages; `just test` includes them. `just web-build`
 assembles all publication artifacts.
 
 CI tests all features on Linux. On macOS it excludes the Linux-only launcher;
-on Windows it uses default features and excludes the launcher and MCP crate.
+on Windows it uses default features and excludes the launcher, MCP crate, and
+mobile host.
 Use the matching platform scope when reproducing those jobs.
+
+`just mobile-build [abi]` builds the opted-in Android example using
+`ANDROID_HOME` and `ANDROID_NDK_HOME`. `just mobile-host <serial> [abi]`
+installs/launches it and serves MCP. `just mobile-test <serial>` qualifies an
+already running example on an exclusively owned API 36 emulator, including
+AndroidX native input and lifecycle. Preserve the selected device and forwarding
+ownership boundaries; record renderer, image, font, and IME inputs with captures.

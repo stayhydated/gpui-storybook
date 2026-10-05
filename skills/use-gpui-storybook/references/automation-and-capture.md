@@ -121,6 +121,14 @@ fresh fixtures and ordinary interactions preserve state.
 
 ## Embedded GPUI and Android hosts
 
+The Android integration is maintained through the main workspace and mobile
+release checks. In the repository, `just mobile-build [abi]` builds the opted-in
+APK, `just mobile-host <serial> [abi]` installs/launches it and serves MCP, and
+`just mobile-test <serial>` qualifies the running example on an owned API 36
+emulator. Build commands use `ANDROID_HOME` and `ANDROID_NDK_HOME`.
+Android x86_64 has emulator runtime evidence; arm64 has signed build evidence.
+The iOS lane checks target-neutral contracts.
+
 Use `gpui-storybook-automation-gpui` to attach to an application-owned root and
 window. Implement `EmbeddedRoot` for route selection, public revision, controls,
 action scope, presentation, and fresh-fixture construction. Register the root

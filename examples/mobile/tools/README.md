@@ -3,6 +3,8 @@
 An isolated, unpublished Cargo workspace compares Android libraries against
 the embedded Counter/Notes example. A separate AndroidX instrumentation APK
 tests native UI behavior. Production dependencies stay in the root workspace.
+Its `gpui-storybook-android-tools` binary supplies the process-isolated probes;
+the maintained Android integration uses the root workspace's mobile host.
 
 | Candidate | Version | Role |
 | --- | --- | --- |

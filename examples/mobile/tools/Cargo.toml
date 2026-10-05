@@ -2,7 +2,7 @@
 resolver = "3"
 
 [package]
-name = "gpui-storybook-android-tools-experiment"
+name = "gpui-storybook-android-tools"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.99"

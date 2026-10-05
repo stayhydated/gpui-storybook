@@ -1,8 +1,10 @@
-# Android embedded automation example
+# Android embedded automation
 
 A native Android Activity owns Counter/Notes tabs, appearance, system/IME insets,
 and a `SurfaceView`. One retained GPUI Mobile runtime renders the production
-views from `examples/embedded`. Automation requires the Cargo `automation`
+views from `examples/embedded`. This maintained example supplies the Android
+runtime and native qualification for Storybook's mobile integration.
+Automation requires the Cargo `automation`
 feature and the `storybook_automation=true` launch extra.
 
 The workspace pins GPUI Mobile revision

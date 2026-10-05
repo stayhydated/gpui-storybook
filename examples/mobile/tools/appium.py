@@ -15,7 +15,7 @@ import time
 import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[3]
-BINARY = ROOT / "examples/mobile/tools/target/debug/gpui-storybook-android-tools-experiment"
+BINARY = ROOT / "examples/mobile/tools/target/debug/gpui-storybook-android-tools"
 
 
 def main():

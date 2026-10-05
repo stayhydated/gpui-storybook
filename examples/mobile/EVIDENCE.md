@@ -1,13 +1,49 @@
 # Android automation stabilization evidence
 
-The `experiment/mobile-automation` worktree implements the reusable contracts,
+The maintained `mobile-automation` branch implements the reusable contracts,
 embedded GPUI attachment, Android endpoint/example, computer MCP backend, and
 capture scopes from the mobile automation plan. The coordinated public API
-publication boundary is **0.8.0**; this experiment retains workspace version
+publication boundary is **0.8.0**; the workspace retains version
 0.7.1. The original plan remains unchanged. The 2026-10-05 stabilization promotes
 `adbutils-rs =0.1.0` into a bounded host transport and AndroidX UI Automator 2.4.0
 into the maintained native qualification harness. The shared GPUI crate owns
 the reusable device coordinator; the Android example supplies its JNI adapter.
+
+## Maintained Android support
+
+Promotion on 2026-10-05 retains version 0.7.1 and the existing release gate.
+The main CI workflow calls `mobile.yml` and requires its result before release.
+CI runs on pushes to master and pull requests targeting master; publication
+remains scoped to the master release job.
+The crate/facade/root descriptions, book, integration skill, public catalog,
+and contributor ownership/validation guidance describe the maintained Android
+surface. The workspace commands are `mobile-build`, `mobile-host`, and
+`mobile-test`.
+
+The isolated probe package is named `gpui-storybook-android-tools`; its Python
+runners select that binary. Candidate UI Automator/Appium dependencies remain
+in its unpublished workspace with their recorded lifecycle and distribution
+limits. Android x86_64 has emulator runtime evidence, arm64 has signed APK build
+evidence, and iOS has neutral contract compilation evidence.
+
+The branch was renamed from `experiment/mobile-automation` to
+`mobile-automation`. The original plan and master checkout remain unchanged;
+the promotion is local and nothing is published or pushed.
+
+Promotion validation passed: `just mobile-build`, installation/launch and raw
+MCP discovery through `just mobile-host emulator-5580`, and the complete
+`just mobile-test emulator-5580` recipe (MCP, explicit Android Cargo test,
+native lifecycle, and AndroidX). The host returned cleanly on EOF with unchanged
+forwarding. The tools workspace built and passed Clippy under its new name.
+Book, LLM text, and catalog builds, workflow lint, scoped formatting/Markdown,
+Python compilation, and package inventory passed. Logs and the host transcript
+are retained under `target/mobile-evidence/promotion-*`.
+
+The first package-inventory attempt required `--allow-dirty` for the edited
+manifest; the passing check used that flag without publishing. The first host
+attempt found the demo emulator closed. Starting the owned qualification
+emulator allowed the recipe checks to pass. Existing Java/D8 diagnostics remain
+recorded below. No public API or workspace version changed during promotion.
 
 ## Qualified inputs
 
@@ -129,8 +165,8 @@ session identity, receipts, mutation ownership, and capture provenance.
 | Reusable coordinator | `automation-gpui::device::DeviceCoordinator<Root>` owns native preflight/acknowledgment, rendered waits, capture tickets, and settlement. The example supplies native snapshots and a JNI queue adapter. Embedded GPUI tests exercise the public coordinator and deferred admission revocation. |
 | Atomic device ownership | `mobile` serializes session, duplicate receipts, and admission under one mutex. Native surface release suspends admission immediately; owner-thread replacement installs a new session and reopens it atomically. Old lease drops cannot release newer work. Owner regressions and the native lifecycle proof verify these boundaries. |
 | Cancellation and cleanup | Unknown native completion retains its lease until acknowledgment or invalidation. Host capture/install tasks survive canceled response futures on their owning runtime; shutdown drains them. Finish revokes a pending capture by its preparation ID. Real peers exercise lost preparation replies and provider/decoder failures. Emulator proofs cover successful install/launch/EOF, startup failure cleanup, and preservation of an externally restarted PID. |
-| Public and publication surfaces | Rustdocs, crate/facade/root READMEs, book, integration reference, examples, and catalog are aligned. The reusable mobile workflow gates the main release job. The coordinated API publication boundary is 0.8.0; this local experiment stays at 0.7.1. |
-| Validation and isolation | All-feature Linux workspace tests, owning Clippy, Android Clippy/default build, both signed APK ABIs, neutral Android/iOS targets, public docs, book/LLM text/catalog, formatting, and package inventory pass. The local checkpoint stays on the experiment branch; master, Manefi, and the original plan are preserved, with no push. |
+| Public and publication surfaces | Rustdocs, crate/facade/root READMEs, book, integration reference, examples, and catalog are aligned. The reusable mobile workflow gates the main release job. The coordinated API publication boundary is 0.8.0; the workspace stays at 0.7.1. |
+| Validation and isolation | All-feature Linux workspace tests, owning Clippy, Android Clippy/default build, both signed APK ABIs, neutral Android/iOS targets, public docs, book/LLM text/catalog, formatting, and package inventory pass. Local checkpoints are retained on `mobile-automation`; master, Manefi, and the original plan are preserved, with no push. |
 
 The owner tests include eleven endpoint/state cases, thirteen host
 transport/capture/task cases, eighteen neutral contract cases, the coordinator
@@ -221,6 +257,6 @@ Atomic replacement guarantees complete-file observation; durability across power
 loss requires a separate storage policy. Appium qualification covers the named
 Android inputs and injected reply failure. Hosted macOS/Windows/mobile jobs and
 iOS runtime qualification retain the limits documented above. The experiment
-keeps the coordinated 0.8.0 publication boundary and workspace version 0.7.1.
+kept the coordinated 0.8.0 publication boundary and workspace version 0.7.1.
 The owned Appium server and emulator were stopped, and forwarding was clean.
 EOF stopped the owned example; master, Manefi, and the original plan were preserved.

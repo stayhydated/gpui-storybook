@@ -30,7 +30,7 @@ readme = "README.md"
 repository = "https://github.com/stayhydated/gpui-storybook"
 rust-version = "1.99"
 # Publish the coordinated automation API extraction at the incompatible 0.8.0
-# boundary. The experiment retains the current version until that release.
+# boundary. Maintained Android support retains the current version until release.
 version = "0.7.1"
 
 [workspace.dependencies]

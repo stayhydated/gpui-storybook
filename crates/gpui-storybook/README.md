@@ -23,8 +23,8 @@ through the application's locale context.
 
 The facade exposes `AutomationBackend`, `SharedAutomationBackend`, and portable
 capability types. Standard initialization installs the gallery backend for MCP.
-Embedded application roots use `gpui-storybook-automation-gpui`; the Android
-example uses its reusable device coordinator, fresh session generations,
+Embedded application roots use `gpui-storybook-automation-gpui`; maintained Android
+integration uses its reusable device coordinator, fresh session generations,
 direct ADB transport, atomic PNG publication, and
 AndroidX native qualification harness.
 
