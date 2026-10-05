@@ -96,3 +96,10 @@ native-main-thread dispatch, retained surface lifecycle, and permitted capture
 form its follow-up runtime work. The native harness qualifies the declared AOSP
 IME/layout; other IMEs and application permission/effect flows need their own
 native tests.
+
+## Android library follow-up
+
+The isolated [library qualification](tools/EVIDENCE.md) exercised both Rust ADB
+clients, both Rust UI Automator clients, and AndroidX UI Automator 2.4.0 against
+this real example. It records the shell exit-status limitation, native dropped
+reply/replay measurements, and an independent instrumentation lifecycle proof.

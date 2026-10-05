@@ -59,3 +59,6 @@ Its API 36 system image supplies Roboto/Noto fonts; artifact logs record the
 resolved system-image fingerprint, renderer, and emulator version. Visual
 baseline acceptance remains deliberate. [Qualification evidence](EVIDENCE.md)
 records the local experiment and its limits.
+
+The isolated [Android library probes](tools/README.md) compare published Rust
+ADB/UI Automator clients and an AndroidX test APK against this example.

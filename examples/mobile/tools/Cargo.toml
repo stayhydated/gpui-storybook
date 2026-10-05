@@ -1,0 +1,33 @@
+[workspace]
+resolver = "3"
+
+[package]
+name = "gpui-storybook-android-tools-experiment"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.99"
+publish = false
+
+[dependencies]
+adb_client = { default-features = false, version = "=3.2.3" }
+adbutils = { default-features = false, features = [
+  "image",
+  "apk",
+], package = "adbutils-rs", version = "=0.1.0" }
+anyhow = "1.0"
+clap = { features = [ "derive" ], version = "4.6" }
+image = { default-features = false, features = [ "png" ], version = "0.25" }
+serde = { features = [ "derive" ], version = "1.0" }
+serde_json = "1.0"
+tokio = { features = [ "rt-multi-thread", "macros", "time", "net", "io-util" ], version = "1.53" }
+uiautomator = "=1.0.2"
+uiautomator2 = { default-features = false, package = "uiautomator2-rs", version = "=0.1.2" }
+
+[lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+
+[lints.clippy]
+all = "warn"
+
+[profile.dev]
+debug = 0
