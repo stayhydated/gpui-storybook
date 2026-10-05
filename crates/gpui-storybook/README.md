@@ -24,8 +24,9 @@ through the application's locale context.
 Live captures size the story canvas to a named viewport or explicit pixel
 dimensions and crop gallery chrome from the PNG.
 
-Linux Wayland window capture requires the GPUI Git patches from the repository
-root `Cargo.toml` in the application's workspace root.
+Linux Wayland window capture requires the GPUI Git patches from the
+[`wayland-render-image` branch](https://github.com/stayhydated/gpui-storybook/blob/wayland-render-image/Cargo.toml)
+in the application's workspace root.
 
 [codecov-badge]: https://codecov.io/github/stayhydated/gpui-storybook/branch/master/graph/badge.svg?component=gpui-storybook
 [codecov]: https://codecov.io/github/stayhydated/gpui-storybook

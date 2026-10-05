@@ -71,20 +71,22 @@ Build publication artifacts through `cargo xtask`: the sources are `book/src`,
 `web/src`, and `examples/story`. The generated book, LLM text, demo, and site
 outputs are not independent editing surfaces.
 
-## Validate Wayland capture
+## Validate capture backends
 
-`just wayland-capture-test` runs the story example's startup-capture
-regression against the Git-pinned GPUI backends. It requires Sway and a working
-Wgpu adapter. The check captures the button story at desktop, tablet, mobile,
-and custom sizes in a private compositor, decodes the PNGs, and verifies
-dimensions, rendered content, and exclusion of workbench controls.
+The `master` branch uses published GPUI packages. Keep the Zed fork patches
+and Wayland startup-capture regression on `wayland-render-image`. On that
+branch, `just wayland-capture-test` captures the button story at desktop,
+tablet, mobile, and custom sizes in private Sway, decodes the PNGs, and verifies
+dimensions, rendered content, and exclusion of workbench controls. It requires
+Sway and a working Wgpu adapter.
 
-The root `[patch.crates-io]` pins `gpui-pre-linux`, `gpui-pre-wgpu`, and
-`gpui-pre-platform` to one Zed fork revision, compatible with `gpui-pre =0.3.7`.
-Keep these revisions and the patch example in `book/src/automation.md` aligned,
-and commit the updated `Cargo.lock`. Consumer applications must apply these
-patches in their own workspace root for Wayland window capture; Cargo patches
-are not inherited from dependencies.
+The `wayland-render-image` branch's root `[patch.crates-io]` pins
+`gpui-pre-linux`, `gpui-pre-wgpu`, and `gpui-pre-platform` to one Zed fork
+revision, compatible with `gpui-pre =0.3.7`. Keep those revisions and the patch
+example in `book/src/automation.md` aligned, and commit the updated `Cargo.lock`
+when changing a pin. Consumer applications apply these patches in their own
+workspace root for Wayland window capture; Cargo patches are not inherited from
+dependencies. Portable runner capture uses the published headless renderers.
 
 ## Validate the changed surface
 

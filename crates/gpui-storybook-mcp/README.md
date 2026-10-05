@@ -19,8 +19,9 @@ Captures wait for the requested story canvas dimensions and exclude gallery
 chrome from the PNG. Explicit paired dimensions override named viewports.
 
 Linux launch commands use `gpui-storybook-launch` and a private Sway session.
-Wayland window capture requires the GPUI Git patches from the repository root
-`Cargo.toml` in the application's workspace root.
+Wayland window capture requires the GPUI Git patches from the
+[`wayland-render-image` branch](https://github.com/stayhydated/gpui-storybook/blob/wayland-render-image/Cargo.toml)
+in the application's workspace root.
 macOS uses GPUI's native image renderer. Logs belong on standard error so the
 JSON Lines transport on standard input and output remains valid.
 

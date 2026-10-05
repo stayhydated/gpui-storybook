@@ -23,9 +23,10 @@ The workspace requires Rust 1.99 or newer and uses edition 2024.
 Live captures size the story canvas to desktop, tablet, mobile, or explicit
 pixel dimensions and crop gallery chrome from the PNG.
 
-Linux Wayland window capture uses the GPUI Git patches pinned in this
-workspace's `Cargo.toml`. Applications using Storybook as a dependency must
-apply those patches in their own workspace root.
+Linux Wayland window capture uses the GPUI Git patches pinned on the
+[`wayland-render-image` branch](https://github.com/stayhydated/gpui-storybook/blob/wayland-render-image/Cargo.toml).
+Applications using Storybook as a dependency must apply those patches in their
+own workspace root.
 
 ## Crates
 

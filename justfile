@@ -50,7 +50,3 @@ web: web-build
 
 web-preview: web-build
     cargo xtask preview web
-
-# Test Wayland window capture using the Git-pinned GPUI backends.
-wayland-capture-test:
-    cargo test -p gpui-storybook-example-story --features mcp --test wayland_capture --locked -- --ignored

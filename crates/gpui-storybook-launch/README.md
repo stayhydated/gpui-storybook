@@ -7,8 +7,8 @@ session on Linux, supplying the compositor-driven frame callbacks required by
 GPUI Storybook MCP and startup capture without using the physical display.
 
 Storybook's Wayland window capture requires the GPUI Git patches from the
-Storybook repository's root `Cargo.toml` in the child application's workspace
-root.
+[`wayland-render-image` branch](https://github.com/stayhydated/gpui-storybook/blob/wayland-render-image/Cargo.toml)
+in the child application's workspace root.
 
 ## Example
 

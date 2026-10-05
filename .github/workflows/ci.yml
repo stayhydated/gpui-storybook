@@ -52,8 +52,6 @@ jobs:
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
         uses: ./.github/actions/install-linux-deps
-        with:
-          sway: "true"
 
       - name: Run Linux tests with every feature
         if: runner.os == 'Linux'
@@ -73,14 +71,6 @@ jobs:
           cargo test --workspace --locked
           --exclude gpui-storybook-launch
           --exclude gpui-storybook-mcp
-
-      - name: Verify Wayland startup capture through headless Sway
-        if: runner.os == 'Linux'
-        env:
-          RUST_LOG: warn
-        run: >-
-          cargo test -p gpui-storybook-example-story --features mcp
-          --test wayland_capture --locked -- --ignored
 
   fmt:
     runs-on: ubuntu-latest

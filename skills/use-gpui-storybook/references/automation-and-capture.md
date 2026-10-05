@@ -14,12 +14,14 @@ there. Set `GPUI_STORYBOOK_MCP_STDIO=1` to serve MCP over stdio. Route tracing
 and diagnostic logs to standard error.
 
 For Linux Wayland window capture, copy the three `[patch.crates-io]` entries
-from GPUI Storybook's root `Cargo.toml` into the application's workspace root.
-They pin `gpui-pre-linux`, `gpui-pre-wgpu`, and `gpui-pre-platform` to the same
-Zed fork commit and retain `gpui-pre =0.3.7` for compatibility with `gpui-kit`.
-Commit the resolved `Cargo.lock`; Cargo patches are not inherited from
-dependencies. Verify the pinned path in the Storybook checkout with
-`just wayland-capture-test`.
+from GPUI Storybook's
+[`wayland-render-image` branch](https://github.com/stayhydated/gpui-storybook/blob/wayland-render-image/Cargo.toml)
+into the application's workspace root. They pin `gpui-pre-linux`,
+`gpui-pre-wgpu`, and `gpui-pre-platform` to the same Zed fork commit and retain
+`gpui-pre =0.3.7` for compatibility with `gpui-kit`. Commit the resolved
+`Cargo.lock`; Cargo patches are not inherited from dependencies. Verify the
+pinned path on that branch with `just wayland-capture-test`. The `master` branch
+uses published GPUI packages, including for portable headless capture.
 
 On Linux, install Sway plus `libgl1-mesa-dri` and `mesa-vulkan-drivers`, then
 install the reusable launcher and run stdio and startup-capture sessions
@@ -285,8 +287,9 @@ Metal renderer on macOS and a Wgpu renderer on Linux, so runner captures run on
 both. Windows gets `Ok(None)`; its DirectX renderer reaches `render_to_image`
 only through a real window, outside the runner's headless context. Linux
 Wayland application captures use the Git-patched Wgpu window renderer and
-private Sway. The `mcp` feature supports Linux and macOS; Linux CI verifies
-application capture at desktop, tablet, mobile, and custom sizes.
+private Sway. The `mcp` feature supports Linux and macOS; the
+`wayland-render-image` branch verifies application capture at desktop, tablet,
+mobile, and custom sizes.
 Treat renderer, fonts, assets, and CI hardware as part of the baseline or timing
 environment; keep platform-specific accepted output where rasterization differs.
 
