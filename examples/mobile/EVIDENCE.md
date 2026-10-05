@@ -3,8 +3,8 @@
 The maintained `mobile-automation` branch implements the reusable contracts,
 embedded GPUI attachment, Android endpoint/example, computer MCP backend, and
 capture scopes from the mobile automation plan. The coordinated public API
-publication boundary is **0.8.0**; the workspace retains version
-0.7.1. The original plan remains unchanged. The 2026-10-05 stabilization promotes
+publication boundary and workspace version are **0.8.0**. The original plan
+remains unchanged. The 2026-10-05 stabilization promotes
 `adbutils-rs =0.1.0` into a bounded host transport and AndroidX UI Automator 2.4.0
 into the maintained native qualification harness. The shared GPUI crate owns
 the reusable device coordinator; the Android example supplies its JNI adapter.
