@@ -95,7 +95,10 @@ impl Gallery {
                 match result {
                     Ok(story) => {
                         crate::automation::interaction::schedule_interaction_target_listing(
-                            story, response, window,
+                            story,
+                            response,
+                            std::rc::Rc::new(crate::automation::capture::DesktopCaptureProvider),
+                            window,
                         );
                     },
                     Err(error) => {
@@ -185,16 +188,19 @@ impl Gallery {
                             return;
                         }
                         crate::automation::interaction::schedule_story_interaction(
-                            crate::automation::interaction::PreparedStoryInteraction {
-                                request_id,
-                                story,
-                                steps,
-                                postconditions,
-                                capture,
-                                response,
-                                progress,
-                                operation,
-                            },
+                            crate::automation::interaction::PreparedStoryInteraction::builder()
+                                .provider(std::rc::Rc::new(
+                                    crate::automation::capture::DesktopCaptureProvider,
+                                ))
+                                .request_id(request_id)
+                                .story(story)
+                                .steps(steps)
+                                .postconditions(postconditions)
+                                .maybe_capture(capture)
+                                .response(response)
+                                .progress(progress)
+                                .operation(operation)
+                                .build(),
                             window,
                         );
                     },

@@ -71,6 +71,7 @@ jobs:
           cargo test --workspace --locked
           --exclude gpui-storybook-launch
           --exclude gpui-storybook-mcp
+          --exclude gpui-storybook-mobile-host
 
   fmt:
     runs-on: ubuntu-latest

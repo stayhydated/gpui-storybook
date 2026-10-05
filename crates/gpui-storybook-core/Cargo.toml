@@ -16,7 +16,13 @@ include = [ "src/**/*", "assets/**/*", "build.rs", "i18n.toml" ]
 ignored = [ "gpui", "gpui_platform" ]
 
 [features]
-capture = [ "dep:gpui_platform", "dep:image", "gpui-kit/test-support", "gpui_platform/test-support" ]
+capture = [
+  "gpui-storybook-automation-gpui/capture",
+  "dep:gpui_platform",
+  "dep:image",
+  "gpui-kit/test-support",
+  "gpui_platform/test-support",
+]
 inspector = [ "gpui-kit/inspector" ]
 performance = [ "dep:gpui", "gpui/profiler" ]
 
@@ -28,8 +34,10 @@ es-fluent = { workspace = true }
 es-fluent-manager-core = { workspace = true }
 es-fluent-manager-embedded = { workspace = true }
 gpui = { optional = true, workspace = true }
-gpui-kit = { workspace = true }
 gpui-es-fluent = { workspace = true }
+gpui-kit = { workspace = true }
+gpui-storybook-automation = { workspace = true }
+gpui-storybook-automation-gpui = { workspace = true }
 gpui-storybook-preferences = { workspace = true }
 gpui_platform = { optional = true, workspace = true }
 image = { optional = true, workspace = true }

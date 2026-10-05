@@ -93,34 +93,38 @@ pub struct StorybookAutomation {
     next_request_id: AtomicU64,
 }
 
-impl StorySnapshot {
-    pub fn from_container(story: &StoryContainer, cx: &impl Borrow<App>) -> Option<Self> {
-        let key = story.story_key_label()?.to_string();
-        let story_name = story
-            .story_name_label()
-            .or_else(|| {
-                story
-                    .story_klass
-                    .as_ref()
-                    .map(|story_klass| story_klass.as_ref())
-            })?
-            .to_string();
+/// Reads registered metadata and scenario templates from a live GPUI container.
+///
+/// Unregistered containers return `None`; construction stays in the GPUI host.
+pub fn story_snapshot_from_container(
+    story: &StoryContainer,
+    cx: &impl Borrow<App>,
+) -> Option<StorySnapshot> {
+    let key = story.story_key_label()?.to_string();
+    let story_name = story
+        .story_name_label()
+        .or_else(|| {
+            story
+                .story_klass
+                .as_ref()
+                .map(|story_klass| story_klass.as_ref())
+        })?
+        .to_string();
 
-        Some(Self {
-            capture_route_id: key.clone(),
-            key,
-            crate_name: story.crate_name_label().unwrap_or_default().to_string(),
-            story_name,
-            title: story.display_title(cx),
-            description: story.display_description(cx),
-            group: story.group.as_ref().map(ToString::to_string),
-            section: story.section.as_ref().map(ToString::to_string),
-            source_file: story.source_file_label().unwrap_or_default().to_string(),
-            source_line: story.source_line().unwrap_or_default(),
-            default_size: StoryDefaultSize::default(),
-            scenarios: story.scenarios().to_vec(),
-        })
-    }
+    Some(StorySnapshot {
+        capture_route_id: key.clone(),
+        key,
+        crate_name: story.crate_name_label().unwrap_or_default().to_string(),
+        story_name,
+        title: story.display_title(cx),
+        description: story.display_description(cx),
+        group: story.group.as_ref().map(ToString::to_string),
+        section: story.section.as_ref().map(ToString::to_string),
+        source_file: story.source_file_label().unwrap_or_default().to_string(),
+        source_line: story.source_line().unwrap_or_default(),
+        default_size: StoryDefaultSize::default(),
+        scenarios: story.scenarios().to_vec(),
+    })
 }
 
 impl StorybookAutomation {
@@ -436,8 +440,9 @@ impl StorybookAutomation {
     /// Runs one validated interaction batch on the live GPUI window thread.
     ///
     /// The batch owns the shared operation guard through every frame wait and
-    /// optional capture. Canceling the receiver is observed at executor safety
-    /// boundaries; already dispatched clicks and actions are never retried.
+    /// optional capture. After executor admission, the batch completes even if
+    /// its response receiver is canceled. Its guard is retained until submitted
+    /// work settles; dispatched clicks and actions are never retried.
     pub async fn run_steps(
         &self,
         request: StoryInteractionRequest,

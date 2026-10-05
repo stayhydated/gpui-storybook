@@ -106,7 +106,7 @@ impl PortableStory {
             .update(|app| {
                 let story = self.story.read(app);
                 let app_ref: &App = app;
-                gpui_storybook_core::automation::StorySnapshot::from_container(story, &app_ref)
+                gpui_storybook_core::automation::story_snapshot_from_container(story, &app_ref)
             })
             .ok_or_else(|| StorybookTestError::StoryMetadataUnavailable {
                 key: self.case.story_key.clone(),
@@ -121,7 +121,9 @@ impl PortableStory {
             let route_id = self.case.route_id.clone();
             let rendered = self
                 .context
-                .update_window(window, |_, _, _| scroll_capture_region_into_view(&route_id))
+                .update_window(window, |_, window, cx| {
+                    scroll_capture_region_into_view(&route_id, window, cx)
+                })
                 .map_err(headless_error)?;
             if !rendered {
                 #[cfg(feature = "capture")]
@@ -156,9 +158,16 @@ impl PortableStory {
             .context
             .update_window(window, |_, window, _| window.bounds().size)
             .map_err(headless_error)?;
+        #[cfg(feature = "capture")]
+        let regions = self
+            .context
+            .update_window(window, |_, window, cx| {
+                gpui_storybook_core::capture_region::window_regions(window, cx)
+            })
+            .map_err(headless_error)?;
         if matches!(&self.case.route, RouteCase::Root) {
             #[cfg(feature = "capture")]
-            return crop_capture_region_image(&self.case.route_id, image, window_size)
+            return crop_capture_region_image(&regions, &self.case.route_id, image, window_size)
                 .map_err(StorybookTestError::CaptureRegion);
             #[cfg(not(feature = "capture"))]
             return Ok(image);
@@ -174,7 +183,7 @@ impl PortableStory {
         }
 
         #[cfg(feature = "capture")]
-        return crop_capture_region_image(&self.case.route_id, image, window_size)
+        return crop_capture_region_image(&regions, &self.case.route_id, image, window_size)
             .map_err(StorybookTestError::CaptureRegion);
         #[cfg(not(feature = "capture"))]
         Err(StorybookTestError::RouteCaptureRequired {

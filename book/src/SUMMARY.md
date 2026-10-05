@@ -8,3 +8,4 @@
 - [Configure Storybook](configuration.md)
 - [Preferences](preferences.md)
 - [Automation and capture](automation.md)
+- [Embedded Android automation](mobile_automation.md)

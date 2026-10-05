@@ -3503,6 +3503,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "gpui-storybook-automation"
+version = "0.7.1"
+dependencies = [
+ "bon",
+ "schemars",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "gpui-storybook-automation-gpui"
+version = "0.7.1"
+dependencies = [
+ "bon",
+ "gpui-pre",
+ "gpui-storybook-automation",
+ "schemars",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tokio",
+]
+
+[[package]]
 name = "gpui-storybook-core"
 version = "0.7.1"
 dependencies = [
@@ -3515,6 +3540,8 @@ dependencies = [
  "es-fluent-manager-embedded",
  "gpui-es-fluent",
  "gpui-kit",
+ "gpui-storybook-automation",
+ "gpui-storybook-automation-gpui",
  "gpui-storybook-preferences",
  "gtk",
  "inventory",

@@ -158,6 +158,48 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 
 [[package]]
+name = "android-activity"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0f2a1bb052857d5dd49572219344a7332b31b76405648eabac5bc68978251bcd"
+dependencies = [
+ "android-properties",
+ "bitflags 2.13.2",
+ "cc",
+ "jni 0.22.4",
+ "libc",
+ "log",
+ "ndk",
+ "ndk-context",
+ "ndk-sys",
+ "num_enum",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "android-properties"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fc7eb209b1518d6bb87b283c20095f5228ecda460da70b44f0802523dea6da04"
+
+[[package]]
+name = "android_log-sys"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "84521a3cf562bc62942e294181d9eef17eb38ceb8c68677bc49f144e4c3d4f8d"
+
+[[package]]
+name = "android_logger"
+version = "0.15.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dbb4e440d04be07da1f1bf44fb4495ebd58669372fe0cffa6e48595ac5bd88a3"
+dependencies = [
+ "android_log-sys",
+ "env_filter",
+ "log",
+]
+
+[[package]]
 name = "android_system_properties"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2947,6 +2989,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "env_filter"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1bf3c259d255ca70051b30e2e95b5446cdb8949ac4cd22c0d7fd634d89f568e2"
+dependencies = [
+ "log",
+ "regex",
+]
+
+[[package]]
 name = "equator"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2990,7 +3042,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3945,7 +3997,7 @@ dependencies = [
  "gobject-sys",
  "libc",
  "system-deps",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -4542,6 +4594,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "gpui-pre-mobile"
+version = "0.1.0"
+source = "git+https://github.com/longbridge/gpui-mobile?rev=9075e3aa3eea812127f2c60ed66f0cd5798ff245#9075e3aa3eea812127f2c60ed66f0cd5798ff245"
+dependencies = [
+ "android-activity",
+ "android_logger",
+ "anyhow",
+ "block2 0.6.2",
+ "core-foundation 0.10.1",
+ "core-foundation-sys",
+ "core-graphics 0.24.0",
+ "core-text",
+ "futures",
+ "gpui-pre",
+ "gpui-pre-wgpu",
+ "jni 0.22.4",
+ "libc",
+ "log",
+ "ndk",
+ "ndk-context",
+ "ndk-sys",
+ "objc2 0.6.4",
+ "parking_lot",
+ "pathfinder_geometry",
+ "raw-window-handle",
+ "rustc-hash 2.1.3",
+ "smallvec",
+ "uuid",
+ "wgpu 29.0.4",
+ "zed-font-kit",
+]
+
+[[package]]
 name = "gpui-pre-perf"
 version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4846,6 +4931,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "gpui-storybook-automation"
+version = "0.7.1"
+dependencies = [
+ "bon",
+ "schemars",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "gpui-storybook-automation-gpui"
+version = "0.7.1"
+dependencies = [
+ "bon",
+ "gpui-kit",
+ "gpui-pre",
+ "gpui-storybook-automation",
+ "image",
+ "schemars",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tokio",
+]
+
+[[package]]
 name = "gpui-storybook-core"
 version = "0.7.1"
 dependencies = [
@@ -4860,6 +4972,8 @@ dependencies = [
  "gpui-kit",
  "gpui-pre",
  "gpui-pre-platform",
+ "gpui-storybook-automation",
+ "gpui-storybook-automation-gpui",
  "gpui-storybook-preferences",
  "gtk",
  "image",
@@ -4896,6 +5010,40 @@ dependencies = [
  "strum",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "gpui-storybook-example-embedded"
+version = "0.7.1"
+dependencies = [
+ "gpui-kit",
+ "gpui-storybook-automation",
+ "gpui-storybook-automation-gpui",
+ "schemars",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "gpui-storybook-example-mobile"
+version = "0.7.1"
+dependencies = [
+ "android-activity",
+ "android_logger",
+ "gpui-kit",
+ "gpui-pre-mobile",
+ "gpui-storybook-automation",
+ "gpui-storybook-automation-gpui",
+ "gpui-storybook-example-embedded",
+ "gpui-storybook-mobile",
+ "jni 0.22.4",
+ "log",
+ "ndk",
+ "schemars",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tokio",
 ]
 
 [[package]]
@@ -4949,12 +5097,32 @@ version = "0.7.1"
 dependencies = [
  "component-shape-mcp",
  "frame-capture",
+ "gpui-storybook-automation",
  "gpui-storybook-core",
  "rmcp",
  "schemars",
  "serde",
  "serde_json",
  "thiserror 2.0.21",
+ "tokio",
+]
+
+[[package]]
+name = "gpui-storybook-mobile"
+version = "0.7.1"
+dependencies = [
+ "gpui-storybook-automation",
+]
+
+[[package]]
+name = "gpui-storybook-mobile-host"
+version = "0.7.1"
+dependencies = [
+ "clap",
+ "gpui-storybook-automation",
+ "gpui-storybook-mcp",
+ "gpui-storybook-mobile",
+ "image",
  "tokio",
 ]
 
@@ -5416,7 +5584,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.57.0",
+ "windows-core 0.62.2",
 ]
 
 [[package]]
@@ -8502,7 +8670,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -9142,7 +9310,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -9210,7 +9378,7 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -10317,10 +10485,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.3",
  "once_cell",
  "rustix",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -11895,7 +12063,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

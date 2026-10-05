@@ -1,15 +1,12 @@
+use super::runner::{InteractionRunner, resolve_story_point, schedule_postcondition_check};
 use super::*;
-use super::{
-    request::automation_action_is_visible,
-    runner::{InteractionRunner, resolve_story_point, schedule_postcondition_check},
-};
-use crate::capture_region::{StorybookElementExt as _, capture_story_view_with_scroll};
+use crate::regions::{StorybookElementExt as _, capture_story_view_with_scroll};
 use gpui_kit::component::h_flex;
 use gpui_kit::{
     AppContext as _, Context, Focusable, InteractiveElement as _, IntoElement, KeyDownEvent,
     ParentElement as _, Render, StatefulInteractiveElement as _, Styled as _, div,
 };
-use std::sync::atomic::AtomicBool;
+use std::{path::PathBuf, sync::atomic::AtomicBool};
 
 /// Sets the harness counter to a caller-provided value.
 #[derive(gpui_kit::Action, Clone, Debug, Deserialize, Eq, schemars::JsonSchema, PartialEq)]
@@ -138,7 +135,7 @@ fn interaction_story_snapshot() -> StorySnapshot {
         source_file: file!().to_owned(),
         source_line: line!(),
         capture_route_id: "interaction-test".to_owned(),
-        default_size: super::super::StoryDefaultSize::default(),
+        default_size: StoryDefaultSize::default(),
         scenarios: Vec::new(),
     }
 }
@@ -177,9 +174,9 @@ async fn run_dynamic_target_interaction(
         let (response, receiver) = oneshot::channel();
         let pending = cx
             .update_window(window.into(), |_, window, cx| {
-                let steps = prepare_interaction_steps(
+                let steps = prepare_test_steps(
                     &[
-                        StoryInteractionStep::FocusNext,
+                        StoryInteractionStep::FocusNext {},
                         StoryInteractionStep::DispatchAction {
                             name: "storybook_interaction_test::SetCounter".to_owned(),
                             args: Some(serde_json::json!({ "value": 1 })),
@@ -197,18 +194,19 @@ async fn run_dynamic_target_interaction(
                 .expect("dynamic target steps should prepare");
                 let pending = Arc::new(AtomicBool::new(true));
                 schedule_story_interaction(
-                    PreparedStoryInteraction {
-                        request_id,
-                        story: dynamic_target_story_snapshot(),
-                        steps,
-                        postconditions: Vec::new(),
-                        capture: None,
-                        response,
-                        progress: Arc::new(AtomicUsize::new(0)),
-                        operation: AutomationOperationGuard {
+                    PreparedStoryInteraction::builder()
+                        .request_id(request_id)
+                        .story(dynamic_target_story_snapshot())
+                        .steps(steps)
+                        .postconditions(Vec::new())
+                        .maybe_capture(None)
+                        .response(response)
+                        .progress(Arc::new(AtomicUsize::new(0)))
+                        .provider(Rc::new(NoCaptureProvider))
+                        .operation(TestOperationGuard {
                             pending: pending.clone(),
-                        },
-                    },
+                        })
+                        .build(),
                     window,
                 );
                 window.refresh();
@@ -241,159 +239,6 @@ async fn run_dynamic_target_interaction(
         decoy_clicks,
         pending.load(Ordering::SeqCst),
     )
-}
-
-fn request(steps: Vec<StoryInteractionStep>) -> StoryInteractionRequest {
-    StoryInteractionRequest {
-        story_key: None,
-        controls: BTreeMap::new(),
-        width: None,
-        height: None,
-        viewport: None,
-        presentation: None,
-        steps,
-        postconditions: Vec::new(),
-        capture: None,
-    }
-}
-
-#[test]
-fn request_validation_enforces_batch_limits_before_dispatch() {
-    assert!(matches!(
-        validate_interaction_request(&request(Vec::new())),
-        Err(StorybookAutomationError::InvalidInteractionRequest { .. })
-    ));
-    assert!(matches!(
-        validate_interaction_request(&request(vec![StoryInteractionStep::WaitFrames {
-            count: 0,
-        }])),
-        Err(StorybookAutomationError::InvalidInteractionStep { step_index: 0, .. })
-    ));
-    assert!(matches!(
-        validate_interaction_request(&request(vec![StoryInteractionStep::Text {
-            value: "x".repeat(MAX_INTERACTION_TEXT_BYTES + 1),
-        }])),
-        Err(StorybookAutomationError::InvalidInteractionRequest { .. })
-    ));
-    assert!(matches!(
-        validate_interaction_request(&request(vec![StoryInteractionStep::Scroll {
-            point: StoryPoint {
-                space: StoryPointSpace::Normalized,
-                x: 0.5,
-                y: 0.5,
-            },
-            delta_x: f32::NAN,
-            delta_y: 1.0,
-        }])),
-        Err(StorybookAutomationError::InvalidInteractionStep { step_index: 0, .. })
-    ));
-
-    assert!(
-        validate_interaction_request(&request(vec![
-            StoryInteractionStep::FocusNext;
-            MAX_INTERACTION_STEPS
-        ]))
-        .is_ok()
-    );
-    assert!(matches!(
-        validate_interaction_request(&request(vec![
-            StoryInteractionStep::FocusNext;
-            MAX_INTERACTION_STEPS + 1
-        ])),
-        Err(StorybookAutomationError::InvalidInteractionRequest { .. })
-    ));
-    assert!(
-        validate_interaction_request(&request(vec![StoryInteractionStep::Text {
-            value: "x".repeat(MAX_INTERACTION_TEXT_BYTES),
-        }]))
-        .is_ok()
-    );
-    assert!(
-        validate_interaction_request(&request(vec![StoryInteractionStep::Keystrokes {
-            keys: vec!["a".to_owned(); MAX_INTERACTION_STEPS],
-        }]))
-        .is_ok()
-    );
-    assert!(matches!(
-        validate_interaction_request(&request(vec![StoryInteractionStep::Keystrokes {
-            keys: vec!["a".to_owned(); MAX_INTERACTION_STEPS + 1],
-        }])),
-        Err(StorybookAutomationError::InvalidInteractionStep { step_index: 0, .. })
-    ));
-    assert!(matches!(
-        validate_interaction_request(&request(vec![StoryInteractionStep::Keystrokes {
-            keys: vec!["x".repeat(MAX_INTERACTION_TEXT_BYTES + 1)],
-        }])),
-        Err(StorybookAutomationError::InvalidInteractionRequest { .. })
-    ));
-    assert!(
-        validate_interaction_request(&request(vec![StoryInteractionStep::WaitFrames {
-            count: MAX_INTERACTION_WAITED_FRAMES,
-        },]))
-        .is_ok()
-    );
-    assert!(matches!(
-        validate_interaction_request(&request(vec![
-            StoryInteractionStep::WaitFrames { count: 60 },
-            StoryInteractionStep::WaitFrames { count: 61 },
-        ])),
-        Err(StorybookAutomationError::InvalidInteractionRequest { .. })
-    ));
-    assert!(matches!(
-        validate_interaction_request(&request(vec![StoryInteractionStep::PointerClick {
-            point: StoryPoint {
-                space: StoryPointSpace::Normalized,
-                x: 1.0,
-                y: 1.01,
-            },
-            button: StoryMouseButton::Left,
-            click_count: 1,
-            modifiers: StoryModifiers::default(),
-        }])),
-        Err(StorybookAutomationError::InvalidInteractionStep { step_index: 0, .. })
-    ));
-    assert!(matches!(
-        validate_interaction_request(&request(vec![StoryInteractionStep::ClickTarget {
-            target_key: " ".to_owned(),
-            button: StoryMouseButton::Left,
-            click_count: 1,
-            modifiers: StoryModifiers::default(),
-        }])),
-        Err(StorybookAutomationError::InvalidInteractionStep { step_index: 0, .. })
-    ));
-}
-
-#[test]
-fn postcondition_validation_rejects_ambiguous_or_unbounded_assertions() {
-    let mut request = request(vec![StoryInteractionStep::FocusNext]);
-    request.postconditions = vec![StoryInteractionPostcondition::new("", Value::Null)];
-    assert!(matches!(
-        validate_interaction_request(&request),
-        Err(StorybookAutomationError::InvalidInteractionPostcondition {
-            postcondition_index: 0,
-            ..
-        })
-    ));
-
-    request.postconditions =
-        vec![StoryInteractionPostcondition::new("status", Value::Null).json_pointer("status")];
-    assert!(matches!(
-        validate_interaction_request(&request),
-        Err(StorybookAutomationError::InvalidInteractionPostcondition {
-            postcondition_index: 0,
-            ..
-        })
-    ));
-
-    request.postconditions =
-        vec![StoryInteractionPostcondition::new("status", Value::Null).max_frames(0)];
-    assert!(matches!(
-        validate_interaction_request(&request),
-        Err(StorybookAutomationError::InvalidInteractionPostcondition {
-            postcondition_index: 0,
-            ..
-        })
-    ));
 }
 
 #[test]
@@ -466,13 +311,11 @@ fn interaction_wire_types_are_closed_and_tagged() {
 
 #[gpui_kit::test]
 fn action_discovery_and_batch_preparation_use_registered_schemas(cx: &mut App) {
-    assert!(!automation_action_is_visible("zed::NoAction"));
-    assert!(!automation_action_is_visible("zed::Unbind"));
-    assert!(!automation_action_is_visible(
-        "storybook_workbench::ResetAllControls"
-    ));
-    assert!(automation_action_is_visible("example::PublicAction"));
-
+    assert!(
+        !list_registered_actions(cx)
+            .iter()
+            .any(|action| action.name == "zed::NoAction")
+    );
     let actions = list_registered_actions(cx);
     let action = actions
         .iter()
@@ -488,16 +331,16 @@ fn action_discovery_and_batch_preparation_use_registered_schemas(cx: &mut App) {
             .and_then(Value::as_str)),
         Some("integer")
     );
-    assert!(actions.iter().all(|action| {
-        action.name != "zed::NoAction"
-            && action.name != "zed::Unbind"
-            && !action.name.starts_with("storybook_workbench::")
-    }));
+    assert!(
+        actions
+            .iter()
+            .all(|action| { action.name != "zed::NoAction" && action.name != "zed::Unbind" })
+    );
 
     assert!(matches!(
-        prepare_interaction_steps(
+        prepare_test_steps(
             &[
-                StoryInteractionStep::FocusNext,
+                StoryInteractionStep::FocusNext {},
                 StoryInteractionStep::DispatchAction {
                     name: "storybook_interaction_test::Missing".to_owned(),
                     args: None,
@@ -551,7 +394,8 @@ async fn postcondition_retries_a_missing_value_until_it_is_rendered(
                     response,
                     progress: progress.clone(),
                     observations: Vec::new(),
-                    _operation: AutomationOperationGuard {
+                    provider: Rc::new(NoCaptureProvider),
+                    _operation: TestOperationGuard {
                         pending: pending.clone(),
                     },
                 },
@@ -581,6 +425,16 @@ async fn postcondition_retries_a_missing_value_until_it_is_rendered(
         window.simulate_next_frame(cx)
     })
     .expect("second postcondition check should run");
+    assert!(
+        pending.load(Ordering::SeqCst),
+        "lease covers the settled frame"
+    );
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
+        .expect("completion frame should draw");
+    cx.update_window(window.into(), |_, window, cx| {
+        window.simulate_next_frame(cx)
+    })
+    .expect("completion callback should run");
 
     let snapshot = receiver
         .await
@@ -629,7 +483,8 @@ async fn postcondition_timeout_preserves_dispatched_progress(cx: &mut gpui_kit::
                     response,
                     progress: progress.clone(),
                     observations: Vec::new(),
-                    _operation: AutomationOperationGuard {
+                    provider: Rc::new(NoCaptureProvider),
+                    _operation: TestOperationGuard {
                         pending: pending.clone(),
                     },
                 },
@@ -687,7 +542,7 @@ async fn executor_dispatches_unicode_actions_pointer_and_frame_waits_in_process(
         let pending = cx
             .update_window(window.into(), |_, window, cx| {
                 let steps = vec![
-                    StoryInteractionStep::FocusNext,
+                    StoryInteractionStep::FocusNext {},
                     StoryInteractionStep::Text {
                         value: "héllo 世界".to_owned(),
                     },
@@ -720,13 +575,13 @@ async fn executor_dispatches_unicode_actions_pointer_and_frame_waits_in_process(
                     },
                     StoryInteractionStep::WaitFrames { count: 1 },
                 ];
-                let prepared = prepare_interaction_steps(&steps, cx)
+                let prepared = prepare_test_steps(&steps, cx)
                     .expect("steps should validate against GPUI registrations");
                 let pending = Arc::new(AtomicBool::new(true));
                 schedule_story_interaction(
-                    PreparedStoryInteraction {
-                        request_id: 9,
-                        story: StorySnapshot {
+                    PreparedStoryInteraction::builder()
+                        .request_id(9)
+                        .story(StorySnapshot {
                             key: "interaction-test".to_owned(),
                             crate_name: "test".to_owned(),
                             story_name: "InteractionHarness".to_owned(),
@@ -737,18 +592,19 @@ async fn executor_dispatches_unicode_actions_pointer_and_frame_waits_in_process(
                             source_file: file!().to_owned(),
                             source_line: line!(),
                             capture_route_id: "interaction-test".to_owned(),
-                            default_size: super::super::StoryDefaultSize::default(),
+                            default_size: StoryDefaultSize::default(),
                             scenarios: Vec::new(),
-                        },
-                        steps: prepared,
-                        postconditions: Vec::new(),
-                        capture: None,
-                        response,
-                        progress: Arc::new(AtomicUsize::new(0)),
-                        operation: AutomationOperationGuard {
+                        })
+                        .steps(prepared)
+                        .postconditions(Vec::new())
+                        .maybe_capture(None)
+                        .response(response)
+                        .progress(Arc::new(AtomicUsize::new(0)))
+                        .provider(Rc::new(NoCaptureProvider))
+                        .operation(TestOperationGuard {
                             pending: pending.clone(),
-                        },
-                    },
+                        })
+                        .build(),
                     window,
                 );
                 window.refresh();
@@ -830,9 +686,9 @@ async fn executor_rejects_an_unrendered_route_without_dispatch(cx: &mut gpui_kit
         let pending = Arc::new(AtomicBool::new(true));
         cx.update_window(window.into(), |_, window, cx| {
             schedule_story_interaction(
-                PreparedStoryInteraction {
-                    request_id: 10,
-                    story: StorySnapshot {
+                PreparedStoryInteraction::builder()
+                    .request_id(10)
+                    .story(StorySnapshot {
                         key: "missing-route".to_owned(),
                         crate_name: "test".to_owned(),
                         story_name: "MissingRoute".to_owned(),
@@ -843,19 +699,22 @@ async fn executor_rejects_an_unrendered_route_without_dispatch(cx: &mut gpui_kit
                         source_file: file!().to_owned(),
                         source_line: line!(),
                         capture_route_id: "missing-route".to_owned(),
-                        default_size: super::super::StoryDefaultSize::default(),
+                        default_size: StoryDefaultSize::default(),
                         scenarios: Vec::new(),
-                    },
-                    steps: prepare_interaction_steps(&[StoryInteractionStep::FocusNext], cx)
-                        .expect("focus step should prepare"),
-                    postconditions: Vec::new(),
-                    capture: None,
-                    response,
-                    progress: progress.clone(),
-                    operation: AutomationOperationGuard {
+                    })
+                    .steps(
+                        prepare_test_steps(&[StoryInteractionStep::FocusNext {}], cx)
+                            .expect("focus step should prepare"),
+                    )
+                    .postconditions(Vec::new())
+                    .maybe_capture(None)
+                    .response(response)
+                    .progress(progress.clone())
+                    .provider(Rc::new(NoCaptureProvider))
+                    .operation(TestOperationGuard {
                         pending: pending.clone(),
-                    },
-                },
+                    })
+                    .build(),
                 window,
             );
             window.refresh();
@@ -905,9 +764,9 @@ async fn capture_failure_reports_partial_dispatch_without_retry(cx: &mut gpui_ki
         let pending = Arc::new(AtomicBool::new(true));
         cx.update_window(window.into(), |_, window, cx| {
             schedule_story_interaction(
-                PreparedStoryInteraction {
-                    request_id: 11,
-                    story: StorySnapshot {
+                PreparedStoryInteraction::builder()
+                    .request_id(11)
+                    .story(StorySnapshot {
                         key: "interaction-test".to_owned(),
                         crate_name: "test".to_owned(),
                         story_name: "InteractionHarness".to_owned(),
@@ -918,35 +777,36 @@ async fn capture_failure_reports_partial_dispatch_without_retry(cx: &mut gpui_ki
                         source_file: file!().to_owned(),
                         source_line: line!(),
                         capture_route_id: "interaction-test".to_owned(),
-                        default_size: super::super::StoryDefaultSize::default(),
+                        default_size: StoryDefaultSize::default(),
                         scenarios: Vec::new(),
-                    },
-                    steps: prepare_interaction_steps(
-                        &[StoryInteractionStep::PointerClick {
-                            point: StoryPoint {
-                                space: StoryPointSpace::Normalized,
-                                x: 0.5,
-                                y: 0.5,
-                            },
-                            button: StoryMouseButton::Left,
-                            click_count: 1,
-                            modifiers: StoryModifiers::default(),
-                        }],
-                        cx,
+                    })
+                    .steps(
+                        prepare_test_steps(
+                            &[StoryInteractionStep::PointerClick {
+                                point: StoryPoint {
+                                    space: StoryPointSpace::Normalized,
+                                    x: 0.5,
+                                    y: 0.5,
+                                },
+                                button: StoryMouseButton::Left,
+                                click_count: 1,
+                                modifiers: StoryModifiers::default(),
+                            }],
+                            cx,
+                        )
+                        .expect("pointer step should prepare"),
                     )
-                    .expect("pointer step should prepare"),
-                    postconditions: Vec::new(),
-                    capture: Some(StoryInteractionCaptureRequest {
-                        // `target` is an existing directory, so PNG save must fail
-                        // after input dispatch without mutating repository files.
+                    .postconditions(Vec::new())
+                    .maybe_capture(Some(StoryInteractionCaptureRequest {
                         output_path: Some(PathBuf::from("target")),
-                    }),
-                    response,
-                    progress: progress.clone(),
-                    operation: AutomationOperationGuard {
+                    }))
+                    .response(response)
+                    .progress(progress.clone())
+                    .provider(Rc::new(NoCaptureProvider))
+                    .operation(TestOperationGuard {
                         pending: pending.clone(),
-                    },
-                },
+                    })
+                    .build(),
                 window,
             );
             window.refresh();
@@ -975,4 +835,23 @@ async fn capture_failure_reports_partial_dispatch_without_retry(cx: &mut gpui_ki
     assert_eq!(progress.load(Ordering::SeqCst), 1);
     assert!(!pending.load(Ordering::SeqCst));
     cx.update(|cx| assert_eq!(harness.read(cx).clicks, 1));
+}
+
+fn prepare_test_steps(
+    steps: &[StoryInteractionStep],
+    cx: &App,
+) -> Result<Vec<PreparedInteractionStep>, StorybookAutomationError> {
+    let scope = list_registered_actions(cx)
+        .into_iter()
+        .map(|action| action.name)
+        .collect();
+    prepare_interaction_steps(steps, &scope, cx)
+}
+struct TestOperationGuard {
+    pending: Arc<AtomicBool>,
+}
+impl Drop for TestOperationGuard {
+    fn drop(&mut self) {
+        self.pending.store(false, Ordering::SeqCst);
+    }
 }

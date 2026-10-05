@@ -1,0 +1,22 @@
+[package]
+name = "gpui-storybook-example-embedded"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+gpui-kit = { default-features = false, features = [ "component", "assets" ], version = "0.7.0" }
+gpui-storybook-automation = { workspace = true }
+gpui-storybook-automation-gpui = { workspace = true }
+schemars = { workspace = true }
+serde = { features = [ "derive" ], workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+gpui-kit = { features = [ "test-support" ], workspace = true }
+tokio = { features = [ "sync" ], workspace = true }
+
+[lints]
+workspace = true

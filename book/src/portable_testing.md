@@ -151,3 +151,8 @@ also verifies application capture through private Sway at desktop, tablet,
 mobile, and custom sizes. Visual baselines are renderer- and font-sensitive, so
 keep separate accepted images when CI spans platforms with materially different
 output.
+
+Rendered route, target, and value registries belong to each application and
+window. Fresh runner contexts and simultaneously attached embedded windows can
+reuse stable route keys while retaining independent rendered state. See
+[embedded mobile automation](mobile_automation.md) for application-owned roots.

@@ -3,6 +3,10 @@ default-members = [ "examples/story" ]
 members = [
   "crates/gpui-storybook",
   "crates/gpui-storybook-core",
+  "crates/gpui-storybook-automation",
+  "crates/gpui-storybook-automation-gpui",
+  "crates/gpui-storybook-mobile",
+  "crates/gpui-storybook-mobile-host",
   "crates/gpui-storybook-macros",
   "crates/gpui-storybook-mcp",
   "crates/gpui-storybook-launch",
@@ -11,6 +15,8 @@ members = [
   "crates/gpui-storybook-toml",
   "examples/story",
   "examples/component",
+  "examples/embedded",
+  "examples/mobile",
   "web",
   "xtask",
 ]
@@ -23,11 +29,14 @@ publish = true
 readme = "README.md"
 repository = "https://github.com/stayhydated/gpui-storybook"
 rust-version = "1.99"
+# Publish the coordinated automation API extraction at the incompatible 0.8.0
+# boundary. The experiment retains the current version until that release.
 version = "0.7.1"
 
 [workspace.dependencies]
 anyhow = "1.0"
 base64 = "0.23"
+bon = "3.10"
 clap = "4.6"
 component-shape-mcp = "0.3.4"
 console_error_panic_hook = "0.1"
@@ -44,11 +53,15 @@ frame-capture = "0.2.3"
 gpui = { package = "gpui-pre", version = "=0.3.7" }
 gpui-es-fluent = "0.3.0"
 gpui-kit = "0.7.0"
+gpui-mobile = { default-features = false, git = "https://github.com/longbridge/gpui-mobile", package = "gpui-pre-mobile", rev = "9075e3aa3eea812127f2c60ed66f0cd5798ff245" }
 gpui-storybook = { path = "crates/gpui-storybook", version = "0.7.1" }
+gpui-storybook-automation = { path = "crates/gpui-storybook-automation", version = "0.7.1" }
+gpui-storybook-automation-gpui = { path = "crates/gpui-storybook-automation-gpui", version = "0.7.1" }
 gpui-storybook-core = { path = "crates/gpui-storybook-core", version = "0.7.1" }
 gpui-storybook-launch = { path = "crates/gpui-storybook-launch", version = "0.7.1" }
 gpui-storybook-macros = { path = "crates/gpui-storybook-macros", version = "0.7.1" }
 gpui-storybook-mcp = { path = "crates/gpui-storybook-mcp", version = "0.7.1" }
+gpui-storybook-mobile = { path = "crates/gpui-storybook-mobile", version = "0.7.1" }
 gpui-storybook-preferences = { path = "crates/gpui-storybook-preferences", version = "0.7.1" }
 gpui-storybook-test = { path = "crates/gpui-storybook-test", version = "0.7.1" }
 gpui-storybook-toml = { path = "crates/gpui-storybook-toml", version = "0.7.1" }
@@ -130,6 +143,11 @@ split-debuginfo = "unpacked"
 
 [profile.dev.package."*"]
 opt-level = 3
+
+[profile.mobile]
+debug-assertions = false
+inherits = "dev"
+overflow-checks = true
 
 [profile.release]
 codegen-units = 1

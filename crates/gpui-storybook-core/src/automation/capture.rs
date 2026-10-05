@@ -35,17 +35,19 @@ struct PendingStoryCapture {
 }
 
 impl PendingStoryCapture {
-    fn is_ready(&self, window: &mut Window) -> Result<bool, StorybookAutomationError> {
+    fn is_ready(&self, window: &mut Window, cx: &App) -> Result<bool, StorybookAutomationError> {
         if let Some((width, height)) = validate_capture_target_size(&self.request)? {
             let scale = window.scale_factor().max(f32::EPSILON);
             let expected = gpui_kit::size(px(width as f32 / scale), px(height as f32 / scale));
             let story_key = capture_route_story_key(&self.story.capture_route_id);
-            if capture_region_bounds(story_key).is_none_or(|region| region.bounds.size != expected)
+            if capture_region_bounds(story_key, window, cx)
+                .is_none_or(|region| region.bounds.size != expected)
             {
                 return Ok(false);
             }
         }
-        ensure_capture_target_visible(&self.story.capture_route_id, window).map(|resized| !resized)
+        ensure_capture_target_visible(&self.story.capture_route_id, window, cx)
+            .map(|resized| !resized)
     }
 
     fn schedule(self, window: &mut Window) {
@@ -57,7 +59,7 @@ impl PendingStoryCapture {
             if self.response.is_closed() {
                 return;
             }
-            match self.is_ready(window) {
+            match self.is_ready(window, cx) {
                 Ok(true) => self.prepare(window, cx),
                 Ok(false) => self.retry(window, cx),
                 Err(error) => self.fail(error, cx),
@@ -89,7 +91,7 @@ impl PendingStoryCapture {
     }
 
     fn prepare(self, window: &mut Window, cx: &mut App) {
-        if !scroll_capture_region_into_view(&self.story.capture_route_id) {
+        if !scroll_capture_region_into_view(&self.story.capture_route_id, window, cx) {
             let error = StorybookAutomationError::CaptureUnavailable {
                 message: format!(
                     "capture route `{}` was not rendered by the current story view",
@@ -107,11 +109,11 @@ impl PendingStoryCapture {
             }
             // Scrolling and resizable panels can change the clip on this frame.
             // Only capture after the final rendered geometry still fits.
-            match self.is_ready(window) {
+            match self.is_ready(window, cx) {
                 Ok(true) => {
                     let _operation = self.operation;
                     let result =
-                        render_story_capture(self.request_id, self.request, self.story, window);
+                        render_story_capture(self.request_id, self.request, self.story, window, cx);
                     let exit_code = capture_exit_code(&result);
                     let _ = self.response.send(result);
                     if self.quit_after_capture {
@@ -153,7 +155,7 @@ pub fn story_snapshots_from_containers(
         let (snapshot, members) = {
             let story = story.read(cx.borrow());
             (
-                StorySnapshot::from_container(story, cx),
+                crate::automation::story_snapshot_from_container(story, cx),
                 story.variants.clone(),
             )
         };
@@ -180,21 +182,6 @@ pub fn default_capture_output_path(story: &StorySnapshot) -> PathBuf {
         .join(format!("{}.png", story.capture_route_id))
 }
 
-pub(crate) fn validate_capture_target_size(
-    request: &StoryScreenshotRequest,
-) -> Result<Option<(u32, u32)>, StorybookAutomationError> {
-    match (request.width, request.height) {
-        (Some(width), Some(height)) if width > 0 && height > 0 => Ok(Some((width, height))),
-        (Some(_), Some(_)) => Err(StorybookAutomationError::InvalidCaptureRequest {
-            message: "capture width and height must be greater than zero".to_string(),
-        }),
-        (None, None) => Ok(request.viewport.and_then(StoryViewportPreset::dimensions)),
-        _ => Err(StorybookAutomationError::InvalidCaptureRequest {
-            message: "capture width and height must be provided together".to_string(),
-        }),
-    }
-}
-
 pub(crate) fn set_capture_target_size(
     story: &Entity<StoryContainer>,
     window: &Window,
@@ -217,9 +204,10 @@ pub(crate) fn set_capture_target_size(
 pub(crate) fn ensure_capture_target_visible(
     route_id: &str,
     window: &mut Window,
+    cx: &App,
 ) -> Result<bool, StorybookAutomationError> {
     let story_key = capture_route_story_key(route_id);
-    let region = capture_region_bounds(story_key).ok_or_else(|| {
+    let region = capture_region_bounds(story_key, window, cx).ok_or_else(|| {
         StorybookAutomationError::CaptureUnavailable {
             message: format!(
                 "capture route `{story_key}` was not rendered before validating its target size"
@@ -262,6 +250,7 @@ pub(crate) fn render_story_capture(
     request: StoryScreenshotRequest,
     story: StorySnapshot,
     window: &mut Window,
+    cx: &App,
 ) -> Result<StoryCaptureSnapshot, StorybookAutomationError> {
     #[cfg(feature = "capture")]
     {
@@ -270,7 +259,7 @@ pub(crate) fn render_story_capture(
                 message: format!("failed to render current story to image: {error}"),
             }
         })?;
-        let image = crop_story_capture_image(image, &story, window)?;
+        let image = crop_story_capture_image(image, &story, window, cx)?;
         let path = request
             .output_path
             .unwrap_or_else(|| default_capture_output_path(&story));
@@ -295,12 +284,13 @@ pub(crate) fn render_story_capture(
             pixel_width: image.width(),
             pixel_height: image.height(),
             story,
+            observation: None,
         })
     }
 
     #[cfg(not(feature = "capture"))]
     {
-        let _ = (request_id, request, story, window);
+        let _ = (request_id, request, story, window, cx);
         Err(StorybookAutomationError::CaptureUnavailable {
             message: "story capture requires the gpui-storybook-core `capture` feature".to_string(),
         })
@@ -312,8 +302,9 @@ fn crop_story_capture_image(
     image: image::RgbaImage,
     story: &StorySnapshot,
     window: &Window,
+    cx: &App,
 ) -> Result<image::RgbaImage, StorybookAutomationError> {
-    let region = capture_region_bounds(&story.capture_route_id).ok_or_else(|| {
+    let region = capture_region_bounds(&story.capture_route_id, window, cx).ok_or_else(|| {
         StorybookAutomationError::CaptureUnavailable {
             message: format!(
                 "capture route `{}` was not rendered by the current story view",
@@ -387,5 +378,30 @@ pub(crate) fn capture_exit_code(
         1
     } else {
         0
+    }
+}
+
+/// Gallery policy for desktop resizing and image rendering.
+pub(crate) struct DesktopCaptureProvider;
+impl gpui_storybook_automation_gpui::interaction::InteractionCaptureProvider
+    for DesktopCaptureProvider
+{
+    fn ensure_visible(
+        &self,
+        route: &str,
+        window: &mut Window,
+        cx: &App,
+    ) -> Result<bool, StorybookAutomationError> {
+        ensure_capture_target_visible(route, window, cx)
+    }
+    fn capture(
+        &self,
+        request_id: u64,
+        request: StoryScreenshotRequest,
+        story: StorySnapshot,
+        window: &mut Window,
+        cx: &App,
+    ) -> Result<StoryCaptureSnapshot, StorybookAutomationError> {
+        render_story_capture(request_id, request, story, window, cx)
     }
 }

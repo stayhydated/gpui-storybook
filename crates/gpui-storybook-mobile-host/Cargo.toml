@@ -1,0 +1,21 @@
+[package]
+name = "gpui-storybook-mobile-host"
+description = "ADB attach and MCP host for embedded Storybook device automation"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+repository.workspace = true
+readme = "README.md"
+
+[dependencies]
+clap = { features = [ "derive" ], workspace = true }
+gpui-storybook-automation = { workspace = true }
+gpui-storybook-mcp = { workspace = true }
+gpui-storybook-mobile = { workspace = true }
+image = { workspace = true }
+tokio = { features = [ "rt-multi-thread", "time" ], workspace = true }
+
+[lints]
+workspace = true

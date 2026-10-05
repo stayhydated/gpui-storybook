@@ -33,12 +33,14 @@ impl Element for CaptureScopeElement {
         window: &mut Window,
         cx: &mut App,
     ) -> (LayoutId, Self::RequestLayoutState) {
+        let regions = window_regions(window, cx);
         let inherited = current_scope();
         let story_key = self
             .story_key
             .clone()
             .or_else(|| inherited.as_ref().and_then(|scope| scope.story_key.clone()));
         let scope = CaptureScope {
+            regions,
             route_id: self
                 .story_key
                 .clone()
@@ -64,6 +66,7 @@ impl Element for CaptureScopeElement {
         window: &mut Window,
         cx: &mut App,
     ) -> Self::PrepaintState {
+        let regions = window_regions(window, cx);
         let inherited = current_scope();
         let story_key = self
             .story_key
@@ -74,6 +77,7 @@ impl Element for CaptureScopeElement {
             .clone()
             .or_else(|| inherited.as_ref().and_then(|scope| scope.route_id.clone()));
         let scope = CaptureScope {
+            regions,
             story_key,
             route_id,
             // Ancestor clips are the actual story pane, even when automation
@@ -87,7 +91,7 @@ impl Element for CaptureScopeElement {
         };
 
         if let Some(story_key) = self.story_key.clone() {
-            reset_capture_regions_for_story(&story_key);
+            scope.regions.reset_story(&story_key);
             record_region(story_key, bounds, &scope, window.viewport_size());
         }
 
@@ -106,8 +110,10 @@ impl Element for CaptureScopeElement {
         window: &mut Window,
         cx: &mut App,
     ) {
+        let regions = window_regions(window, cx);
         let inherited = current_scope();
         let scope = CaptureScope {
+            regions,
             story_key: self
                 .story_key
                 .clone()
@@ -194,7 +200,7 @@ impl Element for CaptureSubstoryElement {
             && let Some(story_key) = scope.story_key.clone()
         {
             let route_id = capture_substory_route_id_with_key(story_key, &self.route_key);
-            clear_route_automation_values(&route_id);
+            clear_route_automation_values(&scope.regions, &route_id);
             record_region(route_id.clone(), bounds, &scope, window.viewport_size());
             with_scope(
                 CaptureScope {
@@ -285,8 +291,16 @@ impl Element for InteractionTargetElement {
         window: &mut Window,
         cx: &mut App,
     ) -> Self::PrepaintState {
-        if let Some(route_id) = current_scope().and_then(|scope| scope.route_id) {
-            record_interaction_target(route_id, self.key.clone(), self.label.clone(), bounds);
+        if let Some(scope) = current_scope()
+            && let Some(route_id) = scope.route_id
+        {
+            record_interaction_target(
+                &scope.regions,
+                route_id,
+                self.key.clone(),
+                self.label.clone(),
+                bounds,
+            );
         }
         self.child.prepaint(window, cx);
     }
@@ -352,8 +366,11 @@ impl Element for SemanticValueElement {
         window: &mut Window,
         cx: &mut App,
     ) -> Self::PrepaintState {
-        if let Some(route_id) = current_scope().and_then(|scope| scope.route_id) {
+        if let Some(scope) = current_scope()
+            && let Some(route_id) = scope.route_id
+        {
             record_semantic_value(
+                &scope.regions,
                 route_id,
                 self.key.clone(),
                 self.label.clone(),

@@ -1,0 +1,134 @@
+# Embedded Android automation
+
+Attach automation to your application's existing GPUI root when a native shell
+owns navigation and the window lifecycle. The Counter/Notes example shares its
+production views between a desktop application and an Android Activity with
+native tabs and an appearance control.
+
+## Choose the integration boundary
+
+| Crate | Application responsibility |
+| --- | --- |
+| `gpui-storybook-automation` | Shared backend, typed requests, capabilities, snapshots, and bounded wire envelopes |
+| `gpui-storybook-automation-gpui` | Supply a root, window, route catalog, controls, action scope, fixtures, and capture provider |
+| `gpui-storybook-mobile` | Opt in, poll admitted requests on the owning thread, retain their device operation lease |
+| `gpui-storybook-mobile-host` | Select an ADB serial, own forwarding and local PNG paths, serve MCP on the computer |
+
+Implement `EmbeddedRoot` with application-owned route selection, public state
+revision, controls, action scope, presentation, and fixture recreation. Create
+`GpuiHostAttachment` after application initialization. Each app/window owns its
+rendered registry. Invalidate the attachment before replacing a surface so
+deferred work cannot target a replacement root through stale handles.
+
+Use `validate_steps` before changing native state for a requested batch. After
+the native owner acknowledges selection, apply the GPUI route through the normal
+application path and await rendered readiness. `AttachedInteraction::builder()`
+carries the operation lease through the shared frame executor. Ad-hoc navigation
+preserves live state; scenarios recreate the selected surface's fixture.
+
+## Run the repository example
+
+Use the pinned Rust toolchain, JDK 21, Python 3, Android platform 36/build-tools
+36.0.0, and NDK 27.1.12297006. The default build targets x86_64 with API 31 as
+the native link baseline. Select `--abi arm64-v8a` for aarch64.
+
+```sh
+python3 examples/mobile/build.py --automation \
+  --sdk "$ANDROID_HOME" --ndk "$ANDROID_NDK_HOME"
+cargo build -p gpui-storybook-mobile-host --locked
+```
+
+The selected GPUI Mobile revision is
+`9075e3aa3eea812127f2c60ed66f0cd5798ff245`, paired with `gpui-pre =0.3.7`
+and GPUI Kit 0.7.0. The workspace `mobile` profile disables renderer debug labels
+while retaining overflow checks. Assets come from GPUI Kit; Android supplies
+Roboto and Noto system fonts. Renderer, fonts, emulator image, orientation,
+density, and keyboard determine capture pixels and belong in recorded evidence.
+
+Start an emulator or select an existing device explicitly. The APK supports API
+31 or newer. The example endpoint requires both its build feature and launch
+extra; the computer launcher supplies the extra with `--launch-example`.
+
+```sh
+cargo run -p gpui-storybook-mobile-host -- \
+  --serial emulator-5580 --allow-interaction \
+  --install target/mobile-example/x86_64/storybook.apk --launch-example
+```
+
+Use the process's stdin/stdout for MCP. Logs stay on stderr. Attaching to an
+already running opted-in app needs only `--serial` and the desired interaction
+opt-in. `--stop-on-eof` explicitly stops an example launched by this command;
+EOF otherwise detaches and releases the owned ADB forwarding.
+
+Run `python3 examples/mobile/verify.py --serial emulator-5580
+python3 examples/mobile/verify_native.py --serial emulator-5580` against the
+running app. It records a raw JSON Lines MCP transcript and PNGs under
+`target/mobile-evidence`, exercises both routes and fresh scenarios, and verifies
+native/GPUI agreement and unsupported-request rejection.
+
+## Discover host operations
+
+`storybook_get_host` reports protocol/session identity, native and GPUI routes,
+public state revision, observed display/surface geometry, scale, and capabilities.
+`storybook_list_host_actions` exposes typed native actions. With interaction
+enabled, select appearance through `storybook_dispatch_host_action`:
+
+```json
+{"action":{"action":"set_appearance","dark":true}}
+```
+
+The ordinary story tools discover routes, edit controls, read semantic values,
+click targets, dispatch scoped actions, and run fresh scenarios. GPUI pointer
+coordinates remain route-relative logical pixels or normalized fractions.
+Android touch coordinates use physical display pixels, including the observed
+surface origin and scale. Test native input separately through Android tooling.
+
+## Capture and operation ownership
+
+`storybook_capture_host` accepts `scope: "display"` or `scope: "gpui"` and a
+computer-owned `output_path`. Display capture includes the native shell and
+visible system/keyboard UI. GPUI capture crops the inset-aware SurfaceView bounds;
+`storybook_capture_current_story` uses that crop for the selected root route.
+
+The app retains an exclusive capture ticket while the computer obtains an ADB
+PNG. Completion validates session, route/state revision, and geometry before
+writing the artifact. Results include dimensions, scope, request/session identity,
+provider, observed host metadata, and local path. This is a compositor observation
+following native and GPUI acknowledgment; its provenance is explicit.
+
+Device evidence uses observed dimensions. Desktop sizing, control application
+inside capture, and capture inside an interaction batch require their own
+advertised capabilities. Unsupported requests fail before dispatch.
+
+Frames contain a big-endian length and bounded JSON payload of at most 1 MiB.
+Protocol/session mismatch rejects admission. The device bounds its request queue
+and connections and admits one mutation, scenario, or capture at a time. Reads
+may observe intermediate public state. Interaction limits remain 64 steps,
+4 KiB text, and 120 explicit frame waits.
+
+Canceling a client response leaves submitted work under its device lease until
+settlement. A transport failure after submission reports an unknown outcome;
+rediscover state without replaying the mutation. Activity recreation replaces
+surface identity and invalidates old attachments while the GPUI runtime remains
+retained. Establish a fresh connection and rediscover routes/targets.
+
+iOS qualification follows a simulator proof using platform-owned lifecycle,
+transport, and capture. The neutral contract's iOS build is one prerequisite.
+
+## Qualification inputs
+
+The mobile workflow checks neutral contracts on Android arm64/x86_64 and iOS
+arm64. It builds signed APKs for both Android ABIs using JDK 21, SDK/platform and
+build tools 36, NDK 27.1.12297006, and the API 31 linker baseline. Its x86_64 lane
+uses a Pixel 7 API 36 default system image, SwiftShader Vulkan, the `mobile`
+profile, and the image's Roboto/Noto fonts. Artifacts record image fingerprint,
+emulator version, renderer logs, protocol transcripts, and scoped PNGs.
+
+The native proof assumes the image's AOSP en-US LatinIME layout and a disposable
+emulator. It taps the actual GPUI surface and soft keyboard using observed scale
+and insets, independently of GPUI mouse/text steps. It checks native tab/route
+agreement, commit/inset behavior, exclusive operation ownership after disconnect,
+duplicate admission, partial progress, capture invalidation, pause/resume, and
+Activity recreation. Other IMEs and application permission/effect flows require
+their own native tests. Keep visual acceptance scoped to recorded renderer and
+font inputs; a PNG's dimensions alone establish geometry.

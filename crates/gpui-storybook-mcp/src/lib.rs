@@ -1,4 +1,4 @@
-//! MCP tools for driving a live `gpui-storybook` window.
+//! MCP tools over a host-owned [`AutomationBackend`] on Linux and macOS.
 //!
 //! This crate supports Linux and macOS. Windows and other targets produce a
 //! compile-time error. Linux launch commands use the headless Sway wrapper;
@@ -10,7 +10,10 @@
 //! a serialized control map before capture, and use named or explicit viewport
 //! dimensions. Facade-created controllers wait for the standard gallery
 //! to publish and attach before handling the first tool call.
-//! These operations reuse the core `ControlSpec` and `ControlValue` contracts.
+//! Shared types and validation come from `gpui-storybook-automation`. Core
+//! implements the gallery backend; MCP serving depends on the target-neutral
+//! interface. Tool registration intersects negotiated host capabilities with
+//! the explicit interaction opt-in. Unsupported operations fail before dispatch.
 //! Generic actions, focused semantic target clicks, keyboard, pointer, frame
 //! waits, and atomic post-interaction capture are registered only when
 //! interaction automation is explicitly enabled with
@@ -26,7 +29,7 @@
 //! overwriting persistent interactive choices. On Linux, generated launch
 //! commands run the Wayland application through Sway's wlroots headless backend
 //! so GPUI receives compositor-driven frame callbacks without a physical display.
-//! MCP servers retain the shared automation registry for the complete live-host
+//! MCP servers retain the shared automation backend for the complete live-host
 //! lifetime; completing an automation call never requests application
 //! shutdown.
 
@@ -35,26 +38,8 @@ compile_error!(
     "gpui-storybook-mcp supports Linux and macOS; Windows and other targets are unsupported"
 );
 
-pub use gpui_storybook_core::automation::{
-    DEFAULT_INTERACTION_POSTCONDITION_FRAMES, DEFAULT_STORY_CAPTURE_HEIGHT,
-    DEFAULT_STORY_CAPTURE_WIDTH, MAX_INTERACTION_POSTCONDITIONS, MAX_INTERACTION_STEPS,
-    MAX_INTERACTION_TEXT_BYTES, MAX_INTERACTION_WAITED_FRAMES, SharedStoryCaptureController,
-    SharedStoryController, SharedStorybookAutomation, StoryActionSnapshot, StoryCaptureSnapshot,
-    StoryControlsSnapshot, StoryCurrentSnapshot, StoryDefaultSize, StoryInteractionCaptureRequest,
-    StoryInteractionDispatch, StoryInteractionObservation, StoryInteractionPostcondition,
-    StoryInteractionPostconditionSnapshot, StoryInteractionRequest, StoryInteractionSnapshot,
-    StoryInteractionStep, StoryInteractionTargetBounds, StoryInteractionTargetSnapshot,
-    StoryInteractionTargetsSnapshot, StoryModifier, StoryModifiers, StoryMouseButton, StoryPoint,
-    StoryPointSpace, StoryScenarioRunSnapshot, StoryScenarioSnapshot, StoryScenarioStep,
-    StoryScenariosSnapshot, StoryScreenshotRequest, StorySemanticValueSnapshot,
-    StorySemanticValuesSnapshot, StorySnapshot, StorybookAutomation, StorybookAutomationError,
-};
-pub use gpui_storybook_core::controls::{
-    ControlBounds, ControlColor, ControlKind, ControlSnapshot, ControlSpec, ControlValue,
-};
-pub use gpui_storybook_core::presentation::StoryViewportPreset;
-
-pub use gpui_storybook_core::automation;
+pub use gpui_storybook_automation as automation;
+pub use gpui_storybook_automation::*;
 
 mod error;
 mod server;
@@ -72,8 +57,9 @@ pub use server::{
     stdio_requested,
 };
 pub use tools::{
-    TOOL_CAPTURE_CURRENT_STORY, TOOL_CAPTURE_LAUNCH_ENV, TOOL_CLICK_TARGET, TOOL_CURRENT_STORY,
-    TOOL_GET_STORY, TOOL_LIST_ACTIONS, TOOL_LIST_INTERACTION_TARGETS, TOOL_LIST_SCENARIOS,
+    TOOL_CAPTURE_CURRENT_STORY, TOOL_CAPTURE_HOST, TOOL_CAPTURE_LAUNCH_ENV, TOOL_CLICK_TARGET,
+    TOOL_CURRENT_STORY, TOOL_DISPATCH_HOST_ACTION, TOOL_GET_HOST, TOOL_GET_STORY,
+    TOOL_LIST_ACTIONS, TOOL_LIST_HOST_ACTIONS, TOOL_LIST_INTERACTION_TARGETS, TOOL_LIST_SCENARIOS,
     TOOL_LIST_STORIES, TOOL_OPEN_STORY, TOOL_READ_CONTROLS, TOOL_READ_SEMANTIC_VALUES,
     TOOL_READ_VALUE, TOOL_RESET_CONTROL, TOOL_RUN_SCENARIO, TOOL_RUN_STEPS, TOOL_SET_CONTROL,
     TOOL_WAIT_FOR_VALUE, register_tools, register_tools_with_options, tool_registry,
@@ -85,10 +71,10 @@ pub const ALLOW_INTERACTION_ENV_VAR: &str = "GPUI_STORYBOOK_MCP_ALLOW_INTERACTIO
 
 pub mod prelude {
     pub use super::{
-        ALLOW_INTERACTION_ENV_VAR, CaptureLaunchEnv, DEFAULT_INTERACTION_POSTCONDITION_FRAMES,
-        MAX_INTERACTION_POSTCONDITIONS, MAX_INTERACTION_STEPS, MAX_INTERACTION_TEXT_BYTES,
-        MAX_INTERACTION_WAITED_FRAMES, SharedStoryCaptureController, SharedStoryController,
-        SharedStorybookAutomation, StoryActionSnapshot, StoryCaptureSnapshot, StoryCurrentSnapshot,
+        ALLOW_INTERACTION_ENV_VAR, AutomationBackend, AutomationCapabilities, AutomationCapability,
+        CaptureLaunchEnv, DEFAULT_INTERACTION_POSTCONDITION_FRAMES, MAX_INTERACTION_POSTCONDITIONS,
+        MAX_INTERACTION_STEPS, MAX_INTERACTION_TEXT_BYTES, MAX_INTERACTION_WAITED_FRAMES,
+        SharedAutomationBackend, StoryActionSnapshot, StoryCaptureSnapshot, StoryCurrentSnapshot,
         StoryDefaultSize, StoryInteractionCaptureRequest, StoryInteractionDispatch,
         StoryInteractionObservation, StoryInteractionPostcondition,
         StoryInteractionPostconditionSnapshot, StoryInteractionRequest, StoryInteractionSnapshot,
@@ -97,10 +83,10 @@ pub mod prelude {
         StoryPoint, StoryPointSpace, StoryScenarioRunSnapshot, StoryScenarioSnapshot,
         StoryScenarioStep, StoryScenariosSnapshot, StoryScreenshotRequest,
         StorySemanticValueSnapshot, StorySemanticValuesSnapshot, StorySnapshot,
-        StorybookAutomation, StorybookAutomationError, StorybookCaptureConfig,
-        StorybookCaptureSession, StorybookMcpServerOptions, StorybookStdioCompletion,
-        capture_catalog, read_capture_session, server, server_with_options, start_capture_session,
-        start_capture_session_from_env, start_stdio, stdio_requested,
+        StorybookAutomationError, StorybookCaptureConfig, StorybookCaptureSession,
+        StorybookMcpServerOptions, StorybookStdioCompletion, capture_catalog, read_capture_session,
+        server, server_with_options, start_capture_session, start_capture_session_from_env,
+        start_stdio, stdio_requested,
     };
 }
 

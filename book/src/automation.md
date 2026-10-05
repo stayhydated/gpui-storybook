@@ -6,6 +6,34 @@ is unsupported on Windows and produces a compile-time error there. The standard
 gallery view attaches the automation controller installed by
 `gpui_storybook::init`.
 
+## Supply an automation backend
+
+MCP server and registry constructors accept `SharedAutomationBackend`, an
+`Arc<dyn AutomationBackend>`. The gallery's `StorybookAutomation` implements
+this interface; standard facade initialization connects it automatically.
+Custom hosts implement the asynchronous methods using their existing runtime
+and advertise an immutable `AutomationCapabilities` set before server creation.
+
+The `gpui-storybook-automation` crate owns portable control metadata, scenario
+templates, presentation, interaction requests, snapshots, and validation.
+It can be checked for Android and iOS independently from GPUI rendering. Core
+owns the gallery, story construction, GPUI entity adapters, and desktop capture.
+The GPUI automation crate owns reusable instrumentation, window scoping, and
+frame execution. [Embedded Android automation](mobile_automation.md) uses an
+application-owned root and native shell with the same contracts.
+
+Tool discovery includes operations supported by the selected backend. Input
+and action tools also require the explicit interaction opt-in. A complete batch
+is checked against every requested input family, control mutation, capture,
+and sizing capability before dispatch. A host with observed device dimensions
+can expose capture without permitting desktop preview resizing.
+
+Backends retain one exclusive mutation or capture operation until submitted
+work settles. Reads may report intermediate state. Fresh scenario construction
+belongs to the host; ad-hoc interactions preserve state. Preserve actual
+partial progress on failure and never replay a submitted mutation after
+cancellation, timeout, or disconnect.
+
 ## Pin the Wayland capture backends
 
 Linux Wayland window capture uses the Zed fork's image readback support with

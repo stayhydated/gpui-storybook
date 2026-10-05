@@ -1,7 +1,7 @@
 #[cfg(feature = "capture")]
-use super::capture_region_bounds;
+use super::RenderedRegions;
 #[cfg(feature = "capture")]
-use gpui_kit::{Bounds, Pixels, Size, point, px};
+use gpui::{Bounds, Pixels, Size, point, px};
 
 /// Failure to crop a rendered full-window image to one registered story route.
 #[derive(Clone, Debug, Eq, thiserror::Error, PartialEq)]
@@ -28,15 +28,17 @@ pub enum CaptureRegionImageError {
 /// runner's built-in root and substory crop contract.
 #[cfg(feature = "capture")]
 pub fn crop_capture_region_image(
+    regions: &RenderedRegions,
     route_id: &str,
     image: image::RgbaImage,
     window_size: Size<Pixels>,
 ) -> Result<image::RgbaImage, CaptureRegionImageError> {
-    let region = capture_region_bounds(route_id).ok_or_else(|| {
-        CaptureRegionImageError::RouteNotRendered {
-            route_id: route_id.to_owned(),
-        }
-    })?;
+    let region =
+        regions
+            .bounds(route_id)
+            .ok_or_else(|| CaptureRegionImageError::RouteNotRendered {
+                route_id: route_id.to_owned(),
+            })?;
     let window_bounds = Bounds {
         origin: point(px(0.), px(0.)),
         size: window_size,

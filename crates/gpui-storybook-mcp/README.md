@@ -4,10 +4,14 @@
 [![crates.io: gpui-storybook-mcp][crate-badge]][crate]
 
 `gpui-storybook-mcp` provides typed MCP automation and story-region PNG capture
-for live GPUI Storybook windows on Linux and macOS. Applications normally enable
+over `SharedAutomationBackend` on Linux and macOS. Applications normally enable
 it through the [facade's `mcp` feature][facade].
 
 ## Overview
+
+Servers register tools from the backend's advertised capabilities and the explicit
+interaction opt-in. Shared request types and validation come from
+`gpui-storybook-automation`; the gallery implementation remains in core.
 
 The tools discover stable story routes, read and set typed controls, run
 declared scenarios, inspect rendered semantic values, and capture named
@@ -15,7 +19,13 @@ viewports or explicit dimensions. Generic actions and input are exposed only
 when `GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1`; those operations can trigger
 application effects.
 
-Captures wait for the requested story canvas dimensions and exclude gallery
+Native hosts also advertise session/geometry discovery, typed host actions,
+and full-display or GPUI-surface compositor captures. The mobile host executable
+attaches through an explicitly selected ADB serial and retains device operation
+ownership through capture validation. Returned observations identify their scope,
+provider, route revision, and surface bounds; sizing remains capability gated.
+
+Gallery captures wait for the requested story canvas dimensions and exclude gallery
 chrome from the PNG. Explicit paired dimensions override named viewports.
 
 Linux launch commands use `gpui-storybook-launch` and a private Sway session.

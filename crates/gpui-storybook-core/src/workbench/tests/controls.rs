@@ -135,7 +135,7 @@ fn external_story_recreation_rebinds_control_editor_subscriptions(cx: &mut TestA
             ControlValue::Text("rebound".to_owned()),
             ControlValue::Integer(9),
             ControlValue::Float(0.75),
-            ControlValue::Color(tint.into()),
+            ControlValue::Color(crate::controls::control_color(tint)),
         ]
     );
 }

@@ -15,3 +15,6 @@ by buttons, key bindings, workbench actions, and fresh scenario runs.
 The `inspector`, `performance`, and `mcp` features forward the corresponding
 facade capabilities. MCP sessions are supported on Linux and macOS; Linux uses
 `gpui-storybook-launch` and a private Sway compositor.
+
+Facade initialization connects the gallery through `AutomationBackend`; the
+MCP catalog reflects its capabilities and the explicit input opt-in.

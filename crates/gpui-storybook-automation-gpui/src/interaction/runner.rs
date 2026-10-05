@@ -1,17 +1,23 @@
 use super::*;
 
-pub(crate) struct PreparedStoryInteraction {
-    pub request_id: u64,
-    pub story: StorySnapshot,
-    pub steps: Vec<PreparedInteractionStep>,
-    pub postconditions: Vec<StoryInteractionPostcondition>,
-    pub capture: Option<StoryInteractionCaptureRequest>,
-    pub response: oneshot::Sender<Result<StoryInteractionSnapshot, StorybookAutomationError>>,
-    pub progress: Arc<AtomicUsize>,
-    pub operation: AutomationOperationGuard,
+/// A completely prepared batch and the host-owned exclusive operation lease.
+/// The executor retains `Lease` until all submitted work settles, even when
+/// the client drops its response receiver.
+#[derive(bon::Builder)]
+pub struct PreparedStoryInteraction<Lease: 'static> {
+    pub(crate) provider: Rc<dyn InteractionCaptureProvider>,
+    pub(crate) request_id: u64,
+    pub(crate) story: StorySnapshot,
+    pub(crate) steps: Vec<PreparedInteractionStep>,
+    pub(crate) postconditions: Vec<StoryInteractionPostcondition>,
+    pub(crate) capture: Option<StoryInteractionCaptureRequest>,
+    pub(crate) response:
+        oneshot::Sender<Result<StoryInteractionSnapshot, StorybookAutomationError>>,
+    pub(crate) progress: Arc<AtomicUsize>,
+    pub(crate) operation: Lease,
 }
 
-pub(crate) fn interaction_target_size(
+pub fn interaction_target_size(
     request: &StoryInteractionRequest,
 ) -> Result<Option<(u32, u32)>, StorybookAutomationError> {
     let size_request = StoryScreenshotRequest {
@@ -23,39 +29,42 @@ pub(crate) fn interaction_target_size(
     validate_capture_target_size(&size_request)
 }
 
-pub(crate) fn schedule_story_interaction(
-    interaction: PreparedStoryInteraction,
+pub fn schedule_story_interaction<Lease: 'static>(
+    interaction: PreparedStoryInteraction<Lease>,
     window: &mut Window,
 ) {
-    window.on_next_frame(move |window, _cx| {
-        if interaction.response.is_closed() {
-            return;
-        }
-        let resized =
-            match ensure_capture_target_visible(&interaction.story.capture_route_id, window) {
-                Ok(resized) => resized,
-                Err(error) => {
-                    let _ = interaction.response.send(Err(error));
-                    return;
-                },
-            };
+    window.on_next_frame(move |window, cx| {
+        let resized = match interaction.provider.ensure_visible(
+            &interaction.story.capture_route_id,
+            window,
+            cx,
+        ) {
+            Ok(resized) => resized,
+            Err(error) => {
+                let _ = interaction.response.send(Err(error));
+                return;
+            },
+        };
         if resized {
             window.refresh();
-            window.on_next_frame(move |window, _cx| prepare_interaction_route(interaction, window));
+            window.on_next_frame(move |window, cx| {
+                prepare_interaction_route(interaction, window, cx)
+            });
         } else {
-            prepare_interaction_route(interaction, window);
+            prepare_interaction_route(interaction, window, cx);
         }
     });
 }
 
-pub(crate) fn schedule_interaction_target_listing(
+pub fn schedule_interaction_target_listing(
     story: StorySnapshot,
     response: oneshot::Sender<Result<StoryInteractionTargetsSnapshot, StorybookAutomationError>>,
+    provider: Rc<dyn InteractionCaptureProvider>,
     window: &mut Window,
 ) {
     window.refresh();
-    window.on_next_frame(move |window, _cx| {
-        let resized = match ensure_capture_target_visible(&story.capture_route_id, window) {
+    window.on_next_frame(move |window, cx| {
+        let resized = match provider.ensure_visible(&story.capture_route_id, window, cx) {
             Ok(resized) => resized,
             Err(error) => {
                 let _ = response.send(Err(error));
@@ -64,11 +73,11 @@ pub(crate) fn schedule_interaction_target_listing(
         };
         if resized {
             window.refresh();
-            window.on_next_frame(move |window, _cx| {
-                prepare_interaction_target_listing(story, response, window);
+            window.on_next_frame(move |window, cx| {
+                prepare_interaction_target_listing(story, response, provider, window, cx);
             });
         } else {
-            prepare_interaction_target_listing(story, response, window);
+            prepare_interaction_target_listing(story, response, provider, window, cx);
         }
     });
 }
@@ -76,9 +85,11 @@ pub(crate) fn schedule_interaction_target_listing(
 fn prepare_interaction_target_listing(
     story: StorySnapshot,
     response: oneshot::Sender<Result<StoryInteractionTargetsSnapshot, StorybookAutomationError>>,
+    provider: Rc<dyn InteractionCaptureProvider>,
     window: &mut Window,
+    cx: &App,
 ) {
-    if !scroll_capture_region_into_view(&story.capture_route_id) {
+    if !scroll_capture_region_into_view(&story.capture_route_id, window, cx) {
         let _ = response.send(Err(
             StorybookAutomationError::InteractionTargetsUnavailable {
                 route: story.capture_route_id,
@@ -87,16 +98,29 @@ fn prepare_interaction_target_listing(
         return;
     }
     window.refresh();
-    window.on_next_frame(move |_window, _cx| {
-        let _ = response.send(rendered_interaction_targets(story));
+    window.on_next_frame(move |window, cx| {
+        let result = provider
+            .validate_host(&story.capture_route_id, window, cx)
+            .and_then(|()| rendered_interaction_targets(story, window, cx));
+        let _ = response.send(result);
     });
 }
 
-fn prepare_interaction_route(interaction: PreparedStoryInteraction, window: &mut Window) {
-    if interaction.response.is_closed() {
+fn prepare_interaction_route<Lease: 'static>(
+    interaction: PreparedStoryInteraction<Lease>,
+    window: &mut Window,
+    cx: &App,
+) {
+    if let Err(error) =
+        interaction
+            .provider
+            .validate_host(&interaction.story.capture_route_id, window, cx)
+    {
+        let _ = interaction.response.send(Err(error));
         return;
     }
-    if !scroll_capture_region_into_view(&interaction.story.capture_route_id) {
+
+    if !scroll_capture_region_into_view(&interaction.story.capture_route_id, window, cx) {
         let _ = interaction
             .response
             .send(Err(StorybookAutomationError::CaptureUnavailable {
@@ -112,7 +136,8 @@ fn prepare_interaction_route(interaction: PreparedStoryInteraction, window: &mut
     window.on_next_frame(move |window, cx| start_interaction_runner(interaction, window, cx));
 }
 
-pub(super) struct InteractionRunner {
+pub(super) struct InteractionRunner<Lease: 'static> {
+    pub(super) provider: Rc<dyn InteractionCaptureProvider>,
     pub(super) request_id: u64,
     pub(super) story: StorySnapshot,
     pub(super) steps: VecDeque<(usize, PreparedInteractionStep)>,
@@ -125,19 +150,25 @@ pub(super) struct InteractionRunner {
         oneshot::Sender<Result<StoryInteractionSnapshot, StorybookAutomationError>>,
     pub(super) progress: Arc<AtomicUsize>,
     pub(super) observations: Vec<StoryInteractionObservation>,
-    pub(super) _operation: AutomationOperationGuard,
+    pub(super) _operation: Lease,
 }
 
-fn start_interaction_runner(
-    interaction: PreparedStoryInteraction,
+fn start_interaction_runner<Lease: 'static>(
+    interaction: PreparedStoryInteraction<Lease>,
     window: &mut Window,
     cx: &mut App,
 ) {
-    if interaction.response.is_closed() {
+    if let Err(error) =
+        interaction
+            .provider
+            .validate_host(&interaction.story.capture_route_id, window, cx)
+    {
+        let _ = interaction.response.send(Err(error));
         return;
     }
 
-    let Some(region) = capture_region_bounds(&interaction.story.capture_route_id) else {
+    let Some(region) = capture_region_bounds(&interaction.story.capture_route_id, window, cx)
+    else {
         let _ = interaction
             .response
             .send(Err(StorybookAutomationError::CaptureUnavailable {
@@ -162,6 +193,7 @@ fn start_interaction_runner(
 
     run_interaction(
         InteractionRunner {
+            provider: interaction.provider,
             request_id: interaction.request_id,
             story: interaction.story,
             steps,
@@ -183,7 +215,7 @@ fn start_interaction_runner(
 fn resolve_step_point(
     step: PreparedInteractionStep,
     step_index: usize,
-    bounds: &gpui_kit::Bounds<gpui_kit::Pixels>,
+    bounds: &gpui::Bounds<gpui::Pixels>,
 ) -> Result<PreparedInteractionStep, StorybookAutomationError> {
     let resolve = |point: StoryPoint| {
         resolve_story_point(point, bounds).map_err(|message| {
@@ -225,6 +257,8 @@ fn resolve_target_click(
     step: PreparedInteractionStep,
     step_index: usize,
     story: &StorySnapshot,
+    window: &Window,
+    cx: &App,
 ) -> Result<PreparedInteractionStep, StorybookAutomationError> {
     let PreparedInteractionStep::ClickTarget {
         key,
@@ -236,7 +270,7 @@ fn resolve_target_click(
         return Ok(step);
     };
 
-    let targets = rendered_interaction_targets(story.clone())?.targets;
+    let targets = rendered_interaction_targets(story.clone(), window, cx)?.targets;
     let target = targets
         .iter()
         .find(|target| target.key == key)
@@ -258,7 +292,7 @@ fn resolve_target_click(
         });
     }
 
-    let region = capture_region_bounds(&story.capture_route_id).ok_or_else(|| {
+    let region = capture_region_bounds(&story.capture_route_id, window, cx).ok_or_else(|| {
         StorybookAutomationError::CaptureUnavailable {
             message: format!(
                 "capture route `{}` was not rendered by the current story view",
@@ -289,7 +323,7 @@ fn resolve_target_click(
 
 pub(super) fn resolve_story_point(
     point: StoryPoint,
-    bounds: &gpui_kit::Bounds<gpui_kit::Pixels>,
+    bounds: &gpui::Bounds<gpui::Pixels>,
 ) -> Result<StoryPoint, String> {
     let origin_x = f32::from(bounds.origin.x);
     let origin_y = f32::from(bounds.origin.y);
@@ -336,8 +370,16 @@ pub(super) fn resolve_story_point(
     })
 }
 
-fn run_interaction(mut runner: InteractionRunner, window: &mut Window, cx: &mut App) {
-    if runner.response.is_closed() {
+fn run_interaction<Lease: 'static>(
+    mut runner: InteractionRunner<Lease>,
+    window: &mut Window,
+    cx: &mut App,
+) {
+    if let Err(error) = runner
+        .provider
+        .validate_host(&runner.story.capture_route_id, window, cx)
+    {
+        send_interaction_failure(runner, error);
         return;
     }
 
@@ -347,7 +389,7 @@ fn run_interaction(mut runner: InteractionRunner, window: &mut Window, cx: &mut 
             return;
         }
 
-        let step = match resolve_target_click(step, step_index, &runner.story) {
+        let step = match resolve_target_click(step, step_index, &runner.story, window, cx) {
             Ok(step) => step,
             Err(error) => {
                 send_interaction_failure(runner, error);
@@ -362,10 +404,6 @@ fn run_interaction(mut runner: InteractionRunner, window: &mut Window, cx: &mut 
             dispatches,
         });
         runner.progress.fetch_add(1, Ordering::SeqCst);
-
-        if runner.response.is_closed() {
-            return;
-        }
         if defer_continuation {
             // GPUI queues action dispatch at the end of the current effect cycle.
             // Queue continuation after it so the next request step cannot overtake
@@ -378,17 +416,23 @@ fn run_interaction(mut runner: InteractionRunner, window: &mut Window, cx: &mut 
     finish_interaction(runner, window, cx);
 }
 
-fn schedule_wait_frames(
-    runner: InteractionRunner,
+fn schedule_wait_frames<Lease: 'static>(
+    runner: InteractionRunner<Lease>,
     step_index: usize,
     remaining: u16,
     window: &mut Window,
 ) {
     window.refresh();
     window.on_next_frame(move |window, cx| {
-        if runner.response.is_closed() {
+        if let Err(error) =
+            runner
+                .provider
+                .validate_host(&runner.story.capture_route_id, window, cx)
+        {
+            send_interaction_failure(runner, error);
             return;
         }
+
         if remaining > 1 {
             schedule_wait_frames(runner, step_index, remaining - 1, window);
         } else {
@@ -517,16 +561,16 @@ fn dispatch_platform_event(
     }
 }
 
-fn window_point(story_point: StoryPoint) -> gpui_kit::Point<gpui_kit::Pixels> {
+fn window_point(story_point: StoryPoint) -> gpui::Point<gpui::Pixels> {
     debug_assert_eq!(story_point.space, StoryPointSpace::LogicalPixels);
     point(px(story_point.x), px(story_point.y))
 }
 
-fn mouse_button(button: StoryMouseButton) -> gpui_kit::MouseButton {
+fn mouse_button(button: StoryMouseButton) -> gpui::MouseButton {
     match button {
-        StoryMouseButton::Left => gpui_kit::MouseButton::Left,
-        StoryMouseButton::Right => gpui_kit::MouseButton::Right,
-        StoryMouseButton::Middle => gpui_kit::MouseButton::Middle,
+        StoryMouseButton::Left => gpui::MouseButton::Left,
+        StoryMouseButton::Right => gpui::MouseButton::Right,
+        StoryMouseButton::Middle => gpui::MouseButton::Middle,
     }
 }
 
@@ -544,7 +588,11 @@ fn gpui_modifiers(modifiers: &StoryModifiers) -> Modifiers {
     result
 }
 
-fn finish_interaction(runner: InteractionRunner, window: &mut Window, cx: &mut App) {
+fn finish_interaction<Lease: 'static>(
+    runner: InteractionRunner<Lease>,
+    window: &mut Window,
+    cx: &mut App,
+) {
     if !runner.postconditions.is_empty() {
         schedule_postcondition_check(runner, window);
         return;
@@ -553,15 +601,19 @@ fn finish_interaction(runner: InteractionRunner, window: &mut Window, cx: &mut A
     finish_interaction_capture(runner, window, cx);
 }
 
-pub(super) fn schedule_postcondition_check(mut runner: InteractionRunner, window: &mut Window) {
-    if runner.response.is_closed() {
-        return;
-    }
-
+pub(super) fn schedule_postcondition_check<Lease: 'static>(
+    mut runner: InteractionRunner<Lease>,
+    window: &mut Window,
+) {
     runner.postcondition_frames_waited = runner.postcondition_frames_waited.saturating_add(1);
     window.refresh();
     window.on_next_frame(move |window, cx| {
-        if runner.response.is_closed() {
+        if let Err(error) =
+            runner
+                .provider
+                .validate_host(&runner.story.capture_route_id, window, cx)
+        {
+            send_interaction_failure(runner, error);
             return;
         }
 
@@ -575,7 +627,7 @@ pub(super) fn schedule_postcondition_check(mut runner: InteractionRunner, window
             )
         };
         let route = runner.story.capture_route_id.clone();
-        let values = match rendered_semantic_values(runner.story.clone()) {
+        let values = match rendered_semantic_values(runner.story.clone(), window, cx) {
             Ok(snapshot) => snapshot.values,
             Err(error) => {
                 send_interaction_failure(runner, error);
@@ -624,18 +676,23 @@ pub(super) fn schedule_postcondition_check(mut runner: InteractionRunner, window
     });
 }
 
-fn finish_interaction_capture(runner: InteractionRunner, window: &mut Window, cx: &mut App) {
-    if runner.response.is_closed() {
+fn finish_interaction_capture<Lease: 'static>(
+    runner: InteractionRunner<Lease>,
+    window: &mut Window,
+    cx: &mut App,
+) {
+    if let Err(error) = runner
+        .provider
+        .validate_host(&runner.story.capture_route_id, window, cx)
+    {
+        send_interaction_failure(runner, error);
         return;
     }
 
     if let Some(capture) = runner.capture.clone() {
         window.refresh();
         window.on_next_frame(move |window, cx| {
-            if runner.response.is_closed() {
-                return;
-            }
-            let capture_result = render_story_capture(
+            let capture_result = runner.provider.capture(
                 runner.request_id,
                 StoryScreenshotRequest {
                     output_path: capture.output_path,
@@ -643,6 +700,7 @@ fn finish_interaction_capture(runner: InteractionRunner, window: &mut Window, cx
                 },
                 runner.story.clone(),
                 window,
+                cx,
             );
             match capture_result {
                 Ok(capture) => send_interaction_snapshot(runner, Some(capture), window, cx),
@@ -650,11 +708,15 @@ fn finish_interaction_capture(runner: InteractionRunner, window: &mut Window, cx
             }
         });
     } else {
-        send_interaction_snapshot(runner, None, window, cx);
+        window.refresh();
+        window.on_next_frame(move |window, cx| send_interaction_snapshot(runner, None, window, cx));
     }
 }
 
-fn send_interaction_failure(runner: InteractionRunner, error: StorybookAutomationError) {
+fn send_interaction_failure<Lease: 'static>(
+    runner: InteractionRunner<Lease>,
+    error: StorybookAutomationError,
+) {
     let steps_dispatched = runner.progress.load(Ordering::SeqCst);
     let _ = runner
         .response
@@ -665,12 +727,20 @@ fn send_interaction_failure(runner: InteractionRunner, error: StorybookAutomatio
         }));
 }
 
-fn send_interaction_snapshot(
-    runner: InteractionRunner,
+fn send_interaction_snapshot<Lease: 'static>(
+    runner: InteractionRunner<Lease>,
     capture: Option<StoryCaptureSnapshot>,
     window: &Window,
     cx: &App,
 ) {
+    if let Err(error) = runner
+        .provider
+        .validate_host(&runner.story.capture_route_id, window, cx)
+    {
+        send_interaction_failure(runner, error);
+        return;
+    }
+
     let steps_dispatched = runner.progress.load(Ordering::SeqCst);
     let _ = runner.response.send(Ok(StoryInteractionSnapshot {
         request_id: runner.request_id,

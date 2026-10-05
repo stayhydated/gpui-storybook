@@ -104,6 +104,67 @@ Scenarios workbench even when it is not installed as the default global.
 Retain the MCP automation state across calls until the transport or
 application host is explicitly stopped.
 
+## Backend integration
+
+Server and registry constructors accept `SharedAutomationBackend`
+(`Arc<dyn AutomationBackend>`). Core's gallery controller implements the
+interface and facade initialization connects it automatically. Custom hosts
+use the portable `gpui-storybook-automation` records and validation and dispatch
+through their existing application owner thread.
+
+Advertise an immutable capability set before constructing MCP. Tool exposure
+intersects those capabilities with the interaction opt-in. Validate every
+requested interaction family, sizing, control mutation, and capture capability
+before dispatching a complete batch. Retain host-side exclusive ownership until
+submitted work settles; cancellation never authorizes replay. Scenarios create
+fresh fixtures and ordinary interactions preserve state.
+
+## Embedded GPUI and Android hosts
+
+Use `gpui-storybook-automation-gpui` to attach to an application-owned root and
+window. Implement `EmbeddedRoot` for route selection, public revision, controls,
+action scope, presentation, and fresh-fixture construction. Register the root
+with `capture_story_view_with_scroll`, target/value wrappers, and a stable
+catalog. Retain `GpuiHostAttachment`, dispatch on the existing GPUI owner thread,
+and invalidate the attachment before surface replacement. Registries belong to
+that app/window; repeated keys in other contexts stay independent.
+
+The repository's `examples/embedded` shares its production `DemoRoot` with
+`examples/mobile`. The Android example uses native Counter/Notes tabs, native
+appearance, one retained GPUI runtime, and an opted-in loopback device endpoint.
+Build and run using `examples/mobile/README.md`; its SDK-direct builder pins
+SDK/build tools 36, NDK 27.1.12297006, API baseline 31, and the `mobile` profile.
+GPUI Mobile revision `9075e3aa3eea812127f2c60ed66f0cd5798ff245` composes with the
+published GPUI 0.3.7 stack. Keep minimal mobile features and system-font inputs
+in qualification evidence.
+
+Run `gpui-storybook-mobile-host --serial DEVICE --allow-interaction` on Linux
+or macOS to attach. Installation, launching the example, and stopping it on EOF
+are explicit flags. EOF releases owned forwarding; reconnection discovers the
+new catalog without replay. Surface replacement changes the session and invalidates
+old geometry, targets, capture tickets, and queued operations. Protocol v1 uses
+closed, length-prefixed JSON bounded to 1 MiB; the device holds one mutation lease
+through native acknowledgment, rendered readiness, and capture settlement.
+
+Discover native geometry/orientation with `storybook_get_host`, native action
+schemas with `storybook_list_host_actions`, and dispatch appearance with
+`storybook_dispatch_host_action`. `storybook_capture_host` accepts `display` or
+`gpui` plus a computer-owned PNG path. Display includes the native shell, visible
+IME, and system UI; GPUI crops the observed surface after IME insets. Captures
+return dimensions, request/session identity, route/surface revisions, geometry,
+and `adb_compositor_observation` provenance. This is a separately validated
+compositor observation. Explicit phone-sized desktop presets require
+`StorySizing`; the Android example uses observed dimensions.
+
+Use `verify.py` for the raw stdio MCP proof and `verify_native.py` for native
+touch, AOSP en-US IME commits/insets, busy/disconnect/duplicate admission,
+partial progress, pause/resume, and recreation. GPUI mouse/text steps and native
+input are independently qualified. Preserve live state during navigation; only
+scenario fixture hooks reset the selected surface. Native permission dialogs
+and other application effects require their own native harness. iOS follow-up
+must prove native-main-thread dispatch, simulator transport, lifecycle, and
+permitted capture before advertising runtime support.
+
 ## MCP tools
 
 - `storybook_list_stories`
@@ -119,6 +180,10 @@ application host is explicitly stopped.
 - `storybook_reset_control`
 - `storybook_capture_current_story`
 - `storybook_capture_launch_env`
+- `storybook_get_host` (native host discovery)
+- `storybook_list_host_actions` (native host actions)
+- `storybook_dispatch_host_action` (native host actions and interaction opt-in)
+- `storybook_capture_host` (device display capture)
 - `storybook_list_actions` (interaction capability)
 - `storybook_list_interaction_targets` (interaction capability)
 - `storybook_click_target` (interaction capability)

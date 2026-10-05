@@ -21,6 +21,11 @@ tooling without constructing stories or opening a window. Localized consumer
 metadata uses `try_localize_message(cx, &message)` and handles `Option<String>`
 through the application's locale context.
 
+The facade exposes `AutomationBackend`, `SharedAutomationBackend`, and portable
+capability types. Standard initialization installs the gallery backend for MCP.
+Embedded application roots use `gpui-storybook-automation-gpui`; the Android
+example's native shell connects through the mobile device and computer hosts.
+
 Live captures size the story canvas to a named viewport or explicit pixel
 dimensions and crop gallery chrome from the PNG.
 
