@@ -8,3 +8,6 @@ pub mod snapshot;
 
 pub mod attachment;
 pub use attachment::{AttachedInteraction, AttachmentError, EmbeddedRoot, GpuiHostAttachment};
+
+#[cfg(feature = "device")]
+pub mod device;

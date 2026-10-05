@@ -83,6 +83,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "adbutils-rs"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ce24e773af895c9619518d38e8eee5d0c4ac549a6c0e8c77cf21b7fea5fa429"
+dependencies = [
+ "async-stream",
+ "chrono",
+ "futures-core",
+ "log",
+ "regex",
+ "thiserror 2.0.21",
+ "tokio",
+]
+
+[[package]]
 name = "addr2line"
 version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4949,6 +4964,7 @@ dependencies = [
  "gpui-kit",
  "gpui-pre",
  "gpui-storybook-automation",
+ "gpui-storybook-mobile",
  "image",
  "schemars",
  "serde",
@@ -5019,6 +5035,7 @@ dependencies = [
  "gpui-kit",
  "gpui-storybook-automation",
  "gpui-storybook-automation-gpui",
+ "gpui-storybook-mobile",
  "schemars",
  "serde",
  "serde_json",
@@ -5040,10 +5057,7 @@ dependencies = [
  "jni 0.22.4",
  "log",
  "ndk",
- "schemars",
- "serde_json",
  "thiserror 2.0.21",
- "tokio",
 ]
 
 [[package]]
@@ -5118,11 +5132,15 @@ dependencies = [
 name = "gpui-storybook-mobile-host"
 version = "0.7.1"
 dependencies = [
+ "adbutils-rs",
+ "bon",
  "clap",
  "gpui-storybook-automation",
  "gpui-storybook-mcp",
  "gpui-storybook-mobile",
  "image",
+ "serde_json",
+ "tempfile",
  "tokio",
 ]
 

@@ -11,11 +11,13 @@ readme = "README.md"
 
 [features]
 capture = [ "dep:image" ]
+device = [ "dep:gpui-storybook-mobile" ]
 
 [dependencies]
 bon = { workspace = true }
 gpui = { workspace = true }
 gpui-storybook-automation = { workspace = true }
+gpui-storybook-mobile = { optional = true, workspace = true }
 image = { optional = true, workspace = true }
 schemars = { workspace = true }
 serde = { workspace = true }

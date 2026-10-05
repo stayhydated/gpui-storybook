@@ -29,6 +29,7 @@ pub(super) struct ShellState {
     revision: u64,
     surface: u64,
     ack: u64,
+    applied: bool,
     display_width: i32,
     display_height: i32,
     active: bool,
@@ -44,6 +45,7 @@ static SHELL: Mutex<ShellState> = Mutex::new(ShellState {
     revision: 0,
     surface: 0,
     ack: 0,
+    applied: true,
     display_width: 0,
     display_height: 0,
     active: false,
@@ -110,7 +112,7 @@ fn launch(cx: &mut gpui_kit::App) {
                 #[cfg(feature = "automation")]
                 automation: AUTOMATION
                     .load(std::sync::atomic::Ordering::Acquire)
-                    .then(super::automation::AutomationHost::new),
+                    .then(super::automation::new),
             })));
             cx.new(|cx| gpui_kit::component::Root::new(view, window, cx))
         })
@@ -172,7 +174,7 @@ fn launch(cx: &mut gpui_kit::App) {
                 }
                 #[cfg(feature = "automation")]
                 if let Some(mut automation) = owner.automation.take() {
-                    automation.poll(&owner.attachment, &owner.root, &shell, window, cx);
+                    automation.poll(&owner.attachment, &shell.snapshot(), window, cx);
                     owner.automation = Some(automation);
                 }
             });
@@ -215,6 +217,8 @@ pub extern "system" fn Java_dev_storybook_mobile_MainActivity_nativeRelease<'a>(
 ) {
     unowned
         .with_env(|_| -> Result<(), NativeError> {
+            #[cfg(feature = "automation")]
+            super::automation::invalidate_surface();
             host::surface_destroyed();
             let mut shell = SHELL.lock().expect("shell state");
             shell.surface += 1;
@@ -254,6 +258,7 @@ pub extern "system" fn Java_dev_storybook_mobile_MainActivity_nativeShell<'a>(
             shell.display_height = display_height;
             if ack != 0 {
                 shell.ack = ack as u64;
+                shell.applied = true;
             }
             shell.revision += 1;
             Ok(())
@@ -354,33 +359,62 @@ pub extern "system" fn Java_dev_storybook_mobile_MainActivity_nativeActive<'a>(
 
 #[cfg(feature = "automation")]
 impl ShellState {
-    pub(super) fn route(&self) -> &str {
-        &self.route
-    }
-    pub(super) fn dark(&self) -> bool {
-        self.dark
-    }
-    pub(super) fn active(&self) -> bool {
-        self.active
-    }
-    pub(super) fn revision(&self) -> u64 {
-        self.revision
-    }
-    pub(super) fn surface(&self) -> u64 {
-        self.surface
-    }
-    pub(super) fn ack(&self) -> u64 {
-        self.ack
-    }
-    pub(super) fn geometry(&self) -> gpui_storybook_automation::wire::SurfaceGeometry {
-        gpui_storybook_automation::wire::SurfaceGeometry::builder()
-            .x(self.x.max(0) as u32)
-            .y(self.y.max(0) as u32)
-            .width(self.width.max(0) as u32)
-            .height(self.height.max(0) as u32)
-            .scale(self.scale)
-            .display_width(self.display_width.max(0) as u32)
-            .display_height(self.display_height.max(0) as u32)
+    fn snapshot(&self) -> gpui_storybook_automation_gpui::device::NativeShellSnapshot {
+        gpui_storybook_automation_gpui::device::NativeShellSnapshot::builder()
+            .route(self.route.clone())
+            .dark(self.dark)
+            .active(self.active)
+            .revision(self.revision)
+            .surface(self.surface)
+            .ack(self.ack)
+            .applied(self.applied)
+            .geometry(
+                gpui_storybook_automation::wire::SurfaceGeometry::builder()
+                    .x(self.x.max(0) as u32)
+                    .y(self.y.max(0) as u32)
+                    .width(self.width.max(0) as u32)
+                    .height(self.height.max(0) as u32)
+                    .scale(self.scale)
+                    .display_width(self.display_width.max(0) as u32)
+                    .display_height(self.display_height.max(0) as u32)
+                    .build(),
+            )
             .build()
     }
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_dev_storybook_mobile_MainActivity_nativeSelectionCurrent(
+    _: EnvUnowned<'_>,
+    _: JObject<'_>,
+    request: i64,
+) -> u8 {
+    #[cfg(feature = "automation")]
+    {
+        let shell = SHELL.lock().expect("shell state");
+        u8::from(super::automation::selection_current(
+            request as u64,
+            shell.surface,
+            shell.active,
+        ))
+    }
+    #[cfg(not(feature = "automation"))]
+    {
+        let _ = request;
+        0
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_dev_storybook_mobile_MainActivity_nativeSelectionSettled(
+    _: EnvUnowned<'_>,
+    _: JObject<'_>,
+    request: i64,
+    applied: u8,
+) {
+    #[cfg(feature = "automation")]
+    super::automation::selection_settled(request as u64);
+    let mut shell = SHELL.lock().expect("shell state");
+    shell.ack = request as u64;
+    shell.applied = applied != 0;
 }

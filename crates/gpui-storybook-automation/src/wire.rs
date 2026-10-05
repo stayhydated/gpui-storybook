@@ -163,9 +163,11 @@ pub enum DeviceOperation {
     DispatchHostAction {
         action: HostAction,
     },
-    /// Retain the device lease through external compositor observation.
+    /// Retain the device lease through external compositor observation. The
+    /// capture ticket equals this request's ID, including before frame readiness.
     PrepareCapture {},
-    /// Validate the observation interval and release its device lease.
+    /// Validate the observation interval and release its device lease. Finishing
+    /// a still-pending preparation revokes its frame wait and reports stale host.
     FinishCapture {
         ticket: u64,
     },

@@ -21,14 +21,11 @@ example with the [mobile example commands](../README.md).
 cargo build --manifest-path examples/mobile/tools/Cargo.toml --locked
 python3 examples/mobile/tools/run.py \
   --serial emulator-5580 --apk target/mobile-example/x86_64/storybook.apk
-python3 examples/mobile/tools/build_androidx.py --sdk "$ANDROID_HOME"
-python3 examples/mobile/tools/run_androidx.py --serial emulator-5580
 ```
 
-The AndroidX builder uses JDK 21, Android platform 36, and build-tools 36.0.0.
-It verifies the artifact hashes in `androidx-dependencies.json` and signs a
-test-only APK under `target/android-tools-apk`. Android SDK boot classes and
-lambda stubs constrain its Java compilation to the Android API.
+The AndroidX qualification is maintained under [the native harness](../native/README.md).
+The root mobile host adopts bounded `adbutils-rs` connection primitives. The Rust
+UI Automator probes retain their single-submission and replay-fault evidence.
 
 Generated reports, hierarchy XML, captured images, and process logs live under
 `target/android-tools-evidence`. [Evidence and integration decisions](EVIDENCE.md)

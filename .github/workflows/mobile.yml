@@ -1,9 +1,7 @@
 name: mobile automation
 
 on:
-  pull_request:
-  push:
-    branches: [master]
+  workflow_call:
   workflow_dispatch:
 
 permissions:
@@ -63,6 +61,9 @@ jobs:
       - name: Build computer MCP host
         if: matrix.abi == 'x86_64'
         run: cargo build -p gpui-storybook-mobile-host --locked
+      - name: Build hash-pinned AndroidX native qualification APK
+        if: matrix.abi == 'x86_64'
+        run: python3 examples/mobile/native/build.py --sdk "$ANDROID_HOME"
       - name: Prove MCP and native lifecycle with SwiftShader Vulkan
         if: matrix.abi == 'x86_64'
         shell: bash
@@ -77,8 +78,11 @@ jobs:
           adb -s emulator-5554 install --no-incremental -r target/mobile-example/x86_64/storybook.apk
           adb -s emulator-5554 shell am start -n dev.storybook.mobile/.MainActivity --ez storybook_automation true
           python3 examples/mobile/verify.py --serial emulator-5554
+          STORYBOOK_ANDROID_SERIAL=emulator-5554 cargo test -p gpui-storybook-mobile-host --test android --locked -- --ignored
           python3 examples/mobile/verify_native.py --serial emulator-5554
+          python3 examples/mobile/native/verify.py --serial emulator-5554
           python3 examples/mobile/verify.py --serial emulator-5554 --lifecycle-only --apk target/mobile-example/x86_64/storybook.apk
+          python3 examples/mobile/verify_lifecycle.py --serial emulator-5554
           adb -s emulator-5554 shell getprop ro.build.fingerprint > target/mobile-evidence/system-image.txt
           adb -s emulator-5554 logcat -d -s storybook-mobile > target/mobile-evidence/runtime.log
           "$ANDROID_HOME/emulator/emulator" -version > target/mobile-evidence/emulator-version.txt
@@ -90,4 +94,5 @@ jobs:
           path: |
             target/mobile-example/${{ matrix.abi }}/storybook.apk
             target/mobile-evidence/
+            target/mobile-native-apk/androidx.apk
           retention-days: 7

@@ -10,7 +10,7 @@ publish = false
 crate-type = [ "cdylib", "rlib" ]
 
 [features]
-automation = [ "dep:gpui-storybook-mobile", "dep:tokio", "dep:serde_json", "dep:schemars" ]
+automation = [ "dep:gpui-storybook-mobile", "gpui-storybook-automation-gpui/device" ]
 
 [target.'cfg(target_os = "android")'.dependencies]
 android-activity = { features = [ "native-activity" ], version = "0.6" }
@@ -24,10 +24,7 @@ gpui-storybook-mobile = { optional = true, workspace = true }
 jni = "0.22"
 log = "0.4"
 ndk = { features = [ "nativewindow" ], version = "0.9" }
-schemars = { optional = true, workspace = true }
-serde_json = { optional = true, workspace = true }
 thiserror = { workspace = true }
-tokio = { features = [ "sync" ], optional = true, workspace = true }
 
 [lints]
 workspace = true

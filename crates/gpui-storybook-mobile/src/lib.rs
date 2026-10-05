@@ -45,6 +45,24 @@ impl Receipts {
 struct GateState {
     active: Option<u64>,
     next: u64,
+    suspended: bool,
+    session: String,
+    receipts: Receipts,
+}
+
+impl GateState {
+    fn acquire(&mut self, gate: OperationGate) -> Result<MutationLease, StorybookAutomationError> {
+        if self.suspended {
+            return Err(StorybookAutomationError::NoLiveHost);
+        }
+        if self.active.is_some() {
+            return Err(StorybookAutomationError::AutomationBusy);
+        }
+        self.next = self.next.checked_add(1).expect("operation IDs exhausted");
+        let token = self.next;
+        self.active = Some(token);
+        Ok(MutationLease { gate, token })
+    }
 }
 
 #[derive(Clone, Default)]
@@ -52,19 +70,17 @@ pub struct OperationGate(Arc<Mutex<GateState>>);
 impl OperationGate {
     pub fn acquire(&self) -> Result<MutationLease, StorybookAutomationError> {
         let mut state = self.0.lock().expect("operation gate");
-        if state.active.is_some() {
-            return Err(StorybookAutomationError::AutomationBusy);
-        }
-        state.next = state.next.checked_add(1).expect("operation IDs exhausted");
-        let token = state.next;
-        state.active = Some(token);
-        Ok(MutationLease {
-            gate: self.clone(),
-            token,
-        })
+        state.acquire(self.clone())
     }
     pub fn invalidate(&self) {
         self.0.lock().expect("operation gate").active = None;
+    }
+    /// Revoke work and stop admission immediately on the native surface owner
+    /// thread. Session replacement reopens it after GPUI attachment invalidation.
+    pub fn suspend(&self) {
+        let mut state = self.0.lock().expect("operation gate");
+        state.suspended = true;
+        state.active = None;
     }
     pub fn busy(&self) -> bool {
         self.0.lock().expect("operation gate").active.is_some()
@@ -74,6 +90,32 @@ impl OperationGate {
 pub struct MutationLease {
     gate: OperationGate,
     token: u64,
+}
+/// A non-owning permit for work queued on a native owner thread. Cloning it
+/// never extends or releases ownership. The callback checks it immediately
+/// before dispatch, serialized with that thread's surface lifecycle callbacks.
+#[derive(Clone)]
+pub struct MutationPermit {
+    gate: OperationGate,
+    token: u64,
+}
+impl MutationPermit {
+    pub fn is_current(&self) -> bool {
+        self.gate.0.lock().expect("operation gate").active == Some(self.token)
+    }
+}
+impl MutationLease {
+    /// Whether this lease still owns the device operation. Explicit host
+    /// invalidation revokes queued work; callers check before native dispatch.
+    pub fn is_current(&self) -> bool {
+        self.gate.0.lock().expect("operation gate").active == Some(self.token)
+    }
+    pub fn permit(&self) -> MutationPermit {
+        MutationPermit {
+            gate: self.gate.clone(),
+            token: self.token,
+        }
+    }
 }
 impl Drop for MutationLease {
     fn drop(&mut self) {
@@ -93,6 +135,20 @@ impl AdmittedRequest {
     pub fn request(&self) -> &DeviceRequest {
         &self.request
     }
+    pub fn permit(&self) -> Option<MutationPermit> {
+        self.lease.as_ref().map(MutationLease::permit)
+    }
+    /// Report a response deadline once while retaining admitted work ownership.
+    /// The owner still settles queued native work or explicitly invalidates its
+    /// host before dropping this request; this report never authorizes replay.
+    pub fn report_unknown(&self, message: impl Into<String>) {
+        let _ = self
+            .response
+            .try_send(Err(StorybookAutomationError::OutcomeUnknown {
+                request_id: self.request.request_id(),
+                message: message.into(),
+            }));
+    }
     pub fn into_parts(
         self,
     ) -> (
@@ -105,11 +161,9 @@ impl AdmittedRequest {
 }
 
 struct SharedEndpoint {
-    session: Mutex<String>,
     gate: OperationGate,
     sender: SyncSender<AdmittedRequest>,
     connections: AtomicUsize,
-    receipts: Mutex<Receipts>,
     closed: AtomicBool,
 }
 
@@ -126,11 +180,12 @@ impl DeviceEndpoint {
         listener.set_nonblocking(true)?;
         let (sender, receiver) = mpsc::sync_channel(QUEUE_CAPACITY);
         let shared = Arc::new(SharedEndpoint {
-            session: Mutex::new(session),
-            gate: OperationGate::default(),
+            gate: OperationGate(Arc::new(Mutex::new(GateState {
+                session,
+                ..Default::default()
+            }))),
             sender,
             connections: AtomicUsize::new(0),
-            receipts: Mutex::default(),
             closed: AtomicBool::new(false),
         });
         let service = shared.clone();
@@ -178,24 +233,54 @@ impl DeviceEndpoint {
         self.port
     }
     pub fn try_recv(&self) -> Option<AdmittedRequest> {
-        self.receiver.try_recv().ok()
+        while let Ok(admitted) = self.receiver.try_recv() {
+            let current = {
+                let state = self.shared.gate.0.lock().expect("operation gate");
+                !state.suspended
+                    && admitted.request.validate_identity(&state.session).is_ok()
+                    && admitted
+                        .lease
+                        .as_ref()
+                        .is_none_or(|lease| state.active == Some(lease.token))
+            };
+            if current {
+                return Some(admitted);
+            }
+            let _ = admitted
+                .response
+                .try_send(Err(StorybookAutomationError::StaleHost {
+                    message: "owning host invalidated queued work".to_owned(),
+                }));
+        }
+        None
     }
     pub fn gate(&self) -> OperationGate {
         self.shared.gate.clone()
     }
     pub fn replace_session(&self, session: String) {
-        *self.shared.session.lock().expect("device session") = session;
-        *self.shared.receipts.lock().expect("request receipts") = Receipts::default();
-        self.shared.gate.invalidate();
+        // Admission, receipts, and lease invalidation share one linearization
+        // point. An old-session request cannot acquire a new-session lease.
+        let mut state = self.shared.gate.0.lock().expect("operation gate");
+        state.session = session;
+        state.receipts = Receipts::default();
+        state.active = None;
+        state.suspended = false;
     }
     pub fn session(&self) -> String {
-        self.shared.session.lock().expect("device session").clone()
+        self.shared
+            .gate
+            .0
+            .lock()
+            .expect("operation gate")
+            .session
+            .clone()
     }
 }
 
 impl Drop for DeviceEndpoint {
     fn drop(&mut self) {
         self.shared.closed.store(true, Ordering::Release);
+        self.shared.gate.invalidate();
     }
 }
 
@@ -209,35 +294,57 @@ impl Drop for ConnectionCount {
 fn serve_connection(mut stream: TcpStream, shared: &SharedEndpoint) -> io::Result<()> {
     stream.set_read_timeout(Some(Duration::from_secs(30)))?;
     stream.set_write_timeout(Some(Duration::from_secs(5)))?;
-    loop {
+    while !shared.closed.load(Ordering::Acquire) {
         let request: DeviceRequest = read_frame(&mut stream)?;
-        let session = shared.session.lock().expect("device session").clone();
         let request_id = request.request_id();
         let (response, receiver) = mpsc::sync_channel(1);
-        let admission = request.validate_identity(&session).and_then(|()| {
-            let mut receipts = shared.receipts.lock().expect("request receipts");
-            if receipts.ids.contains(&request_id) {
-                return Err(StorybookAutomationError::StaleHost {
-                    message: "request ID was already admitted; rediscover without replay"
-                        .to_owned(),
-                });
-            }
-            let lease = if request.command().mutates() {
-                Some(shared.gate.acquire()?)
-            } else {
-                None
-            };
-            shared
-                .sender
-                .try_send(AdmittedRequest {
+        let mut rejected_lease = None;
+        let (session, admission) = {
+            let mut state = shared.gate.0.lock().expect("operation gate");
+            let session = state.session.clone();
+            let admission = request.validate_identity(&session).and_then(|()| {
+                if shared.closed.load(Ordering::Acquire) || state.suspended {
+                    return Err(StorybookAutomationError::NoLiveHost);
+                }
+                if state.receipts.ids.contains(&request_id) {
+                    return Err(StorybookAutomationError::StaleHost {
+                        message: "request ID was already admitted; rediscover without replay"
+                            .to_owned(),
+                    });
+                }
+                let lease = if request.command().mutates() {
+                    Some(state.acquire(shared.gate.clone())?)
+                } else {
+                    None
+                };
+                // Retain a failed enqueue's lease until after the lock is released:
+                // its Drop must reacquire this same gate.
+                match shared.sender.try_send(AdmittedRequest {
                     request,
                     response,
                     lease,
-                })
-                .map_err(|_| StorybookAutomationError::AutomationBusy)?;
-            receipts.insert(request_id);
-            Ok(())
-        });
+                }) {
+                    Ok(()) => {
+                        state.receipts.insert(request_id);
+                        Ok(())
+                    },
+                    Err(mut rejected) => {
+                        // Take the rejected lease out before dropping its request;
+                        // release it after leaving the admission lock.
+                        rejected_lease = match &mut rejected {
+                            mpsc::TrySendError::Full(request)
+                            | mpsc::TrySendError::Disconnected(request) => request.lease.take(),
+                        };
+                        if rejected_lease.is_some() {
+                            state.active = None;
+                        }
+                        Err(StorybookAutomationError::AutomationBusy)
+                    },
+                }
+            });
+            (session, admission)
+        };
+        drop(rejected_lease);
         let outcome = match admission {
             Err(error) => Err(error),
             Ok(()) => receiver
@@ -259,6 +366,7 @@ fn serve_connection(mut stream: TcpStream, shared: &SharedEndpoint) -> io::Resul
                 .build(),
         )?;
     }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -420,15 +528,135 @@ mod tests {
     fn invalidated_lease_cannot_release_a_new_operation() {
         let gate = OperationGate::default();
         let old = gate.acquire().unwrap();
+        assert!(old.is_current());
         assert!(matches!(
             gate.acquire(),
             Err(StorybookAutomationError::AutomationBusy)
         ));
         gate.invalidate();
+        assert!(!old.is_current());
         let current = gate.acquire().unwrap();
+        assert!(current.is_current());
         drop(old);
         assert!(gate.busy());
         drop(current);
         assert!(!gate.busy());
+    }
+
+    #[test]
+    fn replacement_rejects_queued_old_work_and_preserves_the_new_lease() {
+        let endpoint = DeviceEndpoint::listen(0, "surface-1".to_owned()).unwrap();
+        let mut old = connect(&endpoint);
+        write_frame(
+            &mut old,
+            &request(
+                10,
+                PROTOCOL_VERSION,
+                "surface-1",
+                DeviceOperation::OpenStory {
+                    key: "counter".to_owned(),
+                },
+            ),
+        )
+        .unwrap();
+        let deadline = std::time::Instant::now() + Duration::from_secs(3);
+        while !endpoint.gate().busy() {
+            assert!(std::time::Instant::now() < deadline, "old work admission");
+            std::thread::yield_now();
+        }
+        endpoint.replace_session("surface-2".to_owned());
+        let mut current = connect(&endpoint);
+        // A receipt belongs to its session; the new host can admit the same ID.
+        write_frame(
+            &mut current,
+            &request(
+                10,
+                PROTOCOL_VERSION,
+                "surface-2",
+                DeviceOperation::OpenStory {
+                    key: "notes".to_owned(),
+                },
+            ),
+        )
+        .unwrap();
+        let (request, response, lease) = admitted(&endpoint).into_parts();
+        assert_eq!(request.session(), "surface-2");
+        assert!(lease.as_ref().unwrap().is_current());
+        assert!(endpoint.gate().busy());
+        assert!(matches!(
+            read_frame::<DeviceResponse>(&mut old)
+                .unwrap()
+                .into_outcome(),
+            Err(StorybookAutomationError::StaleHost { .. })
+        ));
+        assert!(endpoint.try_recv().is_none());
+        assert!(
+            endpoint.gate().busy(),
+            "discarding old work keeps the current owner"
+        );
+        response
+            .send(Err(StorybookAutomationError::NoLiveHost))
+            .unwrap();
+        drop(lease);
+        assert!(!endpoint.gate().busy());
+        assert!(matches!(
+            read_frame::<DeviceResponse>(&mut current)
+                .unwrap()
+                .into_outcome(),
+            Err(StorybookAutomationError::NoLiveHost)
+        ));
+    }
+    #[test]
+    fn native_surface_release_suspends_admission_until_session_replacement() {
+        let endpoint = DeviceEndpoint::listen(0, "surface-1".to_owned()).unwrap();
+        let old = endpoint.gate().acquire().unwrap();
+        endpoint.gate().suspend();
+        assert!(!old.is_current());
+        assert!(matches!(
+            endpoint.gate().acquire(),
+            Err(StorybookAutomationError::NoLiveHost)
+        ));
+        let mut stream = connect(&endpoint);
+        for command in [
+            DeviceOperation::GetHost {},
+            DeviceOperation::OpenStory {
+                key: "counter".to_owned(),
+            },
+        ] {
+            write_frame(
+                &mut stream,
+                &request(61, PROTOCOL_VERSION, "surface-1", command),
+            )
+            .unwrap();
+            assert!(matches!(
+                read_frame::<DeviceResponse>(&mut stream)
+                    .unwrap()
+                    .into_outcome(),
+                Err(StorybookAutomationError::NoLiveHost)
+            ));
+            assert!(endpoint.try_recv().is_none());
+        }
+        endpoint.replace_session("surface-2".to_owned());
+        write_frame(
+            &mut stream,
+            &request(
+                61,
+                PROTOCOL_VERSION,
+                "surface-2",
+                DeviceOperation::OpenStory {
+                    key: "counter".to_owned(),
+                },
+            ),
+        )
+        .unwrap();
+        let (_, reply, lease) = admitted(&endpoint).into_parts();
+        assert!(lease.as_ref().unwrap().is_current());
+        drop(old);
+        assert!(endpoint.gate().busy());
+        reply
+            .send(Err(StorybookAutomationError::NoActiveStory))
+            .unwrap();
+        drop(lease);
+        assert!(!endpoint.gate().busy());
     }
 }

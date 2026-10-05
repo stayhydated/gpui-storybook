@@ -66,8 +66,9 @@ input contract; the tested single-attempt paths preserve uncertainty.
 
 ## AndroidX lifecycle proof
 
-The custom instrumentation runs in `dev.storybook.tools`, independently of the
-example process. It uses AndroidX `By`, `Until`, `UiObject2`, and `UiDevice`.
+The original custom instrumentation ran in `dev.storybook.tools`, independently
+of the example process. The maintained harness now lives in `../native` and
+runs in `dev.storybook.mobile.test`. It uses AndroidX `By`, `Until`, `UiObject2`, and `UiDevice`.
 It selects native tabs, taps GPUI with observed target geometry, and commits
 `a` plus a trailing space through the actual AOSP keyboard and InputConnection.
 The keyboard layout is qualified separately from GPUI text insertion.
@@ -109,7 +110,7 @@ published direct-call timeout is hard-coded independently of `http_timeout`.
 ## Reproduction and validation
 
 Run the commands in [README.md](README.md). The Cargo lockfile fixes the Rust
-versions; `androidx-dependencies.json` fixes Maven artifacts and SHA-256 hashes.
+versions; `../native/androidx-dependencies.json` fixes Maven artifacts and SHA-256 hashes.
 Generated evidence stays under `target/android-tools-evidence`:
 
 - `rust-report.json`: capabilities, counter deltas, relay events, retry outcomes.

@@ -1,10 +1,13 @@
-# Android automation experiment evidence
+# Android automation stabilization evidence
 
 The `experiment/mobile-automation` worktree implements the reusable contracts,
 embedded GPUI attachment, Android endpoint/example, computer MCP backend, and
 capture scopes from the mobile automation plan. The coordinated public API
 publication boundary is **0.8.0**; this experiment retains workspace version
-0.7.1. The original plan remains unchanged.
+0.7.1. The original plan remains unchanged. The 2026-10-05 stabilization promotes
+`adbutils-rs =0.1.0` into a bounded host transport and AndroidX UI Automator 2.4.0
+into the maintained native qualification harness. The shared GPUI crate owns
+the reusable device coordinator; the Android example supplies its JNI adapter.
 
 ## Qualified inputs
 
@@ -58,9 +61,15 @@ and InputConnection. It verifies the IME inset boundary, device-owned busy
 admission, disconnected work completing once, duplicate-ID rejection, one
 reported dispatched step on partial failure, stale capture rejection, retained
 state/process through pause/resume, and new surface/session identity after
-Activity recreation. A separate default-interaction stdio session verified explicit
-APK installation, fresh launch, stop-on-EOF, and owned forwarding cleanup.
-Both renderer paths ran against the real endpoint.
+Activity recreation. A separate default-interaction stdio session verifies explicit streamed APK
+installation, fresh launch, stop-on-EOF, and unchanged ADB forwarding inventory.
+The production host uses direct device sockets.
+Both renderer paths ran against the real endpoint during the initial experiment.
+The final stabilization run uses SwiftShader. Its typed device-protocol
+presentation proof samples `[255, 255, 255, 255]` in light mode and
+`[10, 10, 10, 255]` in dark mode, then restores the original light sample.
+Native appearance acknowledgment precedes GPUI execution even with the current
+route retained. MCP calls follow the advertised schema.
 
 Local transcripts, environment metadata, logs, and PNGs are retained under
 `target/mobile-evidence`; the software renderer's artifacts are in its
@@ -81,10 +90,10 @@ Generated evidence is independent of accepted visual baselines.
   and Git whitespace checks passed.
 - The MCP normal dependency graph excludes GPUI, GTK, desktop core, and preferences.
 
-`cargo machete --with-metadata` reports the same existing dependency findings
-in this worktree and the original checkout: `es-fluent-build`, core `gtk`,
-preferences `gpui-kit`, and test-crate `tokio`. The new owners introduce no
-additional findings.
+`cargo machete --with-metadata` remains nonzero for existing findings:
+`es-fluent-build` in core and both registration examples, core `gtk`, preferences
+`gpui-kit`, test-crate `tokio`, and `serde` in the isolated library experiment.
+The stabilization's production owners introduce no additional findings.
 
 The GitHub mobile workflow is ready for remote execution; its hosted jobs require
 a pushed branch or pull request. Local commands establish the evidence above.
@@ -97,9 +106,56 @@ form its follow-up runtime work. The native harness qualifies the declared AOSP
 IME/layout; other IMEs and application permission/effect flows need their own
 native tests.
 
-## Android library follow-up
+## Candidate selection
 
 The isolated [library qualification](tools/EVIDENCE.md) exercised both Rust ADB
 clients, both Rust UI Automator clients, and AndroidX UI Automator 2.4.0 against
 this real example. It records the shell exit-status limitation, native dropped
 reply/replay measurements, and an independent instrumentation lifecycle proof.
+
+The Rust UI Automator wrappers remain in the isolated qualification workspace.
+Their default recovery paths replayed a completed click after its reply was
+lost; single-attempt calls preserved uncertainty. Their native service ownership
+and transport limits need their own integration work before production adoption.
+AndroidX supplies independent native input qualification while Storybook retains
+session identity, receipts, mutation ownership, and capture provenance.
+
+## Stabilization audit
+
+| Requirement | Owning implementation and proof |
+| --- | --- |
+| Bounded ADB adoption | `mobile-host/src/adb.rs` wraps selected SDK primitives with explicit serial/loopback server, deadlines, bounded shell-v2/wire/PNG reads, streamed installation, and owned temporary-file cleanup. Real ADB protocol peers verify exit 7, cancellation, failed installation, lost replies, and exactly one delivered mutation. The emulator verifies shell status and package preservation after invalid APK installation. |
+| Maintained native harness | `examples/mobile/native` owns the hash-pinned AndroidX APK and runner. Native selectors, actual GPUI touch, AOSP IME input, leased screenshot, rotation, and pause/resume are exercised on the declared emulator. CI builds it and preserves its artifacts. |
+| Reusable coordinator | `automation-gpui::device::DeviceCoordinator<Root>` owns native preflight/acknowledgment, rendered waits, capture tickets, and settlement. The example supplies native snapshots and a JNI queue adapter. Embedded GPUI tests exercise the public coordinator and deferred admission revocation. |
+| Atomic device ownership | `mobile` serializes session, duplicate receipts, and admission under one mutex. Native surface release suspends admission immediately; owner-thread replacement installs a new session and reopens it atomically. Old lease drops cannot release newer work. Owner regressions and the native lifecycle proof verify these boundaries. |
+| Cancellation and cleanup | Unknown native completion retains its lease until acknowledgment or invalidation. Host capture/install tasks survive canceled response futures on their owning runtime; shutdown drains them. Finish revokes a pending capture by its preparation ID. Real peers exercise lost preparation replies and provider/decoder failures. Emulator proofs cover successful install/launch/EOF, startup failure cleanup, and preservation of an externally restarted PID. |
+| Public and publication surfaces | Rustdocs, crate/facade/root READMEs, book, integration reference, examples, and catalog are aligned. The reusable mobile workflow gates the main release job. The coordinated API publication boundary is 0.8.0; this local experiment stays at 0.7.1. |
+| Validation and isolation | All-feature Linux workspace tests, owning Clippy, Android Clippy/default build, both signed APK ABIs, neutral Android/iOS targets, public docs, book/LLM text/catalog, formatting, and package inventory pass. The local checkpoint stays on the experiment branch; master, Manefi, and the original plan are preserved, with no push. |
+
+The final owner tests include five endpoint cases, seven host transport/capture
+cases, the coordinator acknowledgment deadline case, and six embedded GPUI
+cases. The complete workspace suite also passes. The ADB peers carry real bounded
+wire traffic to a `DeviceEndpoint`; application counters and decoded artifacts
+are independent outcome oracles.
+
+Native invalidation can reject a read after rendered discovery. The AndroidX
+harness rediscovery repeats only `get_host`/`read_values` observations within a
+deadline and record their count; they never repeat touch, keyboard, installation,
+or route mutation. The final presentation regression belongs to the typed device
+protocol because the MCP step schema has no presentation input field.
+
+## Remaining qualification scope
+
+Local validation ran on Linux and the declared Android emulator. The macOS and
+Windows matrix and hosted GitHub jobs await remote execution; nothing was pushed.
+Arm64 Android qualification is a signed build, rather than a physical-device run.
+iOS remains neutral compilation until its simulator/native lifecycle, transport,
+and capture proof is implemented. The Wayland fork regression remains scoped to
+its dedicated branch. Java emits its existing source-11/deprecated-API warning;
+D8 strips invalid local debug metadata from two upstream coroutine methods.
+Neither diagnostic prevented APK signature verification or native execution.
+
+Cleanup operations use bounded connections to the selected device. If that
+device becomes unreachable, remote cleanup can fail and reports its error; the
+host never resolves an unknown outcome by replaying the mutation. Library users
+keep the attachment/first-install runtime alive through `shutdown`.

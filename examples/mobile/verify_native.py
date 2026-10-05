@@ -9,6 +9,7 @@ import struct
 import subprocess
 import time
 import xml.etree.ElementTree as ET
+from png import read_png
 
 ROOT = Path(__file__).resolve().parents[2]
 parser = argparse.ArgumentParser()
@@ -127,6 +128,32 @@ try:
     pid = adb("shell", "pidof", "dev.storybook.mobile").strip()
     rpc({"operation": "open_story", "key": "embedded-counter"})
     original = ready(lambda host: host["geometry"]["height"] > host["geometry"]["display_height"] * .65)
+    # Presentation is a typed device-protocol field. Native and GPUI appearance
+    # must agree even when a batch keeps the current route.
+    background_pixels = {}
+    for background, expected in [("light", False), ("dark", True), ("light", False)]:
+        rpc({"operation": "run_steps", "request": {
+            "presentation": {"background": background, "viewport": "responsive"},
+            "steps": [{"type": "wait_frames", "count": 1}]}})
+        assert ready()["dark"] is expected
+        ticket = rpc({"operation": "prepare_capture"})
+        try:
+            path = args.output / ("counter-direct-" + background + ".png")
+            path.write_bytes(adb("exec-out", "screencap", "-p"))
+            width, height, channels, rows = read_png(path)
+            geometry = ticket["host"]["geometry"]
+            assert (width, height) == (geometry["display_width"], geometry["display_height"])
+            x, y = 4, geometry["y"] + geometry["height"] - 40
+            pixel = rows[y][x * channels:(x + 1) * channels]
+            if background in background_pixels:
+                assert pixel == background_pixels[background]
+            background_pixels[background] = pixel
+        finally:
+            rpc({"operation": "finish_capture", "ticket": ticket["ticket"]})
+    assert background_pixels["dark"] != background_pixels["light"]
+    transcript.append({"presentation_pixels": {
+        key: list(value) for key, value in background_pixels.items()}})
+    print("native/device presentation and rendered pixels passed", flush=True)
     before = state()["count"]
     target_touch("increment")
     wait_state(lambda value: value["count"] == before + 1)

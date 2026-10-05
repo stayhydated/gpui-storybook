@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 parser = argparse.ArgumentParser()
 parser.add_argument("--serial", required=True)
 parser.add_argument("--apk", type=Path, help="Install this APK for the lifecycle-only proof")
-parser.add_argument("--lifecycle-only", action="store_true", help="Prove fresh launch, default interaction gating, and stop/forwarding cleanup on EOF")
+parser.add_argument("--lifecycle-only", action="store_true", help="Prove fresh launch, default interaction gating, and owned process cleanup and unchanged forwarding on EOF")
 parser.add_argument("--output", type=Path, default=ROOT / "target" / "mobile-evidence")
 args = parser.parse_args()
 if args.apk and not args.lifecycle_only:
@@ -170,6 +170,6 @@ if args.lifecycle_only:
     stopped = subprocess.run(["adb", "-s", args.serial, "shell", "pidof", "dev.storybook.mobile"], capture_output=True, timeout=15)
     assert stopped.returncode != 0
     assert subprocess.check_output(["adb", "-s", args.serial, "forward", "--list"], timeout=15) == forwarding_before
-    transcript.append({"eof": "owned example stopped; forwarding removed; default interaction tools omitted"})
+    transcript.append({"eof": "owned example stopped; forwarding unchanged; default interaction tools omitted"})
     transcript_path.write_text(json.dumps(transcript, indent=2) + "\n")
-    print("Explicit launch, interaction gating, stop-on-EOF, and forwarding cleanup passed", flush=True)
+    print("Explicit launch, interaction gating, stop-on-EOF, and unchanged forwarding passed", flush=True)

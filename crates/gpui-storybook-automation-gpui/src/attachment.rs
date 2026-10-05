@@ -64,6 +64,10 @@ pub struct AttachedInteraction<Lease: 'static> {
         oneshot::Sender<Result<StoryInteractionSnapshot, StorybookAutomationError>>,
     pub(crate) progress: Arc<AtomicUsize>,
     pub(crate) lease: Lease,
+    /// Check a platform admission permit before preparation and at each deferred
+    /// execution boundary. The retained lease owns work; this check revokes it
+    /// when the native surface owner invalidates its host.
+    pub(crate) admission_current: Option<Rc<dyn Fn() -> bool>>,
 }
 
 /// Owning-thread attachment to an existing root; it creates no GPUI application.
@@ -362,8 +366,14 @@ impl<R: EmbeddedRoot> GpuiHostAttachment<R> {
             response,
             progress,
             lease,
+            admission_current,
         } = admitted;
         let prepare = (|| {
+            if admission_current.as_ref().is_some_and(|current| !current()) {
+                return Err(StorybookAutomationError::StaleHost {
+                    message: "platform operation admission was revoked".to_owned(),
+                });
+            }
             self.capabilities.validate_interaction(&request)?;
             if fresh_fixture {
                 self.capabilities
@@ -410,7 +420,13 @@ impl<R: EmbeddedRoot> GpuiHostAttachment<R> {
                 // GPUI invokes next-frame callbacks before that frame's layout.
                 // Allow the newly selected/recreated root to prepaint before the
                 // executor reads its region registry on the following frame.
-                let provider = self.provider.clone();
+                let provider: Rc<dyn InteractionCaptureProvider> = match admission_current {
+                    Some(current) => Rc::new(AdmissionProvider {
+                        current,
+                        inner: self.provider.clone(),
+                    }),
+                    None => self.provider.clone(),
+                };
                 window.on_next_frame(move |window, _| {
                     schedule_story_interaction(
                         PreparedStoryInteraction::builder()
@@ -432,6 +448,46 @@ impl<R: EmbeddedRoot> GpuiHostAttachment<R> {
                 let _ = response.send(Err(error));
             },
         }
+    }
+}
+
+struct AdmissionProvider {
+    current: Rc<dyn Fn() -> bool>,
+    inner: Rc<dyn InteractionCaptureProvider>,
+}
+impl InteractionCaptureProvider for AdmissionProvider {
+    fn validate_host(
+        &self,
+        route: &str,
+        window: &Window,
+        cx: &App,
+    ) -> Result<(), StorybookAutomationError> {
+        if !(self.current)() {
+            return Err(StorybookAutomationError::StaleHost {
+                message: "platform operation admission was revoked".to_owned(),
+            });
+        }
+        self.inner.validate_host(route, window, cx)
+    }
+    fn ensure_visible(
+        &self,
+        route: &str,
+        window: &mut Window,
+        cx: &App,
+    ) -> Result<bool, StorybookAutomationError> {
+        self.validate_host(route, window, cx)?;
+        self.inner.ensure_visible(route, window, cx)
+    }
+    fn capture(
+        &self,
+        id: u64,
+        request: StoryScreenshotRequest,
+        story: StorySnapshot,
+        window: &mut Window,
+        cx: &App,
+    ) -> Result<StoryCaptureSnapshot, StorybookAutomationError> {
+        self.validate_host(&story.capture_route_id, window, cx)?;
+        self.inner.capture(id, request, story, window, cx)
     }
 }
 

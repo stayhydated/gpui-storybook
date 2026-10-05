@@ -1,4 +1,4 @@
-package dev.storybook.tools;
+package dev.storybook.mobile.test;
 
 import android.app.Instrumentation;
 import android.graphics.Bitmap;
@@ -23,11 +23,16 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 /** Runs outside the application process against AndroidX UI Automator 2.4.0. */
-public final class Probe extends Instrumentation {
+public final class NativeQualification extends Instrumentation {
     private UiDevice device;
     private String session = "";
     private long requestId = System.nanoTime();
     private final JSONObject report = new JSONObject();
+    private int stateRediscoveries;
+
+    private static final class UnreadyObservation extends java.io.IOException {
+        UnreadyObservation(String message) { super(message); }
+    }
 
     @Override public void onCreate(Bundle arguments) {
         super.onCreate(arguments);
@@ -41,6 +46,7 @@ public final class Probe extends Instrumentation {
         try {
             device = UiDevice.getInstance(this);
             runProof();
+            report.put("state_read_rediscoveries", stateRediscoveries);
             report.put("passed", true);
         } catch (Throwable error) {
             status = 0;
@@ -68,6 +74,7 @@ public final class Probe extends Instrumentation {
         JSONObject request = new JSONObject().put("protocol_version", 1).put("session", session)
             .put("request_id", ++requestId).put("command", command);
         byte[] data = request.toString().getBytes(StandardCharsets.UTF_8);
+        check(data.length > 0 && data.length <= 1024 * 1024, "bounded request");
         try (Socket socket = new Socket()) {
             socket.connect(new InetSocketAddress("127.0.0.1", 28437), 5000);
             socket.setSoTimeout(15000);
@@ -78,14 +85,21 @@ public final class Probe extends Instrumentation {
             check(size > 0 && size <= 1024 * 1024, "bounded response");
             byte[] body = new byte[size]; in.readFully(body);
             JSONObject reply = new JSONObject(new String(body, StandardCharsets.UTF_8));
+            check(reply.getInt("protocol_version") == 1, "response protocol");
             check(reply.getLong("request_id") == requestId, "response identity");
+            check(session.isEmpty() || session.equals(reply.getString("session")), "response session");
             return reply.getJSONObject("outcome");
         }
     }
 
     private JSONObject rpc(JSONObject command) throws Exception {
         JSONObject outcome = response(command);
-        if (outcome.has("Err")) throw new java.io.IOException(outcome.toString());
+        if (outcome.has("Err")) {
+            String code = outcome.getJSONObject("Err").optString("code");
+            if (code.equals("stale_host") || code.equals("no_live_host"))
+                throw new UnreadyObservation(outcome.toString());
+            throw new java.io.IOException(outcome.toString());
+        }
         return outcome.getJSONObject("Ok").getJSONObject("value");
     }
 
@@ -108,12 +122,28 @@ public final class Probe extends Instrumentation {
     private JSONObject ready() throws Exception { return ready(host -> true); }
 
     private JSONObject state() throws Exception {
-        JSONArray values = rpc(command("read_values")).getJSONArray("values");
-        for (int i = 0; i < values.length(); i++) {
-            JSONObject value = values.getJSONObject(i);
-            if (value.getString("key").equals("public-state")) return value.getJSONObject("value");
+        long deadline = SystemClock.elapsedRealtime() + 20000;
+        UnreadyObservation last = null;
+        while (SystemClock.elapsedRealtime() < deadline) {
+            try {
+                JSONArray values = rpc(command("read_values")).getJSONArray("values");
+                for (int i = 0; i < values.length(); i++) {
+                    JSONObject value = values.getJSONObject(i);
+                    if (value.getString("key").equals("public-state")) return value.getJSONObject("value");
+                }
+                throw new AssertionError("public state missing");
+            } catch (UnreadyObservation error) {
+                // Lifecycle can invalidate a read between rendered discovery and
+                // admission. Only read-only observations are repeated here.
+                last = error;
+                stateRediscoveries++;
+                session = "";
+                try { session = rpc(command("get_host")).getString("session"); }
+                catch (UnreadyObservation ignored) { }
+            }
+            SystemClock.sleep(50);
         }
-        throw new AssertionError("public state missing");
+        throw new AssertionError("public state readiness deadline", last);
     }
 
     private void waitState(Predicate<JSONObject> predicate) throws Exception {
@@ -172,7 +202,7 @@ public final class Probe extends Instrumentation {
             rpc(command("finish_capture").put("ticket", ticket.get("ticket")));
         }
         Bitmap bitmap = BitmapFactory.decodeFile(screenshot.toString());
-        JSONObject geometry = original.getJSONObject("geometry");
+        JSONObject geometry = ticket.getJSONObject("host").getJSONObject("geometry");
         check(bitmap.getWidth() == geometry.getInt("display_width") && bitmap.getHeight() == geometry.getInt("display_height"), "decoded full display dimensions");
         HashSet<Integer> colors = new HashSet<>();
         for (int y = geometry.getInt("y") + 10; y < geometry.getInt("y") + geometry.getInt("height") - 10; y += 7)

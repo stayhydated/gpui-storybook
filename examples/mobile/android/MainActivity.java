@@ -103,7 +103,15 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         surface.post(() -> publishShell(0));
     }
     public void gpuiSelect(String next, boolean nextDark, long request) {
-        runOnUiThread(() -> { select(next, nextDark); surface.post(() -> publishShell(request)); });
+        runOnUiThread(() -> {
+            if (!nativeSelectionCurrent(request)) {
+                nativeSelectionSettled(request, false);
+                return;
+            }
+            select(next, nextDark);
+            publishShell(request);
+            nativeSelectionSettled(request, true);
+        });
     }
     private void publishShell(long request) {
         int[] position = new int[2]; surface.getLocationOnScreen(position);
@@ -257,6 +265,8 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
             };
         }
     }
+    private native boolean nativeSelectionCurrent(long request);
+    private native void nativeSelectionSettled(long request, boolean applied);
     private native void nativeStart(boolean automation);
     private native void nativeSurface(Surface surface, float scale);
     private native void nativeRelease();

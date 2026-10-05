@@ -12,7 +12,7 @@ native tabs and an appearance control.
 | `gpui-storybook-automation` | Shared backend, typed requests, capabilities, snapshots, and bounded wire envelopes |
 | `gpui-storybook-automation-gpui` | Supply a root, window, route catalog, controls, action scope, fixtures, and capture provider |
 | `gpui-storybook-mobile` | Opt in, poll admitted requests on the owning thread, retain their device operation lease |
-| `gpui-storybook-mobile-host` | Select an ADB serial, own forwarding and local PNG paths, serve MCP on the computer |
+| `gpui-storybook-mobile-host` | Select an ADB serial, own bounded direct connections and local PNG paths, serve MCP on the computer |
 
 Implement `EmbeddedRoot` with application-owned route selection, public state
 revision, controls, action scope, presentation, and fixture recreation. Create
@@ -25,6 +25,20 @@ the native owner acknowledges selection, apply the GPUI route through the normal
 application path and await rendered readiness. `AttachedInteraction::builder()`
 carries the operation lease through the shared frame executor. Ad-hoc navigation
 preserves live state; scenarios recreate the selected surface's fixture.
+
+Enable the GPUI automation crate's `device` feature and construct
+`DeviceCoordinator` with the opted-in `DeviceEndpoint` and your native queue
+adapter. Poll with `NativeShellSnapshot` after the ordinary application path
+applies the native route. The adapter retains `NativeSelection`, checks its
+permit and surface revision on the native lifecycle thread immediately before
+dispatch, and acknowledges applied or revoked work. Report rejection before
+enqueueing separately from unknown delivery. A native response deadline retains
+its device lease until acknowledgment or explicit host invalidation.
+
+On native surface release, call `OperationGate::suspend` immediately. This closes
+admission during the handoff to the GPUI owner. After invalidating the old
+attachment, `DeviceCoordinator::surface_replaced` installs a new session and
+reopens admission atomically.
 
 ## Run the repository example
 
@@ -57,12 +71,25 @@ cargo run -p gpui-storybook-mobile-host -- \
 
 Use the process's stdin/stdout for MCP. Logs stay on stderr. Attaching to an
 already running opted-in app needs only `--serial` and the desired interaction
-opt-in. `--stop-on-eof` explicitly stops an example launched by this command;
-EOF otherwise detaches and releases the owned ADB forwarding.
+opt-in. `--stop-on-eof` explicitly stops the owned example launched by this command;
+startup failure also cleans it up after checking its PID. Host
+EOF otherwise detaches after admitted captures settle.
 
-Run `python3 examples/mobile/verify.py --serial emulator-5580
-python3 examples/mobile/verify_native.py --serial emulator-5580` against the
-running app. It records a raw JSON Lines MCP transcript and PNGs under
+Run the MCP, raw native, and AndroidX qualification paths on an owned API 36
+Pixel 7 emulator with AOSP en-US LatinIME:
+
+```sh
+python3 examples/mobile/verify.py --serial emulator-5580
+python3 examples/mobile/verify_native.py --serial emulator-5580
+python3 examples/mobile/native/build.py --sdk "$ANDROID_HOME"
+python3 examples/mobile/native/verify.py --serial emulator-5580
+```
+
+The maintained AndroidX UI Automator 2.4.0 test APK uses hash-pinned Maven
+artifacts, native selectors, actual touch/IME input, rotation, pause/resume,
+hierarchy XML, and screenshot decoding. Its reports live under
+`target/mobile-evidence/androidx` and its APK under `target/mobile-native-apk`.
+The MCP proof records a raw JSON Lines MCP transcript and PNGs under
 `target/mobile-evidence`, exercises both routes and fresh scenarios, and verifies
 native/GPUI agreement and unsupported-request rejection.
 
@@ -76,6 +103,9 @@ enabled, select appearance through `storybook_dispatch_host_action`:
 ```json
 {"action":{"action":"set_appearance","dark":true}}
 ```
+
+Light/dark presentation in a step batch or scenario also waits for native
+appearance acknowledgment before GPUI execution.
 
 The ordinary story tools discover routes, edit controls, read semantic values,
 click targets, dispatch scoped actions, and run fresh scenarios. GPUI pointer
@@ -91,7 +121,8 @@ visible system/keyboard UI. GPUI capture crops the inset-aware SurfaceView bound
 `storybook_capture_current_story` uses that crop for the selected root route.
 
 The app retains an exclusive capture ticket while the computer obtains an ADB
-PNG. Completion validates session, route/state revision, and geometry before
+PNG. The ticket equals the preparation request ID; completion can revoke a
+still-pending frame wait if the preparation reply is lost. Completion validates session, route/state revision, and geometry before
 writing the artifact. Results include dimensions, scope, request/session identity,
 provider, observed host metadata, and local path. This is a compositor observation
 following native and GPUI acknowledgment; its provenance is explicit.
@@ -106,8 +137,18 @@ and connections and admits one mutation, scenario, or capture at a time. Reads
 may observe intermediate public state. Interaction limits remain 64 steps,
 4 KiB text, and 120 explicit frame waits.
 
+The computer wraps selected `adbutils-rs =0.1.0` connection primitives in overall
+deadlines and byte budgets: 1 MiB wire/shell responses, 64 MiB encoded/decoded
+PNGs, and streamed APKs of at most 512 MiB. Installation runs once and removes
+its unique device temporary file; package-manager failures preserve the package.
+The transport selects a loopback ADB server, exposes shell-v2 exit status, and
+uses direct device sockets. ADB/platform tools provide the local server.
+
 Canceling a client response leaves submitted work under its device lease until
-settlement. A transport failure after submission reports an unknown outcome;
+settlement. Capture work survives caller cancellation on the attachment runtime,
+settles its ticket after provider/decoder failure, and validates before writing.
+Library users keep that runtime alive and call `RemoteBackend::shutdown` after
+closing admission. A transport failure after submission reports an unknown outcome;
 rediscover state without replaying the mutation. Activity recreation replaces
 surface identity and invalidates old attachments while the GPUI runtime remains
 retained. Establish a fresh connection and rediscover routes/targets.

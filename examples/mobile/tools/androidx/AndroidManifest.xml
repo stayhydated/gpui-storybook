@@ -1,6 +1,0 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="dev.storybook.tools">
-    <uses-sdk android:minSdkVersion="31" android:targetSdkVersion="36" />
-    <uses-permission android:name="android.permission.INTERNET" />
-    <application android:debuggable="true" android:label="Storybook Tools Test" />
-    <instrumentation android:name="dev.storybook.tools.Probe" android:targetPackage="dev.storybook.tools" />
-</manifest>

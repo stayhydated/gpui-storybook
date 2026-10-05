@@ -16,6 +16,8 @@ serde_json = { workspace = true }
 
 [dev-dependencies]
 gpui-kit = { features = [ "test-support" ], workspace = true }
+gpui-storybook-automation-gpui = { features = [ "device" ], workspace = true }
+gpui-storybook-mobile = { workspace = true }
 tokio = { features = [ "sync" ], workspace = true }
 
 [lints]

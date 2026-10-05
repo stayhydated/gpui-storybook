@@ -7,3 +7,8 @@ input execution, rendered-frame waits, and capture observation.
 
 Surface replacement assigns a new session. A disconnected client rediscovers
 public state without replaying its submitted mutation.
+
+Session replacement, duplicate receipts, and lease revocation share one atomic
+admission boundary. `try_recv` discards revoked queued work. Native queues retain
+a non-owning `MutationPermit` and check it immediately before dispatch; the
+original lease remains with the operation owner through acknowledgment.

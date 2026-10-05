@@ -24,8 +24,13 @@ selects aarch64; the default is x86_64. The `mobile` Cargo profile disables
 Wgpu debug labels and preserves overflow checking. APK signing uses a generated
 example key under `target/mobile-example`.
 
+The reusable `DeviceCoordinator<DemoRoot>` owns device preflight, native
+acknowledgment, frames, and captures. The Android adapter queues the selection
+permit and checks it with the surface revision before native dispatch. Timeouts
+retain ownership until acknowledgment or surface invalidation.
+
 The device endpoint binds IPv4 loopback at port 28437. The computer selects an
-ADB serial explicitly, owns its forwarding, and chooses PNG paths. Native route
+ADB serial explicitly, opens direct device connections, and chooses PNG paths. Native route
 acknowledgment and rendered GPUI geometry precede success. Recreated surfaces
 receive a new session; attachment requires rediscovery.
 
@@ -60,5 +65,8 @@ resolved system-image fingerprint, renderer, and emulator version. Visual
 baseline acceptance remains deliberate. [Qualification evidence](EVIDENCE.md)
 records the local experiment and its limits.
 
-The isolated [Android library probes](tools/README.md) compare published Rust
-ADB/UI Automator clients and an AndroidX test APK against this example.
+The maintained [AndroidX native harness](native/README.md) uses hash-pinned
+UI Automator 2.4.0 artifacts for native selectors, actual touch/IME input,
+rotation, pause/resume, hierarchy XML, and screenshot decoding. It runs in CI.
+The isolated [Android library probes](tools/README.md) retain the comparative
+Rust ADB/UI Automator qualification and replay-fault evidence.

@@ -129,6 +129,17 @@ catalog. Retain `GpuiHostAttachment`, dispatch on the existing GPUI owner thread
 and invalidate the attachment before surface replacement. Registries belong to
 that app/window; repeated keys in other contexts stay independent.
 
+Enable `device` for `DeviceCoordinator`; supply an opted-in endpoint, native
+snapshot, and queue adapter. Retain the selection permit, check its surface and
+admission immediately before native dispatch, and acknowledge applied or revoked
+work. Distinguish rejected enqueueing from unknown delivery; a response deadline
+retains ownership until acknowledgment or explicit host invalidation.
+
+On native surface release, call `OperationGate::suspend` immediately. This closes
+admission during the handoff to the GPUI owner. After invalidating the old
+attachment, `DeviceCoordinator::surface_replaced` installs a new session and
+reopens admission atomically.
+
 The repository's `examples/embedded` shares its production `DemoRoot` with
 `examples/mobile`. The Android example uses native Counter/Notes tabs, native
 appearance, one retained GPUI runtime, and an opted-in loopback device endpoint.
@@ -140,7 +151,7 @@ in qualification evidence.
 
 Run `gpui-storybook-mobile-host --serial DEVICE --allow-interaction` on Linux
 or macOS to attach. Installation, launching the example, and stopping it on EOF
-are explicit flags. EOF releases owned forwarding; reconnection discovers the
+are explicit flags. EOF settles admitted captures and closes host connections; reconnection discovers the
 new catalog without replay. Surface replacement changes the session and invalidates
 old geometry, targets, capture tickets, and queued operations. Protocol v1 uses
 closed, length-prefixed JSON bounded to 1 MiB; the device holds one mutation lease
@@ -156,7 +167,16 @@ and `adb_compositor_observation` provenance. This is a separately validated
 compositor observation. Explicit phone-sized desktop presets require
 `StorySizing`; the Android example uses observed dimensions.
 
-Use `verify.py` for the raw stdio MCP proof and `verify_native.py` for native
+The computer uses pinned `adbutils-rs` primitives with host deadlines, bounded
+wire/shell/PNG reads, preserved shell-v2 status, and direct device connections.
+APK installation streams to an owned temporary path, installs once, and cleans
+that path without automatic uninstall. Captures survive caller cancellation on
+the attachment runtime; call `RemoteBackend::shutdown` after closing admission.
+
+Use the maintained `native/build.py` and `native/verify.py` AndroidX UI Automator
+2.4.0 harness for native selectors, real touch/IME input, rotation, pause/resume,
+and screenshot/hierarchy artifacts. Maven dependencies are hash-pinned and CI
+records the declared API 36 Pixel 7/AOSP inputs. Use `verify.py` for the raw stdio MCP proof and `verify_native.py` for native
 touch, AOSP en-US IME commits/insets, busy/disconnect/duplicate admission,
 partial progress, pause/resume, and recreation. GPUI mouse/text steps and native
 input are independently qualified. Preserve live state during navigation; only

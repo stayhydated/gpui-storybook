@@ -10,12 +10,19 @@ repository.workspace = true
 readme = "README.md"
 
 [dependencies]
+adbutils = { workspace = true }
+bon = { workspace = true }
 clap = { features = [ "derive" ], workspace = true }
 gpui-storybook-automation = { workspace = true }
 gpui-storybook-mcp = { workspace = true }
 gpui-storybook-mobile = { workspace = true }
 image = { workspace = true }
-tokio = { features = [ "rt-multi-thread", "time" ], workspace = true }
+serde_json = { workspace = true }
+tokio = { features = [ "rt-multi-thread", "time", "net", "io-util", "fs" ], workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+tokio = { features = [ "macros", "test-util" ], workspace = true }
 
 [lints]
 workspace = true

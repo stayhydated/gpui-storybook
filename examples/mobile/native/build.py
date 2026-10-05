@@ -6,6 +6,7 @@ import io
 import json
 from pathlib import Path
 import subprocess
+import shutil
 from urllib.request import urlopen
 import zipfile
 
@@ -16,7 +17,7 @@ parser.add_argument("--sdk", type=Path, required=True)
 args = parser.parse_args()
 tools = args.sdk / "build-tools/36.0.0"
 android = args.sdk / "platforms/android-36/android.jar"
-build = ROOT / "target/android-tools-apk"
+build = ROOT / "target/mobile-native-apk"
 build.mkdir(parents=True, exist_ok=True)
 jars = []
 dependencies = json.loads((HERE / "androidx-dependencies.json").read_text())
@@ -42,11 +43,13 @@ def run(*command):
 
 
 classes, dex = build / "classes", build / "dex"
-classes.mkdir(exist_ok=True)
-dex.mkdir(exist_ok=True)
+shutil.rmtree(classes, ignore_errors=True)
+shutil.rmtree(dex, ignore_errors=True)
+classes.mkdir()
+dex.mkdir()
 run("javac", "-source", "8", "-target", "8", "-Xlint:-options", "-bootclasspath",
     str(tools / "core-lambda-stubs.jar") + ":" + str(android), "-classpath",
-    ":".join(str(p) for p in jars), "-d", classes, HERE / "androidx/Probe.java")
+    ":".join(str(p) for p in jars), "-d", classes, HERE / "androidx/NativeQualification.java")
 compiled = build / "probe.jar"
 run("jar", "cf", compiled, "-C", classes, ".")
 run(tools / "d8", "--lib", android, "--min-api", "31", "--output", dex, compiled, *jars)
@@ -60,7 +63,7 @@ run(tools / "zipalign", "-f", "-p", "4", unaligned, unsigned)
 key = build / "debug.keystore"
 if not key.exists():
     run("keytool", "-genkeypair", "-keystore", key, "-storepass", "android", "-keypass", "android",
-        "-alias", "androiddebugkey", "-dname", "CN=Storybook Tools Test", "-keyalg", "RSA", "-validity", "3650")
+        "-alias", "androiddebugkey", "-dname", "CN=Storybook Native Qualification", "-keyalg", "RSA", "-validity", "3650")
 run(tools / "apksigner", "sign", "--ks", key, "--ks-pass", "pass:android", "--out", apk, unsigned)
 run(tools / "apksigner", "verify", apk)
 print(apk)
