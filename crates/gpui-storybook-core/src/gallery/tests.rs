@@ -225,7 +225,7 @@ fn gallery_selects_by_title_key_and_automation_command(cx: &mut App) {
                         height: None,
                         viewport: None,
                         presentation: None,
-                        steps: vec![crate::automation::StoryInteractionStep::FocusNext],
+                        steps: vec![crate::automation::StoryInteractionStep::FocusNext {}],
                         postconditions: Vec::new(),
                         capture: None,
                     },
@@ -380,7 +380,10 @@ fn capture_dimensions_override_preview_and_keep_chrome_outside_the_story() {
         let canvas = cx
             .debug_bounds("story-canvas")
             .expect("canvas should render");
-        let region = crate::capture_region::capture_region_bounds("crate-ControlledStory")
+        let region = cx
+            .update(|window, cx| {
+                crate::capture_region::capture_region_bounds("crate-ControlledStory", window, cx)
+            })
             .expect("story should register capture bounds");
         assert_eq!(
             canvas.size,
@@ -838,4 +841,83 @@ fn only_the_window_that_claims_the_default_controller_can_run_scenarios(cx: &mut
             assert!(gallery.workbench_state.read(cx).automation().is_none());
         })
         .expect("second gallery should reject the claimed controller");
+}
+
+async fn exercise_gallery_backend(cx: &mut gpui_kit::TestAppContext) {
+    use crate::automation::{SharedAutomationBackend, StorybookAutomation};
+    let automation = StorybookAutomation::new();
+    let automation_for_view = automation.clone();
+    let window: gpui_kit::WindowHandle<Gallery> = cx.update(|cx| {
+        gpui_kit::init(cx);
+        cx.open_window(Default::default(), move |window, cx| {
+            let story = StoryContainer::panel::<ControlledStory>(window, cx);
+            story.update(cx, |story, _| {
+                story.set_registration_metadata(RegisteredStoryMetadata::new(
+                    StoryKey::new("crate-ControlledStory"),
+                    StoryName::new("ControlledStory"),
+                    None,
+                    "crate",
+                    "/tmp/crate",
+                    "src/controlled.rs",
+                    1,
+                ))
+            });
+            Gallery::view_with_automation(vec![story], None, automation_for_view, window, cx)
+        })
+        .unwrap()
+    });
+    let backend: SharedAutomationBackend = automation;
+    backend.wait_until_ready().await.unwrap();
+    assert_eq!(
+        backend.stories().await.unwrap()[0].key,
+        "crate-ControlledStory"
+    );
+    let current = backend
+        .open_story("crate-ControlledStory".into())
+        .await
+        .unwrap();
+    assert_eq!(current.story.unwrap().key, "crate-ControlledStory");
+    assert_eq!(
+        backend.read_controls().await.unwrap().controls[0].value,
+        ControlValue::Boolean(false)
+    );
+    assert_eq!(
+        backend
+            .set_control("enabled".into(), ControlValue::Boolean(true))
+            .await
+            .unwrap()
+            .controls[0]
+            .value,
+        ControlValue::Boolean(true)
+    );
+    cx.update(|cx| {
+        window
+            .update(cx, |gallery, _, cx| {
+                let state = gallery.workbench_state.read(cx);
+                assert_eq!(
+                    state.controls_snapshot(cx).unwrap().controls[0].value,
+                    ControlValue::Boolean(true)
+                );
+            })
+            .unwrap();
+    });
+    assert_eq!(
+        backend.reset_control(None).await.unwrap().controls[0].value,
+        ControlValue::Boolean(false)
+    );
+    assert!(matches!(
+        backend
+            .set_control("missing".into(), ControlValue::Boolean(true))
+            .await,
+        Err(StorybookAutomationError::ControlOperationFailed { .. })
+    ));
+}
+
+// Keep `Borrow` out of the macro's scope: its generated `Rc::borrow` call
+// needs to resolve through `RefCell`.
+mod backend {
+    #[gpui_kit::test]
+    async fn navigates_and_mutates_the_gallery_owned_story(cx: &mut gpui_kit::TestAppContext) {
+        super::exercise_gallery_backend(cx).await;
+    }
 }

@@ -30,7 +30,7 @@ then open the window.
   metadata, typed controls, action scopes, scenarios, sections, and substories.
 - [Automation and capture](references/automation-and-capture.md): MCP tools,
   platform launch commands, semantic interaction, captures, portable tests,
-  visual baselines, and automation failures.
+  visual baselines, automation failures, and maintained embedded Android hosts.
 
 ## Preserve the integration contracts
 
@@ -63,6 +63,9 @@ then open the window.
 - Use `gpui-storybook-test` for isolated cases. Keep baseline checking and
   acceptance explicit, and supply assets, initialization, and theme/language
   adapters required by the application.
+- Use `gpui-storybook-automation-gpui`, `gpui-storybook-mobile`, and the mobile
+  host for an opted-in Android application. Keep native lifecycle dispatch,
+  endpoint session invalidation, and computer-owned ADB capture aligned.
 
 After edits, build the affected Storybook package with the requested features.
 Exercise the changed route, control, scenario, or capture when the target

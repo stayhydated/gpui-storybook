@@ -8,6 +8,7 @@ fn capture_output_schema_accepts_runtime_snapshot_shape() {
         pixel_width: 900,
         pixel_height: 700,
         story: sample_story(),
+        observation: None,
     };
     let definition = component_shape_mcp::tool_definition(
         "capture_schema_test",

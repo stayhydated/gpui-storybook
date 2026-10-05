@@ -27,7 +27,7 @@ impl Gallery {
 
     pub(crate) fn active_story_snapshot(&self, cx: &impl Borrow<App>) -> Option<StorySnapshot> {
         let story = self.workbench_state.read(cx.borrow()).active_story()?;
-        StorySnapshot::from_container(story.read(cx.borrow()), cx)
+        crate::automation::story_snapshot_from_container(story.read(cx.borrow()), cx)
     }
 
     pub(super) fn sync_automation_stories(&self, cx: &impl Borrow<App>) {

@@ -118,8 +118,6 @@ impl HeadlessStoryRunner {
             return Err(StorybookTestError::PerformanceUnavailable);
         }
 
-        reset_capture_regions_for_story(&case.story_key);
-
         let text_system: Arc<dyn PlatformTextSystem> =
             Arc::new(gpui_wgpu::CosmicTextSystem::new(&self.config.font_fallback));
         let mut context = HeadlessAppContext::with_platform(

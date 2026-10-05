@@ -14,6 +14,9 @@ typed controls and presentation before capture. Applications can provide assets,
 initialization, theme and language adapters, and custom substory crop policy
 through `RunnerConfig`.
 
+Rendered regions and semantic registrations belong to each app/window context.
+Fresh contexts and frames isolate identical route keys across matrix cases.
+
 `BaselinePolicy::Check` verifies accepted output, while
 `BaselinePolicy::Update` makes baseline acceptance explicit. The optional
 `performance` feature records GPUI profiler samples for draw and

@@ -1,0 +1,35 @@
+[package]
+name = "gpui-storybook-example-mobile"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+crate-type = [ "cdylib", "rlib" ]
+
+[features]
+automation = [
+  "dep:gpui-storybook-mobile",
+  "dep:serde_json",
+  "gpui-storybook-automation-gpui/device",
+]
+
+[target.'cfg(target_os = "android")'.dependencies]
+android-activity = { features = [ "native-activity" ], version = "0.6" }
+android_logger = "0.15"
+gpui-kit = { default-features = false, features = [ "component", "assets" ], version = "0.7.0" }
+gpui-mobile = { workspace = true }
+gpui-storybook-automation = { workspace = true }
+gpui-storybook-automation-gpui = { workspace = true }
+gpui-storybook-example-embedded = { path = "../embedded" }
+gpui-storybook-mobile = { optional = true, workspace = true }
+jni = "0.22"
+log = "0.4"
+ndk = { features = [ "nativewindow" ], version = "0.9" }
+serde_json = { optional = true, workspace = true }
+thiserror = { workspace = true }
+
+[lints]
+workspace = true

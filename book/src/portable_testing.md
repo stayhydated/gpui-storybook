@@ -133,7 +133,7 @@ Headless capture therefore follows one path per platform:
 | Platform | Portable runner capture | Application capture |
 |---|---|---|
 | macOS | Metal headless renderer | Metal window renderer |
-| Linux | Wgpu headless renderer (gpui-pre 0.3.7) | Wayland Wgpu window renderer with the workspace's Git patches |
+| Linux | Wgpu headless renderer (gpui-pre 0.3.7) | Wayland Wgpu window renderer with consumer-owned Git patches |
 | Windows | Not available (`Ok(None)`) | DirectX window readback on an unshown window |
 
 The runner owns its offscreen window and renderer inside a fresh
@@ -146,7 +146,13 @@ application and MCP path, which is separate from the runner.
 
 For Wayland application capture, apply the GPUI patches described in
 [Automation and capture](automation.md#pin-the-wayland-capture-backends).
-The `mcp` feature supports Linux and macOS. Linux CI also verifies application
-capture through private Sway at desktop, tablet, mobile, and custom sizes.
-Visual baselines are renderer- and font-sensitive, so keep separate accepted
-images when CI spans platforms with materially different output.
+The `mcp` feature supports Linux and macOS. The `wayland-render-image` branch
+also verifies application capture through private Sway at desktop, tablet,
+mobile, and custom sizes. Visual baselines are renderer- and font-sensitive, so
+keep separate accepted images when CI spans platforms with materially different
+output.
+
+Rendered route, target, and value registries belong to each application and
+window. Fresh runner contexts and simultaneously attached embedded windows can
+reuse stable route keys while retaining independent rendered state. See
+[embedded mobile automation](mobile_automation.md) for application-owned roots.

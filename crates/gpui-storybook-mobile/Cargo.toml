@@ -1,0 +1,21 @@
+[package]
+name = "gpui-storybook-mobile"
+description = "Bounded application-owned device automation admission and transport"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+repository.workspace = true
+readme = "README.md"
+
+[dependencies]
+gpui-storybook-automation = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+loom = { workspace = true }
+proptest = { workspace = true }
+
+[lints]
+workspace = true

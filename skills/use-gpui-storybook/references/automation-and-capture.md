@@ -14,12 +14,14 @@ there. Set `GPUI_STORYBOOK_MCP_STDIO=1` to serve MCP over stdio. Route tracing
 and diagnostic logs to standard error.
 
 For Linux Wayland window capture, copy the three `[patch.crates-io]` entries
-from GPUI Storybook's root `Cargo.toml` into the application's workspace root.
-They pin `gpui-pre-linux`, `gpui-pre-wgpu`, and `gpui-pre-platform` to the same
-Zed fork commit and retain `gpui-pre =0.3.7` for compatibility with `gpui-kit`.
-Commit the resolved `Cargo.lock`; Cargo patches are not inherited from
-dependencies. Verify the pinned path in the Storybook checkout with
-`just wayland-capture-test`.
+from GPUI Storybook's
+[`wayland-render-image` branch](https://github.com/stayhydated/gpui-storybook/blob/wayland-render-image/Cargo.toml)
+into the application's workspace root. They pin `gpui-pre-linux`,
+`gpui-pre-wgpu`, and `gpui-pre-platform` to the same Zed fork commit and retain
+`gpui-pre =0.3.7` for compatibility with `gpui-kit`. Commit the resolved
+`Cargo.lock`; Cargo patches are not inherited from dependencies. Verify the
+pinned path on that branch with `just wayland-capture-test`. The `master` branch
+uses published GPUI packages, including for portable headless capture.
 
 On Linux, install Sway plus `libgl1-mesa-dri` and `mesa-vulkan-drivers`, then
 install the reusable launcher and run stdio and startup-capture sessions
@@ -102,6 +104,131 @@ Scenarios workbench even when it is not installed as the default global.
 Retain the MCP automation state across calls until the transport or
 application host is explicitly stopped.
 
+## Backend integration
+
+Server and registry constructors accept `SharedAutomationBackend`
+(`Arc<dyn AutomationBackend>`). Core's gallery controller implements the
+interface and facade initialization connects it automatically. Custom hosts
+use the portable `gpui-storybook-automation` records and validation and dispatch
+through their existing application owner thread.
+
+Advertise an immutable capability set before constructing MCP. Tool exposure
+intersects those capabilities with the interaction opt-in. Validate every
+requested interaction family, sizing, control mutation, and capture capability
+before dispatching a complete batch. Retain host-side exclusive ownership until
+submitted work settles; cancellation never authorizes replay. Scenarios create
+fresh fixtures and ordinary interactions preserve state.
+
+## Embedded GPUI and Android hosts
+
+The Android integration is maintained through the main workspace and mobile
+release checks. In the repository, `just mobile-build [abi]` builds the opted-in
+APK, `just mobile-host <serial> [abi]` installs/launches it and serves MCP, and
+`just mobile-test <serial>` qualifies the running example on an owned API 36
+emulator. Build commands use `ANDROID_HOME` and `ANDROID_NDK_HOME`.
+Android x86_64 has emulator runtime evidence; arm64 has signed build evidence.
+The iOS lane checks target-neutral contracts.
+
+Use `gpui-storybook-automation-gpui` to attach to an application-owned root and
+window. Implement `EmbeddedRoot` for route selection, public revision, controls,
+action scope, presentation, and fresh-fixture construction. Register the root
+with `capture_story_view_with_scroll`, target/value wrappers, and a stable
+catalog. Retain `GpuiHostAttachment`, dispatch on the existing GPUI owner thread,
+and invalidate the attachment before surface replacement. Registries belong to
+that app/window; repeated keys in other contexts stay independent.
+
+Enable `device` for `DeviceCoordinator`; supply an opted-in endpoint, native
+snapshot, and queue adapter. Retain the selection permit, check its surface and
+admission immediately before native dispatch, and acknowledge applied or revoked
+work. Distinguish rejected enqueueing from unknown delivery; a response deadline
+retains ownership until acknowledgment or explicit host invalidation.
+
+On native surface release, call `OperationGate::suspend` immediately. This closes
+admission during the handoff to the GPUI owner. After invalidating the old
+attachment, `DeviceCoordinator::surface_replaced()` advances an endpoint-owned
+session generation and reopens admission atomically. Seed `DeviceEndpoint::listen`
+with a process-unique string of 1–107 bytes; native revisions stay observation metadata.
+
+The repository's `examples/embedded` shares its production `DemoRoot` with
+`examples/mobile`. The Android example uses Jetpack Compose Counter/Notes tabs,
+appearance, an independent native counter, one retained GPUI runtime, and an
+opted-in loopback device endpoint. Build and run using
+`examples/mobile/README.md`; its builder pins
+SDK/build tools 36, NDK 27.1.12297006, API baseline 31, and the `mobile` profile.
+GPUI Mobile revision `9075e3aa3eea812127f2c60ed66f0cd5798ff245` composes with the
+published GPUI 0.3.7 stack. Keep minimal mobile features and system-font inputs
+in qualification evidence.
+The Gradle 8.13 wrapper pins AGP 8.13.2, Kotlin/Compose compiler 2.3.10,
+Compose BOM 2025.12.01, and Activity Compose 1.11.0. Normal builds use checked-in
+dependency locks and SHA-256 verification metadata; refresh them deliberately
+with `build.py --write-gradle-locks` and review both artifacts.
+The Activity/input bridge, Compose shell, and native qualification harness use
+Kotlin with a JVM 17 target. Preserve the JNI callback descriptors during edits.
+The native builder shares the Gradle/compiler pins, verifies its independent
+AndroidX closure, and locks the Kotlin runtime; use its own
+`build.py --write-gradle-locks` deliberately when refreshing those dependencies.
+
+Supply native action descriptors and distinct native semantic-value keys in
+`NativeShellSnapshot`. Validate `NativeSelection::action()` before enqueueing
+`HostAction::Invoke`; ordinary native UI and MCP commands share one state owner,
+and acknowledgment follows its committed frame. The example advertises
+`compose.increment` and `compose.reset` with empty object arguments:
+
+```json
+{"action":{"action":"invoke","name":"compose.increment","arguments":{}}}
+```
+
+Read `native.compose-counter` as `{"count":1}` through semantic-value discovery
+or `storybook_read_value`. Compose counter state survives navigation and Activity
+recreation independently of GPUI scenario fixtures. AndroidX selectors use
+`By.res("storybook.compose.increment")`, `storybook.compose.reset`, and
+`storybook.compose.count`; navigation uses `storybook.counter`, `storybook.notes`,
+and `storybook.appearance`. Keep `testTagsAsResourceId` enabled on the Compose
+subtree and verify visible text after native/MCP actions.
+
+Run `gpui-storybook-mobile-host --serial DEVICE --allow-interaction` on Linux
+or macOS to attach. Installation, launching the example, and stopping it on EOF
+are explicit flags. EOF settles admitted captures and closes host connections; reconnection discovers the
+new catalog without replay. Surface replacement changes the session and invalidates
+old geometry, targets, capture tickets, and queued operations. Protocol v1 uses
+closed, length-prefixed JSON bounded to 1 MiB; the device holds one mutation lease
+through native acknowledgment, rendered readiness, and capture settlement.
+Incoming frames have an overall 30-second deadline, responses have a five-second
+write deadline, and endpoint drop closes sockets and joins transport threads.
+
+Discover native geometry/orientation with `storybook_get_host`, native action
+schemas with `storybook_list_host_actions`, and dispatch appearance with
+`storybook_dispatch_host_action`. `storybook_capture_host` accepts `display` or
+`gpui` plus a computer-owned PNG path. Display includes the native shell, visible
+IME, and system UI; GPUI crops the observed surface after IME insets. Captures
+return dimensions, request/session identity, route/surface revisions, geometry,
+and `adb_compositor_observation` provenance. This is a separately validated
+compositor observation. Explicit phone-sized desktop presets require
+`StorySizing`; the Android example uses observed dimensions.
+
+The computer uses pinned `adbutils-rs` primitives with host deadlines, bounded
+wire/shell/PNG reads, preserved shell-v2 status, and direct device connections.
+APK installation streams to an owned temporary path, installs once, and cleans
+that path without automatic uninstall. Captures survive caller cancellation on
+the attachment runtime; call `RemoteBackend::shutdown` after closing admission.
+The install deadline includes local file validation/opening; APK inputs must be
+regular files. PNGs replace their destination atomically after encoding and
+ticket settlement. Inspect both `operation` and `cleanup` in a
+`settlement_failed` result, retaining the primary mutation's replay prohibition.
+Use `RUST_LOG=gpui_storybook_mobile_host=debug` for stderr request/session tracing.
+
+Use the maintained `native/build.py` and `native/verify.py` AndroidX UI Automator
+2.4.0 harness for native selectors, real touch/IME input, rotation, pause/resume,
+and screenshot/hierarchy artifacts. Maven dependencies are hash-pinned and CI
+records the declared API 36 Pixel 7/AOSP inputs. Use `verify.py` for the raw stdio MCP proof and `verify_native.py` for native
+touch, AOSP en-US IME commits/insets, busy/disconnect/duplicate admission,
+partial progress, pause/resume, and recreation. GPUI mouse/text steps and native
+input are independently qualified. Preserve live state during navigation; only
+scenario fixture hooks reset the selected surface. Native permission dialogs
+and other application effects require their own native harness. iOS follow-up
+must prove native-main-thread dispatch, simulator transport, lifecycle, and
+permitted capture before advertising runtime support.
+
 ## MCP tools
 
 - `storybook_list_stories`
@@ -117,6 +244,10 @@ application host is explicitly stopped.
 - `storybook_reset_control`
 - `storybook_capture_current_story`
 - `storybook_capture_launch_env`
+- `storybook_get_host` (native host discovery)
+- `storybook_list_host_actions` (native host actions)
+- `storybook_dispatch_host_action` (native host actions and interaction opt-in)
+- `storybook_capture_host` (device display capture)
 - `storybook_list_actions` (interaction capability)
 - `storybook_list_interaction_targets` (interaction capability)
 - `storybook_click_target` (interaction capability)
@@ -285,8 +416,9 @@ Metal renderer on macOS and a Wgpu renderer on Linux, so runner captures run on
 both. Windows gets `Ok(None)`; its DirectX renderer reaches `render_to_image`
 only through a real window, outside the runner's headless context. Linux
 Wayland application captures use the Git-patched Wgpu window renderer and
-private Sway. The `mcp` feature supports Linux and macOS; Linux CI verifies
-application capture at desktop, tablet, mobile, and custom sizes.
+private Sway. The `mcp` feature supports Linux and macOS; the
+`wayland-render-image` branch verifies application capture at desktop, tablet,
+mobile, and custom sizes.
 Treat renderer, fonts, assets, and CI hardware as part of the baseline or timing
 environment; keep platform-specific accepted output where rasterization differs.
 

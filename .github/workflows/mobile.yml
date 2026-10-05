@@ -1,0 +1,98 @@
+name: mobile automation
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [aarch64-linux-android, x86_64-linux-android, aarch64-apple-ios]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@1.99.0
+        with:
+          targets: ${{ matrix.target }}
+      - name: Check neutral device contracts
+        run: cargo check -p gpui-storybook-automation -p gpui-storybook-mobile --target ${{ matrix.target }} --locked
+
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        abi: [x86_64, arm64-v8a]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@1.99.0
+        with:
+          targets: aarch64-linux-android,x86_64-linux-android
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: ./.github/actions/install-linux-deps
+      - name: Install explicit Android build inputs
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import subprocess
+          subprocess.run(["sdkmanager", "--licenses"], input="y\n" * 100, text=True, check=True, stdout=subprocess.DEVNULL)
+          PY
+          sdkmanager 'platforms;android-36' 'build-tools;36.0.0' 'ndk;27.1.12297006'
+      - name: Build opted-in Android composition and signed APK
+        shell: bash
+        run: >-
+          python3 examples/mobile/build.py --sdk "$ANDROID_HOME"
+          --ndk "$ANDROID_HOME/ndk/27.1.12297006"
+          --abi ${{ matrix.abi }} --automation --profile mobile
+      - name: Install declared emulator and system fonts
+        if: matrix.abi == 'x86_64'
+        run: sdkmanager emulator 'system-images;android-36;default;x86_64'
+      - name: Build computer MCP host
+        if: matrix.abi == 'x86_64'
+        run: cargo build -p gpui-storybook-mobile-host --locked
+      - name: Build hash-pinned AndroidX native qualification APK
+        if: matrix.abi == 'x86_64'
+        run: python3 examples/mobile/native/build.py --sdk "$ANDROID_HOME"
+      - name: Prove MCP and native lifecycle with SwiftShader Vulkan
+        if: matrix.abi == 'x86_64'
+        shell: bash
+        run: |
+          sudo chmod 666 /dev/kvm
+          printf 'no\n' | avdmanager create avd --force --name storybook_ci --package 'system-images;android-36;default;x86_64' --device pixel_7
+          mkdir -p target/mobile-evidence
+          "$ANDROID_HOME/emulator/emulator" -avd storybook_ci -port 5554 -no-window -no-audio -no-snapshot -no-boot-anim -gpu swiftshader > target/mobile-evidence/emulator.log 2>&1 &
+          trap 'adb -s emulator-5554 emu kill || true' EXIT
+          timeout 180 adb -s emulator-5554 wait-for-device
+          timeout 180 bash -c 'until [ "$(adb -s emulator-5554 shell getprop sys.boot_completed | tr -d "\r")" = 1 ]; do sleep 1; done'
+          adb -s emulator-5554 install --no-incremental -r target/mobile-example/x86_64/storybook.apk
+          adb -s emulator-5554 shell am start -n dev.storybook.mobile/.MainActivity --ez storybook_automation true
+          python3 examples/mobile/verify.py --serial emulator-5554
+          STORYBOOK_ANDROID_SERIAL=emulator-5554 cargo test -p gpui-storybook-mobile-host --test android --locked -- --ignored
+          python3 examples/mobile/verify_native.py --serial emulator-5554
+          python3 examples/mobile/native/verify.py --serial emulator-5554
+          python3 examples/mobile/verify.py --serial emulator-5554 --lifecycle-only --apk target/mobile-example/x86_64/storybook.apk
+          python3 examples/mobile/verify_lifecycle.py --serial emulator-5554
+          adb -s emulator-5554 shell getprop ro.build.fingerprint > target/mobile-evidence/system-image.txt
+          adb -s emulator-5554 logcat -d -s storybook-mobile > target/mobile-evidence/runtime.log
+          "$ANDROID_HOME/emulator/emulator" -version > target/mobile-evidence/emulator-version.txt
+      - name: Preserve scoped evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-${{ matrix.abi }}
+          path: |
+            target/mobile-example/${{ matrix.abi }}/storybook.apk
+            target/mobile-evidence/
+            target/mobile-native-apk/androidx.apk
+          retention-days: 7

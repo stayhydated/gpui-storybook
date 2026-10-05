@@ -12,13 +12,16 @@ readme = "README.md"
 [dependencies]
 component-shape-mcp = { workspace = true }
 frame-capture = { workspace = true }
-gpui-storybook-core = { features = [ "capture" ], workspace = true }
+gpui-storybook-automation = { workspace = true }
 rmcp = { workspace = true }
 schemars = { workspace = true }
 serde = { features = [ "derive" ], workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 tokio = { features = [ "rt-multi-thread", "sync", "time" ], workspace = true }
+
+[dev-dependencies]
+gpui-storybook-core = { features = [ "capture" ], workspace = true }
 
 [lints]
 workspace = true

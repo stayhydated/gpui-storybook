@@ -21,11 +21,21 @@ tooling without constructing stories or opening a window. Localized consumer
 metadata uses `try_localize_message(cx, &message)` and handles `Option<String>`
 through the application's locale context.
 
+The facade exposes `AutomationBackend`, `SharedAutomationBackend`, and portable
+capability types. Standard initialization installs the gallery backend for MCP.
+Embedded application roots use `gpui-storybook-automation-gpui`; maintained Android
+integration uses its reusable device coordinator, fresh session generations,
+direct ADB transport, atomic PNG publication, and
+AndroidX native qualification harness.
+The Android example exposes Jetpack Compose controls alongside embedded GPUI
+through advertised native actions, semantic values, and accessibility test tags.
+
 Live captures size the story canvas to a named viewport or explicit pixel
 dimensions and crop gallery chrome from the PNG.
 
-Linux Wayland window capture requires the GPUI Git patches from the repository
-root `Cargo.toml` in the application's workspace root.
+Linux Wayland window capture requires the GPUI Git patches from the
+[`wayland-render-image` branch](https://github.com/stayhydated/gpui-storybook/blob/wayland-render-image/Cargo.toml)
+in the application's workspace root.
 
 [codecov-badge]: https://codecov.io/github/stayhydated/gpui-storybook/branch/master/graph/badge.svg?component=gpui-storybook
 [codecov]: https://codecov.io/github/stayhydated/gpui-storybook

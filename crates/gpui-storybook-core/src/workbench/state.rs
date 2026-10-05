@@ -272,7 +272,7 @@ impl WorkbenchState {
         let story = self
             .active_story()
             .ok_or(StorybookAutomationError::NoActiveStory)?;
-        let snapshot = StorySnapshot::from_container(story.read(cx), cx)
+        let snapshot = crate::automation::story_snapshot_from_container(story.read(cx), cx)
             .ok_or(StorybookAutomationError::NoActiveStory)?;
         let target = story.read(cx).control_target().ok_or_else(|| {
             StorybookAutomationError::ControlsUnavailable {

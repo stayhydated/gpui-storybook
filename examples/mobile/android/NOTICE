@@ -1,0 +1,7 @@
+InputConnection portions of MainActivity.kt are adapted from GPUI Mobile.
+Source: example/android/gradle/app/src/main/java/dev/gpui/mobile/GpuiInputActivity.java
+Repository: https://github.com/longbridge/gpui-mobile
+Revision: 9075e3aa3eea812127f2c60ed66f0cd5798ff245
+License selected: Apache-2.0 (see LICENSE-APACHE)
+Modifications: Kotlin Compose/SurfaceView host, native tabs and appearance,
+IME inset ownership, and dispatch into the retained Storybook GPUI runtime.

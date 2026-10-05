@@ -124,10 +124,12 @@ pub use gpui_storybook_core::tokio_bridge;
 pub use gpui_storybook_core::{
     assets::Assets,
     automation::{
-        StoryActionSnapshot, StoryCaptureSnapshot, StoryInteractionCaptureRequest,
-        StoryInteractionDispatch, StoryInteractionObservation, StoryInteractionPostcondition,
-        StoryInteractionPostconditionSnapshot, StoryInteractionRequest, StoryInteractionSnapshot,
-        StoryInteractionStep, StoryInteractionTargetBounds, StoryInteractionTargetSnapshot,
+        AutomationBackend, AutomationCapabilities, AutomationCapability, BackendFuture,
+        SharedAutomationBackend, StoryActionSnapshot, StoryCaptureSnapshot,
+        StoryInteractionCaptureRequest, StoryInteractionDispatch, StoryInteractionObservation,
+        StoryInteractionPostcondition, StoryInteractionPostconditionSnapshot,
+        StoryInteractionRequest, StoryInteractionSnapshot, StoryInteractionStep,
+        StoryInteractionTargetBounds, StoryInteractionTargetSnapshot,
         StoryInteractionTargetsSnapshot, StoryModifier, StoryModifiers, StoryMouseButton,
         StoryPoint, StoryPointSpace, StoryScenarioRunSnapshot, StoryScenariosSnapshot,
         StorySemanticValueSnapshot, StorySemanticValuesSnapshot, StorybookAutomationError,
@@ -139,7 +141,7 @@ pub use gpui_storybook_core::{
     controls::{
         ControlBounds, ControlColor, ControlError, ControlKind, ControlSnapshot, ControlSpec,
         ControlTarget, ControlValue, ControlValueField, StoryControls, choice_control_value,
-        parse_choice_control_value,
+        control_color, hsla_color, parse_choice_control_value,
     },
     gallery::Gallery,
     language::{CurrentLanguage, Language},
