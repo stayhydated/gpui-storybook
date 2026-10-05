@@ -1,7 +1,7 @@
 # Android embedded automation
 
 A Jetpack Compose shell owns Counter/Notes tabs, appearance, and an independent
-native counter. Its Android Activity owns system/IME insets and a `SurfaceView`.
+native counter. Its Kotlin Activity owns system/IME insets and a `SurfaceView`.
 One retained GPUI Mobile runtime renders the production
 views from `examples/embedded`. This maintained example supplies the Android
 runtime and native qualification for Storybook's mobile integration.
@@ -29,6 +29,8 @@ example key under `target/mobile-example`.
 The checked-in Gradle 8.13 wrapper builds AGP 8.13.2, Kotlin/Compose compiler
 2.3.10, Compose BOM 2025.12.01, and Activity Compose 1.11.0. Dependency locks and
 SHA-256 verification metadata pin the resolved Android artifacts.
+The Activity, Compose shell, and AndroidX qualification harness are Kotlin,
+compiled for JVM 17. JNI callbacks retain their declared method descriptors.
 
 Discover `compose.increment` and `compose.reset` with
 `storybook_list_host_actions`, then call `storybook_dispatch_host_action`:

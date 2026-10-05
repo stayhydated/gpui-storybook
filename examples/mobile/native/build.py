@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Build a test-only APK from hash-pinned AndroidX artifacts without Gradle."""
+"""Build the Kotlin native qualification APK with pinned Gradle and AndroidX."""
 import argparse
 import hashlib
 import io
 import json
+import os
 from pathlib import Path
 import subprocess
 import shutil
@@ -14,15 +15,19 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--sdk", type=Path, required=True)
+parser.add_argument("--write-gradle-locks", action="store_true", help="Refresh Kotlin dependency locks and SHA-256 verification metadata")
 args = parser.parse_args()
 tools = args.sdk / "build-tools/36.0.0"
-android = args.sdk / "platforms/android-36/android.jar"
 build = ROOT / "target/mobile-native-apk"
 build.mkdir(parents=True, exist_ok=True)
-jars = []
+downloads = build / "downloads"
+downloads.mkdir(exist_ok=True)
+jars = build / "dependencies"
+shutil.rmtree(jars, ignore_errors=True)
+jars.mkdir()
 dependencies = json.loads((HERE / "androidx-dependencies.json").read_text())
 for dependency in dependencies:
-    path = build / dependency["filename"]
+    path = downloads / dependency["filename"]
     if not path.exists():
         path.write_bytes(urlopen(dependency["url"], timeout=30).read())
     data = path.read_bytes()
@@ -31,35 +36,33 @@ for dependency in dependencies:
         with zipfile.ZipFile(io.BytesIO(data)) as archive:
             for name in archive.namelist():
                 if name == "classes.jar" or (name.startswith("libs/") and name.endswith(".jar")):
-                    jar = build / (path.stem + "-" + name.replace("/", "-"))
+                    jar = jars / (path.stem + "-" + name.replace("/", "-"))
                     jar.write_bytes(archive.read(name))
-                    jars.append(jar)
     else:
-        jars.append(path)
+        shutil.copyfile(path, jars / path.name)
 
 
-def run(*command):
-    subprocess.run([str(value) for value in command], check=True)
+env = dict(os.environ)
+env["ANDROID_HOME"] = str(args.sdk.resolve())
+env["ANDROID_SDK_ROOT"] = str(args.sdk.resolve())
 
 
-classes, dex = build / "classes", build / "dex"
-shutil.rmtree(classes, ignore_errors=True)
-shutil.rmtree(dex, ignore_errors=True)
-classes.mkdir()
-dex.mkdir()
-run("javac", "-source", "8", "-target", "8", "-Xlint:-options", "-bootclasspath",
-    str(tools / "core-lambda-stubs.jar") + ":" + str(android), "-classpath",
-    ":".join(str(p) for p in jars), "-d", classes, HERE / "androidx/NativeQualification.java")
-compiled = build / "probe.jar"
-run("jar", "cf", compiled, "-C", classes, ".")
-run(tools / "d8", "--lib", android, "--min-api", "31", "--output", dex, compiled, *jars)
-unaligned, unsigned, apk = [build / name for name in ("unaligned.apk", "unsigned.apk", "androidx.apk")]
-run(tools / "aapt2", "link", "-I", android, "--manifest", HERE / "androidx/AndroidManifest.xml",
-    "-o", unaligned)
-with zipfile.ZipFile(unaligned, "a") as archive:
-    archive.write(dex / "classes.dex", "classes.dex")
-    archive.write(HERE / "androidx-dependencies.json", "assets/dependencies.json")
-run(tools / "zipalign", "-f", "-p", "4", unaligned, unsigned)
+def run(*command, cwd=ROOT):
+    subprocess.run([str(value) for value in command], cwd=cwd, env=env, check=True)
+
+
+assets = build / "assets"
+assets.mkdir(exist_ok=True)
+shutil.copyfile(HERE / "androidx-dependencies.json", assets / "dependencies.json")
+project = HERE.parent / "android"
+gradle = [project / "gradlew", "--no-daemon", ":native-qualification:assembleDebug",
+          f"-PstorybookBuildRoot={build / 'gradle'}", f"-PstorybookNativeJars={jars}",
+          f"-PstorybookNativeAssets={assets}"]
+if args.write_gradle_locks:
+    gradle += ["--write-locks", "--write-verification-metadata", "sha256"]
+run(*gradle, cwd=project)
+unsigned = build / "gradle/native-qualification/outputs/apk/debug/native-qualification-debug.apk"
+apk = build / "androidx.apk"
 key = build / "debug.keystore"
 if not key.exists():
     run("keytool", "-genkeypair", "-keystore", key, "-storepass", "android", "-keypass", "android",

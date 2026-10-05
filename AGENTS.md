@@ -74,6 +74,9 @@ instructions and book or API navigation to those linked surfaces.
   keys, MCP descriptors, and independent native/GPUI qualification aligned.
   Refresh Android dependencies deliberately with `build.py --write-gradle-locks`
   and review both Gradle locks and SHA-256 verification metadata.
+  The Kotlin native harness shares the app's Gradle/compiler pins and verifies
+  its AndroidX closure independently. Its builder owns a separate Gradle lockfile.
+  Preserve JVM descriptors when editing Kotlin JNI callbacks.
 - **Portable tests:** keep the test crate README, portable-testing and automation
   book sections, examples, and automation skill reference aligned when capture
   matrices, baseline policy, context setup, or frame budgets change.

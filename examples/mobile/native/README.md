@@ -23,9 +23,13 @@ The qualified AOSP key-row centers are measured from the observed keyboard
 bottom in density-independent pixels, allowing its suggestion strip to change
 height.
 
-The builder uses JDK 21, Android platform 36/build-tools 36.0.0, Android boot
-classes/lambda stubs, and the SHA-256-pinned Maven closure in
-`androidx-dependencies.json`. It signs `target/mobile-native-apk/androidx.apk`.
+The Kotlin harness uses the application's Gradle 8.13 wrapper, AGP 8.13.2,
+Kotlin 2.3.10 compiler, JVM 17 target, JDK 21, and Android platform
+36/build-tools 36.0.0. The builder verifies the AndroidX Maven closure in
+`androidx-dependencies.json`; Gradle locks and SHA-256 metadata verify its Kotlin
+runtime. Its annotations dependency comes from the independently pinned closure.
+Refresh the Kotlin locks deliberately with `build.py --write-gradle-locks`.
+The builder signs `target/mobile-native-apk/androidx.apk`.
 The runner explicitly selects one emulator and stops its test package after
 completion. Reports, instrumentation output, XML, and PNG live under
 `target/mobile-evidence/androidx`. The mobile CI workflow builds and runs this

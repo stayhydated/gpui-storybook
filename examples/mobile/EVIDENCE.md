@@ -93,6 +93,35 @@ read the wrong result field; it now checks the advertised `semantic_value`.
 Existing native harness D8 diagnostics remain recorded. Arm64 runtime, other
 keyboard layouts, and hosted platform jobs retain their qualification scope.
 
+## Kotlin native implementation
+
+The Activity/input bridge and independent AndroidX qualification harness are
+Kotlin. Compose callbacks use Kotlin function types. JNI methods remain instance
+methods on `dev.storybook.mobile.MainActivity`; compiled JVM descriptors were
+checked with `javap` before emulator execution. The InputConnection adapter
+retains session validation, batching, composing text, deletion, and focus ownership.
+Source attribution is preserved in the Kotlin header and packaged notice.
+
+The native harness uses the same pinned Gradle wrapper and Kotlin compiler as
+the application, targeting JVM 17. Its AndroidX closure remains independently
+hash-pinned. Kotlin stdlib 2.3.10 belongs to its checked-in Gradle lockfile and
+shared verification metadata; annotations 23.0.0 comes from the native closure.
+The stdlib's transitive annotations edge is excluded to preserve one copy.
+
+Signed x86_64 and arm64-v8a opted-in APKs and a default-feature arm64 APK built.
+The complete `just mobile-test emulator-5580` recipe passed against the Kotlin
+Activity and Kotlin instrumentation: MCP actions/values/captures, actual native
+and IME input, exclusive operation settlement, rotation, pause/resume, retained
+GPUI/Compose state, and native screenshot decoding. Native builds passed again
+with ordinary dependency verification and existing locks. Logs and compiled JNI
+descriptors are retained under `target/mobile-evidence/kotlin-*`.
+
+Conversion validation required clearing generated Java class outputs before the
+first Kotlin APK build. An inline helper in the anonymous InputConnection wrapper
+was rejected by the compiler and became an ordinary private function. The first
+harness build found two annotations versions; the resolved dependency edge above
+removes that duplication. Final builds and runtime proofs passed after these fixes.
+
 ## Qualified inputs
 
 | Input | Value |
@@ -102,7 +131,7 @@ keyboard layouts, and hosted platform jobs retain their qualification scope.
 | GPUI Mobile | `9075e3aa3eea812127f2c60ed66f0cd5798ff245` |
 | Android SDK / build tools | Platform 36 / 36.0.0 |
 | NDK / native API baseline | 27.1.12297006 / 31 |
-| Java | OpenJDK 21; Compose app JVM 17, independent native harness source/target 11 |
+| JVM | OpenJDK 21; Kotlin app and independent native harness target JVM 17 |
 | Android app build | Gradle 8.13, AGP 8.13.2, Kotlin/Compose compiler 2.3.10 |
 | Compose | BOM 2025.12.01, Activity Compose 1.11.0; locked dependencies with SHA-256 verification |
 | APK ABIs | x86_64 and arm64-v8a, signed and verified |

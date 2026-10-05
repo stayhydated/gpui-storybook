@@ -28,7 +28,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.unit.dp
-import java.util.function.BiConsumer
 
 /** Activity-owned state shared by Compose callbacks and admitted MCP commands. */
 class ComposeShell(
@@ -36,8 +35,8 @@ class ComposeShell(
     initialRoute: String,
     initialDark: Boolean,
     initialCount: Int,
-    private val selection: BiConsumer<String, Boolean>,
-    private val changed: Runnable,
+    private val selection: (String, Boolean) -> Unit,
+    private val changed: () -> Unit,
 ) {
     private var route by mutableStateOf(initialRoute)
     private var dark by mutableStateOf(initialDark)
@@ -55,7 +54,7 @@ class ComposeShell(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text("Embedded Storybook", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
-                            TextButton(onClick = { selection.accept(route, !dark) }, modifier = Modifier.testTag("storybook.appearance")) {
+                            TextButton(onClick = { selection(route, !dark) }, modifier = Modifier.testTag("storybook.appearance")) {
                                 Text(if (dark) "Light" else "Dark")
                             }
                         }
@@ -63,7 +62,7 @@ class ComposeShell(
                             for ((key, label) in listOf("counter" to "Counter", "notes" to "Notes")) {
                                 Tab(
                                     selected = route == "embedded-$key",
-                                    onClick = { selection.accept("embedded-$key", dark) },
+                                    onClick = { selection("embedded-$key", dark) },
                                     modifier = Modifier.testTag("storybook.$key"),
                                     text = { Text(label) },
                                 )
@@ -97,15 +96,15 @@ class ComposeShell(
 
     fun increment() {
         count = (count + 1).coerceAtMost(MAX_COUNT)
-        changed.run()
+        changed()
     }
 
     fun reset() {
         count = 0
-        changed.run()
+        changed()
     }
 
-    fun afterFrame(action: Runnable) {
+    fun afterFrame(action: () -> Unit) {
         view.viewTreeObserver.registerFrameCommitCallback(action)
         view.invalidate()
     }

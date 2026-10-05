@@ -13,4 +13,8 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "storybook-android"
-include(":app")
+if (providers.gradleProperty("storybookNativeJars").isPresent) {
+    include(":native-qualification")
+} else {
+    include(":app")
+}

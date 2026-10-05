@@ -81,15 +81,6 @@
     "license": "Eclipse Public License 1.0"
   },
   {
-    "group": "org.jetbrains.kotlin",
-    "artifact": "kotlin-stdlib",
-    "version": "2.1.20",
-    "filename": "kotlin-stdlib-2.1.20.jar",
-    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/2.1.20/kotlin-stdlib-2.1.20.jar",
-    "sha256": "1bcc74e8ce84e2c25eaafde10f1248349cce3062b6e36978cbeec610db1e930a",
-    "license": "The Apache License, Version 2.0"
-  },
-  {
     "group": "org.jetbrains.kotlinx",
     "artifact": "kotlinx-coroutines-core-jvm",
     "version": "1.8.1",

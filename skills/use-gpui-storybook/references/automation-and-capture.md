@@ -162,6 +162,11 @@ The Gradle 8.13 wrapper pins AGP 8.13.2, Kotlin/Compose compiler 2.3.10,
 Compose BOM 2025.12.01, and Activity Compose 1.11.0. Normal builds use checked-in
 dependency locks and SHA-256 verification metadata; refresh them deliberately
 with `build.py --write-gradle-locks` and review both artifacts.
+The Activity/input bridge, Compose shell, and native qualification harness use
+Kotlin with a JVM 17 target. Preserve the JNI callback descriptors during edits.
+The native builder shares the Gradle/compiler pins, verifies its independent
+AndroidX closure, and locks the Kotlin runtime; use its own
+`build.py --write-gradle-locks` deliberately when refreshing those dependencies.
 
 Supply native action descriptors and distinct native semantic-value keys in
 `NativeShellSnapshot`. Validate `NativeSelection::action()` before enqueueing

@@ -4,6 +4,8 @@ Attach automation to your application's existing GPUI root when a native shell
 owns navigation and the window lifecycle. The Counter/Notes example shares its
 production views between a desktop application and an Android Activity with
 Jetpack Compose tabs, an appearance control, and an independent native counter.
+The Android Activity, input bridge, Compose shell, and native qualification
+harness are written in Kotlin.
 
 Android automation is a maintained integration. Its device endpoint, reusable
 GPUI coordinator, computer MCP host, and AndroidX harness participate in the
@@ -119,6 +121,10 @@ The maintained AndroidX UI Automator 2.4.0 test APK uses hash-pinned Maven
 artifacts, native selectors, actual touch/IME input, rotation, pause/resume,
 hierarchy XML, and screenshot decoding. Its reports live under
 `target/mobile-evidence/androidx` and its APK under `target/mobile-native-apk`.
+Its Kotlin build shares the application's pinned Gradle/compiler inputs and
+targets JVM 17. AndroidX artifacts retain their independent hash verification;
+Gradle locks and SHA-256 metadata pin the Kotlin runtime. Refresh those locks
+deliberately with `native/build.py --sdk "$ANDROID_HOME" --write-gradle-locks`.
 The MCP proof records a raw JSON Lines MCP transcript and PNGs under
 `target/mobile-evidence`, exercises both routes and fresh scenarios, and verifies
 native/GPUI agreement and unsupported-request rejection.
