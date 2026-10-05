@@ -25,5 +25,6 @@ A response deadline retains ownership until acknowledgment or host invalidation.
 
 On native surface release, call `OperationGate::suspend` immediately. This closes
 admission during the handoff to the GPUI owner. After invalidating the old
-attachment, `DeviceCoordinator::surface_replaced` installs a new session and
-reopens admission atomically.
+attachment, `DeviceCoordinator::surface_replaced()` advances the endpoint-owned
+session generation and reopens admission atomically. Native surface revisions
+remain observation metadata; each replacement receives a fresh session.

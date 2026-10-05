@@ -17,11 +17,15 @@ gpui-storybook-automation = { workspace = true }
 gpui-storybook-mcp = { workspace = true }
 gpui-storybook-mobile = { workspace = true }
 image = { workspace = true }
+libc = { workspace = true }
 serde_json = { workspace = true }
+tempfile = { workspace = true }
 tokio = { features = [ "rt-multi-thread", "time", "net", "io-util", "fs" ], workspace = true }
+tokio-util = { features = [ "rt" ], workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { features = [ "env-filter" ], workspace = true }
 
 [dev-dependencies]
-tempfile = { workspace = true }
 tokio = { features = [ "macros", "test-util" ], workspace = true }
 
 [lints]

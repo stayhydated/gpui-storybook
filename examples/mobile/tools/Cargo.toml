@@ -15,7 +15,9 @@ adbutils = { default-features = false, features = [
   "apk",
 ], package = "adbutils-rs", version = "=0.1.0" }
 anyhow = "1.0"
+appium-client = "=0.2.2"
 clap = { features = [ "derive" ], version = "4.6" }
+http = "0.2"
 image = { default-features = false, features = [ "png" ], version = "0.25" }
 serde = { features = [ "derive" ], version = "1.0" }
 serde_json = "1.0"

@@ -7,6 +7,12 @@ use std::time::Duration;
 
 use adb_client::{ADBDeviceExt, server_device::ADBServerDevice};
 use anyhow::{Context, Result, bail, ensure};
+use appium_client::{
+    ClientBuilder,
+    capabilities::{AppCapable, AppiumCapability, UdidCapable, android::AndroidCapabilities},
+    commands::AppiumCommand,
+    find::{AppiumFind, By},
+};
 use clap::{Parser, ValueEnum};
 use serde_json::{Value, json};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -17,6 +23,7 @@ enum Candidate {
     Adbutils,
     Uiautomator,
     Uiautomator2,
+    Appium,
 }
 
 #[derive(Debug, Parser)]
@@ -34,6 +41,9 @@ struct Args {
     /// Bypass uiautomator2's server recovery for input operations.
     #[arg(long)]
     single_attempt: bool,
+    /// Exercise Appium cleanup without an awaited WebDriver close.
+    #[arg(long)]
+    appium_drop_only: bool,
 }
 
 enum Probe {
@@ -41,6 +51,7 @@ enum Probe {
     Adbutils(adbutils::AdbDevice),
     Uiautomator(uiautomator::JsonRpcClient),
     Uiautomator2(uiautomator2::Server, bool),
+    Appium(appium_client::AndroidClient, bool),
 }
 
 /// Bounded stdout/stderr for adb_client's streaming shell API.
@@ -97,6 +108,27 @@ impl Probe {
                 uiautomator2::connect_server(adb, args.port).await?,
                 args.single_attempt,
             ),
+            Candidate::Appium => {
+                let mut capabilities = AndroidCapabilities::new_uiautomator();
+                capabilities.udid(&args.serial);
+                capabilities.no_reset(true);
+                capabilities.set_bool("appium:autoLaunch", false);
+                capabilities.set_str("appium:appPackage", "dev.storybook.mobile");
+                capabilities.set_str("appium:appActivity", "dev.storybook.mobile.MainActivity");
+                capabilities.set_number("appium:systemPort", 5820.into());
+                capabilities.set_number("appium:newCommandTimeout", 30.into());
+                capabilities.set_number("appium:uiautomator2ServerReadTimeout", 10000.into());
+                Self::Appium(
+                    ClientBuilder::native(capabilities)
+                        .connect(
+                            args.rpc_url
+                                .as_deref()
+                                .context("Appium requires --rpc-url")?,
+                        )
+                        .await?,
+                    args.appium_drop_only,
+                )
+            },
         })
     }
 
@@ -191,10 +223,40 @@ impl Probe {
                         image::load_from_memory(&stdout.0)?.to_rgb8()
                     },
                     Self::Adbutils(device) => device.screenshot(None, false).await?,
+                    Self::Appium(client, _) => {
+                        image::load_from_memory(&client.screenshot().await?)?.to_rgb8()
+                    },
                     _ => bail!("screenshot is an ADB probe operation"),
                 };
                 image.save(path)?;
                 Ok(json!({"width":image.width(),"height":image.height()}))
+            },
+            "appium_source" => {
+                let Self::Appium(client, _) = self else {
+                    bail!("Appium operation")
+                };
+                Ok(json!(client.source().await?))
+            },
+            "appium_select" => {
+                let Self::Appium(client, _) = self else {
+                    bail!("Appium operation")
+                };
+                let prefix = serde_json::to_string(text(request, "prefix")?)?;
+                let element = client
+                    .find_by(By::uiautomator(&format!(
+                        "new UiSelector().textStartsWith({prefix})"
+                    )))
+                    .await?;
+                element.click().await?;
+                Ok(json!(true))
+            },
+            "appium_click" => {
+                let Self::Appium(client, _) = self else {
+                    bail!("Appium operation")
+                };
+                Ok(client.issue_cmd(AppiumCommand::Custom(http::Method::POST, "execute/sync".to_owned(), Some(json!({
+                    "script": "mobile: clickGesture", "args": [{"x":request["x"], "y":request["y"]}]
+                })))).await?)
             },
             "rpc" => {
                 let method = text(request, "method")?;
@@ -225,8 +287,12 @@ impl Probe {
     }
 
     async fn close(self) -> Result<()> {
-        if let Self::Uiautomator2(server, _) = self {
-            server.stop().await?;
+        match self {
+            Self::Uiautomator2(server, _) => server.stop().await?,
+            // Await the underlying WebDriver close explicitly; Appium's Drop
+            // spawns a separate best-effort delete and cannot prove settlement.
+            Self::Appium(client, false) => std::ops::Deref::deref(&client).clone().close().await?,
+            _ => (),
         }
         Ok(())
     }

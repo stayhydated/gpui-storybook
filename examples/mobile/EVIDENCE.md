@@ -132,9 +132,11 @@ session identity, receipts, mutation ownership, and capture provenance.
 | Public and publication surfaces | Rustdocs, crate/facade/root READMEs, book, integration reference, examples, and catalog are aligned. The reusable mobile workflow gates the main release job. The coordinated API publication boundary is 0.8.0; this local experiment stays at 0.7.1. |
 | Validation and isolation | All-feature Linux workspace tests, owning Clippy, Android Clippy/default build, both signed APK ABIs, neutral Android/iOS targets, public docs, book/LLM text/catalog, formatting, and package inventory pass. The local checkpoint stays on the experiment branch; master, Manefi, and the original plan are preserved, with no push. |
 
-The final owner tests include five endpoint cases, seven host transport/capture
-cases, the coordinator acknowledgment deadline case, and six embedded GPUI
-cases. The complete workspace suite also passes. The ADB peers carry real bounded
+The owner tests include eleven endpoint/state cases, thirteen host
+transport/capture/task cases, eighteen neutral contract cases, the coordinator
+acknowledgment deadline case, and six embedded GPUI cases. The complete Linux
+workspace suite passes with 323 tests and five platform/environment-gated cases
+ignored; the explicit Android shell/install test also passes on the emulator. The ADB peers carry real bounded
 wire traffic to a `DeviceEndpoint`; application counters and decoded artifacts
 are independent outcome oracles.
 
@@ -159,3 +161,66 @@ Cleanup operations use bounded connections to the selected device. If that
 device becomes unreachable, remote cleanup can fail and reports its error; the
 host never resolves an unknown outcome by replaying the mutation. Library users
 keep the attachment/first-install runtime alive through `shutdown`.
+
+## Further stabilization and crate adoption
+
+The follow-up audit's five findings are resolved in their owning crates. The
+2026-10-05 verification used fresh signed x86_64 and arm64-v8a APKs and the owned
+`gpui_android_api36` emulator. Evidence is retained in
+`target/mobile-evidence/further-stabilization-*`.
+
+| Requirement | Implementation and observable proof |
+| --- | --- |
+| Overall frame deadline and endpoint shutdown | A deadline-aware stream bounds the incoming prefix and body together, and response writes separately. Endpoint drop suspends admission, shuts down registered sockets, and joins transport threads. Real socket regressions send periodic incomplete prefixes/bodies, then verify closure before admission; drop closes incomplete reads and pending replies, revokes permits, and leaves an empty connection registry. |
+| APK special-file rejection and complete install deadline | Input metadata is checked before open; Unix opens use `O_NONBLOCK`, and opened-handle metadata is checked again. Validation/opening, upload, and installation share the install deadline. A real FIFO with a 50 ms install budget returns an input error without contacting ADB; owned shutdown settles without a writer. Real device testing preserves shell exit 7, the installed package, and temporary-file inventory after invalid APK installation. |
+| Fresh session identity | The endpoint generates a monotonically increasing suffix from a process-unique seed. Replacement clears receipts and revokes leases atomically, independently of native surface revision metadata. Property sequences verify distinct sessions and retained receipts; the public coordinator regression replaces twice against unchanged native observations and rejects old requests each time. Real native/AndroidX rotation observes a new session and retained application state. |
+| Secondary cleanup outcomes | `SettlementFailed` retains typed `operation` and `cleanup` errors and preserves the primary source. Real protocol peers fail installation and removal together, and fail PNG decoding and capture completion together. Both outcomes reach the caller; the MCP regression verifies both nested machine-readable errors, including an unknown request ID. |
+| Atomic PNG publication | `tempfile::NamedTempFile` encodes beside the destination and persists only after success. Regressions preserve prior bytes after partial encoding, preserve a directory on failed replacement, reclaim temporary files, and decode a successfully replaced PNG. Real MCP capture independently decodes display/GPUI dimensions and content and verifies their crop relationship. |
+| Owned host task tracking | `tokio-util::TaskTracker` replaces manual counters/notifications, with a mutex admission guard serializing registration and closure. Tests prove permanent closure and drainage of active work. Canceled install/capture callers leave their owned cleanup running until shutdown returns; real EOF verifies install, launch, detach/stop, and forwarding settlement. |
+| Structured tracing | `tracing` spans carry request/session identity and close timing; combined failures emit both errors. The CLI subscriber writes to stderr. The real raw MCP EOF proof runs with debug tracing and parses its stdout successfully; its log contains request IDs, elapsed install timing, and span close timing. |
+| Property and concurrency coverage | Three bounded `proptest` properties cover fragmented wire sequences, every generated request truncation, and session/receipt sequences. Two Loom models run the production gate transition methods under Loom's mutex, exploring replacement/old-release and suspension/admission orderings. Real sockets and GPUI/native tests cover their surrounding boundaries. |
+| Additional Android crate qualification | The unpublished tools workspace pins `appium-client =0.2.2`. Real native selectors, one-click public state, a dropped completed-click reply, a leased PNG, explicit session closure, asynchronous Drop, and clean forwarding pass with the isolated Appium server. The report and distribution/lifecycle limits are in `tools/EVIDENCE.md`. |
+
+Validation commands completed successfully:
+
+```sh
+cargo test --workspace --all-features --locked
+cargo test -p gpui-storybook-example-embedded --all-features --locked
+cargo clippy -p gpui-storybook-automation -p gpui-storybook-mobile \
+  -p gpui-storybook-mobile-host -p gpui-storybook-mcp \
+  -p gpui-storybook-automation-gpui -p gpui-storybook-example-embedded \
+  --all-targets --all-features --locked -- -D warnings
+cargo clippy -p gpui-storybook-mobile-host --all-targets --all-features --locked -- -D warnings
+cargo doc --workspace --all-features --no-deps --locked
+cargo check -p gpui-storybook-automation -p gpui-storybook-mobile \
+  --target aarch64-apple-ios --locked
+MDBOOK_BUILD__CREATE_MISSING=false cargo xtask build book
+MDBOOK_BUILD__CREATE_MISSING=false cargo xtask build llms-txt
+cargo xtask build web
+cargo build --manifest-path examples/mobile/tools/Cargo.toml --locked
+cargo clippy --manifest-path examples/mobile/tools/Cargo.toml --all-targets --locked -- -D warnings
+```
+
+Both Android builds used `examples/mobile/build.py --automation --profile mobile`
+with the declared SDK/NDK and each ABI. Runtime verification used `verify.py`,
+`verify_native.py`, `native/verify.py`, and `tools/appium.py` with explicit serial
+`emulator-5580`. The explicit Android Cargo test ran with
+`STORYBOOK_ANDROID_SERIAL=emulator-5580`. The EOF proof used debug tracing,
+`--lifecycle-only`, and the new x86_64 APK. The Appium PNG was inspected visually
+and showed native tabs, the GPUI counter at two, and its Increment control.
+
+Initial authoring checks caught the new MCP enum match arm, an incorrect test
+helper name/status assertion, the Appium selector's borrowed-string requirement,
+and incorrect route names in its runner. These were corrected before the passing
+runs. The changed TOML files were formatted after their initial format check.
+The final Rust/TOML/Markdown and Python checks pass.
+
+The TaskTracker guard and Loom models cover the stated lifecycle transitions;
+network, renderer, and JNI boundaries have their own integration evidence.
+Atomic replacement guarantees complete-file observation; durability across power
+loss requires a separate storage policy. Appium qualification covers the named
+Android inputs and injected reply failure. Hosted macOS/Windows/mobile jobs and
+iOS runtime qualification retain the limits documented above. The experiment
+keeps the coordinated 0.8.0 publication boundary and workspace version 0.7.1.
+The owned Appium server and emulator were stopped, and forwarding was clean.
+EOF stopped the owned example; master, Manefi, and the original plan were preserved.

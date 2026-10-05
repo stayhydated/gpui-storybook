@@ -33,6 +33,10 @@ The device endpoint binds IPv4 loopback at port 28437. The computer selects an
 ADB serial explicitly, opens direct device connections, and chooses PNG paths. Native route
 acknowledgment and rendered GPUI geometry precede success. Recreated surfaces
 receive a new session; attachment requires rediscovery.
+Session generations belong to the endpoint. Incomplete frames expire within
+30 seconds; endpoint drop closes sockets and joins its transport threads.
+The host publishes PNGs atomically and retains operation and cleanup failures
+together, including after caller cancellation.
 
 ```sh
 python3 examples/mobile/verify.py --serial emulator-5580

@@ -133,7 +133,7 @@ fn launch(cx: &mut gpui_kit::App) {
                     owner.surface = shell.surface;
                     #[cfg(feature = "automation")]
                     if let Some(automation) = &mut owner.automation {
-                        automation.surface_replaced(shell.surface);
+                        automation.surface_replaced();
                     }
                     owner.revision = u64::MAX;
                 }

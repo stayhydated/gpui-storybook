@@ -11,10 +11,17 @@ use tokio::{
     net::TcpStream,
 };
 
-use crate::{request_id, tasks::OwnedTasks, unavailable};
+use crate::{request_id, settle, tasks::OwnedTasks, unavailable};
 
 pub(crate) const MAX_CAPTURE_BYTES: usize = 64 * 1024 * 1024;
 const MAX_SHELL_BYTES: usize = 1024 * 1024;
+
+fn validate_apk(metadata: &std::fs::Metadata) -> Result<(), StorybookAutomationError> {
+    if !metadata.is_file() || metadata.len() == 0 || metadata.len() > 512 * 1024 * 1024 {
+        return Err(unavailable("APK must be a regular file of at most 512 MiB"));
+    }
+    Ok(())
+}
 
 /// Explicit device selection and overall I/O deadlines. The local ADB server
 /// owns transport selection; Storybook owns framing, limits, and input outcomes.
@@ -81,14 +88,12 @@ impl AdbTransport {
     /// Package-manager failures never trigger uninstall or mutation replay.
     pub async fn install(&self, path: std::path::PathBuf) -> Result<(), StorybookAutomationError> {
         let owner = self.installs.get_or_init(OwnedTasks::current);
-        let job = owner.admit()?;
         let transport = self.clone();
         let (reply, receiver) = tokio::sync::oneshot::channel();
         owner.spawn(async move {
-            let _job = job;
             let result = transport.install_owned(path).await;
             let _ = reply.send(result);
-        });
+        })?;
         receiver
             .await
             .map_err(|error| unavailable(error.to_string()))?
@@ -103,25 +108,40 @@ impl AdbTransport {
             .await;
     }
 
+    #[tracing::instrument(skip_all, fields(serial = self.serial(), request_id = tracing::field::Empty))]
     async fn install_owned(
         &self,
         path: std::path::PathBuf,
     ) -> Result<(), StorybookAutomationError> {
-        let mut file = tokio::fs::File::open(path)
-            .await
-            .map_err(|error| unavailable(error.to_string()))?;
-        let metadata = file
-            .metadata()
-            .await
-            .map_err(|error| unavailable(error.to_string()))?;
-        const MAX_APK_BYTES: u64 = 512 * 1024 * 1024;
-        if !metadata.is_file() || metadata.len() == 0 || metadata.len() > MAX_APK_BYTES {
-            return Err(unavailable("APK must be a regular file of at most 512 MiB"));
-        }
         let id = request_id();
+        tracing::Span::current().record("request_id", id);
         let remote = format!("/data/local/tmp/storybook-{}-{id}.apk", std::process::id());
+        let started = std::time::Instant::now();
+        let mut upload_started = false;
         let operation = async {
+            // Reject special files before open. O_NONBLOCK also prevents a FIFO
+            // swapped into this path between metadata and open from blocking
+            // Tokio's uncancellable filesystem worker. Check the opened handle
+            // again so a path replacement cannot bypass the regular-file policy.
+            let metadata = tokio::fs::metadata(&path)
+                .await
+                .map_err(|error| unavailable(error.to_string()))?;
+            validate_apk(&metadata)?;
+            let mut options = tokio::fs::OpenOptions::new();
+            options.read(true);
+            #[cfg(unix)]
+            options.custom_flags(libc::O_NONBLOCK);
+            let mut file = options
+                .open(&path)
+                .await
+                .map_err(|error| unavailable(error.to_string()))?;
+            let metadata = file
+                .metadata()
+                .await
+                .map_err(|error| unavailable(error.to_string()))?;
+            validate_apk(&metadata)?;
             let mut stream = self.service("sync:").await?;
+            upload_started = true;
             let upload = async {
                 let destination = format!("{remote},33188");
                 stream.write_all(b"SEND").await?;
@@ -183,16 +203,32 @@ impl AdbTransport {
         };
         let result = tokio::time::timeout(self.options.install_timeout, operation)
             .await
-            .map_err(|_| unknown(id, "APK install deadline exceeded"))
+            .map_err(|_| {
+                if upload_started {
+                    unknown(id, "APK install deadline exceeded")
+                } else {
+                    unavailable("APK input deadline exceeded before upload")
+                }
+            })
             .and_then(|result| result);
+        if !upload_started {
+            return result;
+        }
         let removed = self
             .shell(&["rm", "-f", &remote])
             .await
             .and_then(ShellOutput::require_success);
-        result?;
-        removed.map(|_| ())
+        let result = settle(result, removed.map(|_| ()), "remove uploaded APK", id);
+        tracing::debug!(
+            request_id = id,
+            elapsed_ms = started.elapsed().as_millis() as u64,
+            success = result.is_ok(),
+            "APK install settled"
+        );
+        result.map(|((), ())| ())
     }
 
+    #[tracing::instrument(skip_all, fields(serial = self.serial(), request_id = id, session))]
     pub(crate) async fn exchange(
         &self,
         port: u16,

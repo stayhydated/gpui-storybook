@@ -9,122 +9,25 @@
 
 use gpui_storybook_automation::{StorybookAutomationError, wire::*};
 use std::{
-    collections::{BTreeSet, VecDeque},
+    collections::BTreeMap,
     io,
     net::{TcpListener, TcpStream},
     sync::{
         Arc, Mutex,
-        atomic::{AtomicBool, AtomicUsize, Ordering},
+        atomic::{AtomicBool, Ordering},
         mpsc::{self, Receiver, SyncSender},
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
+
+mod gate;
+use gate::GateState;
+pub use gate::{MutationLease, MutationPermit, OperationGate};
 
 pub const DEVICE_PORT: u16 = 28437;
 const QUEUE_CAPACITY: usize = 32;
 const MAX_CONNECTIONS: usize = 4;
 const RECEIPT_CAPACITY: usize = 4096;
-
-#[derive(Default)]
-struct Receipts {
-    ids: BTreeSet<u64>,
-    order: VecDeque<u64>,
-}
-impl Receipts {
-    fn insert(&mut self, id: u64) {
-        self.ids.insert(id);
-        self.order.push_back(id);
-        if self.order.len() > RECEIPT_CAPACITY {
-            self.ids
-                .remove(&self.order.pop_front().expect("full receipt window"));
-        }
-    }
-}
-
-#[derive(Default)]
-struct GateState {
-    active: Option<u64>,
-    next: u64,
-    suspended: bool,
-    session: String,
-    receipts: Receipts,
-}
-
-impl GateState {
-    fn acquire(&mut self, gate: OperationGate) -> Result<MutationLease, StorybookAutomationError> {
-        if self.suspended {
-            return Err(StorybookAutomationError::NoLiveHost);
-        }
-        if self.active.is_some() {
-            return Err(StorybookAutomationError::AutomationBusy);
-        }
-        self.next = self.next.checked_add(1).expect("operation IDs exhausted");
-        let token = self.next;
-        self.active = Some(token);
-        Ok(MutationLease { gate, token })
-    }
-}
-
-#[derive(Clone, Default)]
-pub struct OperationGate(Arc<Mutex<GateState>>);
-impl OperationGate {
-    pub fn acquire(&self) -> Result<MutationLease, StorybookAutomationError> {
-        let mut state = self.0.lock().expect("operation gate");
-        state.acquire(self.clone())
-    }
-    pub fn invalidate(&self) {
-        self.0.lock().expect("operation gate").active = None;
-    }
-    /// Revoke work and stop admission immediately on the native surface owner
-    /// thread. Session replacement reopens it after GPUI attachment invalidation.
-    pub fn suspend(&self) {
-        let mut state = self.0.lock().expect("operation gate");
-        state.suspended = true;
-        state.active = None;
-    }
-    pub fn busy(&self) -> bool {
-        self.0.lock().expect("operation gate").active.is_some()
-    }
-}
-
-pub struct MutationLease {
-    gate: OperationGate,
-    token: u64,
-}
-/// A non-owning permit for work queued on a native owner thread. Cloning it
-/// never extends or releases ownership. The callback checks it immediately
-/// before dispatch, serialized with that thread's surface lifecycle callbacks.
-#[derive(Clone)]
-pub struct MutationPermit {
-    gate: OperationGate,
-    token: u64,
-}
-impl MutationPermit {
-    pub fn is_current(&self) -> bool {
-        self.gate.0.lock().expect("operation gate").active == Some(self.token)
-    }
-}
-impl MutationLease {
-    /// Whether this lease still owns the device operation. Explicit host
-    /// invalidation revokes queued work; callers check before native dispatch.
-    pub fn is_current(&self) -> bool {
-        self.gate.0.lock().expect("operation gate").active == Some(self.token)
-    }
-    pub fn permit(&self) -> MutationPermit {
-        MutationPermit {
-            gate: self.gate.clone(),
-            token: self.token,
-        }
-    }
-}
-impl Drop for MutationLease {
-    fn drop(&mut self) {
-        let mut state = self.gate.0.lock().expect("operation gate");
-        if state.active == Some(self.token) {
-            state.active = None;
-        }
-    }
-}
 
 pub struct AdmittedRequest {
     request: DeviceRequest,
@@ -163,36 +66,67 @@ impl AdmittedRequest {
 struct SharedEndpoint {
     gate: OperationGate,
     sender: SyncSender<AdmittedRequest>,
-    connections: AtomicUsize,
+    connections: Mutex<Connections>,
     closed: AtomicBool,
+    frame_timeout: Duration,
+}
+
+#[derive(Default)]
+struct Connections {
+    next: u64,
+    streams: BTreeMap<u64, TcpStream>,
 }
 
 pub struct DeviceEndpoint {
     shared: Arc<SharedEndpoint>,
     receiver: Receiver<AdmittedRequest>,
     port: u16,
+    listener: Option<std::thread::JoinHandle<Vec<std::thread::JoinHandle<()>>>>,
 }
 impl DeviceEndpoint {
-    /// Bind only IPv4 loopback. Call only after application build/runtime opt-in.
+    /// Bind only IPv4 loopback with a 30-second overall frame deadline. Supply a
+    /// process-unique session seed of 1–107 bytes; this endpoint generates fresh
+    /// generations on replacement. Drop closes sockets and joins transport threads.
+    /// Call only after application build/runtime opt-in.
     pub fn listen(port: u16, session: String) -> io::Result<Self> {
+        Self::listen_with_timeout(port, session, Duration::from_secs(30))
+    }
+    fn listen_with_timeout(
+        port: u16,
+        session: String,
+        frame_timeout: Duration,
+    ) -> io::Result<Self> {
+        if session.is_empty() || session.len() > 107 || frame_timeout.is_zero() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "invalid session seed or frame deadline",
+            ));
+        }
         let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, port))?;
         let port = listener.local_addr()?.port();
         listener.set_nonblocking(true)?;
         let (sender, receiver) = mpsc::sync_channel(QUEUE_CAPACITY);
         let shared = Arc::new(SharedEndpoint {
-            gate: OperationGate(Arc::new(Mutex::new(GateState {
-                session,
-                ..Default::default()
-            }))),
+            gate: OperationGate(Arc::new(Mutex::new(GateState::new(session)))),
             sender,
-            connections: AtomicUsize::new(0),
+            connections: Mutex::new(Connections::default()),
             closed: AtomicBool::new(false),
+            frame_timeout,
         });
         let service = shared.clone();
-        std::thread::Builder::new()
+        let listener = std::thread::Builder::new()
             .name("storybook-device-listener".to_owned())
             .spawn(move || {
+                let mut threads: Vec<std::thread::JoinHandle<()>> = Vec::new();
                 while !service.closed.load(Ordering::Acquire) {
+                    let mut ix = 0;
+                    while ix < threads.len() {
+                        if threads[ix].is_finished() {
+                            let _ = threads.swap_remove(ix).join();
+                        } else {
+                            ix += 1;
+                        }
+                    }
                     let stream = match listener.accept() {
                         Ok((stream, _)) => stream,
                         Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
@@ -201,32 +135,47 @@ impl DeviceEndpoint {
                         },
                         Err(_) => break,
                     };
-                    if service
-                        .connections
-                        .try_update(Ordering::AcqRel, Ordering::Acquire, |value| {
-                            (value < MAX_CONNECTIONS).then_some(value + 1)
-                        })
-                        .is_err()
-                    {
-                        continue;
-                    }
+                    // Registration and closing share a lock so shutdown cannot
+                    // miss a socket accepted concurrently with endpoint drop.
+                    let connection = {
+                        let mut connections =
+                            service.connections.lock().expect("device connections");
+                        if service.closed.load(Ordering::Acquire)
+                            || connections.streams.len() >= MAX_CONNECTIONS
+                        {
+                            continue;
+                        }
+                        let Ok(socket) = stream.try_clone() else {
+                            continue;
+                        };
+                        connections.next += 1;
+                        let id = connections.next;
+                        connections.streams.insert(id, socket);
+                        Connection {
+                            shared: service.clone(),
+                            id,
+                        }
+                    };
                     let service = service.clone();
-                    let connection = ConnectionCount(service.clone());
-                    if let Err(error) = std::thread::Builder::new()
+                    match std::thread::Builder::new()
                         .name("storybook-device-connection".to_owned())
                         .spawn(move || {
                             let _connection = connection;
-                            let _ = serve_connection(stream, &service);
-                        })
-                    {
-                        eprintln!("device connection spawn failed: {error}");
+                            if let Err(error) = serve_connection(stream, &service) {
+                                tracing::debug!(%error, "device connection closed");
+                            }
+                        }) {
+                        Ok(thread) => threads.push(thread),
+                        Err(error) => tracing::error!(%error, "device connection spawn failed"),
                     }
                 }
+                threads
             })?;
         Ok(Self {
             shared,
             receiver,
             port,
+            listener: Some(listener),
         })
     }
     pub fn port(&self) -> u16 {
@@ -257,14 +206,15 @@ impl DeviceEndpoint {
     pub fn gate(&self) -> OperationGate {
         self.shared.gate.clone()
     }
-    pub fn replace_session(&self, session: String) {
+    /// Revoke work and atomically reopen admission with a never-reused session.
+    /// Receipt clearing is tied to the endpoint-owned generation, independent of
+    /// native revision values supplied by the application.
+    pub fn replace_session(&self) {
         // Admission, receipts, and lease invalidation share one linearization
         // point. An old-session request cannot acquire a new-session lease.
         let mut state = self.shared.gate.0.lock().expect("operation gate");
-        state.session = session;
-        state.receipts = Receipts::default();
-        state.active = None;
-        state.suspended = false;
+        state.rotate();
+        tracing::debug!(session = %state.session, "device session replaced");
     }
     pub fn session(&self) -> String {
         self.shared
@@ -279,24 +229,77 @@ impl DeviceEndpoint {
 
 impl Drop for DeviceEndpoint {
     fn drop(&mut self) {
-        self.shared.closed.store(true, Ordering::Release);
-        self.shared.gate.invalidate();
+        {
+            let connections = self.shared.connections.lock().expect("device connections");
+            self.shared.closed.store(true, Ordering::Release);
+            for stream in connections.streams.values() {
+                let _ = stream.shutdown(std::net::Shutdown::Both);
+            }
+        }
+        self.shared.gate.suspend();
+        if let Some(listener) = self.listener.take()
+            && let Ok(threads) = listener.join()
+        {
+            for thread in threads {
+                let _ = thread.join();
+            }
+        }
     }
 }
 
-struct ConnectionCount(Arc<SharedEndpoint>);
-impl Drop for ConnectionCount {
+struct Connection {
+    shared: Arc<SharedEndpoint>,
+    id: u64,
+}
+impl Drop for Connection {
     fn drop(&mut self) {
-        self.0.connections.fetch_sub(1, Ordering::AcqRel);
+        self.shared
+            .connections
+            .lock()
+            .expect("device connections")
+            .streams
+            .remove(&self.id);
+    }
+}
+
+struct DeadlineStream<'a> {
+    stream: &'a mut TcpStream,
+    deadline: Instant,
+}
+impl DeadlineStream<'_> {
+    fn remaining(&self) -> io::Result<Duration> {
+        self.deadline
+            .checked_duration_since(Instant::now())
+            .filter(|duration| !duration.is_zero())
+            .ok_or_else(|| {
+                io::Error::new(io::ErrorKind::TimedOut, "overall frame deadline exceeded")
+            })
+    }
+}
+impl io::Read for DeadlineStream<'_> {
+    fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
+        self.stream.set_read_timeout(Some(self.remaining()?))?;
+        io::Read::read(self.stream, bytes)
+    }
+}
+impl io::Write for DeadlineStream<'_> {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        self.stream.set_write_timeout(Some(self.remaining()?))?;
+        io::Write::write(self.stream, bytes)
+    }
+    fn flush(&mut self) -> io::Result<()> {
+        io::Write::flush(self.stream)
     }
 }
 
 fn serve_connection(mut stream: TcpStream, shared: &SharedEndpoint) -> io::Result<()> {
-    stream.set_read_timeout(Some(Duration::from_secs(30)))?;
-    stream.set_write_timeout(Some(Duration::from_secs(5)))?;
     while !shared.closed.load(Ordering::Acquire) {
-        let request: DeviceRequest = read_frame(&mut stream)?;
+        let request: DeviceRequest = read_frame(&mut DeadlineStream {
+            stream: &mut stream,
+            deadline: Instant::now() + shared.frame_timeout,
+        })?;
         let request_id = request.request_id();
+        let started = Instant::now();
         let (response, receiver) = mpsc::sync_channel(1);
         let mut rejected_lease = None;
         let (session, admission) = {
@@ -313,7 +316,7 @@ fn serve_connection(mut stream: TcpStream, shared: &SharedEndpoint) -> io::Resul
                     });
                 }
                 let lease = if request.command().mutates() {
-                    Some(state.acquire(shared.gate.clone())?)
+                    Some(shared.gate.lease(state.acquire_token()?))
                 } else {
                     None
                 };
@@ -347,17 +350,32 @@ fn serve_connection(mut stream: TcpStream, shared: &SharedEndpoint) -> io::Resul
         drop(rejected_lease);
         let outcome = match admission {
             Err(error) => Err(error),
-            Ok(()) => receiver
-                .recv_timeout(Duration::from_secs(25))
-                .unwrap_or_else(|error| {
-                    Err(StorybookAutomationError::OutcomeUnknown {
-                        request_id,
-                        message: error.to_string(),
-                    })
-                }),
+            Ok(()) => {
+                let deadline = Instant::now() + Duration::from_secs(25);
+                loop {
+                    if shared.closed.load(Ordering::Acquire) {
+                        return Ok(());
+                    }
+                    let remaining = deadline.saturating_duration_since(Instant::now());
+                    match receiver.recv_timeout(remaining.min(Duration::from_millis(50))) {
+                        Ok(outcome) => break outcome,
+                        Err(mpsc::RecvTimeoutError::Timeout) if !remaining.is_zero() => continue,
+                        Err(error) => {
+                            break Err(StorybookAutomationError::OutcomeUnknown {
+                                request_id,
+                                message: error.to_string(),
+                            });
+                        },
+                    }
+                }
+            },
         };
+        tracing::debug!(request_id, %session, elapsed_ms = started.elapsed().as_millis() as u64, success = outcome.is_ok(), "device response settled");
         write_frame(
-            &mut stream,
+            &mut DeadlineStream {
+                stream: &mut stream,
+                deadline: Instant::now() + Duration::from_secs(5),
+            },
             &DeviceResponse::builder()
                 .protocol_version(PROTOCOL_VERSION)
                 .session(session)
@@ -489,7 +507,7 @@ mod tests {
             .unwrap();
         drop(lease);
         assert!(!endpoint.gate().busy());
-        endpoint.replace_session("surface-2".to_owned());
+        endpoint.replace_session();
         write_frame(
             &mut second,
             &request(
@@ -522,6 +540,90 @@ mod tests {
             assert_eq!(stream.read(&mut byte).unwrap(), 0);
             assert!(endpoint.try_recv().is_none()); assert!(!endpoint.gate().busy());
         }
+    }
+
+    #[test]
+    fn trickled_frames_expire_without_admission() {
+        use std::io::{Read as _, Write as _};
+        for partial_prefix in [false, true] {
+            let endpoint = DeviceEndpoint::listen_with_timeout(
+                0,
+                "process".to_owned(),
+                Duration::from_millis(150),
+            )
+            .unwrap();
+            let mut stream = connect(&endpoint);
+            if !partial_prefix {
+                stream.write_all(&1000u32.to_be_bytes()).unwrap();
+            }
+            let mut writer = stream.try_clone().unwrap();
+            let started = Instant::now();
+            let sender = std::thread::spawn(move || {
+                let prefix = 1000u32.to_be_bytes();
+                let bytes = prefix
+                    .into_iter()
+                    .skip(if partial_prefix { 0 } else { 4 })
+                    .chain(std::iter::repeat(b' '));
+                for byte in bytes {
+                    if writer.write_all(&[byte]).is_err() {
+                        break;
+                    }
+                    if started.elapsed() > Duration::from_secs(3) {
+                        break;
+                    }
+                    std::thread::sleep(Duration::from_millis(10));
+                }
+            });
+            let result = stream.read(&mut [0]);
+            assert!(
+                matches!(result, Ok(0))
+                    || result.is_err_and(|error| error.kind() == io::ErrorKind::ConnectionReset)
+            );
+            sender.join().unwrap();
+            assert!(started.elapsed() < Duration::from_secs(2));
+            assert!(endpoint.try_recv().is_none());
+            assert!(!endpoint.gate().busy());
+        }
+    }
+
+    #[test]
+    fn drop_closes_incomplete_frames_and_waiting_responses() {
+        use std::io::{Read as _, Write as _};
+        let endpoint = DeviceEndpoint::listen(0, "process".to_owned()).unwrap();
+        let shared = endpoint.shared.clone();
+        let mut partial = connect(&endpoint);
+        partial.write_all(&100u32.to_be_bytes()).unwrap();
+        partial.write_all(b"{").unwrap();
+        let mut waiting = connect(&endpoint);
+        write_frame(
+            &mut waiting,
+            &request(
+                81,
+                PROTOCOL_VERSION,
+                "process",
+                DeviceOperation::OpenStory {
+                    key: "counter".to_owned(),
+                },
+            ),
+        )
+        .unwrap();
+        let owned = admitted(&endpoint);
+        let permit = owned.permit().unwrap();
+        drop(endpoint);
+        assert!(!permit.is_current());
+        assert!(shared.connections.lock().unwrap().streams.is_empty());
+        for mut socket in [partial, waiting] {
+            let result = socket.read(&mut [0]);
+            assert!(
+                matches!(result, Ok(0))
+                    || result.is_err_and(|error| error.kind() == io::ErrorKind::ConnectionReset)
+            );
+        }
+        drop(owned);
+        assert_eq!(
+            shared.gate.acquire().err(),
+            Some(StorybookAutomationError::NoLiveHost)
+        );
     }
 
     #[test]
@@ -564,7 +666,7 @@ mod tests {
             assert!(std::time::Instant::now() < deadline, "old work admission");
             std::thread::yield_now();
         }
-        endpoint.replace_session("surface-2".to_owned());
+        endpoint.replace_session();
         let mut current = connect(&endpoint);
         // A receipt belongs to its session; the new host can admit the same ID.
         write_frame(
@@ -572,7 +674,7 @@ mod tests {
             &request(
                 10,
                 PROTOCOL_VERSION,
-                "surface-2",
+                "surface-1.1",
                 DeviceOperation::OpenStory {
                     key: "notes".to_owned(),
                 },
@@ -580,7 +682,7 @@ mod tests {
         )
         .unwrap();
         let (request, response, lease) = admitted(&endpoint).into_parts();
-        assert_eq!(request.session(), "surface-2");
+        assert_eq!(request.session(), "surface-1.1");
         assert!(lease.as_ref().unwrap().is_current());
         assert!(endpoint.gate().busy());
         assert!(matches!(
@@ -636,13 +738,13 @@ mod tests {
             ));
             assert!(endpoint.try_recv().is_none());
         }
-        endpoint.replace_session("surface-2".to_owned());
+        endpoint.replace_session();
         write_frame(
             &mut stream,
             &request(
                 61,
                 PROTOCOL_VERSION,
-                "surface-2",
+                "surface-1.1",
                 DeviceOperation::OpenStory {
                     key: "counter".to_owned(),
                 },

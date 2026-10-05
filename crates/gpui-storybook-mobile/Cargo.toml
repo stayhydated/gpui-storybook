@@ -11,6 +11,11 @@ readme = "README.md"
 
 [dependencies]
 gpui-storybook-automation = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+loom = { workspace = true }
+proptest = { workspace = true }
 
 [lints]
 workspace = true

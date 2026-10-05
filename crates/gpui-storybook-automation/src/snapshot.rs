@@ -140,6 +140,14 @@ pub struct StoryCaptureSnapshot {
 #[derive(Clone, Debug, Deserialize, Eq, Error, JsonSchema, PartialEq, Serialize)]
 #[serde(tag = "code", rename_all = "snake_case", deny_unknown_fields)]
 pub enum StorybookAutomationError {
+    /// An operation failed and its subsequent settlement also failed. Both
+    /// typed outcomes are retained; an unknown mutation outcome still forbids replay.
+    #[error("{operation}; cleanup also failed: {cleanup}")]
+    SettlementFailed {
+        #[source]
+        operation: Box<StorybookAutomationError>,
+        cleanup: Box<StorybookAutomationError>,
+    },
     #[error("automation protocol mismatch: expected {expected}, received {actual}")]
     ProtocolMismatch { expected: u32, actual: u32 },
     #[error("automation host identity changed: {message}")]

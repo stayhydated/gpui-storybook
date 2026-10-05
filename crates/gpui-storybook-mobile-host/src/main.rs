@@ -82,6 +82,13 @@ async fn attach(transport: AdbTransport, port: u16) -> Result<RemoteBackend, Hos
 }
 
 fn main() -> Result<(), HostError> {
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "warn".into()),
+        )
+        .with_writer(std::io::stderr)
+        .with_span_events(tracing_subscriber::fmt::format::FmtSpan::CLOSE)
+        .init();
     let arguments = Arguments::parse();
     let runtime = tokio::runtime::Runtime::new()?;
     let transport = AdbTransport::new(

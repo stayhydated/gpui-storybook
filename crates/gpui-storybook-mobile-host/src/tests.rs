@@ -113,6 +113,7 @@ enum Fault {
     HoldReply,
     WrongDescriptor,
     ChangedCapabilities,
+    LostFinishReply,
 }
 struct Gateway {
     address: std::net::SocketAddr,
@@ -180,6 +181,11 @@ async fn gateway(port: u16, fault: Fault, png: Vec<u8>) -> Gateway {
                     let size = device.read_u32().await.unwrap() as usize;
                     let mut body = vec![0; size];
                     device.read_exact(&mut body).await.unwrap();
+                    if matches!(fault, Fault::LostFinishReply)
+                        && matches!(request.command(), DeviceOperation::FinishCapture { .. })
+                    {
+                        return;
+                    }
                     if request.command().mutates() {
                         match fault {
                             Fault::LostReply => return,
@@ -218,7 +224,7 @@ async fn gateway(port: u16, fault: Fault, png: Vec<u8>) -> Gateway {
                                 }
                                 body = serde_json::to_vec(&response).unwrap();
                             },
-                            Fault::None => (),
+                            Fault::None | Fault::LostFinishReply => (),
                         }
                     }
                     let _ = stream.write_u32(body.len() as u32).await;
@@ -389,6 +395,15 @@ async fn canceled_capture_and_provider_error_both_settle_the_device_ticket() {
 
 #[tokio::test]
 async fn canceled_install_finishes_owned_file_cleanup_before_shutdown_returns() {
+    install_cleanup_case(true, false).await;
+}
+
+#[tokio::test]
+async fn failed_install_and_file_cleanup_both_reach_the_caller() {
+    install_cleanup_case(false, true).await;
+}
+
+async fn install_cleanup_case(cancel: bool, cleanup_fails: bool) {
     let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
     let address = listener.local_addr().unwrap();
     let remote_directory = tempfile::tempdir().unwrap();
@@ -442,8 +457,12 @@ async fn canceled_install_finishes_owned_file_cleanup_before_shutdown_returns() 
                 } else {
                     assert!(service.starts_with("shell,v2,raw:"));
                     let status = if service.starts_with("shell,v2,raw:rm -f ") {
-                        std::fs::remove_file(observed).unwrap();
-                        0
+                        if cleanup_fails {
+                            7
+                        } else {
+                            std::fs::remove_file(observed).unwrap();
+                            0
+                        }
                     } else {
                         assert!(service.starts_with("shell,v2,raw:pm install -r -t "));
                         1 // Package-manager failure still requires owned artifact cleanup.
@@ -469,17 +488,29 @@ async fn canceled_install_finishes_owned_file_cleanup_before_shutdown_returns() 
     let caller = tokio::spawn(async move { caller_transport.install(source).await });
     uploads.recv().await.unwrap();
     assert_eq!(std::fs::read(&remote).unwrap(), contents);
-    caller.abort();
-    assert!(caller.await.unwrap_err().is_cancelled());
+    if cancel {
+        caller.abort();
+    }
     assert!(
         remote.exists(),
         "queued completion still owns the uploaded artifact"
     );
     release.add_permits(1);
+    let returned = caller.await;
+    if cancel {
+        assert!(returned.unwrap_err().is_cancelled());
+    } else {
+        let error = returned.unwrap().unwrap_err();
+        let StorybookAutomationError::SettlementFailed { operation, cleanup } = error else {
+            panic!("both errors must survive")
+        };
+        assert!(operation.to_string().contains("exited 1"));
+        assert!(cleanup.to_string().contains("exited 7"));
+    }
     tokio::time::timeout(std::time::Duration::from_secs(3), transport.shutdown())
         .await
         .unwrap();
-    assert!(!remote.exists());
+    assert_eq!(remote.exists(), cleanup_fails);
     assert!(
         transport.install(path).await.is_err(),
         "shutdown closes install admission"
@@ -535,4 +566,156 @@ async fn inconsistent_capture_metadata_releases_ownership_before_observation() {
         assert!(!device.gate.busy());
         assert!(!path.exists());
     }
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn fifo_apk_is_rejected_without_adb_or_a_blocked_filesystem_worker() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("input.apk");
+    let name = std::ffi::CString::new(path.as_os_str().as_encoded_bytes()).unwrap();
+    // SAFETY: name is a NUL-terminated, live pathname in this test's private directory.
+    assert_eq!(unsafe { libc::mkfifo(name.as_ptr(), 0o600) }, 0);
+    let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
+    let transport = AdbTransport::new(
+        AdbTransportOptions::builder()
+            .serial("qualification-device".to_owned())
+            .server(listener.local_addr().unwrap())
+            .timeout(std::time::Duration::from_millis(50))
+            .install_timeout(std::time::Duration::from_millis(50))
+            .build(),
+    )
+    .unwrap();
+    let outcome = tokio::time::timeout(std::time::Duration::from_secs(1), transport.install(path))
+        .await
+        .unwrap();
+    assert!(matches!(
+        outcome,
+        Err(StorybookAutomationError::CaptureUnavailable { .. })
+    ));
+    tokio::time::timeout(std::time::Duration::from_secs(1), transport.shutdown())
+        .await
+        .unwrap();
+    assert!(
+        tokio::time::timeout(std::time::Duration::from_millis(10), listener.accept())
+            .await
+            .is_err()
+    );
+}
+
+#[test]
+fn atomic_publication_preserves_existing_artifacts_on_encode_and_replace_failure() {
+    use std::io::Write as _;
+    let directory = tempfile::tempdir().unwrap();
+    let destination = directory.path().join("capture.png");
+    let mut old = std::io::Cursor::new(Vec::new());
+    image::DynamicImage::new_rgba8(2, 3)
+        .write_to(&mut old, image::ImageFormat::Png)
+        .unwrap();
+    let old = old.into_inner();
+    std::fs::write(&destination, &old).unwrap();
+    assert!(
+        atomic_write(&destination, |file| {
+            file.write_all(b"partial PNG").unwrap();
+            Err(unavailable("encoder failed"))
+        })
+        .is_err()
+    );
+    assert_eq!(std::fs::read(&destination).unwrap(), old);
+    let blocked = directory.path().join("directory.png");
+    std::fs::create_dir(&blocked).unwrap();
+    std::fs::write(blocked.join("marker"), b"preserved").unwrap();
+    assert!(
+        atomic_write(&blocked, |file| {
+            file.write_all(b"PNG")
+                .map_err(|error| unavailable(error.to_string()))
+        })
+        .is_err()
+    );
+    assert_eq!(std::fs::read(blocked.join("marker")).unwrap(), b"preserved");
+    // Private temporary artifacts are reclaimed on both failure paths.
+    assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 2);
+    let image = image::DynamicImage::new_rgba8(3, 2);
+    atomic_write(&destination, |file| {
+        image
+            .write_to(file, image::ImageFormat::Png)
+            .map_err(|error| unavailable(error.to_string()))
+    })
+    .unwrap();
+    let published = image::open(&destination).unwrap();
+    assert_eq!((published.width(), published.height()), (3, 2));
+    assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 2);
+}
+
+#[test]
+fn secondary_cleanup_errors_preserve_typed_uncertainty_and_serialization() {
+    let operation = StorybookAutomationError::OutcomeUnknown {
+        request_id: 91,
+        message: "reply lost".to_owned(),
+    };
+    let cleanup = unavailable("owned file removal failed");
+    let error =
+        settle::<(), ()>(Err(operation.clone()), Err(cleanup.clone()), "cleanup", 91).unwrap_err();
+    let StorybookAutomationError::SettlementFailed {
+        operation: primary,
+        cleanup: secondary,
+    } = &error
+    else {
+        panic!("both outcomes must survive")
+    };
+    assert_eq!(**primary, operation);
+    assert_eq!(**secondary, cleanup);
+    assert_eq!(
+        std::error::Error::source(&error).unwrap().to_string(),
+        operation.to_string()
+    );
+    let wire = serde_json::to_vec(&error).unwrap();
+    assert_eq!(
+        serde_json::from_slice::<StorybookAutomationError>(&wire).unwrap(),
+        error
+    );
+    assert_eq!(
+        settle::<(), ()>(Err(operation.clone()), Ok(()), "cleanup", 91).unwrap_err(),
+        operation
+    );
+    assert_eq!(
+        settle(Ok(()), Err::<(), _>(cleanup.clone()), "cleanup", 91).unwrap_err(),
+        cleanup
+    );
+}
+
+#[tokio::test]
+async fn decoder_and_finish_transport_failures_both_reach_the_caller() {
+    let device = Device::start();
+    let mut gateway = gateway(device.port, Fault::LostFinishReply, b"invalid PNG".to_vec()).await;
+    gateway.release.add_permits(1);
+    let backend = RemoteBackend::attach_with_transport(
+        transport(&gateway, std::time::Duration::from_secs(3)),
+        device.port,
+    )
+    .await
+    .unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("capture.png");
+    std::fs::write(&path, b"previous artifact").unwrap();
+    let error = backend
+        .capture_host(HostCaptureScope::Display, path.clone())
+        .await
+        .unwrap_err();
+    let StorybookAutomationError::SettlementFailed { operation, cleanup } = error else {
+        panic!("both failures must reach the caller")
+    };
+    assert!(matches!(
+        *operation,
+        StorybookAutomationError::CaptureUnavailable { .. }
+    ));
+    assert!(matches!(
+        *cleanup,
+        StorybookAutomationError::OutcomeUnknown { .. }
+    ));
+    backend.shutdown().await;
+    gateway.captures.recv().await.unwrap();
+    assert_eq!(device.finished.load(Ordering::Acquire), 1);
+    assert!(!device.gate.busy());
+    assert_eq!(std::fs::read(path).unwrap(), b"previous artifact");
 }

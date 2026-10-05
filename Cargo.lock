@@ -3888,6 +3888,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "generator"
+version = "0.8.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "54ade96dc9003043bce7c035c85a9df5a858bfb2039c5a2e6fdf00f324f6c551"
+dependencies = [
+ "cc",
+ "cfg-if",
+ "libc",
+ "log",
+ "rustversion",
+ "windows-link 0.2.1",
+ "windows-result 0.4.1",
+]
+
+[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4950,6 +4965,7 @@ name = "gpui-storybook-automation"
 version = "0.7.1"
 dependencies = [
  "bon",
+ "proptest",
  "schemars",
  "serde",
  "serde_json",
@@ -5126,6 +5142,9 @@ name = "gpui-storybook-mobile"
 version = "0.7.1"
 dependencies = [
  "gpui-storybook-automation",
+ "loom",
+ "proptest",
+ "tracing",
 ]
 
 [[package]]
@@ -5139,9 +5158,13 @@ dependencies = [
  "gpui-storybook-mcp",
  "gpui-storybook-mobile",
  "image",
+ "libc",
  "serde_json",
  "tempfile",
  "tokio",
+ "tokio-util",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -6599,6 +6622,19 @@ name = "longest-increasing-subsequence"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b3bd0dd2cd90571056fdb71f6275fada10131182f84899f4b2a916e565d81d86"
+
+[[package]]
+name = "loom"
+version = "0.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "419e0dc8046cb947daa77eb95ae174acfbddb7673b4151f56d1eed8e93fbfaca"
+dependencies = [
+ "cfg-if",
+ "generator",
+ "scoped-tls",
+ "tracing",
+ "tracing-subscriber",
+]
 
 [[package]]
 name = "loop9"

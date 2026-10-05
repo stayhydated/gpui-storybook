@@ -37,8 +37,10 @@ its device lease until acknowledgment or explicit host invalidation.
 
 On native surface release, call `OperationGate::suspend` immediately. This closes
 admission during the handoff to the GPUI owner. After invalidating the old
-attachment, `DeviceCoordinator::surface_replaced` installs a new session and
-reopens admission atomically.
+attachment, call `DeviceCoordinator::surface_replaced()` to advance the
+endpoint-owned session generation and reopen admission atomically. Pass a
+process-unique seed of 1–107 bytes to `DeviceEndpoint::listen`; replacement
+identity is independent of native revision values.
 
 ## Run the repository example
 
@@ -132,6 +134,9 @@ inside capture, and capture inside an interaction batch require their own
 advertised capabilities. Unsupported requests fail before dispatch.
 
 Frames contain a big-endian length and bounded JSON payload of at most 1 MiB.
+The device gives each incoming prefix and payload one 30-second deadline and
+each response a five-second write deadline. Dropping its endpoint suspends
+admission, closes sockets, and joins transport threads.
 Protocol/session mismatch rejects admission. The device bounds its request queue
 and connections and admits one mutation, scenario, or capture at a time. Reads
 may observe intermediate public state. Interaction limits remain 64 steps,
@@ -141,6 +146,8 @@ The computer wraps selected `adbutils-rs =0.1.0` connection primitives in overal
 deadlines and byte budgets: 1 MiB wire/shell responses, 64 MiB encoded/decoded
 PNGs, and streamed APKs of at most 512 MiB. Installation runs once and removes
 its unique device temporary file; package-manager failures preserve the package.
+The 120-second install deadline includes local input validation and opening.
+APKs must be regular, nonempty files; special files fail before upload.
 The transport selects a loopback ADB server, exposes shell-v2 exit status, and
 uses direct device sockets. ADB/platform tools provide the local server.
 
@@ -152,6 +159,14 @@ closing admission. A transport failure after submission reports an unknown outco
 rediscover state without replaying the mutation. Activity recreation replaces
 surface identity and invalidates old attachments while the GPUI runtime remains
 retained. Establish a fresh connection and rediscover routes/targets.
+
+PNG publication atomically replaces the destination after encoding and ticket
+settlement, preserving an existing artifact when encoding fails. This guarantee
+covers readers observing complete files; power-loss durability is a separate
+filesystem concern. A `settlement_failed` error contains `operation` and `cleanup`
+typed errors. Inspect both; an `outcome_unknown` primary result still forbids
+mutation replay. The host emits cleanup diagnostics to stderr and accepts
+`RUST_LOG=gpui_storybook_mobile_host=debug` for request/session tracing.
 
 iOS qualification follows a simulator proof using platform-owned lifecycle,
 transport, and capture. The neutral contract's iOS build is one prerequisite.

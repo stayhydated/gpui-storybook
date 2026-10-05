@@ -15,6 +15,7 @@ existing opted-in mobile build. These results qualify those inputs.
 | `uiautomator` 1.0.2 | Bootstrapped its service; found/clicked native tabs; tapped a registered GPUI target; captured JPEG | Optional native backend with `Settings.max_retry = 1` |
 | `uiautomator2-rs` 0.1.2 | Started/stopped its service; native selectors/input and JPEG capture passed | Prefer its public single-attempt JSON-RPC function for native mutations |
 | AndroidX UI Automator 2.4.0 | Native selectors, GPUI touch, keyboard input, leased PNG capture, rotation, pause/resume passed | Preferred independent native qualification harness |
+| `appium-client` 0.2.2 | Native selectors, GPUI touch, leased PNG, and a dropped completed-click reply passed with Appium 3.8.0 / UiAutomator2 driver 8.7.0 | Isolated qualification candidate with explicit awaited session closure |
 
 The ADB clients each installed the actual example APK. Both created a `tcp:0`
 forward and removed the resulting local endpoint. Their forwarding methods
@@ -131,3 +132,59 @@ The upstream contracts are documented by
 [uiautomator](https://docs.rs/uiautomator/1.0.2/uiautomator/),
 [uiautomator2-rs](https://docs.rs/uiautomator2-rs/0.1.2/uiautomator2/), and
 [AndroidX release notes](https://developer.android.com/jetpack/androidx/releases/test-uiautomator).
+
+## Appium qualification
+
+The further stabilization run used published `appium-client =0.2.2`, Appium
+Server 3.8.0, UiAutomator2 driver 8.7.0 (device server 10.6.6), and Node 26.10.0.
+It ran on the same owned API 36 emulator and the newly rebuilt example APK.
+Native UiSelector text-prefix queries selected Notes and Counter. The example's
+rendered public count increased by exactly one for a coordinate click through
+`mobile: clickGesture`. A real HTTP relay then discarded one reply after Appium
+completed another click; the client returned a transport error and the count
+increased by exactly one. This qualifies that submitted command and failure,
+with the Storybook count as the independent oracle.
+
+A screenshot taken under a Storybook capture ticket decoded to 1080 × 2400.
+The completion host matched the preparation host. Hierarchy XML exposed native
+controls and SurfaceView. Reports, XML, PNG, and client stderr are under
+`target/android-tools-evidence/appium`; server and invocation logs are under
+`target/mobile-evidence/further-stabilization-appium*`.
+
+Awaiting the underlying WebDriver client's `close()` removed the session:
+subsequent source observation returned HTTP 404. A separate run held session
+DELETE before forwarding it, then exited using the Appium client's Drop alone.
+The process returned while source observation still returned HTTP 200. The
+runner explicitly deleted that known session and observed HTTP 404 before
+cleanup. Its before/after forwarding inventories matched.
+
+The published crate uses GPL-3.0-or-later and bases its client on fantoccini
+0.19.3. Its Drop spawns cleanup without returning a join handle. Keep this pinned
+candidate in the unpublished tools workspace; a production integration needs a
+compatible distribution policy and an owned, bounded session/server lifecycle.
+Primary references: [published manifest](https://docs.rs/crate/appium-client/0.2.2/source/Cargo.toml)
+and [client implementation](https://docs.rs/appium-client/0.2.2/src/appium_client/lib.rs.html#330-351).
+The qualification's close adapter awaits WebDriver completion; the probe also
+preserves the original Drop behavior through `--appium-drop-only`.
+
+Reproduce with an exclusively owned emulator, a rebuilt opted-in app already
+running, and a private Appium installation/home. The server binds loopback;
+the client supplies the serial and uses system port 5820. Stop this server after
+the runner returns. Keep its package manager lockfiles with generated evidence.
+
+```sh
+npm install --prefix target/appium-qualification-server appium@3.8.0
+APPIUM_HOME="$PWD/target/appium-qualification-home" \
+  target/appium-qualification-server/node_modules/.bin/appium \
+  driver install uiautomator2@8.7.0
+APPIUM_HOME="$PWD/target/appium-qualification-home" \
+  target/appium-qualification-server/node_modules/.bin/appium \
+  --address 127.0.0.1 --port 5783 --log-no-colors
+```
+
+From another shell in the same worktree:
+
+```sh
+cargo build --manifest-path examples/mobile/tools/Cargo.toml --locked
+python3 examples/mobile/tools/appium.py --serial emulator-5580
+```

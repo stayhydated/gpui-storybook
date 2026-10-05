@@ -404,4 +404,25 @@ fn finishing_pending_capture_revokes_its_frame_wait_and_releases_admission(
         next.is_current(),
         "old frame callbacks cannot release a new operation"
     );
+    let mut last = "surface-1".to_owned();
+    // The coordinator owns fresh identity even when native observations retain
+    // the same surface revision. Old request IDs cannot target a replacement.
+    for _ in 0..2 {
+        coordinator.surface_replaced();
+        assert!(!next.is_current());
+        let mut stream = connect();
+        write_frame(
+            &mut stream,
+            &envelope(51, DeviceOperation::PrepareCapture {}),
+        )
+        .unwrap();
+        let response: DeviceResponse = read_frame(&mut stream).unwrap();
+        assert_ne!(response.session(), last);
+        last = response.session().to_owned();
+        assert!(matches!(
+            response.into_outcome(),
+            Err(StorybookAutomationError::StaleHost { .. })
+        ));
+        assert!(!gate.busy());
+    }
 }

@@ -230,6 +230,9 @@ pub(crate) fn interaction_automation_tool_error(error: StorybookAutomationError)
 
 pub(crate) fn structured_automation_error(error: StorybookAutomationError) -> McpToolError {
     let detail = match &error {
+        StorybookAutomationError::SettlementFailed { operation, cleanup } => json!({
+            "code": "settlement_failed", "operation": operation, "cleanup": cleanup,
+        }),
         StorybookAutomationError::ProtocolMismatch { expected, actual } => {
             json!({"code": "protocol_mismatch", "expected": expected, "actual": actual})
         },

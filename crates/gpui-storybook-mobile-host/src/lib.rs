@@ -131,21 +131,20 @@ impl RemoteBackend {
     ) -> Result<HostCaptureSnapshot, StorybookAutomationError> {
         self.capabilities()
             .require(AutomationCapability::DisplayCapture)?;
-        let job = self.jobs.admit()?;
         let backend = self.clone();
         let (reply, receiver) = oneshot::channel();
         self.jobs.spawn(async move {
-            let _job = job;
             let result = backend
                 .capture_owned(scope, output_path, expected_route)
                 .await;
             let _ = reply.send(result);
-        });
+        })?;
         receiver
             .await
             .map_err(|error| unavailable(format!("owned capture ended: {error}")))?
     }
 
+    #[tracing::instrument(skip_all, fields(session = self.descriptor.session(), ?scope, request_id = tracing::field::Empty))]
     async fn capture_owned(
         &self,
         scope: HostCaptureScope,
@@ -153,6 +152,7 @@ impl RemoteBackend {
         expected_route: Option<String>,
     ) -> Result<HostCaptureSnapshot, StorybookAutomationError> {
         let id = request_id();
+        tracing::Span::current().record("request_id", id);
         let prepared = self
             .request_with_id(id, DeviceOperation::PrepareCapture {})
             .await;
@@ -161,12 +161,12 @@ impl RemoteBackend {
             result => {
                 // Preparation can have been admitted even if its reply was lost.
                 // Finish also revokes a pending capture frame by its request ID.
-                let _ = self
-                    .request(DeviceOperation::FinishCapture { ticket: id })
-                    .await;
-                return Err(result.err().unwrap_or_else(|| {
+                let finished = self.finish_capture(id).await;
+                let error = result.err().unwrap_or_else(|| {
                     unavailable("capture preparation returned an invalid ticket")
-                }));
+                });
+                return settle(Err(error), finished, "finish capture preparation", id)
+                    .map(|(capture, _)| capture);
             },
         };
         let result = async {
@@ -186,15 +186,8 @@ impl RemoteBackend {
         }
         .await;
         // Provider failures and decoder panics both settle the admitted ticket.
-        let finished = self
-            .request(DeviceOperation::FinishCapture { ticket })
-            .await;
-        let image = result?;
-        let DeviceResult::Host(after) = finished? else {
-            return Err(unavailable(
-                "capture completion returned an unexpected result",
-            ));
-        };
+        let finished = self.finish_capture(ticket).await;
+        let (image, after) = settle(result, finished, "finish capture", ticket)?;
         if host != after {
             return Err(StorybookAutomationError::StaleHost {
                 message: "host changed during ADB compositor observation".to_owned(),
@@ -204,15 +197,11 @@ impl RemoteBackend {
         let width = image.width();
         let height = image.height();
         tokio::task::spawn_blocking(move || {
-            if let Some(parent) = destination
-                .parent()
-                .filter(|path| !path.as_os_str().is_empty())
-            {
-                std::fs::create_dir_all(parent).map_err(|error| unavailable(error.to_string()))?;
-            }
-            image
-                .save_with_format(&destination, image::ImageFormat::Png)
-                .map_err(|error| unavailable(error.to_string()))
+            atomic_write(&destination, |file| {
+                image
+                    .write_to(file, image::ImageFormat::Png)
+                    .map_err(|error| unavailable(error.to_string()))
+            })
         })
         .await
         .map_err(|error| unavailable(error.to_string()))??;
@@ -226,6 +215,65 @@ impl RemoteBackend {
             .provider("adb_compositor_observation".to_owned())
             .build())
     }
+
+    async fn finish_capture(
+        &self,
+        ticket: u64,
+    ) -> Result<HostDescriptor, StorybookAutomationError> {
+        match self
+            .request(DeviceOperation::FinishCapture { ticket })
+            .await?
+        {
+            DeviceResult::Host(host) => Ok(host),
+            _ => Err(unavailable(
+                "capture completion returned an unexpected result",
+            )),
+        }
+    }
+}
+
+/// Preserve both typed outcomes, including the primary mutation uncertainty.
+fn settle<T, U>(
+    operation: Result<T, StorybookAutomationError>,
+    cleanup: Result<U, StorybookAutomationError>,
+    phase: &str,
+    request_id: u64,
+) -> Result<(T, U), StorybookAutomationError> {
+    match (operation, cleanup) {
+        (Ok(value), Ok(settled)) => Ok((value, settled)),
+        (Err(error), Ok(_)) | (Ok(_), Err(error)) => Err(error),
+        (Err(operation), Err(cleanup)) => {
+            tracing::warn!(request_id, phase, %operation, %cleanup, "operation and cleanup failed");
+            Err(StorybookAutomationError::SettlementFailed {
+                operation: Box::new(operation),
+                cleanup: Box::new(cleanup),
+            })
+        },
+    }
+}
+
+/// Encode beside the destination; a failed encode or replace preserves the
+/// existing artifact. Atomic replacement is an observation guarantee, not a
+/// power-loss durability guarantee.
+fn atomic_write(
+    destination: &Path,
+    encode: impl FnOnce(&mut std::fs::File) -> Result<(), StorybookAutomationError>,
+) -> Result<(), StorybookAutomationError> {
+    use std::io::Write as _;
+    let parent = destination
+        .parent()
+        .filter(|path| !path.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    std::fs::create_dir_all(parent).map_err(|error| unavailable(error.to_string()))?;
+    let mut file =
+        tempfile::NamedTempFile::new_in(parent).map_err(|error| unavailable(error.to_string()))?;
+    encode(file.as_file_mut())?;
+    file.as_file_mut()
+        .flush()
+        .map_err(|error| unavailable(error.to_string()))?;
+    file.persist(destination)
+        .map_err(|error| unavailable(error.to_string()))?;
+    Ok(())
 }
 
 fn decode_capture(

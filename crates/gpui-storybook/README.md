@@ -24,7 +24,8 @@ through the application's locale context.
 The facade exposes `AutomationBackend`, `SharedAutomationBackend`, and portable
 capability types. Standard initialization installs the gallery backend for MCP.
 Embedded application roots use `gpui-storybook-automation-gpui`; the Android
-example uses its reusable device coordinator, direct ADB transport, and
+example uses its reusable device coordinator, fresh session generations,
+direct ADB transport, atomic PNG publication, and
 AndroidX native qualification harness.
 
 Live captures size the story canvas to a named viewport or explicit pixel

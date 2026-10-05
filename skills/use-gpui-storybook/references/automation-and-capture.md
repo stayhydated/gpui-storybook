@@ -137,8 +137,9 @@ retains ownership until acknowledgment or explicit host invalidation.
 
 On native surface release, call `OperationGate::suspend` immediately. This closes
 admission during the handoff to the GPUI owner. After invalidating the old
-attachment, `DeviceCoordinator::surface_replaced` installs a new session and
-reopens admission atomically.
+attachment, `DeviceCoordinator::surface_replaced()` advances an endpoint-owned
+session generation and reopens admission atomically. Seed `DeviceEndpoint::listen`
+with a process-unique string of 1–107 bytes; native revisions stay observation metadata.
 
 The repository's `examples/embedded` shares its production `DemoRoot` with
 `examples/mobile`. The Android example uses native Counter/Notes tabs, native
@@ -156,6 +157,8 @@ new catalog without replay. Surface replacement changes the session and invalida
 old geometry, targets, capture tickets, and queued operations. Protocol v1 uses
 closed, length-prefixed JSON bounded to 1 MiB; the device holds one mutation lease
 through native acknowledgment, rendered readiness, and capture settlement.
+Incoming frames have an overall 30-second deadline, responses have a five-second
+write deadline, and endpoint drop closes sockets and joins transport threads.
 
 Discover native geometry/orientation with `storybook_get_host`, native action
 schemas with `storybook_list_host_actions`, and dispatch appearance with
@@ -172,6 +175,11 @@ wire/shell/PNG reads, preserved shell-v2 status, and direct device connections.
 APK installation streams to an owned temporary path, installs once, and cleans
 that path without automatic uninstall. Captures survive caller cancellation on
 the attachment runtime; call `RemoteBackend::shutdown` after closing admission.
+The install deadline includes local file validation/opening; APK inputs must be
+regular files. PNGs replace their destination atomically after encoding and
+ticket settlement. Inspect both `operation` and `cleanup` in a
+`settlement_failed` result, retaining the primary mutation's replay prohibition.
+Use `RUST_LOG=gpui_storybook_mobile_host=debug` for stderr request/session tracing.
 
 Use the maintained `native/build.py` and `native/verify.py` AndroidX UI Automator
 2.4.0 harness for native selectors, real touch/IME input, rotation, pause/resume,

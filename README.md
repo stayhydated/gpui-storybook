@@ -25,7 +25,9 @@ validation live in `gpui-storybook-automation`; core supplies the gallery backen
 Application-owned roots attach through `gpui-storybook-automation-gpui`.
 The Android example combines native navigation with embedded GPUI content,
 while `gpui-storybook-mobile-host` serves its remote MCP connection through
-bounded `adbutils-rs` device sockets. AndroidX UI Automator qualifies native
+bounded `adbutils-rs` device sockets, retained cleanup outcomes, and atomic PNG
+publication. Device-owned session generations invalidate replaced surfaces.
+AndroidX UI Automator qualifies native
 selectors, touch, IME input, lifecycle, and screenshots in the maintained harness.
 
 Live captures size the story canvas to desktop, tablet, mobile, or explicit

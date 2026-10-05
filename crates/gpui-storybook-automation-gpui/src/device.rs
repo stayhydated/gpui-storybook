@@ -162,7 +162,6 @@ pub struct DeviceCoordinator<Root: EmbeddedRoot> {
     select_native: Box<dyn Fn(NativeSelection) -> Result<(), NativeSubmissionError>>,
     root: PhantomData<fn() -> Root>,
     endpoint: DeviceEndpoint,
-    process_session: String,
     shell: Option<PendingShell>,
     captures: BTreeMap<u64, CaptureTicket>,
     frames: Vec<PendingFrame>,
@@ -176,10 +175,8 @@ impl<Root: EmbeddedRoot> DeviceCoordinator<Root> {
         endpoint: DeviceEndpoint,
         select_native: impl Fn(NativeSelection) -> Result<(), NativeSubmissionError> + 'static,
     ) -> Self {
-        let process_session = endpoint.session();
         Self {
             endpoint,
-            process_session,
             select_native: Box::new(select_native),
             root: PhantomData,
             shell: None,
@@ -195,9 +192,8 @@ impl<Root: EmbeddedRoot> DeviceCoordinator<Root> {
     /// Install a fresh surface session and reopen admission atomically. Call on
     /// the GPUI owner after invalidating the old attachment. Pending shell work,
     /// frame waits, and capture tickets are revoked without replay.
-    pub fn surface_replaced(&mut self, surface: u64) {
-        self.endpoint
-            .replace_session(format!("{}-{surface}", self.process_session));
+    pub fn surface_replaced(&mut self) {
+        self.endpoint.replace_session();
         if let Some(pending) = self.shell.take() {
             let (_, response, _) = pending.admitted.into_parts();
             let _ = response.try_send(Err(stale()));

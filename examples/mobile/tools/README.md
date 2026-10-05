@@ -10,6 +10,7 @@ tests native UI behavior. Production dependencies stay in the root workspace.
 | `adbutils-rs` | 0.1.0 | Async ADB and direct device sockets |
 | `uiautomator` | 1.0.2 | Rust JSON-RPC client and native service bootstrap |
 | `uiautomator2-rs` | 0.1.2 | Rust native service lifecycle and JSON-RPC transport |
+| `appium-client` | 0.2.2 | Native selectors, touch, PNG capture through an owned Appium server |
 | AndroidX UI Automator | 2.4.0 | Native selectors, input, lifecycle, PNG capture |
 
 Run on an exclusively owned disposable API 36 Pixel 7 emulator with AOSP en-US
@@ -26,6 +27,15 @@ python3 examples/mobile/tools/run.py \
 The AndroidX qualification is maintained under [the native harness](../native/README.md).
 The root mobile host adopts bounded `adbutils-rs` connection primitives. The Rust
 UI Automator probes retain their single-submission and replay-fault evidence.
+The Appium probe uses an isolated loopback server and explicit device selection:
+
+```sh
+python3 examples/mobile/tools/appium.py --serial emulator-5580
+```
+
+Its report checks native selectors, lost-click replies, leased PNG capture,
+awaited session closure, asynchronous Drop, and forwarding cleanup. Server inputs
+and reproduction commands are recorded in the qualification evidence.
 
 Generated reports, hierarchy XML, captured images, and process logs live under
 `target/android-tools-evidence`. [Evidence and integration decisions](EVIDENCE.md)

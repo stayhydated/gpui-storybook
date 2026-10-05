@@ -371,3 +371,56 @@ pub fn write_frame<T: Serialize>(writer: &mut impl Write, value: &T) -> io::Resu
     writer.write_all(&buffer)?;
     writer.flush()
 }
+
+#[cfg(test)]
+mod properties {
+    use super::*;
+    use proptest::prelude::*;
+
+    struct Fragments<'a> {
+        bytes: &'a [u8],
+        limit: usize,
+    }
+    impl Read for Fragments<'_> {
+        fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+            let count = output.len().min(self.limit).min(self.bytes.len());
+            output[..count].copy_from_slice(&self.bytes[..count]);
+            self.bytes = &self.bytes[count..];
+            Ok(count)
+        }
+    }
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(128))]
+        #[test]
+        fn fragmented_sequence_preserves_frame_and_request_identity(ids in prop::collection::vec(1u64..u64::MAX, 1..16), session in "[a-z0-9]{1,24}", fragment in 1usize..9) {
+            let mut bytes = Vec::new();
+            for id in &ids {
+                let request = DeviceRequest::builder().protocol_version(PROTOCOL_VERSION).session(session.clone()).request_id(*id).command(DeviceOperation::GetHost {}).build();
+                write_frame(&mut bytes, &request).unwrap();
+            }
+            // Check the wire prefix independently of the production decoder.
+            let size = u32::from_be_bytes(bytes[..4].try_into().unwrap()) as usize;
+            let first: serde_json::Value = serde_json::from_slice(&bytes[4..4+size]).unwrap();
+            prop_assert_eq!(first["request_id"].as_u64(), Some(ids[0]));
+            prop_assert_eq!(first["session"].as_str(), Some(session.as_str()));
+            let mut reader = Fragments { bytes: &bytes, limit: fragment };
+            for id in ids {
+                let received: DeviceRequest = read_frame(&mut reader).unwrap();
+                prop_assert_eq!(received.request_id(), id);
+                prop_assert_eq!(received.session(), session.as_str());
+                prop_assert!(received.validate_identity(&session).is_ok());
+            }
+            prop_assert!(reader.bytes.is_empty());
+        }
+        #[test]
+        fn every_truncated_request_is_rejected(cut in any::<usize>(), fragment in 1usize..9) {
+            let request = DeviceRequest::builder().protocol_version(PROTOCOL_VERSION).session("process".to_owned()).request_id(17).command(DeviceOperation::GetHost {}).build();
+            let mut bytes = Vec::new();
+            write_frame(&mut bytes, &request).unwrap();
+            let cut = cut % bytes.len();
+            let mut reader = Fragments { bytes: &bytes[..cut], limit: fragment };
+            let error = read_frame::<DeviceRequest>(&mut reader).unwrap_err();
+            prop_assert_eq!(error.kind(), io::ErrorKind::UnexpectedEof);
+        }
+    }
+}
