@@ -306,8 +306,8 @@ def uia_probe(candidate):
         ET.fromstring(xml)
         (args.output / (candidate + ".xml")).write_text(xml)
         assert "android.view.SurfaceView" in xml
-        assert "increment" not in xml
-        for label, route in [("NOTES", "embedded-notes"), ("COUNTER", "embedded-counter")]:
+        assert "storybook.compose.increment" in xml
+        for label, route in [("Notes", "embedded-notes"), ("Counter", "embedded-counter")]:
             selector = {"mask": 8, "textStartsWith": label}
             assert rpc("exist", [selector]) is True
             assert rpc("click", [selector]) is True

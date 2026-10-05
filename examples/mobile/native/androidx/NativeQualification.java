@@ -122,6 +122,10 @@ public final class NativeQualification extends Instrumentation {
     private JSONObject ready() throws Exception { return ready(host -> true); }
 
     private JSONObject state() throws Exception {
+        return state("public-state");
+    }
+
+    private JSONObject state(String key) throws Exception {
         long deadline = SystemClock.elapsedRealtime() + 20000;
         UnreadyObservation last = null;
         while (SystemClock.elapsedRealtime() < deadline) {
@@ -129,7 +133,7 @@ public final class NativeQualification extends Instrumentation {
                 JSONArray values = rpc(command("read_values")).getJSONArray("values");
                 for (int i = 0; i < values.length(); i++) {
                     JSONObject value = values.getJSONObject(i);
-                    if (value.getString("key").equals("public-state")) return value.getJSONObject("value");
+                    if (value.getString("key").equals(key)) return value.getJSONObject("value");
                 }
                 throw new AssertionError("public state missing");
             } catch (UnreadyObservation error) {
@@ -156,7 +160,7 @@ public final class NativeQualification extends Instrumentation {
     }
 
     private void tab(String label, String route) throws Exception {
-        UiObject2 button = device.wait(Until.findObject(By.textStartsWith(label).clazz("android.widget.Button")), 10000);
+        UiObject2 button = device.wait(Until.findObject(By.res("storybook." + label.toLowerCase(java.util.Locale.ROOT))), 10000);
         check(button != null, "native tab " + label);
         button.click();
         ready(host -> route.equals(host.optString("active_route")));
@@ -181,6 +185,28 @@ public final class NativeQualification extends Instrumentation {
         device.setOrientationNatural();
         JSONObject original = ready(host -> "portrait".equals(host.optString("orientation")));
         String pid = device.executeShellCommand("pidof dev.storybook.mobile").trim();
+        check(state("native.compose-counter").getInt("count") == 0, "fresh Compose counter");
+        UiObject2 increment = device.wait(Until.findObject(By.res("storybook.compose.increment")), 10000);
+        check(increment != null && increment.isEnabled(), "Compose increment semantics");
+        increment.click();
+        long composeDeadline = SystemClock.elapsedRealtime() + 10000;
+        while (state("native.compose-counter").getInt("count") != 1) {
+            check(SystemClock.elapsedRealtime() < composeDeadline, "native Compose count deadline");
+            SystemClock.sleep(50);
+        }
+        check(device.wait(Until.findObject(By.res("storybook.compose.count").text("1")), 10000) != null, "rendered Compose count");
+        JSONObject composeAction = new JSONObject().put("action", "invoke").put("name", "compose.increment").put("arguments", new JSONObject());
+        rpc(command("dispatch_host_action").put("action", composeAction));
+        check(state("native.compose-counter").getInt("count") == 2, "MCP Compose increment");
+        check("2".equals(device.wait(Until.findObject(By.res("storybook.compose.count")), 10000).getText()), "MCP acknowledged Compose frame");
+        composeAction.put("name", "compose.reset");
+        rpc(command("dispatch_host_action").put("action", composeAction));
+        check(state("native.compose-counter").getInt("count") == 0, "MCP Compose reset");
+        check(!device.wait(Until.findObject(By.res("storybook.compose.reset")), 10000).isEnabled(), "zero Compose reset disabled");
+        composeAction.put("name", "compose.increment");
+        rpc(command("dispatch_host_action").put("action", composeAction));
+        rpc(command("dispatch_host_action").put("action", composeAction));
+        report.put("compose", new JSONObject().put("native_click_delta", 1).put("mcp_increment_delta", 1).put("reset", 0).put("retained_count", 2));
         tab("NOTES", "embedded-notes");
         tab("COUNTER", "embedded-counter");
         report.put("selector_routes", new JSONArray().put("embedded-notes").put("embedded-counter"));
@@ -223,9 +249,13 @@ public final class NativeQualification extends Instrumentation {
         double top = keyboardGeometry.getDouble("y") + keyboardGeometry.getDouble("height");
         double bottom = geometry.getDouble("y") + originalHeight;
         double width = keyboardGeometry.getDouble("display_width");
-        check(device.click((int) Math.round(width * .1), (int) Math.round(top + (bottom - top) * .46)), "native soft key a");
+        double scale = keyboardGeometry.getDouble("scale");
+        // Suggestion-strip visibility changes IME height; the qualified AOSP
+        // portrait key rows retain their positions relative to its bottom.
+        check(bottom - top >= 240 * scale, "qualified keyboard height");
+        check(device.click((int) Math.round(width * .1), (int) Math.round(bottom - 160 * scale)), "native soft key a");
         waitState(value -> "a".equals(value.optString("note")));
-        check(device.click((int) Math.round(width * .5), (int) Math.round(top + (bottom - top) * .90)), "native soft key space");
+        check(device.click((int) Math.round(width * .5), (int) Math.round(bottom - 40 * scale)), "native soft key space");
         waitState(value -> "a ".equals(value.optString("note")));
         report.put("native_ime", state().getString("note"));
         device.pressBack();
@@ -235,6 +265,7 @@ public final class NativeQualification extends Instrumentation {
         JSONObject landscape = ready(host -> "landscape".equals(host.optString("orientation")) && !portrait.optString("session").equals(host.optString("session")));
         check(landscape.getLong("surface_revision") > portrait.getLong("surface_revision"), "new rendered surface");
         check(state().getInt("count") == before + 1, "rotation retains state");
+        check(state("native.compose-counter").getInt("count") == 2, "rotation retains Compose state");
         check(device.executeShellCommand("pidof dev.storybook.mobile").trim().equals(pid), "retained process");
         report.put("rotation", landscape);
         device.pressHome();
@@ -243,6 +274,7 @@ public final class NativeQualification extends Instrumentation {
         device.executeShellCommand("am start -n dev.storybook.mobile/.MainActivity --ez storybook_automation true");
         ready();
         check(state().getInt("count") == before + 1, "resume retains state");
+        check(state("native.compose-counter").getInt("count") == 2, "resume retains Compose state");
         report.put("pause_resume", "retained count and PID");
     }
 }

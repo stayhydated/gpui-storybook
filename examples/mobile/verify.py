@@ -80,6 +80,14 @@ def state():
     snapshot = call("storybook_read_semantic_values")
     return next(value["value"] for value in snapshot["values"] if value["key"] == "public-state")
 
+def compose_state():
+    snapshot = call("storybook_read_semantic_values")
+    return next(value["value"] for value in snapshot["values"] if value["key"] == "native.compose-counter")
+
+def compose_action(name, arguments=None, error=False):
+    return call("storybook_dispatch_host_action", {"action": {"action": "invoke", "name": name,
+                "arguments": {} if arguments is None else arguments}}, error=error)
+
 try:
     rpc("initialize", {"protocolVersion": "2025-03-26", "capabilities": {},
                        "clientInfo": {"name": "mobile-proof", "version": "1"}})
@@ -101,8 +109,24 @@ try:
         assert host["active_route"] == host["native_route"]
         host_actions = call("storybook_list_host_actions")["actions"]
         assert any(action["name"] == "set_appearance" for action in host_actions)
+        assert {"compose.increment", "compose.reset"} <= {action["name"] for action in host_actions}
         call("storybook_open_story", {"story_key": "embedded-counter"})
         before = state()["count"]
+        native_before = compose_state()["count"]
+        compose_action("compose.increment")
+        assert compose_state()["count"] == native_before + 1
+        native_value = call("storybook_read_value", {"value_key": "native.compose-counter"})
+        assert native_value["semantic_value"]["value"]["count"] == native_before + 1
+        call("storybook_wait_for_value", {"value_key": "native.compose-counter", "json_pointer": "/count",
+             "expected": native_before + 1, "max_frames": 60})
+        assert state()["count"] == before
+        compose_action("compose.increment", {"unexpected": True}, error=True)
+        compose_action("compose.increment", [], error=True)
+        compose_action("compose.unknown", error=True)
+        assert compose_state()["count"] == native_before + 1
+        compose_action("compose.reset")
+        assert compose_state()["count"] == 0
+        compose_action("compose.increment")
         call("storybook_click_target", {"target_key": "increment"})
         assert state()["count"] == before + 1
         actions = call("storybook_list_actions")["actions"]
@@ -111,6 +135,7 @@ try:
             {"type": "dispatch_action", "name": "embedded_demo::Increment"}]})
         assert result["steps_dispatched"] == 1
         assert state()["count"] == before + 2
+        assert compose_state()["count"] == 1
         call("storybook_wait_for_value", {"value_key": "public-state", "json_pointer": "/count", "expected": before + 2, "max_frames": 60})
         call("storybook_capture_host", {"scope": "display", "output_path": str(args.output / "counter-display.png")})
         call("storybook_capture_current_story", {"output_path": str(args.output / "counter-gpui.png")})
@@ -131,6 +156,7 @@ try:
         for _ in range(2):
             call("storybook_run_scenario", {"story_key": "embedded-counter", "scenario_key": "increment-twice"})
             assert state()["count"] == 2
+        assert compose_state()["count"] == 1
         call("storybook_capture_host", {"scope": "display", "output_path": str(args.output / "counter-dark-display.png")})
         decoded = {}
         for capture in captures:

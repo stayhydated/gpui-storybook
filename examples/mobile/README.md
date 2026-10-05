@@ -1,7 +1,8 @@
 # Android embedded automation
 
-A native Android Activity owns Counter/Notes tabs, appearance, system/IME insets,
-and a `SurfaceView`. One retained GPUI Mobile runtime renders the production
+A Jetpack Compose shell owns Counter/Notes tabs, appearance, and an independent
+native counter. Its Android Activity owns system/IME insets and a `SurfaceView`.
+One retained GPUI Mobile runtime renders the production
 views from `examples/embedded`. This maintained example supplies the Android
 runtime and native qualification for Storybook's mobile integration.
 Automation requires the Cargo `automation`
@@ -20,11 +21,30 @@ cargo run -p gpui-storybook-mobile-host -- \
   --install target/mobile-example/x86_64/storybook.apk --launch-example
 ```
 
-Build inputs: Rust 1.99.0, JDK 21, Python 3, Android platform 36/build-tools
+Build inputs: Rust 1.99.0, JDK 21, Python 3.11+, Android platform 36/build-tools
 36.0.0, NDK 27.1.12297006, and Android API 31 or newer. `--abi arm64-v8a`
 selects aarch64; the default is x86_64. The `mobile` Cargo profile disables
 Wgpu debug labels and preserves overflow checking. APK signing uses a generated
 example key under `target/mobile-example`.
+The checked-in Gradle 8.13 wrapper builds AGP 8.13.2, Kotlin/Compose compiler
+2.3.10, Compose BOM 2025.12.01, and Activity Compose 1.11.0. Dependency locks and
+SHA-256 verification metadata pin the resolved Android artifacts.
+
+Discover `compose.increment` and `compose.reset` with
+`storybook_list_host_actions`, then call `storybook_dispatch_host_action`:
+
+```json
+{"action":{"action":"invoke","name":"compose.increment","arguments":{}}}
+```
+
+`storybook_read_semantic_values` reports `native.compose-counter` as
+`{"count":1}`. Both actions use the same Activity-owned state as native clicks;
+acknowledgment follows its committed Compose frame. Navigation and Activity
+recreation retain this counter independently of GPUI scenario fixtures.
+AndroidX selectors use `By.res("storybook.compose.increment")`,
+`By.res("storybook.compose.reset")`, and `By.res("storybook.compose.count")`.
+The tabs and appearance control expose `storybook.counter`, `storybook.notes`,
+and `storybook.appearance`.
 
 The reusable `DeviceCoordinator<DemoRoot>` owns device preflight, native
 acknowledgment, frames, and captures. The Android adapter queues the selection
@@ -47,7 +67,8 @@ python3 examples/mobile/verify.py --serial emulator-5580 --lifecycle-only
 ```
 
 This raw stdio proof records its transcript and PNGs under `target/mobile-evidence`.
-It checks native/GPUI agreement, clicks, fresh scenarios, preserved navigation
+It checks Compose action discovery, independent native/GPUI state, invalid native
+arguments, native/GPUI agreement, clicks, fresh scenarios, preserved navigation
 state, appearance, capture scopes, and preflight rejection. Full display capture
 includes visible keyboard/system UI; the GPUI crop uses the inset-aware native
 surface bounds. Capture metadata identifies an ADB compositor observation.

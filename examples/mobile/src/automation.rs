@@ -1,4 +1,5 @@
 //! Android queue adapter for the reusable device-to-GPUI coordinator.
+use gpui_storybook_automation::wire::{HostAction, HostActionDescriptor};
 use gpui_storybook_automation_gpui::device::{
     DeviceCoordinator, NativeSelection, NativeSubmissionError,
 };
@@ -60,6 +61,22 @@ pub(super) fn selection_settled(request: u64) {
     }
 }
 fn select_native(selection: NativeSelection) -> Result<(), NativeSubmissionError> {
+    let action = match selection.action() {
+        Some(HostAction::Invoke { name, arguments })
+            if matches!(name.as_str(), "compose.increment" | "compose.reset")
+                && arguments
+                    .as_object()
+                    .is_some_and(|fields| fields.is_empty()) =>
+        {
+            name.clone()
+        },
+        None => String::new(),
+        Some(_) => {
+            return Err(NativeSubmissionError::Rejected(
+                "invalid Compose action arguments".to_owned(),
+            ));
+        },
+    };
     let route = selection.route().to_owned();
     let dark = selection.dark();
     let request = selection.request_id();
@@ -68,15 +85,17 @@ fn select_native(selection: NativeSelection) -> Result<(), NativeSubmissionError
     let result = gpui_mobile::android::jni::with_env(|env| {
         let activity = gpui_mobile::android::jni::activity(env)?;
         let route = env.new_string(route).map_err(|error| error.to_string())?;
+        let action = env.new_string(action).map_err(|error| error.to_string())?;
         submitted = true;
         env.call_method(
             &activity,
             jni::jni_str!("gpuiSelect"),
-            jni::jni_sig!("(Ljava/lang/String;ZJ)V"),
+            jni::jni_sig!("(Ljava/lang/String;ZJLjava/lang/String;)V"),
             &[
                 jni::objects::JValue::Object(&route),
                 jni::objects::JValue::Bool(dark),
                 jni::objects::JValue::Long(request as i64),
+                jni::objects::JValue::Object(&action),
             ],
         )
         .map_err(|error| error.to_string())?;
@@ -90,4 +109,14 @@ fn select_native(selection: NativeSelection) -> Result<(), NativeSubmissionError
             Err(NativeSubmissionError::Rejected(message))
         },
     }
+}
+
+pub(super) fn native_actions() -> Vec<HostActionDescriptor> {
+    [("compose.increment", "Increment the Compose counter"), ("compose.reset", "Reset the Compose counter")]
+        .into_iter().map(|(name, description)| HostActionDescriptor::builder()
+            .name(name.to_owned()).description(description.to_owned())
+            .input_schema(serde_json::json!({"type":"object", "required":["action","name","arguments"],
+                "properties":{"action":{"const":"invoke"}, "name":{"const":name},
+                "arguments":{"type":"object","additionalProperties":false}}, "additionalProperties":false}))
+            .build()).collect()
 }

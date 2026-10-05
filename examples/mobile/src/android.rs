@@ -26,6 +26,7 @@ enum NativeError {
 pub(super) struct ShellState {
     route: String,
     dark: bool,
+    compose_count: i32,
     revision: u64,
     surface: u64,
     ack: u64,
@@ -42,6 +43,7 @@ pub(super) struct ShellState {
 static SHELL: Mutex<ShellState> = Mutex::new(ShellState {
     route: String::new(),
     dark: false,
+    compose_count: 0,
     revision: 0,
     surface: 0,
     ack: 0,
@@ -243,12 +245,14 @@ pub extern "system" fn Java_dev_storybook_mobile_MainActivity_nativeShell<'a>(
     display_width: i32,
     display_height: i32,
     ack: i64,
+    compose_count: i32,
 ) {
     unowned
         .with_env(|_| -> Result<(), NativeError> {
             let mut shell = SHELL.lock().expect("shell state");
             shell.route = route.to_string();
             shell.dark = dark != 0;
+            shell.compose_count = compose_count;
             shell.x = x;
             shell.y = y;
             shell.width = width;
@@ -368,6 +372,14 @@ impl ShellState {
             .surface(self.surface)
             .ack(self.ack)
             .applied(self.applied)
+            .actions(super::automation::native_actions())
+            .values(vec![
+                gpui_storybook_automation::StorySemanticValueSnapshot {
+                    key: "native.compose-counter".to_owned(),
+                    label: "Compose counter".to_owned(),
+                    value: serde_json::json!({ "count": self.compose_count }),
+                },
+            ])
             .geometry(
                 gpui_storybook_automation::wire::SurfaceGeometry::builder()
                     .x(self.x.max(0) as u32)

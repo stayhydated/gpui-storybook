@@ -426,3 +426,188 @@ fn finishing_pending_capture_revokes_its_frame_wait_and_releases_admission(
         assert!(!gate.busy());
     }
 }
+
+#[gpui_kit::test]
+fn native_actions_preflight_and_retain_ownership_after_disconnect(cx: &mut TestAppContext) {
+    use gpui_storybook_automation::wire::*;
+    use gpui_storybook_automation_gpui::device::{
+        DeviceCoordinator, NativeSelection, NativeShellSnapshot, NativeSubmissionError,
+    };
+    use gpui_storybook_mobile::DeviceEndpoint;
+    use std::{
+        cell::RefCell,
+        net::TcpStream,
+        rc::Rc,
+        time::{Duration, Instant},
+    };
+
+    let (window, root, attachment) = setup(cx);
+    pump(cx, window, 2);
+    let endpoint = DeviceEndpoint::listen(0, "native-action".to_owned()).unwrap();
+    let gate = endpoint.gate();
+    let port = endpoint.port();
+    let queued = Rc::new(RefCell::new(Vec::<NativeSelection>::new()));
+    let selections = queued.clone();
+    let mut coordinator = DeviceCoordinator::new(endpoint, move |selection| {
+        if !matches!(selection.action(), Some(HostAction::Invoke { arguments, .. })
+            if arguments == &serde_json::json!({}))
+        {
+            return Err(NativeSubmissionError::Rejected(
+                "invalid native arguments".to_owned(),
+            ));
+        }
+        selections.borrow_mut().push(selection);
+        Ok(())
+    });
+    let geometry = cx
+        .update_window(window.into(), |_, window, _| {
+            let viewport = window.viewport_size();
+            let scale = window.scale_factor();
+            let width = (f32::from(viewport.width) * scale).round() as u32;
+            let height = (f32::from(viewport.height) * scale).round() as u32;
+            SurfaceGeometry::builder()
+                .x(0)
+                .y(0)
+                .width(width)
+                .height(height)
+                .scale(scale)
+                .display_width(width)
+                .display_height(height)
+                .build()
+        })
+        .unwrap();
+    let snapshot = |ack| {
+        NativeShellSnapshot::builder()
+            .route(COUNTER_ROUTE.to_owned())
+            .dark(false)
+            .revision(ack + 1)
+            .surface(1)
+            .ack(ack)
+            .active(true)
+            .geometry(geometry.clone())
+            .actions(vec![
+                HostActionDescriptor::builder()
+                    .name("native.increment".to_owned())
+                    .description("Native increment".to_owned())
+                    .input_schema(serde_json::json!({"type":"object"}))
+                    .build(),
+            ])
+            .build()
+    };
+    let invoke = |name: &str, arguments| DeviceOperation::DispatchHostAction {
+        action: HostAction::Invoke {
+            name: name.to_owned(),
+            arguments,
+        },
+    };
+    let send = |id, command| {
+        let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(3)))
+            .unwrap();
+        write_frame(
+            &mut stream,
+            &DeviceRequest::builder()
+                .protocol_version(PROTOCOL_VERSION)
+                .session("native-action".to_owned())
+                .request_id(id)
+                .command(command)
+                .build(),
+        )
+        .unwrap();
+        let deadline = Instant::now() + Duration::from_secs(3);
+        while !gate.busy() {
+            assert!(
+                Instant::now() < deadline,
+                "native request admission deadline"
+            );
+            std::thread::yield_now();
+        }
+        stream
+    };
+    for (id, command) in [
+        (91, invoke("unknown", serde_json::json!({}))),
+        (92, invoke("native.increment", serde_json::json!([]))),
+        (
+            93,
+            invoke("native.increment", serde_json::json!({"extra":true})),
+        ),
+    ] {
+        let mut stream = send(id, command);
+        let deadline = Instant::now() + Duration::from_secs(3);
+        while gate.busy() {
+            assert!(Instant::now() < deadline, "native preflight deadline");
+            cx.update_window(window.into(), |_, window, cx| {
+                coordinator.poll(&attachment, &snapshot(0), window, cx)
+            })
+            .unwrap();
+            std::thread::yield_now();
+        }
+        assert!(
+            read_frame::<DeviceResponse>(&mut stream)
+                .unwrap()
+                .into_outcome()
+                .is_err()
+        );
+        assert!(!gate.busy());
+        assert!(
+            queued.borrow().is_empty(),
+            "preflight cannot enqueue rejected work"
+        );
+    }
+    let stream = send(94, invoke("native.increment", serde_json::json!({})));
+    let deadline = Instant::now() + Duration::from_secs(3);
+    while queued.borrow().is_empty() {
+        assert!(Instant::now() < deadline, "native enqueue deadline");
+        cx.update_window(window.into(), |_, window, cx| {
+            coordinator.poll(&attachment, &snapshot(0), window, cx)
+        })
+        .unwrap();
+        std::thread::yield_now();
+    }
+    assert_eq!(queued.borrow().len(), 1);
+    assert_eq!(queued.borrow()[0].request_id(), 94);
+    let permit = queued.borrow()[0].permit();
+    assert!(permit.is_current());
+    drop(stream);
+    // Disconnect cannot release native work already owned by its queue adapter.
+    pump(cx, window, 3);
+    cx.update_window(window.into(), |_, window, cx| {
+        coordinator.poll(&attachment, &snapshot(0), window, cx)
+    })
+    .unwrap();
+    assert!(gate.busy());
+    assert_eq!(queued.borrow().len(), 1, "native mutation must not replay");
+    cx.update_window(window.into(), |_, window, cx| {
+        coordinator.poll(&attachment, &snapshot(94), window, cx)
+    })
+    .unwrap();
+    assert!(!gate.busy());
+    assert!(!permit.is_current());
+    assert_eq!(
+        cx.update(|cx| root.read(cx).count()),
+        0,
+        "native action preserves GPUI state"
+    );
+
+    let _stream = send(95, invoke("native.increment", serde_json::json!({})));
+    let deadline = Instant::now() + Duration::from_secs(3);
+    while queued.borrow().len() < 2 {
+        assert!(
+            Instant::now() < deadline,
+            "native replacement enqueue deadline"
+        );
+        cx.update_window(window.into(), |_, window, cx| {
+            coordinator.poll(&attachment, &snapshot(94), window, cx)
+        })
+        .unwrap();
+        std::thread::yield_now();
+    }
+    let permit = queued.borrow()[1].permit();
+    coordinator.surface_replaced();
+    assert!(
+        !permit.is_current(),
+        "replacement revokes queued native work"
+    );
+    assert!(!gate.busy());
+}

@@ -15,3 +15,6 @@ JSON values, error derivation, and Bon builders and can be checked independently
 for mobile targets. Its wire envelopes validate protocol/session identity and
 bound JSON frames to 1 MiB. Host descriptors report native/GPUI agreement and
 observed geometry; device capture records carry compositor provenance.
+`HostAction::Invoke` carries an advertised application-native action name and
+JSON object arguments. Native adapters validate before enqueueing and retain
+exclusive ownership through frame acknowledgment; clients never replay it.

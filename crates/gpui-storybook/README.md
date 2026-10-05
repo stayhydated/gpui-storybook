@@ -27,6 +27,8 @@ Embedded application roots use `gpui-storybook-automation-gpui`; maintained Andr
 integration uses its reusable device coordinator, fresh session generations,
 direct ADB transport, atomic PNG publication, and
 AndroidX native qualification harness.
+The Android example exposes Jetpack Compose controls alongside embedded GPUI
+through advertised native actions, semantic values, and accessibility test tags.
 
 Live captures size the story canvas to a named viewport or explicit pixel
 dimensions and crop gallery chrome from the PNG.

@@ -25,8 +25,8 @@ The workspace requires Rust 1.99 or newer and uses edition 2024.
 MCP servers consume an asynchronous automation backend. Shared contracts and
 validation live in `gpui-storybook-automation`; core supplies the gallery backend.
 Application-owned roots attach through `gpui-storybook-automation-gpui`.
-The maintained Android integration combines native navigation with embedded
-GPUI content,
+The maintained Android example combines Jetpack Compose navigation and an
+automatable native counter with embedded GPUI content,
 while `gpui-storybook-mobile-host` serves its remote MCP connection through
 bounded `adbutils-rs` device sockets, retained cleanup outcomes, and atomic PNG
 publication. Device-owned session generations invalidate replaced surfaces.

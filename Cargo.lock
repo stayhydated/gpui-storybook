@@ -5073,6 +5073,7 @@ dependencies = [
  "jni 0.22.4",
  "log",
  "ndk",
+ "serde_json",
  "thiserror 2.0.21",
 ]
 

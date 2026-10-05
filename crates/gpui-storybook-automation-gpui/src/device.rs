@@ -38,6 +38,13 @@ pub struct NativeShellSnapshot {
     applied: bool,
     active: bool,
     geometry: SurfaceGeometry,
+    /// Advertised application actions. The native adapter validates each action's
+    /// arguments before enqueueing and acknowledges its committed native frame.
+    #[builder(default)]
+    actions: Vec<HostActionDescriptor>,
+    /// Native observations use application-owned keys distinct from GPUI keys.
+    #[builder(default)]
+    values: Vec<StorySemanticValueSnapshot>,
 }
 impl NativeShellSnapshot {
     pub fn route(&self) -> &str {
@@ -72,6 +79,7 @@ pub struct NativeSelection {
     request_id: u64,
     surface: u64,
     permit: MutationPermit,
+    action: Option<HostAction>,
 }
 /// Submission knowledge returned by the native queue adapter.
 #[derive(Debug, thiserror::Error)]
@@ -85,6 +93,11 @@ pub enum NativeSubmissionError {
     OutcomeUnknown(String),
 }
 impl NativeSelection {
+    /// Application action to validate before enqueueing on the native owner.
+    /// Route/appearance selections carry `None`.
+    pub fn action(&self) -> Option<&HostAction> {
+        self.action.as_ref()
+    }
     pub fn route(&self) -> &str {
         &self.route
     }
@@ -354,6 +367,23 @@ impl<Root: EmbeddedRoot> DeviceCoordinator<Root> {
                 DeviceOperation::DispatchHostAction {
                     action: HostAction::SetAppearance { dark },
                 } => Ok(Some((shell.route().to_owned(), *dark))),
+                DeviceOperation::DispatchHostAction {
+                    action: HostAction::Invoke { name, arguments },
+                } => {
+                    if name.is_empty()
+                        || name.len() > 128
+                        || !arguments.is_object()
+                        || arguments.to_string().len() > 4096
+                        || !shell.actions.iter().any(|action| action.name() == name)
+                    {
+                        Err(StorybookAutomationError::ControlOperationFailed {
+                            message: "native action is unadvertised or has invalid arguments"
+                                .to_owned(),
+                        })
+                    } else {
+                        Ok(Some((shell.route().to_owned(), shell.dark())))
+                    }
+                },
                 DeviceOperation::RunSteps { request } => attachment
                     .validate_steps(request, false, window, cx)
                     .map(|_| {
@@ -396,12 +426,19 @@ impl<Root: EmbeddedRoot> DeviceCoordinator<Root> {
                     let _ = response.try_send(Err(error));
                 },
                 Ok(Some((route, dark))) => {
+                    let action = match admitted.request().command() {
+                        DeviceOperation::DispatchHostAction {
+                            action: action @ HostAction::Invoke { .. },
+                        } => Some(action.clone()),
+                        _ => None,
+                    };
                     let submitted = (self.select_native)(NativeSelection {
                         route: route.clone(),
                         dark,
                         request_id: admitted.request().request_id(),
                         surface: shell.surface(),
                         permit: admitted.permit().expect("native selection mutation lease"),
+                        action,
                     });
                     let reported = match submitted {
                         Err(NativeSubmissionError::Rejected(message)) => {
@@ -509,7 +546,11 @@ impl<Root: EmbeddedRoot> DeviceCoordinator<Root> {
                 DeviceOperation::ReadValues {} => {
                     let (send, receive) = oneshot::channel();
                     attachment.read_values(send, window, cx)?;
-                    forward(receive, response.clone(), lease, DeviceResult::Values, cx);
+                    let native = shell.values.clone();
+                    forward(receive, response.clone(), lease, move |mut values| {
+                        values.values.extend(native);
+                        DeviceResult::Values(values)
+                    }, cx);
                     return Ok(None);
                 },
                 DeviceOperation::RunSteps { request } => {
@@ -573,18 +614,22 @@ impl<Root: EmbeddedRoot> DeviceCoordinator<Root> {
                     );
                     return Ok(None);
                 },
-                DeviceOperation::ListHostActions {} => Ok(DeviceResult::HostActions(vec![
-                    HostActionDescriptor::builder()
+                DeviceOperation::ListHostActions {} => {
+                    let mut actions = vec![HostActionDescriptor::builder()
                         .name("set_appearance".to_owned())
                         .description(
                             "Select light or dark appearance through the native shell".to_owned(),
                         )
                         .input_schema(
-                            serde_json::to_value(schemars::schema_for!(HostAction))
-                                .expect("action schema"),
+                            serde_json::json!({"type":"object", "required":["action", "dark"],
+                                "properties":{"action":{"const":"set_appearance"}, "dark":{"type":"boolean"}},
+                                "additionalProperties":false}),
                         )
                         .build(),
-                ])),
+                    ];
+                    actions.extend(shell.actions.clone());
+                    Ok(DeviceResult::HostActions(actions))
+                },
                 DeviceOperation::PrepareCapture {} => {
                     self.wait_for_frame(id, response.clone(), lease, host, None, window);
                     return Ok(None);

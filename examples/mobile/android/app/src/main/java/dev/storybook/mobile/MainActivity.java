@@ -1,11 +1,11 @@
 /*
  * InputConnection portions adapted from GPUI Mobile under Apache-2.0.
  * See NOTICE and LICENSE-APACHE for source attribution and selected terms.
- * Modified for the Storybook plain Activity/SurfaceView host and IME insets.
+ * Modified for the Storybook Compose/SurfaceView host and IME insets.
  */
 package dev.storybook.mobile;
 
-import android.app.Activity;
+import androidx.activity.ComponentActivity;
 import android.os.Bundle;
 import android.graphics.Color;
 import android.text.Editable;
@@ -23,17 +23,15 @@ import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.InputConnectionWrapper;
 import android.view.inputmethod.InputMethodManager;
-import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
-import android.widget.TextView;
 
-/** Native navigation owns route/appearance; GPUI owns the embedded content. */
-public final class MainActivity extends Activity implements SurfaceHolder.Callback {
+/** Compose owns native controls; GPUI owns the embedded content. */
+public final class MainActivity extends ComponentActivity implements SurfaceHolder.Callback {
     static { System.loadLibrary("gpui_storybook_example_mobile"); }
     private LinearLayout shell;
     private SurfaceView surface;
-    private Button counter, notes, appearance;
+    private ComposeShell compose;
     private String route = "embedded-counter";
     private boolean dark;
     private InputProxy input;
@@ -53,21 +51,20 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
             view.setPadding(bars.left, bars.top, bars.right, Math.max(bars.bottom, ime.bottom));
             return insets;
         });
-        TextView title = new TextView(this);
-        title.setText("Embedded Storybook"); title.setTextSize(20);
-        title.setPadding(dp(16), dp(12), dp(16), dp(12));
-        shell.addView(title);
-        LinearLayout tabs = new LinearLayout(this);
-        counter = button("Counter", () -> select("embedded-counter", dark));
-        notes = button("Notes", () -> select("embedded-notes", dark));
-        appearance = button("Dark", () -> select(route, !dark));
-        for (Button button : new Button[] {counter, notes, appearance})
-            tabs.addView(button, new LinearLayout.LayoutParams(0, dp(56), 1));
-        shell.addView(tabs);
+        compose = new ComposeShell(this, route, dark,
+            state == null ? 0 : state.getInt("composeCount", 0),
+            (next, nextDark) -> select(next, nextDark),
+            () -> surface.post(() -> publishShell(0)));
+        shell.addView(compose.getView());
         surface = new SurfaceView(this);
+        surface.setFocusableInTouchMode(true);
         surface.getHolder().setFormat(android.graphics.PixelFormat.RGBA_8888);
         surface.getHolder().addCallback(this);
         surface.setOnTouchListener((view, event) -> {
+            // Preserve an active InputConnection when tapping an already
+            // focused GPUI text input. Otherwise return key ownership from Compose.
+            if (event.getActionMasked() == android.view.MotionEvent.ACTION_DOWN
+                    && (input == null || !input.hasFocus())) view.requestFocus();
             for (int i = 0; i < event.getPointerCount(); i++) {
                 int action = event.getActionMasked();
                 if (action == 5 || action == 6) {
@@ -83,34 +80,29 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         select(route, dark);
     }
 
-    private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
-    private Button button(String label, Runnable action) {
-        Button button = new Button(this); button.setText(label);
-        button.setOnClickListener(view -> action.run()); return button;
-    }
     private void select(String next, boolean nextDark) {
         route = next; dark = nextDark;
-        counter.setSelected(route.equals("embedded-counter"));
-        notes.setSelected(route.equals("embedded-notes"));
-        counter.setText(route.equals("embedded-counter") ? "Counter ✓" : "Counter");
-        notes.setText(route.equals("embedded-notes") ? "Notes ✓" : "Notes");
-        appearance.setText(dark ? "Light" : "Dark");
+        compose.select(route, dark);
         int lightBars = android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
                       | android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;
         getWindow().getInsetsController().setSystemBarsAppearance(dark ? 0 : lightBars, lightBars);
         shell.setBackgroundColor(dark ? Color.rgb(24, 24, 27) : Color.rgb(250, 250, 250));
-        ((TextView)shell.getChildAt(0)).setTextColor(dark ? Color.WHITE : Color.BLACK);
         surface.post(() -> publishShell(0));
     }
-    public void gpuiSelect(String next, boolean nextDark, long request) {
+    public void gpuiSelect(String next, boolean nextDark, long request, String action) {
         runOnUiThread(() -> {
             if (!nativeSelectionCurrent(request)) {
                 nativeSelectionSettled(request, false);
                 return;
             }
             select(next, nextDark);
-            publishShell(request);
-            nativeSelectionSettled(request, true);
+            if (action.equals("compose.increment")) compose.increment();
+            if (action.equals("compose.reset")) compose.reset();
+            // Observe Compose's committed frame before acknowledging native work.
+            compose.afterFrame(() -> {
+                publishShell(request);
+                nativeSelectionSettled(request, true);
+            });
         });
     }
     private void publishShell(long request) {
@@ -118,7 +110,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         android.util.DisplayMetrics display = new android.util.DisplayMetrics();
         getWindowManager().getDefaultDisplay().getRealMetrics(display);
         nativeShell(route, dark, position[0], position[1], surface.getWidth(), surface.getHeight(),
-                    getResources().getDisplayMetrics().density, display.widthPixels, display.heightPixels, request);
+                    getResources().getDisplayMetrics().density, display.widthPixels, display.heightPixels, request, compose.count());
     }
     @Override public void surfaceCreated(SurfaceHolder holder) {
         nativeSurface(holder.getSurface(), getResources().getDisplayMetrics().density);
@@ -132,10 +124,12 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     @Override protected void onResume() { super.onResume(); nativeActive(true); }
     @Override protected void onPause() { nativeActive(false); super.onPause(); }
     @Override protected void onSaveInstanceState(Bundle state) {
-        state.putString("route", route); state.putBoolean("dark", dark); super.onSaveInstanceState(state);
+        state.putString("route", route); state.putBoolean("dark", dark);
+        state.putInt("composeCount", compose.count()); super.onSaveInstanceState(state);
     }
     @Override public boolean dispatchKeyEvent(KeyEvent event) {
         if (input != null && input.hasFocus()) return super.dispatchKeyEvent(event);
+        if (compose.getView().hasFocus()) return super.dispatchKeyEvent(event);
         nativeKey(event.getKeyCode(), event.getAction(), event.getMetaState());
         return true;
     }
@@ -270,7 +264,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     private native void nativeStart(boolean automation);
     private native void nativeSurface(Surface surface, float scale);
     private native void nativeRelease();
-    private native void nativeShell(String route, boolean dark, int x, int y, int width, int height, float scale, int displayWidth, int displayHeight, long request);
+    private native void nativeShell(String route, boolean dark, int x, int y, int width, int height, float scale, int displayWidth, int displayHeight, long request, int composeCount);
     private native void nativeTouch(int action, int id, float x, float y);
     private native void nativeKey(int code, int action, int meta);
     private native void nativeActive(boolean active);

@@ -190,7 +190,16 @@ impl DeviceOperation {
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
 pub enum HostAction {
-    SetAppearance { dark: bool },
+    SetAppearance {
+        dark: bool,
+    },
+    /// Invoke an application-advertised native action. The native adapter
+    /// validates its arguments before enqueueing and retains admission through
+    /// native acknowledgment. Submitted actions are never replayed.
+    Invoke {
+        name: String,
+        arguments: serde_json::Value,
+    },
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize, bon::Builder)]

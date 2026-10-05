@@ -1,4 +1,4 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="dev.storybook.mobile">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
   <uses-sdk android:minSdkVersion="31" android:targetSdkVersion="36" />
   <uses-permission android:name="android.permission.INTERNET" />
   <application android:label="Embedded Storybook" android:theme="@android:style/Theme.Material.Light.NoActionBar" android:debuggable="true" android:extractNativeLibs="true">

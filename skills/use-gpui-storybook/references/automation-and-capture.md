@@ -150,13 +150,36 @@ session generation and reopens admission atomically. Seed `DeviceEndpoint::liste
 with a process-unique string of 1–107 bytes; native revisions stay observation metadata.
 
 The repository's `examples/embedded` shares its production `DemoRoot` with
-`examples/mobile`. The Android example uses native Counter/Notes tabs, native
-appearance, one retained GPUI runtime, and an opted-in loopback device endpoint.
-Build and run using `examples/mobile/README.md`; its SDK-direct builder pins
+`examples/mobile`. The Android example uses Jetpack Compose Counter/Notes tabs,
+appearance, an independent native counter, one retained GPUI runtime, and an
+opted-in loopback device endpoint. Build and run using
+`examples/mobile/README.md`; its builder pins
 SDK/build tools 36, NDK 27.1.12297006, API baseline 31, and the `mobile` profile.
 GPUI Mobile revision `9075e3aa3eea812127f2c60ed66f0cd5798ff245` composes with the
 published GPUI 0.3.7 stack. Keep minimal mobile features and system-font inputs
 in qualification evidence.
+The Gradle 8.13 wrapper pins AGP 8.13.2, Kotlin/Compose compiler 2.3.10,
+Compose BOM 2025.12.01, and Activity Compose 1.11.0. Normal builds use checked-in
+dependency locks and SHA-256 verification metadata; refresh them deliberately
+with `build.py --write-gradle-locks` and review both artifacts.
+
+Supply native action descriptors and distinct native semantic-value keys in
+`NativeShellSnapshot`. Validate `NativeSelection::action()` before enqueueing
+`HostAction::Invoke`; ordinary native UI and MCP commands share one state owner,
+and acknowledgment follows its committed frame. The example advertises
+`compose.increment` and `compose.reset` with empty object arguments:
+
+```json
+{"action":{"action":"invoke","name":"compose.increment","arguments":{}}}
+```
+
+Read `native.compose-counter` as `{"count":1}` through semantic-value discovery
+or `storybook_read_value`. Compose counter state survives navigation and Activity
+recreation independently of GPUI scenario fixtures. AndroidX selectors use
+`By.res("storybook.compose.increment")`, `storybook.compose.reset`, and
+`storybook.compose.count`; navigation uses `storybook.counter`, `storybook.notes`,
+and `storybook.appearance`. Keep `testTagsAsResourceId` enabled on the Compose
+subtree and verify visible text after native/MCP actions.
 
 Run `gpui-storybook-mobile-host --serial DEVICE --allow-interaction` on Linux
 or macOS to attach. Installation, launching the example, and stopping it on EOF

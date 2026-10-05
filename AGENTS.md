@@ -25,6 +25,7 @@ in `rust-toolchain.toml` for local validation.
 | `examples/story`, `examples/component` | Executable application examples and registration fixtures |
 | `examples/embedded`, `examples/mobile` | Shared production views, Android native shell, and maintained device qualification |
 | `examples/mobile/native` | Hash-pinned AndroidX native input and lifecycle harness |
+| `examples/mobile/android` | Pinned Gradle/Kotlin/Compose shell, dependency locks, and artifact verification |
 | `examples/mobile/tools` | Isolated, unpublished Android library qualification probes |
 | `book/src` | Application user guide; navigate through `SUMMARY.md` |
 | `skills/use-gpui-storybook` | Application integration guidance for coding agents |
@@ -68,6 +69,11 @@ instructions and book or API navigation to those linked surfaces.
   secondary cleanup errors. Keep the example's build/runtime opt-in explicit.
   The mobile CI workflow gates release; library probes stay in their separate
   unpublished workspace.
+  Compose state belongs to the Activity; native actions validate before enqueueing
+  and acknowledge committed frames. Keep accessibility test tags, native value
+  keys, MCP descriptors, and independent native/GPUI qualification aligned.
+  Refresh Android dependencies deliberately with `build.py --write-gradle-locks`
+  and review both Gradle locks and SHA-256 verification metadata.
 - **Portable tests:** keep the test crate README, portable-testing and automation
   book sections, examples, and automation skill reference aligned when capture
   matrices, baseline policy, context setup, or frame budgets change.

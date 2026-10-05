@@ -107,8 +107,7 @@ def tap_node(node):
     adb("shell", "input", "tap", str((left + right) // 2), str((top + bottom) // 2))
 
 def native_tab(label):
-    tap_node(next(node for node in nodes() if node.attrib["class"] == "android.widget.Button"
-                  and node.attrib["text"].startswith(label)))
+    tap_node(next(node for node in nodes() if node.attrib.get("resource-id") == "storybook." + label.lower()))
 
 def target_touch(key):
     host = ready()
@@ -169,11 +168,15 @@ try:
     host = ready(lambda host: host["geometry"]["height"] < original["geometry"]["height"])
     keyboard_top = host["geometry"]["y"] + host["geometry"]["height"]
     keyboard_bottom = original["geometry"]["y"] + original["geometry"]["height"]
-    keyboard_height = keyboard_bottom - keyboard_top
     width = host["geometry"]["display_width"]
-    adb("shell", "input", "tap", str(round(width * .1)), str(round(keyboard_top + keyboard_height * .46)))
+    scale = host["geometry"]["scale"]
+    # LatinIME can hide its suggestion strip without moving its key rows.
+    # The qualified portrait layout places row/space centers relative to its
+    # observed bottom, in density-independent pixels.
+    assert keyboard_bottom - keyboard_top >= 240 * scale
+    adb("shell", "input", "tap", str(round(width * .1)), str(round(keyboard_bottom - 160 * scale)))
     wait_state(lambda value: value["note"] == "a")
-    adb("shell", "input", "tap", str(round(width * .5)), str(round(keyboard_top + keyboard_height * .90)))
+    adb("shell", "input", "tap", str(round(width * .5)), str(round(keyboard_bottom - 40 * scale)))
     wait_state(lambda value: value["note"] == "a ")
     transcript.append({"native_ime": "AOSP soft-keyboard a and space committed through InputConnection", "keyboard_top": keyboard_top, "host": host})
     print("native IME commit and insets passed", flush=True)

@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Build the dependency-free native Android shell with the selected SDK and NDK."""
+"""Build the Rust GPUI library and pinned Jetpack Compose Android application."""
 import argparse
 import os
 from pathlib import Path
 import subprocess
-import zipfile
+import shutil
+import tomllib
 
 ROOT = Path(__file__).resolve().parents[2]
 HERE = Path(__file__).resolve().parent
@@ -16,11 +17,11 @@ parser.add_argument("--platform", default="36")
 parser.add_argument("--abi", choices=["x86_64", "arm64-v8a"], default="x86_64")
 parser.add_argument("--automation", action="store_true")
 parser.add_argument("--profile", default="mobile")
+parser.add_argument("--write-gradle-locks", action="store_true", help="Refresh dependency locks and SHA-256 verification metadata")
 args = parser.parse_args()
 if not args.sdk or not args.ndk:
     parser.error("provide --sdk/--ndk or ANDROID_HOME/ANDROID_NDK_HOME")
 tools = args.sdk / "build-tools" / args.build_tools
-android = args.sdk / "platforms" / f"android-{args.platform}" / "android.jar"
 target, clang = {
     "x86_64": ("x86_64-linux-android", "x86_64-linux-android31-clang"),
     "arm64-v8a": ("aarch64-linux-android", "aarch64-linux-android31-clang"),
@@ -32,30 +33,36 @@ env[f"CARGO_TARGET_{target.upper().replace('-', '_')}_LINKER"] = str(bin_dir / c
 env[f"CC_{target.replace('-', '_')}"] = str(bin_dir / clang)
 env[f"CXX_{target.replace('-', '_')}"] = str(bin_dir / f"{clang}++")
 env[f"AR_{target.replace('-', '_')}"] = str(bin_dir / "llvm-ar")
-def run(*command):
-    subprocess.run([str(value) for value in command], cwd=ROOT, env=env, check=True)
+def run(*command, cwd=ROOT):
+    subprocess.run([str(value) for value in command], cwd=cwd, env=env, check=True)
 
 build = ROOT / "target" / "mobile-example" / args.abi
-classes, dex = build / "classes", build / "dex"
-classes.mkdir(parents=True, exist_ok=True)
-dex.mkdir(parents=True, exist_ok=True)
+build.mkdir(parents=True, exist_ok=True)
 cargo = ["cargo", "build", "-p", "gpui-storybook-example-mobile", "--locked", "--target", target, "--profile", args.profile]
 if args.automation:
     cargo += ["--features", "automation"]
 run(*cargo)
-run("javac", "-source", "11", "-target", "11", "-classpath", android, "-d", classes,
-    HERE / "android" / "MainActivity.java")
-class_files = sorted(classes.rglob("*.class"))
-run(tools / "d8", "--lib", android, "--min-api", "31", "--output", dex, *class_files)
-unaligned, unsigned, apk = build / "unaligned.apk", build / "unsigned.apk", build / "storybook.apk"
-run(tools / "aapt2", "link", "-I", android, "--manifest", HERE / "android" / "AndroidManifest.xml", "-o", unaligned)
-with zipfile.ZipFile(unaligned, "a") as archive:
-    archive.write(dex / "classes.dex", "classes.dex")
-    archive.write(HERE / "android" / "LICENSE-APACHE", "assets/licenses/gpui-mobile/LICENSE-APACHE")
-    archive.write(HERE / "android" / "NOTICE", "assets/licenses/gpui-mobile/NOTICE")
-    archive.write(ROOT / "target" / target / ("debug" if args.profile == "dev" else args.profile) / "libgpui_storybook_example_mobile.so",
-                  f"lib/{args.abi}/libgpui_storybook_example_mobile.so")
-run(tools / "zipalign", "-f", "-p", "4", unaligned, unsigned)
+library = ROOT / "target" / target / ("debug" if args.profile == "dev" else args.profile) / "libgpui_storybook_example_mobile.so"
+jni = build / "jni" / args.abi
+jni.mkdir(parents=True, exist_ok=True)
+shutil.copyfile(library, jni / library.name)
+licenses = build / "assets/licenses/gpui-mobile"
+licenses.mkdir(parents=True, exist_ok=True)
+for name in ("LICENSE-APACHE", "NOTICE"):
+    shutil.copyfile(HERE / "android" / name, licenses / name)
+version = tomllib.loads((ROOT / "Cargo.toml").read_text())["workspace"]["package"]["version"]
+env["ANDROID_HOME"] = str(args.sdk.resolve())
+env["ANDROID_SDK_ROOT"] = str(args.sdk.resolve())
+gradle = [HERE / "android/gradlew", "--no-daemon", ":app:assembleDebug",
+          f"-PstorybookBuildRoot={build / 'gradle'}", f"-PstorybookJni={build / 'jni'}",
+          f"-PstorybookAssets={build / 'assets'}", f"-PstorybookAbi={args.abi}",
+          f"-PstorybookPlatform={args.platform}", f"-PstorybookBuildTools={args.build_tools}",
+          f"-PstorybookVersion={version}"]
+if args.write_gradle_locks:
+    gradle += ["--write-locks", "--write-verification-metadata", "sha256"]
+run(*gradle, cwd=HERE / "android")
+unsigned = build / "gradle/app/outputs/apk/debug/app-debug.apk"
+apk = build / "storybook.apk"
 key = ROOT / "target" / "mobile-example" / "debug.keystore"
 if not key.exists():
     run("keytool", "-genkeypair", "-keystore", key, "-storepass", "android", "-keypass", "android",

@@ -45,6 +45,54 @@ attempt found the demo emulator closed. Starting the owned qualification
 emulator allowed the recipe checks to pass. Existing Java/D8 diagnostics remain
 recorded below. No public API or workspace version changed during promotion.
 
+## Jetpack Compose integration
+
+The 2026-10-05 example adds a real Compose shell alongside the retained GPUI
+SurfaceView. Compose owns tabs, appearance, and an independent counter. Native
+clicks and MCP `compose.increment`/`compose.reset` commands share Activity-owned
+state. `native.compose-counter` exposes that state through semantic discovery,
+single-value reads, and bounded waits. Invalid names, non-object arguments, and
+unexpected fields fail before mutation. GPUI scenarios preserve the native count.
+
+The reusable wire contract adds `HostAction::Invoke`; native snapshots advertise
+action schemas and distinct native value keys. The native adapter validates
+arguments before enqueueing, checks its permit/surface before applying work, and
+acknowledges the committed Compose frame. The real socket/GPUI regression verifies
+rejected work stays out of the queue, disconnect retains ownership without replay,
+acknowledgment releases it, and surface replacement revokes queued permits.
+
+The AndroidX proof clicks `storybook.compose.increment`, observes visible count
+1, dispatches the advertised increment to visible count 2, resets to 0 with a disabled reset
+control, then retains count 2 through rotation and pause/resume. Its hierarchy
+uses Compose resource-ID test tags. It independently verifies GPUI input and
+state, IME commits, capture dimensions/content, and a retained process. The
+captured display visibly contains both counters; the GPUI crop excludes Compose.
+
+The pinned Gradle wrapper builds the Kotlin/Compose app around the selected Rust
+ABI. The resolved dependency lock and SHA-256 metadata are checked in; normal
+builds verify them. Signed x86_64 and arm64-v8a automation APKs and a default-feature
+arm64 APK built successfully. The final runtime qualification uses the owned
+`gpui_android_api36` emulator with SwiftShader and the declared API 36 inputs.
+
+The full `just mobile-test emulator-5580` recipe passed. Additional MCP proof
+covers single-value native reads and bounded native waits; launch/EOF and host
+lifecycle proofs pass independently. The owning all-feature Rust suite passes
+101 tests with its Android case ignored locally; that case passes explicitly
+on the emulator. Linux and
+Android Clippy with warnings denied, public Rustdocs, book, LLM text, catalog,
+and scoped format/Markdown checks pass. Logs and transcripts use
+`target/mobile-evidence/compose-*`; the native report and screenshot remain in
+`target/mobile-evidence/androidx`.
+
+Qualification exposed two IME issues: a suggestion strip changes keyboard
+height, and requesting SurfaceView focus on an already focused text input
+displaces its InputConnection. Key rows now use the observed keyboard bottom
+and qualified density offsets; active input retains focus. Both native input
+proofs pass after the corrections. A single-value harness assertion initially
+read the wrong result field; it now checks the advertised `semantic_value`.
+Existing native harness D8 diagnostics remain recorded. Arm64 runtime, other
+keyboard layouts, and hosted platform jobs retain their qualification scope.
+
 ## Qualified inputs
 
 | Input | Value |
@@ -54,7 +102,9 @@ recorded below. No public API or workspace version changed during promotion.
 | GPUI Mobile | `9075e3aa3eea812127f2c60ed66f0cd5798ff245` |
 | Android SDK / build tools | Platform 36 / 36.0.0 |
 | NDK / native API baseline | 27.1.12297006 / 31 |
-| Java | OpenJDK 21, Java source/target 11 |
+| Java | OpenJDK 21; Compose app JVM 17, independent native harness source/target 11 |
+| Android app build | Gradle 8.13, AGP 8.13.2, Kotlin/Compose compiler 2.3.10 |
+| Compose | BOM 2025.12.01, Activity Compose 1.11.0; locked dependencies with SHA-256 verification |
 | APK ABIs | x86_64 and arm64-v8a, signed and verified |
 | Runtime emulator | 37.1.11, API 36 default x86_64, Pixel 7 |
 | Display | 1080 × 2400 physical pixels, scale 2.625 |

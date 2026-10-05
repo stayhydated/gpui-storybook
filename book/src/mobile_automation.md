@@ -3,7 +3,7 @@
 Attach automation to your application's existing GPUI root when a native shell
 owns navigation and the window lifecycle. The Counter/Notes example shares its
 production views between a desktop application and an Android Activity with
-native tabs and an appearance control.
+Jetpack Compose tabs, an appearance control, and an independent native counter.
 
 Android automation is a maintained integration. Its device endpoint, reusable
 GPUI coordinator, computer MCP host, and AndroidX harness participate in the
@@ -45,6 +45,12 @@ dispatch, and acknowledges applied or revoked work. Report rejection before
 enqueueing separately from unknown delivery. A native response deadline retains
 its device lease until acknowledgment or explicit host invalidation.
 
+Set the `NativeShellSnapshot` builder's `actions` to application-native descriptors
+and `values` to native observations whose keys are distinct from GPUI keys.
+`HostAction::Invoke` reaches your adapter through `NativeSelection::action()`.
+Validate the name and arguments before enqueueing; use the same state owner as
+ordinary UI callbacks and acknowledge the committed native frame.
+
 On native surface release, call `OperationGate::suspend` immediately. This closes
 admission during the handoff to the GPUI owner. After invalidating the old
 attachment, call `DeviceCoordinator::surface_replaced()` to advance the
@@ -54,9 +60,14 @@ identity is independent of native revision values.
 
 ## Run the repository example
 
-Use the pinned Rust toolchain, JDK 21, Python 3, Android platform 36/build-tools
+Use the pinned Rust toolchain, JDK 21, Python 3.11+, Android platform 36/build-tools
 36.0.0, and NDK 27.1.12297006. The default build targets x86_64 with API 31 as
 the native link baseline. Select `--abi arm64-v8a` for aarch64.
+The checked-in Gradle 8.13 wrapper uses AGP 8.13.2, Kotlin/Compose compiler
+2.3.10, Compose BOM 2025.12.01, and Activity Compose 1.11.0. Normal builds verify
+the locked Android dependency closure against checked-in SHA-256 metadata.
+When deliberately updating these dependencies, build with
+`--write-gradle-locks` and review both the lockfile and verification metadata.
 
 ```sh
 python3 examples/mobile/build.py --automation \
@@ -125,6 +136,25 @@ enabled, select appearance through `storybook_dispatch_host_action`:
 
 Light/dark presentation in a step batch or scenario also waits for native
 appearance acknowledgment before GPUI execution.
+
+The example advertises `compose.increment` and `compose.reset`. Dispatch either
+with an empty arguments object:
+
+```json
+{"action":{"action":"invoke","name":"compose.increment","arguments":{}}}
+```
+
+Read `native.compose-counter` through `storybook_read_semantic_values` or
+`storybook_read_value`; its value is `{"count":1}` after one fresh increment.
+Native clicks and MCP commands share Activity-owned Compose state. Navigation,
+rotation, and pause/resume retain it; GPUI scenarios recreate their own fixtures.
+The native harness verifies visible Compose text after action acknowledgment.
+
+Compose enables `testTagsAsResourceId` for its subtree. Use AndroidX
+`By.res("storybook.compose.increment")`, `By.res("storybook.compose.reset")`,
+and `By.res("storybook.compose.count")` for the native counter. The selected
+tabs and appearance control expose `storybook.counter`, `storybook.notes`, and
+`storybook.appearance`. GPUI targets use Storybook's rendered registry.
 
 The ordinary story tools discover routes, edit controls, read semantic values,
 click targets, dispatch scoped actions, and run fresh scenarios. GPUI pointer
