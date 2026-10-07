@@ -1,5 +1,6 @@
 package dev.storybook.automation
 
+import android.annotation.TargetApi
 import android.app.Activity
 import android.os.Build
 import android.os.Handler
@@ -39,6 +40,7 @@ data class NativeSelection(
  * SurfaceView release events here before releasing the native renderer, and
  * supply their state/application callbacks. Construct on the main thread.
  */
+@TargetApi(Build.VERSION_CODES.Q)
 class StorybookAutomation(
     private val activity: Activity,
     private val bridge: NativeBridge,
