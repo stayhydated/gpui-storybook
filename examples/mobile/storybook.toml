@@ -1,0 +1,12 @@
+group = "embedded-mobile"
+
+[android]
+activity = ".MainActivity"
+apk = "../../target/mobile-example/x86_64/storybook.apk"
+build = [ "python3", "build.py", "--automation" ]
+device_port = 28437
+package = "dev.storybook.mobile"
+smoke_plan = "smoke.json"
+
+[android.boolean_extras]
+storybook_automation = true

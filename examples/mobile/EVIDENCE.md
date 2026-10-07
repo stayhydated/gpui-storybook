@@ -339,3 +339,45 @@ iOS runtime qualification retain the limits documented above. The experiment
 kept the coordinated 0.8.0 publication boundary and workspace version 0.7.1.
 The owned Appium server and emulator were stopped, and forwarding was clean.
 EOF stopped the owned example; master, Manefi, and the original plan were preserved.
+
+## SDK integration UX/DX qualification, 2026-10-06
+
+The `mobile-automation` implementation uses protocol version 2, the shared
+`DeviceHost`/`NativeShellHandle` owner, and the SDK Kotlin adapter. The maintained
+example delegates its lifecycle, geometry, selection queue, and committed-frame
+acknowledgment to those owners. Its source captures Compose state during
+composition before retaining it in `SideEffect`.
+
+Qualified locally on `emulator-5580`, API 36 AOSP x86_64 Pixel 7, density 420,
+SwiftShader Vulkan, NDK 27.1.12297006, JDK 21, and the `mobile` profile:
+
+- Raw MCP stdio: native actions and argument rejection, independent native/GPUI
+  state, semantic input, fresh scenarios, named appearance selection, both PNG
+  scopes, and preflight rejection passed.
+- Raw native proof: actual touch and AOSP LatinIME input/insets, disconnect/busy/
+  duplicate admission, partial progress without replay, capture invalidation,
+  pause/resume, and rotation passed.
+- AndroidX UI Automator: native selectors, Compose actions/state, touch/IME,
+  screenshot decoding, fresh surface sessions, and background diagnostics passed.
+- Configured SDK `smoke`: semantic plan, four scoped PNGs, stale attachment,
+  retained state/PID, background/resume, and exact observed rotation policy
+  restoration passed. The initial and restored host were portrait.
+- Real-device Rust tests: a canceled smoke response still completed its captures
+  and lifecycle restoration; failed install preserved the package and temporary
+  file inventory.
+- Neutral/device/embedded/MCP/host/TOML suites, facade capture and duplicate-key
+  fixture, strict affected-package Clippy, public Rustdocs, book/LLM builds,
+  Markdown/local links, and Rust/TOML formatting passed.
+- ARM64 application compile and iOS ARM64 neutral contract compile passed.
+
+The host and APK were built from the same protocol-2 sources. Existing disposable
+debug certificates were reused for local updates; the host install path preserves
+an installed package on failure. Runtime qualification covers this emulator and
+renderer; physical ARM64 and iOS runtime behavior require their native lanes.
+
+Artifacts remain under `target/mobile-dx-*`: scoped PNGs, protocol/native
+transcripts, doctor output, semantic smoke report, and command logs.
+
+Application APK SHA-256: `da84fb4c203a4186b079b55660ea1447cf43ac6a17ac1cae44367d65d871685b`.
+
+SDK Kotlin source SHA-256: `783498b145f65986a5138bfd269ea17f3ca109d8563cad34bf7f3673d3ccde96`.

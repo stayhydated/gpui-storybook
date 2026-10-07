@@ -9,6 +9,10 @@ On Linux or macOS, forward the facade feature:
 mcp = ["gpui-storybook/mcp"]
 ```
 
+The facade `mcp` feature also enables its gallery capture backend. Use `capture`
+for capture without MCP, and `gpui_storybook::Tokio::handle(cx)` for the installed
+runtime without depending on core directly.
+
 The `mcp` feature is unsupported on Windows and produces a compile-time error
 there. Set `GPUI_STORYBOOK_MCP_STDIO=1` to serve MCP over stdio. Route tracing
 and diagnostic logs to standard error.
@@ -121,113 +125,72 @@ fresh fixtures and ordinary interactions preserve state.
 
 ## Embedded GPUI and Android hosts
 
-The Android integration is maintained through the main workspace and mobile
-release checks. In the repository, `just mobile-build [abi]` builds the opted-in
-APK, `just mobile-host <serial> [abi]` installs/launches it and serves MCP, and
-`just mobile-test <serial>` qualifies the running example on an owned API 36
-emulator. Build commands use `ANDROID_HOME` and `ANDROID_NDK_HOME`.
-Android x86_64 has emulator runtime evidence; arm64 has signed build evidence.
-The iOS lane checks target-neutral contracts.
+Enable `gpui-storybook-automation-gpui/android` for `DeviceHost::attach_android`.
+Supply the existing root, `EmbeddedRoute` catalog, capabilities, and
+`DeviceHostOptions`. Its default opens no endpoint; pass `.automation(true)` only
+with application build/runtime opt-in. Retain `host.native_shell()` for JNI and
+run the owner against the existing window. `EmbeddedRoot` requires route selection
+and public revision; optional controls/actions/fixtures have defaults.
 
-Use `gpui-storybook-automation-gpui` to attach to an application-owned root and
-window. Implement `EmbeddedRoot` for route selection, public revision, controls,
-action scope, presentation, and fresh-fixture construction. Register the root
-with `capture_story_view_with_scroll`, target/value wrappers, and a stable
-catalog. Retain `GpuiHostAttachment`, dispatch on the existing GPUI owner thread,
-and invalidate the attachment before surface replacement. Registries belong to
-that app/window; repeated keys in other contexts stay independent.
+Export the version-matched Kotlin source with
+`gpui-storybook-mobile-host android-source --output PATH`. Construct its
+`StorybookAutomation` on the Activity with `NativeBridge`, the current SurfaceView,
+a committed `NativeFrame` reader, and the application selection callback. Forward
+lifecycle, surface release, and close; expose `storybookDispatch(String): Boolean`.
+JNI forwards `publish_json`, `is_current`, and `is_input_allowed` to the retained
+`NativeShellHandle`. Read Compose state during composition, capture it in
+`SideEffect`, and return null until that snapshot is committed.
 
-Enable `device` for `DeviceCoordinator`; supply an opted-in endpoint, native
-snapshot, and queue adapter. Retain the selection permit, check its surface and
-admission immediately before native dispatch, and acknowledge applied or revoked
-work. Distinguish rejected enqueueing from unknown delivery; a response deadline
-retains ownership until acknowledgment or explicit host invalidation.
+The SDK owns geometry revisions, frame acknowledgments, permit retention,
+attachment replacement, and polling. Rotation replaces the session even when an
+Activity/window is retained; IME-only viewport changes preserve it. Application
+fixtures, authentication, permissions, public values, and action validation remain
+application-owned. Lower-level hosts use `GpuiHostAttachment`, `DeviceCoordinator`,
+`NativeShellSnapshot`, and `DeviceEndpoint::listen_fresh`.
 
-On native surface release, call `OperationGate::suspend` immediately. This closes
-admission during the handoff to the GPUI owner. After invalidating the old
-attachment, `DeviceCoordinator::surface_replaced()` advances an endpoint-owned
-session generation and reopens admission atomically. Seed `DeviceEndpoint::listen`
-with a process-unique string of 1–107 bytes; native revisions stay observation metadata.
+Declare native `HostAppearance` IDs and labels in `DeviceHostOptions`. Override
+`EmbeddedRoot::apply_host_appearance` for custom schemes such as OLED. Discover
+choices with `storybook_get_host`, then submit
+`{"action":{"action":"set_appearance","id":"oled"}}` only for an advertised ID.
+Native action/semantic keys remain stable and distinct from GPUI keys.
 
-The repository's `examples/embedded` shares its production `DemoRoot` with
-`examples/mobile`. The Android example uses Jetpack Compose Counter/Notes tabs,
-appearance, an independent native counter, one retained GPUI runtime, and an
-opted-in loopback device endpoint. Build and run using
-`examples/mobile/README.md`; its builder pins
-SDK/build tools 36, NDK 27.1.12297006, API baseline 31, and the `mobile` profile.
-GPUI Mobile revision `9075e3aa3eea812127f2c60ed66f0cd5798ff245` composes with the
-published GPUI 0.3.7 stack. Keep minimal mobile features and system-font inputs
-in qualification evidence.
-The Gradle 8.13 wrapper pins AGP 8.13.2, Kotlin/Compose compiler 2.3.10,
-Compose BOM 2025.12.01, and Activity Compose 1.11.0. Normal builds use checked-in
-dependency locks and SHA-256 verification metadata; refresh them deliberately
-with `build.py --write-gradle-locks` and review both artifacts.
-The Activity/input bridge, Compose shell, and native qualification harness use
-Kotlin with a JVM 17 target. Preserve the JNI callback descriptors during edits.
-The native builder shares the Gradle/compiler pins, verifies its independent
-AndroidX closure, and locks the Kotlin runtime; use its own
-`build.py --write-gradle-locks` deliberately when refreshing those dependencies.
+Declare package, activity, device port, APK, build hook, and runtime/fixture extras
+under `[android]` in the consumer's `storybook.toml`. Paths resolve against that
+file's directory. Use these commands:
 
-Supply native action descriptors and distinct native semantic-value keys in
-`NativeShellSnapshot`. Validate `NativeSelection::action()` before enqueueing
-`HostAction::Invoke`; ordinary native UI and MCP commands share one state owner,
-and acknowledgment follows its committed frame. The example advertises
-`compose.increment` and `compose.reset` with empty object arguments:
-
-```json
-{"action":{"action":"invoke","name":"compose.increment","arguments":{}}}
+```sh
+gpui-storybook-mobile-host serve --serial DEVICE --config storybook.toml --launch --allow-interaction
+gpui-storybook-mobile-host doctor --serial DEVICE --config storybook.toml
+gpui-storybook-mobile-host smoke --serial DEVICE --config storybook.toml --allow-interaction --lifecycle
 ```
 
-Read `native.compose-counter` as `{"count":1}` through semantic-value discovery
-or `storybook_read_value`. Compose counter state survives navigation and Activity
-recreation independently of GPUI scenario fixtures. AndroidX selectors use
-`By.res("storybook.compose.increment")`, `storybook.compose.reset`, and
-`storybook.compose.count`; navigation uses `storybook.counter`, `storybook.notes`,
-and `storybook.appearance`. Keep `testTagsAsResourceId` enabled on the Compose
-subtree and verify visible text after native/MCP actions.
+`serve --build --launch` runs the configured build hook once. Installation and
+launch are single submissions; failed installs preserve the package. EOF drains
+captures, and `--stop-on-eof` stops only the observed owned PID. A replaced process
+is preserved. Diagnostics stay on stderr; MCP uses stdin/stdout.
 
-Run `gpui-storybook-mobile-host --serial DEVICE --allow-interaction` on Linux
-or macOS to attach. Installation, launching the example, and stopping it on EOF
-are explicit flags. EOF settles admitted captures and closes host connections; reconnection discovers the
-new catalog without replay. Surface replacement changes the session and invalidates
-old geometry, targets, capture tickets, and queued operations. Protocol v1 uses
-closed, length-prefixed JSON bounded to 1 MiB; the device holds one mutation lease
-through native acknowledgment, rendered readiness, and capture settlement.
-Incoming frames have an overall 30-second deadline, responses have a five-second
-write deadline, and endpoint drop closes sockets and joins transport threads.
+`doctor` reports typed readiness causes and the last observation on timeout.
+`RemoteBackend::attach_when_ready` repeats only discovery. A new session requires
+explicit reattachment and capability rediscovery; never replay a submitted mutation.
+Protocol version 2 uses closed, bounded length-prefixed JSON.
 
-Discover native geometry/orientation with `storybook_get_host`, native action
-schemas with `storybook_list_host_actions`, and dispatch appearance with
-`storybook_dispatch_host_action`. `storybook_capture_host` accepts `display` or
-`gpui` plus a computer-owned PNG path. Display includes the native shell, visible
-IME, and system UI; GPUI crops the observed surface after IME insets. Captures
-return dimensions, request/session identity, route/surface revisions, geometry,
-and `adb_compositor_observation` provenance. This is a separately validated
-compositor observation. Explicit phone-sized desktop presets require
-`StorySizing`; the Android example uses observed dimensions.
+An application smoke plan declares its route, optional scenario/steps, and exact
+semantic postconditions. Effects require explicit interaction opt-in. Lifecycle
+qualification requires an exclusively owned disposable emulator; it checks
+rotation, stale sessions, retained state/PID, pause/resume, captures, and restores
+the observed rotation policy. The command writes a partial/complete JSON report
+and scoped PNGs. Library consumers retain `SmokeRunner`, await `shutdown`, then
+stop its initial Tokio runtime; response cancellation leaves work and restoration
+owned. `RemoteBackend::shutdown` and `AdbTransport::shutdown` settle captures and
+installs for lower-level integrations.
 
-The computer uses pinned `adbutils-rs` primitives with host deadlines, bounded
-wire/shell/PNG reads, preserved shell-v2 status, and direct device connections.
-APK installation streams to an owned temporary path, installs once, and cleans
-that path without automatic uninstall. Captures survive caller cancellation on
-the attachment runtime; call `RemoteBackend::shutdown` after closing admission.
-The install deadline includes local file validation/opening; APK inputs must be
-regular files. PNGs replace their destination atomically after encoding and
-ticket settlement. Inspect both `operation` and `cleanup` in a
-`settlement_failed` result, retaining the primary mutation's replay prohibition.
-Use `RUST_LOG=gpui_storybook_mobile_host=debug` for stderr request/session tracing.
-
-Use the maintained `native/build.py` and `native/verify.py` AndroidX UI Automator
-2.4.0 harness for native selectors, real touch/IME input, rotation, pause/resume,
-and screenshot/hierarchy artifacts. Maven dependencies are hash-pinned and CI
-records the declared API 36 Pixel 7/AOSP inputs. Use `verify.py` for the raw stdio MCP proof and `verify_native.py` for native
-touch, AOSP en-US IME commits/insets, busy/disconnect/duplicate admission,
-partial progress, pause/resume, and recreation. GPUI mouse/text steps and native
-input are independently qualified. Preserve live state during navigation; only
-scenario fixture hooks reset the selected surface. Native permission dialogs
-and other application effects require their own native harness. iOS follow-up
-must prove native-main-thread dispatch, simulator transport, lifecycle, and
-permitted capture before advertising runtime support.
+The maintained example shares its production `DemoRoot`, SDK Kotlin adapter, and
+real GPUI runtime. Its builder pins SDK/build tools 36, NDK 27.1.12297006, API
+baseline 31, the `mobile` profile, GPUI Mobile revision
+`9075e3aa3eea812127f2c60ed66f0cd5798ff245`, and GPUI 0.3.7. The Gradle/Kotlin closure
+is locked and SHA-256 verified. Keep renderer, image, font, scale, and IME inputs
+with qualification evidence. Run the example's MCP, native, and AndroidX checks
+from its owning guide; never guess an application fixture or baseline acceptance.
 
 ## MCP tools
 

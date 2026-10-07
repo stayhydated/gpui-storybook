@@ -1,0 +1,8 @@
+{
+  "route": "embedded-counter",
+  "scenario": "increment-twice",
+  "steps": [],
+  "postconditions": [
+    {"value_key": "public-state", "json_pointer": "/count", "expected": 2, "max_frames": 120}
+  ]
+}

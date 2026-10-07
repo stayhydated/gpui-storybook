@@ -21,10 +21,10 @@ if args.apk and not args.lifecycle_only:
 args.output.mkdir(parents=True, exist_ok=True)
 transcript = []
 captures = []
-command = [ROOT / "target/debug/gpui-storybook-mobile-host", "--serial", args.serial]
+command = [ROOT / "target/debug/gpui-storybook-mobile-host", "serve", "--serial", args.serial]
 forwarding_before = None
 if args.lifecycle_only:
-    command += ["--launch-example", "--stop-on-eof"]
+    command += ["--config", str(ROOT / "examples/mobile/storybook.toml"), "--launch", "--stop-on-eof"]
     if args.apk:
         command += ["--install", str(args.apk)]
     forwarding_before = subprocess.check_output(["adb", "-s", args.serial, "forward", "--list"], timeout=15)
@@ -139,8 +139,8 @@ try:
         call("storybook_wait_for_value", {"value_key": "public-state", "json_pointer": "/count", "expected": before + 2, "max_frames": 60})
         call("storybook_capture_host", {"scope": "display", "output_path": str(args.output / "counter-display.png")})
         call("storybook_capture_current_story", {"output_path": str(args.output / "counter-gpui.png")})
-        call("storybook_dispatch_host_action", {"action": {"action": "set_appearance", "dark": True}})
-        assert call("storybook_get_host")["dark"] is True
+        call("storybook_dispatch_host_action", {"action": {"action": "set_appearance", "id": "dark"}})
+        assert call("storybook_get_host")["appearance"]["id"] == "dark"
         call("storybook_open_story", {"story_key": "embedded-notes"})
         host = call("storybook_get_host")
         assert host["native_route"] == host["active_route"] == "embedded-notes"

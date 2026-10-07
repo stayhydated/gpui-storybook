@@ -17,48 +17,85 @@ workspace's test and release checks.
 | Android arm64-v8a | Signed APK build; qualify runtime behavior on the intended device and renderer |
 | iOS arm64 | Target-neutral contract compilation; runtime adoption requires a simulator lifecycle, transport, and capture proof |
 
-## Choose the integration boundary
+## Attach an application root
 
-| Crate | Application responsibility |
+Use the automation-GPUI crate's `android` feature and implement `EmbeddedRoot`
+for the application's existing root. Route selection and public state revision
+are required; controls, actions, presentation, and fresh fixtures have optional
+implementations. Override `readiness` to gate the public surface on local
+application availability, authentication, or loading state. Register routes with `EmbeddedRoute::new(key, title)` or its
+builder, which supplies the ordinary metadata defaults.
+
+Create `DeviceHost::attach_android` in the existing window's creation callback.
+Pass the real root, route catalog, supported capabilities, and
+`DeviceHostOptions`. Retain `host.native_shell()` for JNI callbacks and call
+`host.run(window_handle, cx)` after creating the window. The host owns polling,
+route synchronization, attachment replacement, endpoint sessions, and shutdown.
+It creates no second GPUI application or root.
+
+`DeviceHostOptions::default()` opens no endpoint. Opt in with
+`.automation(build_feature_enabled && runtime_opt_in)` after validating the
+application's debug/runtime launch policy. `DeviceHost` also synchronizes the
+native shell when automation is disabled, so ordinary application startup uses
+the same state owner.
+
+Export the matching Kotlin adapter into the consumer's Android sources:
+
+```sh
+gpui-storybook-mobile-host android-source \
+  --output android/app/src/main/java/dev/storybook/automation/StorybookAutomation.kt
+```
+
+Construct `StorybookAutomation` on the Activity owner with a `NativeBridge`,
+the current `SurfaceView`, a committed-frame reader, and an application callback
+that applies a `NativeSelection`. The Activity exposes
+`storybookDispatch(String): Boolean` and delegates it to `adapter.dispatch`.
+Forward `onResume`/`onPause` to `setActive`, call `surfaceReleased` before the
+native renderer releases its surface, and call `close` from `onDestroy`.
+
+The three JNI forwards are:
+
+| Kotlin bridge | Retained Rust handle |
 | --- | --- |
-| `gpui-storybook-automation` | Shared backend, typed requests, capabilities, snapshots, and bounded wire envelopes |
-| `gpui-storybook-automation-gpui` | Supply a root, window, route catalog, controls, action scope, fixtures, and capture provider |
-| `gpui-storybook-mobile` | Opt in, poll admitted requests on the owning thread, retain their device operation lease |
-| `gpui-storybook-mobile-host` | Select an ADB serial, own bounded direct connections and local PNG paths, serve MCP on the computer |
+| `publish(event)` | `NativeShellHandle::publish_json` |
+| `isCurrent(request)` | `NativeShellHandle::is_current` |
+| `isInputAllowed()` | `NativeShellHandle::is_input_allowed` |
 
-Implement `EmbeddedRoot` with application-owned route selection, public state
-revision, controls, action scope, presentation, and fixture recreation. Create
-`GpuiHostAttachment` after application initialization. Each app/window owns its
-rendered registry. Invalidate the attachment before replacing a surface so
-deferred work cannot target a replacement root through stale handles.
+Return a `NativeFrame` only when the application's displayed native state is
+committed. In Compose, read every public state field during composition, then
+retain that captured snapshot in `SideEffect`; reading only inside the effect
+can miss child recompositions. The SDK observes committed display frames and
+surface geometry before acknowledging a selection. Startup retries publish
+current observations; they never replay application commands.
 
-Use `validate_steps` before changing native state for a requested batch. After
-the native owner acknowledges selection, apply the GPUI route through the normal
-application path and await rendered readiness. `AttachedInteraction::builder()`
-carries the operation lease through the shared frame executor. Ad-hoc navigation
-preserves live state; scenarios recreate the selected surface's fixture.
+The adapter preserves foreground state when a surface is replaced. Display
+rotation advances its geometry generation and revokes stale work; IME-only
+viewport changes preserve the session. Application authentication, fixture data,
+permissions, and action argument validation remain application-owned.
 
-Enable the GPUI automation crate's `device` feature and construct
-`DeviceCoordinator` with the opted-in `DeviceEndpoint` and your native queue
-adapter. Poll with `NativeShellSnapshot` after the ordinary application path
-applies the native route. The adapter retains `NativeSelection`, checks its
-permit and surface revision on the native lifecycle thread immediately before
-dispatch, and acknowledges applied or revoked work. Report rejection before
-enqueueing separately from unknown delivery. A native response deadline retains
-its device lease until acknowledgment or explicit host invalidation.
+### Register appearance choices
 
-Set the `NativeShellSnapshot` builder's `actions` to application-native descriptors
-and `values` to native observations whose keys are distinct from GPUI keys.
-`HostAction::Invoke` reaches your adapter through `NativeSelection::action()`.
-Validate the name and arguments before enqueueing; use the same state owner as
-ordinary UI callbacks and acknowledge the committed native frame.
+Declare stable `HostAppearance` IDs, labels, and light/dark classification with
+`DeviceHostOptions::appearances`. IDs such as `dark` and `oled` remain distinct.
+Override `EmbeddedRoot::apply_host_appearance` to apply custom application
+schemes; its default supports the standard `light` and `dark` IDs.
 
-On native surface release, call `OperationGate::suspend` immediately. This closes
-admission during the handoff to the GPUI owner. After invalidating the old
-attachment, call `DeviceCoordinator::surface_replaced()` to advance the
-endpoint-owned session generation and reopen admission atomically. Pass a
-process-unique seed of 1–107 bytes to `DeviceEndpoint::listen`; replacement
-identity is independent of native revision values.
+### Choose a lower-level integration
+
+`GpuiHostAttachment` owns an application/window registry and accepts a capture
+provider. `DeviceCoordinator` accepts a `DeviceEndpoint`, immutable
+`NativeShellSnapshot` observations, and a native queue callback. Use these when
+owning a different platform integration. `NativeShellHandle` centralizes lifecycle,
+geometry revisions, permit retention, native actions/values, and acknowledgment.
+`DeviceEndpoint::listen_fresh` allocates a unique session seed.
+
+Native queues check their permit immediately before dispatch on their lifecycle
+owner and distinguish rejection before enqueueing from unknown delivery. A
+response deadline retains ownership until acknowledgment or explicit host
+invalidation. Invalidate the attachment before replacing its surface, then call
+`DeviceCoordinator::surface_replaced` to allocate a fresh endpoint session.
+Native value keys must be distinct from GPUI keys. The native JSON/JNI bridge
+forwards opaque signed `Long` request bits unchanged; wire request IDs remain unsigned.
 
 ## Run the repository example
 
@@ -86,17 +123,17 @@ density, and keyboard determine capture pixels and belong in recorded evidence.
 
 Start an emulator or select an existing device explicitly. The APK supports API
 31 or newer. The example endpoint requires both its build feature and launch
-extra; the computer launcher supplies the extra with `--launch-example`.
+extra; `[android.boolean_extras]` declares it for the launcher.
 
 ```sh
 cargo run -p gpui-storybook-mobile-host -- \
-  --serial emulator-5580 --allow-interaction \
-  --install target/mobile-example/x86_64/storybook.apk --launch-example
+  serve --serial emulator-5580 --allow-interaction \
+  --config examples/mobile/storybook.toml --launch
 ```
 
 Use the process's stdin/stdout for MCP. Logs stay on stderr. Attaching to an
-already running opted-in app needs only `--serial` and the desired interaction
-opt-in. `--stop-on-eof` explicitly stops the owned example launched by this command;
+already running opted-in app needs `serve --serial` and the desired interaction
+opt-in. `--stop-on-eof` explicitly stops the owned application launched by this command;
 startup failure also cleans it up after checking its PID. Host
 EOF otherwise detaches after admitted captures settle.
 
@@ -129,15 +166,84 @@ The MCP proof records a raw JSON Lines MCP transcript and PNGs under
 `target/mobile-evidence`, exercises both routes and fresh scenarios, and verifies
 native/GPUI agreement and unsupported-request rejection.
 
+## Configure a consumer launch
+
+Declare the application in its `storybook.toml`. Artifact paths and the optional
+build hook resolve against that file's directory:
+
+```toml
+group = "my-mobile-app"
+[android]
+package = "com.example.app"
+activity = ".MainActivity"
+device_port = 28438
+apk = "build/app-debug.apk"
+smoke_plan = "smoke.json"
+build = ["./build-debug-app"]
+[android.boolean_extras]
+my_automation = true
+[android.string_extras]
+my_fixture = "account"
+```
+
+`serve --config storybook.toml --serial DEVICE --launch` installs the declared
+APK once and submits one fresh launch. Add `--build` to run the application-owned
+hook first, or override the APK with `--install`. `--stop-on-eof` stops only the
+process whose PID the command observed after its launch. Startup failure also
+cleans that owned process; a replacement process is preserved.
+
+## Diagnose and verify a consumer
+
+```sh
+gpui-storybook-mobile-host doctor --serial DEVICE --config storybook.toml
+gpui-storybook-mobile-host smoke --serial DEVICE --config storybook.toml \
+  --allow-interaction --lifecycle --output target/mobile-smoke
+```
+
+`doctor` reads device/API/ABI, the configured package/PID, endpoint readiness,
+geometry, appearances, and capabilities. A nonzero exit includes the last typed
+observation and a next action. `host_not_ready` distinguishes background lifecycle,
+unavailable surface/geometry, route disagreement, pending frames, viewport mismatch,
+and application synchronization failure. Use `RemoteBackend::attach_when_ready`
+with `ReadinessOptions` for bounded observations and explicit reattachment after
+surface replacement. The timeout retains the last observation. Reconnect and
+rediscover capabilities; submitted mutations and captures are single attempts.
+
+A smoke plan supplies application-owned semantic expectations:
+
+```json
+{
+  "route": "account",
+  "steps": [],
+  "postconditions": [
+    {"value_key":"public-state","json_pointer":"/preview","expected":true}
+  ]
+}
+```
+
+Set `scenario` to a registered fresh-fixture scenario, or supply ad-hoc `steps`.
+Effects require `--allow-interaction`; a readonly plan verifies the existing
+route, values, and captures. `--lifecycle` additionally requires an exclusively
+owned disposable emulator and configured application. It checks rotation, fresh
+sessions, stale attachments, pause/resume, retained PID/state, and restoration of
+the observed rotation policy. It blurs once before rotating; an additional Android
+Back could finish the Activity.
+
+The command writes `report.json` and scoped PNGs. The report retains completed
+checks and typed failures. Library consumers retain `SmokeRunner`, call `run`,
+and await `shutdown` before dropping its initial runtime. Dropping a response
+future leaves admitted work and lifecycle restoration owned by the runner.
+
 ## Discover host operations
 
 `storybook_get_host` reports protocol/session identity, native and GPUI routes,
-public state revision, observed display/surface geometry, scale, and capabilities.
+public state revision, observed display/surface geometry, scale, capabilities,
+and the selected/available named appearances.
 `storybook_list_host_actions` exposes typed native actions. With interaction
 enabled, select appearance through `storybook_dispatch_host_action`:
 
 ```json
-{"action":{"action":"set_appearance","dark":true}}
+{"action":{"action":"set_appearance","id":"dark"}}
 ```
 
 Light/dark presentation in a step batch or scenario also waits for native
@@ -186,7 +292,7 @@ Device evidence uses observed dimensions. Desktop sizing, control application
 inside capture, and capture inside an interaction batch require their own
 advertised capabilities. Unsupported requests fail before dispatch.
 
-Frames contain a big-endian length and bounded JSON payload of at most 1 MiB.
+Protocol version 2 frames contain a big-endian length and bounded JSON payload of at most 1 MiB.
 The device gives each incoming prefix and payload one 30-second deadline and
 each response a five-second write deadline. Dropping its endpoint suspends
 admission, closes sockets, and joins transport threads.

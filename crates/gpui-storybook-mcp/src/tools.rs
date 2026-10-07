@@ -251,6 +251,15 @@ pub(crate) fn structured_automation_error(error: StorybookAutomationError) -> Mc
             "seconds": seconds,
         }),
         StorybookAutomationError::NoLiveHost => json!({ "code": "no_live_host" }),
+        StorybookAutomationError::DeviceReadinessTimedOut {
+            seconds,
+            last_observation,
+        } => {
+            json!({ "code": "device_readiness_timed_out", "seconds": seconds, "last_observation": last_observation })
+        },
+        StorybookAutomationError::HostNotReady { issue } => {
+            json!({ "code": "host_not_ready", "issue": issue })
+        },
         StorybookAutomationError::HostDisconnected {
             steps_dispatched, ..
         } => json!({

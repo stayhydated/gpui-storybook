@@ -16,12 +16,15 @@ clap = { features = [ "derive" ], workspace = true }
 gpui-storybook-automation = { workspace = true }
 gpui-storybook-mcp = { workspace = true }
 gpui-storybook-mobile = { workspace = true }
+gpui-storybook-toml = { workspace = true }
 image = { workspace = true }
 libc = { workspace = true }
+serde = { features = [ "derive" ], workspace = true }
 serde_json = { workspace = true }
 tempfile = { workspace = true }
 tokio = { features = [ "rt-multi-thread", "time", "net", "io-util", "fs" ], workspace = true }
 tokio-util = { features = [ "rt" ], workspace = true }
+toml = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { features = [ "env-filter" ], workspace = true }
 

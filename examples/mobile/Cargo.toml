@@ -22,10 +22,10 @@ android_logger = "0.15"
 gpui-kit = { default-features = false, features = [ "component", "assets" ], version = "0.7.0" }
 gpui-mobile = { workspace = true }
 gpui-storybook-automation = { workspace = true }
-gpui-storybook-automation-gpui = { workspace = true }
+gpui-storybook-automation-gpui = { features = [ "android" ], workspace = true }
 gpui-storybook-example-embedded = { path = "../embedded" }
 gpui-storybook-mobile = { optional = true, workspace = true }
-jni = "0.22"
+jni = { workspace = true }
 log = "0.4"
 ndk = { features = [ "nativewindow" ], version = "0.9" }
 serde_json = { optional = true, workspace = true }

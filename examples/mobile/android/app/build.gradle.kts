@@ -17,6 +17,7 @@ android {
         ndk.abiFilters += providers.gradleProperty("storybookAbi").get()
     }
     sourceSets.getByName("main") {
+        java.srcDir("../../../../crates/gpui-storybook-mobile/android")
         jniLibs.srcDir(providers.gradleProperty("storybookJni").get())
         assets.srcDir(providers.gradleProperty("storybookAssets").get())
     }

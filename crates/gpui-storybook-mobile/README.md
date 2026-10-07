@@ -2,13 +2,14 @@
 
 Bounded loopback transport and operation admission for an application-owned
 device host. The maintained Android integration uses this target-neutral
-endpoint with `gpui-storybook-automation-gpui` and its native device coordinator.
+endpoint with `gpui-storybook-automation-gpui` and its `DeviceHost`/native coordinator.
+It also supplies the version-matched Kotlin Activity/SurfaceView adapter source.
 The app enables automation explicitly, polls requests on its GPUI
 owner thread, and carries the supplied mutation lease through native updates,
 input execution, rendered-frame waits, and capture observation.
 
-Surface replacement advances an endpoint-owned session generation. Supply a
-process-unique seed of 1–107 bytes to `DeviceEndpoint::listen`; call
+Surface replacement advances an endpoint-owned session generation. Use `DeviceEndpoint::listen_fresh` for a unique process/session seed, or supply
+a process-unique seed of 1–107 bytes to `DeviceEndpoint::listen`; call
 `replace_session()` after invalidating the old attachment. A disconnected client rediscovers
 public state without replaying its submitted mutation.
 

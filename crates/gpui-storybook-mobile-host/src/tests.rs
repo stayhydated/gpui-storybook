@@ -16,7 +16,8 @@ fn host(session: String) -> HostDescriptor {
         .route_revision(1)
         .active_route("counter".to_owned())
         .native_route("counter".to_owned())
-        .dark(false)
+        .appearance(HostAppearance::light())
+        .appearances(HostAppearance::standard())
         .orientation(DisplayOrientation::Portrait)
         .geometry(
             SurfaceGeometry::builder()
