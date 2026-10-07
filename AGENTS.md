@@ -140,7 +140,9 @@ Use the matching platform scope when reproducing those jobs.
 
 `just mobile-build [abi]` builds the opted-in Android example using
 `ANDROID_HOME` and `ANDROID_NDK_HOME`. `just mobile-host <serial> [abi]`
-installs/launches it and serves MCP. `just mobile-test <serial>` qualifies an
+installs/launches it and serves MCP. `just mobile-doctor <serial>` reads endpoint readiness and
+`just mobile-smoke <serial>` runs the declared semantic plan and owned-emulator
+lifecycle checks. `just mobile-test <serial>` qualifies an
 already running example on an exclusively owned API 36 emulator, including
 AndroidX native input and lifecycle. Preserve the selected device and forwarding
 ownership boundaries; record renderer, image, font, and IME inputs with captures.

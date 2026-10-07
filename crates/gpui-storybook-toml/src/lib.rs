@@ -13,6 +13,9 @@ use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
+mod android;
+pub use android::AndroidApplication;
+
 /// File name loaded by [`load_from_dir`].
 pub const STORYBOOK_TOML_FILE_NAME: &str = "storybook.toml";
 
@@ -64,6 +67,9 @@ pub struct StorybookToml {
     /// Deterministic effective preference overrides for the runtime config.
     #[serde(default)]
     pub overrides: StorybookPreferenceOverrides,
+    /// Application-owned Android launch configuration for the mobile host.
+    #[serde(default)]
+    pub android: Option<AndroidApplication>,
 }
 
 impl StorybookToml {
@@ -358,6 +364,7 @@ mod tests {
             allow: None,
             disable_story: Vec::new(),
             overrides: StorybookPreferenceOverrides::default(),
+            android: None,
         };
 
         assert_eq!(config.group(), Some("Examples"));
@@ -377,6 +384,7 @@ mod tests {
             allow: Some(vec![" Other ".to_string()]),
             disable_story: Vec::new(),
             overrides: StorybookPreferenceOverrides::default(),
+            android: None,
         };
         assert!(allow.allows_group(Some(" Other ")));
     }

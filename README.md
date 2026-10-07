@@ -28,6 +28,7 @@ Application-owned roots attach through `gpui-storybook-automation-gpui`.
 The maintained Android example combines Jetpack Compose navigation and an
 automatable native counter with embedded GPUI content,
 while `gpui-storybook-mobile-host` serves its remote MCP connection through
+consumer launch configuration, readiness diagnostics, a reusable smoke harness,
 bounded `adbutils-rs` device sockets, retained cleanup outcomes, and atomic PNG
 publication. Device-owned session generations invalidate replaced surfaces.
 AndroidX UI Automator qualifies native selectors, touch, IME input, lifecycle,

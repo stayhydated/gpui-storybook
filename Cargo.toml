@@ -76,6 +76,7 @@ image = { default-features = false, features = [ "png" ], version = "0.25" }
 insta = "1.49"
 inventory = "0.3"
 itertools = "0.15"
+jni = "0.22"
 koruma = "0.13.0"
 libc = "0.2"
 loom = "0.7"

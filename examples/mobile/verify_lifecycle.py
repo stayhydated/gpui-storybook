@@ -24,13 +24,13 @@ def pid():
     result = adb('shell', 'pidof', package)
     return result.stdout.decode().strip() if result.returncode == 0 else None
 
-failed = subprocess.run([host, '--serial', args.serial, '--launch-example', '--device-port', '1'],
+failed = subprocess.run([host, 'serve', '--serial', args.serial, '--config', str(ROOT / 'examples/mobile/storybook.toml'), '--launch', '--device-port', '1'],
                         stdin=subprocess.DEVNULL, capture_output=True, timeout=50)
 (args.output / 'startup-failure-stderr.txt').write_bytes(failed.stderr)
 assert failed.returncode != 0
 assert pid() is None, 'failed attachment left its launched example alive'
 
-process = subprocess.Popen([host, '--serial', args.serial, '--launch-example', '--stop-on-eof'],
+process = subprocess.Popen([host, 'serve', '--serial', args.serial, '--config', str(ROOT / 'examples/mobile/storybook.toml'), '--launch', '--stop-on-eof'],
                            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 replacement = None
 try:

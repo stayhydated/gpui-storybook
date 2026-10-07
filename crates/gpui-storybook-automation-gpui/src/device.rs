@@ -24,12 +24,18 @@ use std::{
 };
 use tokio::sync::oneshot;
 
+mod shell;
+pub use shell::{NativeDispatch, NativeObservation, NativeShellEvent, NativeShellHandle};
+mod host;
+pub use host::{DeviceHost, DeviceHostOptions};
+
 type Reply = SyncSender<Result<DeviceResult, StorybookAutomationError>>;
 /// Immutable native observation captured alongside an owner-thread update.
 #[derive(Clone, bon::Builder)]
 pub struct NativeShellSnapshot {
+    sync_issue: Option<HostReadinessIssue>,
     route: String,
-    dark: bool,
+    appearance: HostAppearance,
     revision: u64,
     surface: u64,
     #[builder(default)]
@@ -37,7 +43,9 @@ pub struct NativeShellSnapshot {
     #[builder(default = true)]
     applied: bool,
     active: bool,
-    geometry: SurfaceGeometry,
+    geometry: Option<SurfaceGeometry>,
+    #[builder(default = HostAppearance::standard())]
+    appearances: Vec<HostAppearance>,
     /// Advertised application actions. The native adapter validates each action's
     /// arguments before enqueueing and acknowledges its committed native frame.
     #[builder(default)]
@@ -50,8 +58,11 @@ impl NativeShellSnapshot {
     pub fn route(&self) -> &str {
         &self.route
     }
+    pub fn appearance(&self) -> &HostAppearance {
+        &self.appearance
+    }
     pub fn dark(&self) -> bool {
-        self.dark
+        self.appearance.is_dark()
     }
     pub fn active(&self) -> bool {
         self.active
@@ -65,7 +76,7 @@ impl NativeShellSnapshot {
     pub fn ack(&self) -> u64 {
         self.ack
     }
-    pub fn geometry(&self) -> SurfaceGeometry {
+    pub fn geometry(&self) -> Option<SurfaceGeometry> {
         self.geometry.clone()
     }
 }
@@ -75,7 +86,7 @@ impl NativeShellSnapshot {
 /// surface immediately before dispatch; it acknowledges applied or revoked work.
 pub struct NativeSelection {
     route: String,
-    dark: bool,
+    appearance: HostAppearance,
     request_id: u64,
     surface: u64,
     permit: MutationPermit,
@@ -101,8 +112,11 @@ impl NativeSelection {
     pub fn route(&self) -> &str {
         &self.route
     }
+    pub fn appearance(&self) -> &HostAppearance {
+        &self.appearance
+    }
     pub fn dark(&self) -> bool {
-        self.dark
+        self.appearance.is_dark()
     }
     pub fn request_id(&self) -> u64 {
         self.request_id
@@ -119,7 +133,7 @@ struct PendingShell {
     deadline: Instant,
     reported: bool,
     route: String,
-    dark: bool,
+    appearance: HostAppearance,
 }
 enum NativeSettlement {
     Waiting,
@@ -141,7 +155,7 @@ impl PendingShell {
             if !shell.applied {
                 return NativeSettlement::Rejected;
             }
-            if ready && shell.route() == self.route && shell.dark() == self.dark {
+            if ready && shell.route() == self.route && shell.appearance() == &self.appearance {
                 return NativeSettlement::Applied;
             }
         }
@@ -223,12 +237,63 @@ impl<Root: EmbeddedRoot> DeviceCoordinator<Root> {
         window: &Window,
         cx: &App,
     ) -> Result<HostDescriptor, StorybookAutomationError> {
+        let not_ready = |issue| StorybookAutomationError::HostNotReady { issue };
+        if !shell.active() {
+            return Err(not_ready(HostReadinessIssue::Background));
+        }
+        if let Some(issue) = &shell.sync_issue {
+            return Err(not_ready(issue.clone()));
+        }
+        attachment.check_readiness(window, cx)?;
+        let geometry = shell
+            .geometry()
+            .filter(SurfaceGeometry::validate)
+            .ok_or_else(|| not_ready(HostReadinessIssue::GeometryUnavailable))?;
         let current = attachment.current_story(window, cx)?;
         let story = current
             .story
-            .ok_or(StorybookAutomationError::NoActiveStory)?;
-        let capabilities = attachment.capabilities();
-        let mut capabilities: Vec<AutomationCapability> = capabilities.iter().collect();
+            .ok_or_else(|| not_ready(HostReadinessIssue::NoActiveRoute))?;
+        if story.key != shell.route() {
+            return Err(not_ready(HostReadinessIssue::RouteDisagreement {
+                native_route: shell.route().to_owned(),
+                active_route: story.key,
+            }));
+        }
+        if shell.appearances.is_empty()
+            || shell.appearances.len() > 32
+            || shell.appearances.iter().any(|choice| !choice.validate())
+            || shell
+                .appearances
+                .iter()
+                .map(HostAppearance::id)
+                .collect::<std::collections::BTreeSet<_>>()
+                .len()
+                != shell.appearances.len()
+            || !shell.appearances.contains(shell.appearance())
+        {
+            return Err(not_ready(HostReadinessIssue::AppearanceUnavailable {
+                id: shell.appearance().id().to_owned(),
+            }));
+        }
+        if capture_region_bounds(&story.key, window, cx).is_none() {
+            return Err(not_ready(HostReadinessIssue::FramePending {
+                route: story.key,
+            }));
+        }
+        let viewport = window.viewport_size();
+        let width = f32::from(viewport.width) * window.scale_factor();
+        let height = f32::from(viewport.height) * window.scale_factor();
+        if (width - geometry.width() as f32).abs() > 1.0
+            || (height - geometry.height() as f32).abs() > 1.0
+        {
+            return Err(not_ready(HostReadinessIssue::ViewportMismatch {
+                gpui_width: width.round() as u32,
+                gpui_height: height.round() as u32,
+                native_width: geometry.width(),
+                native_height: geometry.height(),
+            }));
+        }
+        let mut capabilities: Vec<_> = attachment.capabilities().iter().collect();
         capabilities.extend([
             AutomationCapability::HostDiscovery,
             AutomationCapability::HostActions,
@@ -242,31 +307,16 @@ impl<Root: EmbeddedRoot> DeviceCoordinator<Root> {
             .route_revision(shell.revision().saturating_add(current.revision))
             .active_route(story.key)
             .native_route(shell.route().to_owned())
-            .dark(shell.dark())
-            .orientation(
-                if shell.geometry().display_width() > shell.geometry().display_height() {
-                    DisplayOrientation::Landscape
-                } else {
-                    DisplayOrientation::Portrait
-                },
-            )
-            .geometry(shell.geometry())
+            .appearance(shell.appearance().clone())
+            .appearances(shell.appearances.clone())
+            .orientation(if geometry.display_width() > geometry.display_height() {
+                DisplayOrientation::Landscape
+            } else {
+                DisplayOrientation::Portrait
+            })
+            .geometry(geometry)
             .capabilities(AutomationCapabilities::new(capabilities))
             .build();
-        if !shell.active()
-            || !host.agrees()
-            || capture_region_bounds(host.active_route(), window, cx).is_none()
-        {
-            return Err(StorybookAutomationError::NoLiveHost);
-        }
-        let viewport = window.viewport_size();
-        let geometry = host.geometry();
-        if (f32::from(viewport.width) * window.scale_factor() - geometry.width() as f32).abs() > 1.0
-            || (f32::from(viewport.height) * window.scale_factor() - geometry.height() as f32).abs()
-                > 1.0
-        {
-            return Err(StorybookAutomationError::NoLiveHost);
-        }
         Ok(host)
     }
     /// Poll after the ordinary application path has applied the observed native
@@ -303,7 +353,7 @@ impl<Root: EmbeddedRoot> DeviceCoordinator<Root> {
                             || host.surface_revision() != frame.host.surface_revision()
                             || host.active_route() != frame.host.active_route()
                             || host.native_route() != frame.host.native_route()
-                            || host.dark() != frame.host.dark()
+                            || host.appearance() != frame.host.appearance()
                         {
                             return Err(stale());
                         }
@@ -363,10 +413,18 @@ impl<Root: EmbeddedRoot> DeviceCoordinator<Root> {
                     .capabilities()
                     .require(AutomationCapability::Navigation)
                     .and_then(|()| attachment.get_story(key))
-                    .map(|_| Some((key.clone(), shell.dark()))),
+                    .map(|_| Some((key.clone(), shell.appearance().clone()))),
                 DeviceOperation::DispatchHostAction {
-                    action: HostAction::SetAppearance { dark },
-                } => Ok(Some((shell.route().to_owned(), *dark))),
+                    action: HostAction::SetAppearance { id },
+                } => shell
+                    .appearances
+                    .iter()
+                    .find(|choice| choice.id() == id)
+                    .cloned()
+                    .ok_or_else(|| StorybookAutomationError::ControlOperationFailed {
+                        message: format!("appearance `{id}` is not advertised by the native shell"),
+                    })
+                    .map(|appearance| Some((shell.route().to_owned(), appearance))),
                 DeviceOperation::DispatchHostAction {
                     action: HostAction::Invoke { name, arguments },
                 } => {
@@ -381,24 +439,26 @@ impl<Root: EmbeddedRoot> DeviceCoordinator<Root> {
                                 .to_owned(),
                         })
                     } else {
-                        Ok(Some((shell.route().to_owned(), shell.dark())))
+                        Ok(Some((shell.route().to_owned(), shell.appearance().clone())))
                     }
                 },
                 DeviceOperation::RunSteps { request } => attachment
                     .validate_steps(request, false, window, cx)
-                    .map(|_| {
-                        let dark = requested_dark(request.presentation, shell.dark());
-                        if request.story_key.is_some() || dark != shell.dark() {
-                            Some((
-                                request
-                                    .story_key
-                                    .clone()
-                                    .unwrap_or_else(|| shell.route().to_owned()),
-                                dark,
-                            ))
-                        } else {
-                            None
-                        }
+                    .and_then(|_| {
+                        let appearance = requested_appearance(request.presentation, shell)?;
+                        Ok(
+                            if request.story_key.is_some() || &appearance != shell.appearance() {
+                                Some((
+                                    request
+                                        .story_key
+                                        .clone()
+                                        .unwrap_or_else(|| shell.route().to_owned()),
+                                    appearance,
+                                ))
+                            } else {
+                                None
+                            },
+                        )
                     }),
                 DeviceOperation::RunScenario {
                     story_key,
@@ -415,7 +475,7 @@ impl<Root: EmbeddedRoot> DeviceCoordinator<Root> {
                             story_key
                                 .clone()
                                 .unwrap_or_else(|| shell.route().to_owned()),
-                            requested_dark(request.presentation, shell.dark()),
+                            requested_appearance(request.presentation, shell)?,
                         )))
                     }),
                 _ => Ok(None),
@@ -425,7 +485,12 @@ impl<Root: EmbeddedRoot> DeviceCoordinator<Root> {
                     let (_, response, _) = admitted.into_parts();
                     let _ = response.try_send(Err(error));
                 },
-                Ok(Some((route, dark))) => {
+                Ok(Some((route, appearance))) => {
+                    if let Err(error) = self.descriptor(attachment, shell, window, cx) {
+                        let (_, response, _) = admitted.into_parts();
+                        let _ = response.try_send(Err(error));
+                        continue;
+                    }
                     let action = match admitted.request().command() {
                         DeviceOperation::DispatchHostAction {
                             action: action @ HostAction::Invoke { .. },
@@ -434,7 +499,7 @@ impl<Root: EmbeddedRoot> DeviceCoordinator<Root> {
                     };
                     let submitted = (self.select_native)(NativeSelection {
                         route: route.clone(),
-                        dark,
+                        appearance: appearance.clone(),
                         request_id: admitted.request().request_id(),
                         surface: shell.surface(),
                         permit: admitted.permit().expect("native selection mutation lease"),
@@ -459,7 +524,7 @@ impl<Root: EmbeddedRoot> DeviceCoordinator<Root> {
                         deadline: Instant::now() + Duration::from_secs(5),
                         reported,
                         route,
-                        dark,
+                        appearance,
                     });
                 },
                 Ok(None) => self.execute(admitted, attachment, shell, window, cx),
@@ -618,11 +683,11 @@ impl<Root: EmbeddedRoot> DeviceCoordinator<Root> {
                     let mut actions = vec![HostActionDescriptor::builder()
                         .name("set_appearance".to_owned())
                         .description(
-                            "Select light or dark appearance through the native shell".to_owned(),
+                            "Select an advertised appearance by its stable ID through the native shell".to_owned(),
                         )
                         .input_schema(
-                            serde_json::json!({"type":"object", "required":["action", "dark"],
-                                "properties":{"action":{"const":"set_appearance"}, "dark":{"type":"boolean"}},
+                            serde_json::json!({"type":"object", "required":["action", "id"],
+                                "properties":{"action":{"const":"set_appearance"}, "id":{"type":"string", "enum": shell.appearances.iter().map(HostAppearance::id).collect::<Vec<_>>()}},
                                 "additionalProperties":false}),
                         )
                         .build(),
@@ -674,12 +739,26 @@ impl<Root: EmbeddedRoot> DeviceCoordinator<Root> {
         });
     }
 }
-fn requested_dark(presentation: Option<StoryPresentation>, current: bool) -> bool {
-    match presentation.map(|presentation| presentation.background) {
+fn requested_appearance(
+    presentation: Option<StoryPresentation>,
+    shell: &NativeShellSnapshot,
+) -> Result<HostAppearance, StorybookAutomationError> {
+    let dark = match presentation.map(|presentation| presentation.background) {
         Some(StoryCanvasBackground::Dark) => true,
         Some(StoryCanvasBackground::Light) => false,
-        _ => current,
+        _ => return Ok(shell.appearance().clone()),
+    };
+    if shell.dark() == dark {
+        return Ok(shell.appearance().clone());
     }
+    shell
+        .appearances
+        .iter()
+        .find(|choice| choice.is_dark() == dark)
+        .cloned()
+        .ok_or(StorybookAutomationError::UnsupportedCapability {
+            capability: AutomationCapability::Presentation,
+        })
 }
 fn stale() -> StorybookAutomationError {
     StorybookAutomationError::StaleHost {
@@ -759,11 +838,11 @@ mod tests {
             deadline: now,
             reported: false,
             route: "counter".to_owned(),
-            dark: false,
+            appearance: HostAppearance::light(),
         };
         let mut shell = NativeShellSnapshot::builder()
             .route("counter".to_owned())
-            .dark(false)
+            .appearance(HostAppearance::light())
             .revision(1)
             .surface(1)
             .active(true)

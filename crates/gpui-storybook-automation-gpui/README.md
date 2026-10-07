@@ -1,36 +1,35 @@
 # GPUI Storybook automation for GPUI
 
-Rendered-region, target, and semantic-value instrumentation for an application-owned
-GPUI window. Applications provide initialization and assets. Each app/window owns
-its registry; a new root frame removes stale route metadata.
+Attach automation to an application's existing root and window. Rendered-region,
+semantic-target, and public-value instrumentation uses the application's real
+GPUI state. Each app/window owns its registry; a new root frame removes stale
+route metadata.
 
-Implement `EmbeddedRoot` for route selection, typed controls, scoped actions,
-presentation, public state revision, and fresh fixtures. Attach a catalog and
-capture provider with `GpuiHostAttachment::attach`. The application owns command
-admission and supplies a lease with `AttachedInteraction::builder()`.
+Implement `EmbeddedRoot` for route selection and public revision. Optional
+controls, actions, presentation, and fresh fixtures have defaults. Application
+availability uses the optional `readiness` hook. Register
+compact `EmbeddedRoute` metadata and choose supported capabilities explicitly.
 
-Whole-batch preflight precedes dispatch. The executor retains the lease through
-frame callbacks after response cancellation. Invalidate the attachment before
-surface replacement; deferred input then stops against the stale root.
-The Counter/Notes example renders and exercises this API with real GPUI contexts.
+With `android`, `DeviceHost::attach_android` and the SDK's Kotlin
+`StorybookAutomation` adapter own native lifecycle, geometry revisions, JNI
+selection dispatch, committed-frame acknowledgment, attachment replacement, and
+polling. `DeviceHostOptions` opens no endpoint by default; application build/runtime
+opt-in enables it. Retain `NativeShellHandle` for native callbacks and run the
+owner against the existing window. Display rotation replaces sessions; IME-only
+viewport changes preserve them.
 
-Enable `device` to use `device::DeviceCoordinator` with your `EmbeddedRoot`.
-Supply an opted-in `DeviceEndpoint`, immutable `NativeShellSnapshot` observations,
-and a native queue adapter. The coordinator owns preflight, native acknowledgment,
-rendered-frame waits, capture tickets, and operation settlement. The adapter
-retains `NativeSelection` and checks its permit and surface revision immediately
-before dispatch on the native lifecycle owner thread, then acknowledges applied
-or revoked work. Distinguish rejection before enqueueing from unknown delivery.
-A response deadline retains ownership until acknowledgment or host invalidation.
+Declare named `HostAppearance` choices and override
+`EmbeddedRoot::apply_host_appearance` for application schemes such as OLED.
+The default supports standard light/dark IDs. Authentication, fixtures,
+permissions, native actions, and their argument validation remain application-owned.
 
-Advertise application-native actions and semantic values in `NativeShellSnapshot`.
-`HostAction::Invoke` reaches the native adapter as `NativeSelection::action()`;
-validate its arguments before enqueueing and acknowledge the committed native
-frame. Native value keys belong to the application and must be distinct from
-GPUI keys. The Android example uses this boundary for its Jetpack Compose counter.
+Lower-level integrations use `GpuiHostAttachment`, capture providers,
+`AttachedInteraction`, and the `device` feature's `DeviceCoordinator`.
+Whole-batch preflight precedes dispatch. Submitted work retains its lease through
+native and GPUI frames after response cancellation. Native queues check retained
+permits immediately before dispatch and distinguish known rejection from unknown
+submission. Surface invalidation revokes deferred work without replay.
 
-On native surface release, call `OperationGate::suspend` immediately. This closes
-admission during the handoff to the GPUI owner. After invalidating the old
-attachment, `DeviceCoordinator::surface_replaced()` advances the endpoint-owned
-session generation and reopens admission atomically. Native surface revisions
-remain observation metadata; each replacement receives a fresh session.
+Native semantic-value keys are distinct from GPUI keys. The maintained
+Counter/Notes example exercises the shared production root, SDK Android adapter,
+and independent Activity-owned Compose state.

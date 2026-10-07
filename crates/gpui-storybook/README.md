@@ -14,17 +14,21 @@ themes, viewports, and repeatable scenarios.
 - Initialize preferences and localization once, await readiness, and construct
   a `StorybookWindow`.
 - Enable `mcp` for Linux/macOS live automation and capture, `inspector` for GPUI
-  Inspector integration, or `performance` for frame telemetry.
+  Inspector integration, or `performance` for frame telemetry. `capture` enables
+  the gallery image backend independently; `mcp` includes it.
 
 The facade also exposes static registration catalogs for documentation and
 tooling without constructing stories or opening a window. Localized consumer
 metadata uses `try_localize_message(cx, &message)` and handles `Option<String>`
-through the application's locale context.
+through the application's locale context. `Tokio::handle(cx)` exposes the installed
+Storybook runtime through this facade. `default_storybook_automation(cx)` returns
+the installed gallery backend for direct integration and capture.
 
 The facade exposes `AutomationBackend`, `SharedAutomationBackend`, and portable
 capability types. Standard initialization installs the gallery backend for MCP.
 Embedded application roots use `gpui-storybook-automation-gpui`; maintained Android
-integration uses its reusable device coordinator, fresh session generations,
+integration uses its SDK Activity/GPUI owner, readiness diagnostics, named appearances,
+consumer launch configuration, smoke harness, and fresh session generations,
 direct ADB transport, atomic PNG publication, and
 AndroidX native qualification harness.
 The Android example exposes Jetpack Compose controls alongside embedded GPUI

@@ -17,8 +17,8 @@ python3 examples/mobile/build.py --automation \
   --sdk "$ANDROID_HOME" --ndk "$ANDROID_NDK_HOME"
 cargo build -p gpui-storybook-mobile-host --locked
 cargo run -p gpui-storybook-mobile-host -- \
-  --serial emulator-5580 --allow-interaction \
-  --install target/mobile-example/x86_64/storybook.apk --launch-example
+  serve --serial emulator-5580 --allow-interaction \
+  --config examples/mobile/storybook.toml --launch
 ```
 
 Build inputs: Rust 1.99.0, JDK 21, Python 3.11+, Android platform 36/build-tools
@@ -48,8 +48,8 @@ AndroidX selectors use `By.res("storybook.compose.increment")`,
 The tabs and appearance control expose `storybook.counter`, `storybook.notes`,
 and `storybook.appearance`.
 
-The reusable `DeviceCoordinator<DemoRoot>` owns device preflight, native
-acknowledgment, frames, and captures. The Android adapter queues the selection
+The SDK `DeviceHost<DemoRoot>` and Kotlin `StorybookAutomation` own device preflight, native
+acknowledgment, frames, and captures. The SDK adapter queues the selection
 permit and checks it with the surface revision before native dispatch. Timeouts
 retain ownership until acknowledgment or surface invalidation.
 

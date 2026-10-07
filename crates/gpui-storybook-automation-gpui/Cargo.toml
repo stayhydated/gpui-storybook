@@ -10,6 +10,7 @@ repository.workspace = true
 readme = "README.md"
 
 [features]
+android = [ "device", "dep:gpui-mobile", "dep:jni" ]
 capture = [ "dep:image" ]
 device = [ "dep:gpui-storybook-mobile" ]
 
@@ -24,6 +25,11 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 tokio = { features = [ "sync" ], workspace = true }
+tracing = { workspace = true }
+
+[target.'cfg(target_os = "android")'.dependencies]
+gpui-mobile = { optional = true, workspace = true }
+jni = { optional = true, workspace = true }
 
 [dev-dependencies]
 gpui-kit = { features = [ "test-support" ], workspace = true }

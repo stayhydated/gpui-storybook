@@ -12,7 +12,7 @@ use std::{
     path::PathBuf,
 };
 
-pub const PROTOCOL_VERSION: u32 = 1;
+pub const PROTOCOL_VERSION: u32 = 2;
 pub const MAX_WIRE_BYTES: usize = 1024 * 1024;
 
 #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize, bon::Builder)]
@@ -72,6 +72,95 @@ pub enum DisplayOrientation {
     Landscape,
 }
 
+/// Application-advertised appearance. Stable IDs distinguish schemes that share
+/// the same light/dark classification, such as dark and OLED canvases.
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize, bon::Builder)]
+#[serde(deny_unknown_fields)]
+pub struct HostAppearance {
+    id: String,
+    label: String,
+    dark: bool,
+}
+impl HostAppearance {
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+    pub fn label(&self) -> &str {
+        &self.label
+    }
+    pub fn is_dark(&self) -> bool {
+        self.dark
+    }
+    pub fn light() -> Self {
+        Self::builder()
+            .id("light".to_owned())
+            .label("Light".to_owned())
+            .dark(false)
+            .build()
+    }
+    pub fn dark() -> Self {
+        Self::builder()
+            .id("dark".to_owned())
+            .label("Dark".to_owned())
+            .dark(true)
+            .build()
+    }
+    pub fn standard() -> Vec<Self> {
+        vec![Self::light(), Self::dark()]
+    }
+    pub fn validate(&self) -> bool {
+        !self.id.trim().is_empty()
+            && self.id.len() <= 128
+            && !self.label.trim().is_empty()
+            && self.label.len() <= 256
+    }
+}
+
+/// A readiness failure with enough context to explain the next useful action.
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize, thiserror::Error)]
+#[serde(tag = "reason", rename_all = "snake_case", deny_unknown_fields)]
+pub enum HostReadinessIssue {
+    #[error("application surface is unavailable: {message}")]
+    ApplicationUnavailable { message: String },
+    #[error("application synchronization failed: {message}")]
+    ApplicationSynchronization { message: String },
+    #[error("orientation is {observed:?}; waiting for {expected:?}")]
+    OrientationPending {
+        expected: DisplayOrientation,
+        observed: DisplayOrientation,
+    },
+    #[error("surface session `{session}` is still current; waiting for its replacement")]
+    SessionPending { session: String },
+    #[error("application is in the background; resume its Activity")]
+    Background,
+    #[error("native surface is unavailable; wait for a replacement surface")]
+    SurfaceUnavailable,
+    #[error("native geometry is unavailable; publish the committed SurfaceView bounds")]
+    GeometryUnavailable,
+    #[error("no GPUI route is selected; select a registered application route")]
+    NoActiveRoute,
+    #[error(
+        "native route `{native_route}` disagrees with GPUI route `{active_route}`; wait for route synchronization"
+    )]
+    RouteDisagreement {
+        native_route: String,
+        active_route: String,
+    },
+    #[error("route `{route}` has no rendered capture bounds; wait for its first GPUI frame")]
+    FramePending { route: String },
+    #[error(
+        "GPUI viewport {gpui_width}x{gpui_height} differs from native surface {native_width}x{native_height}; wait for resize synchronization"
+    )]
+    ViewportMismatch {
+        gpui_width: u32,
+        gpui_height: u32,
+        native_width: u32,
+        native_height: u32,
+    },
+    #[error("appearance `{id}` is absent or duplicated in the native appearance catalog")]
+    AppearanceUnavailable { id: String },
+}
+
 #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize, bon::Builder)]
 #[serde(deny_unknown_fields)]
 pub struct HostDescriptor {
@@ -81,7 +170,8 @@ pub struct HostDescriptor {
     route_revision: u64,
     active_route: String,
     native_route: String,
-    dark: bool,
+    appearance: HostAppearance,
+    appearances: Vec<HostAppearance>,
     orientation: DisplayOrientation,
     geometry: SurfaceGeometry,
     capabilities: AutomationCapabilities,
@@ -105,8 +195,14 @@ impl HostDescriptor {
     pub fn native_route(&self) -> &str {
         &self.native_route
     }
+    pub fn appearance(&self) -> &HostAppearance {
+        &self.appearance
+    }
+    pub fn appearances(&self) -> &[HostAppearance] {
+        &self.appearances
+    }
     pub fn dark(&self) -> bool {
-        self.dark
+        self.appearance.is_dark()
     }
     pub fn orientation(&self) -> DisplayOrientation {
         self.orientation
@@ -126,6 +222,13 @@ impl HostDescriptor {
         self.active_route == self.native_route
             && self.geometry.validate()
             && self.orientation == observed
+            && self.appearance.validate()
+            && self
+                .appearances
+                .iter()
+                .filter(|choice| *choice == &self.appearance)
+                .count()
+                == 1
     }
 }
 
@@ -191,7 +294,7 @@ impl DeviceOperation {
 #[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
 pub enum HostAction {
     SetAppearance {
-        dark: bool,
+        id: String,
     },
     /// Invoke an application-advertised native action. The native adapter
     /// validates its arguments before enqueueing and retains admission through

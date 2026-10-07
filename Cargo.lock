@@ -4979,14 +4979,17 @@ dependencies = [
  "bon",
  "gpui-kit",
  "gpui-pre",
+ "gpui-pre-mobile",
  "gpui-storybook-automation",
  "gpui-storybook-mobile",
  "image",
+ "jni 0.22.4",
  "schemars",
  "serde",
  "serde_json",
  "thiserror 2.0.21",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -5158,12 +5161,15 @@ dependencies = [
  "gpui-storybook-automation",
  "gpui-storybook-mcp",
  "gpui-storybook-mobile",
+ "gpui-storybook-toml",
  "image",
  "libc",
+ "serde",
  "serde_json",
  "tempfile",
  "tokio",
  "tokio-util",
+ "toml 1.1.6+spec-1.1.0",
  "tracing",
  "tracing-subscriber",
 ]

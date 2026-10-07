@@ -29,7 +29,7 @@ request_id = time.time_ns()
 def connect():
     return socket.create_connection(("127.0.0.1", port), timeout=30)
 
-def message(command, version=1, identity=None, id=None):
+def message(command, version=2, identity=None, id=None):
     global request_id
     request_id += 1
     return {"protocol_version": version, "session": session if identity is None else identity,
@@ -53,7 +53,7 @@ def receive(stream):
     assert 0 < length <= 1024 * 1024
     return json.loads(exact(stream, length))
 
-def rpc(command, error=None, version=1, identity=None, id=None):
+def rpc(command, error=None, version=2, identity=None, id=None):
     request = message(command, version, identity, id)
     with connect() as stream:
         send(stream, request)
@@ -134,7 +134,7 @@ try:
         rpc({"operation": "run_steps", "request": {
             "presentation": {"background": background, "viewport": "responsive"},
             "steps": [{"type": "wait_frames", "count": 1}]}})
-        assert ready()["dark"] is expected
+        assert ready()["appearance"]["dark"] is expected
         ticket = rpc({"operation": "prepare_capture"})
         try:
             path = args.output / ("counter-direct-" + background + ".png")
@@ -205,7 +205,7 @@ try:
     assert failed["steps_dispatched"] == 1
     assert state()["count"] == before + 2
     print("partial dispatch without retry passed", flush=True)
-    rpc({"operation": "open_story", "key": "embedded-counter"}, version=2, error="protocol_mismatch")
+    rpc({"operation": "open_story", "key": "embedded-counter"}, version=3, error="protocol_mismatch")
     ticket = rpc({"operation": "prepare_capture"})
     rpc({"operation": "open_story", "key": "embedded-notes"}, error="automation_busy")
     native_tab("NOTES")
@@ -216,7 +216,17 @@ try:
     before = state()["count"]
     old_session = session
     adb("shell", "input", "keyevent", "3")
-    rpc({"operation": "get_host"}, error="no_live_host")
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        try:
+            rpc({"operation": "get_host"}, identity="")
+        except RuntimeError as error:
+            outcome = error.args[0]
+            if outcome.get("code") == "host_not_ready" and outcome["issue"]["reason"] == "background":
+                break
+        time.sleep(.05)
+    else:
+        raise TimeoutError("background readiness diagnostic did not settle")
     adb("shell", "am", "start", "-n", "dev.storybook.mobile/.MainActivity", "--ez", "storybook_automation", "true")
     resumed = ready()
     assert adb("shell", "pidof", "dev.storybook.mobile").strip() == pid

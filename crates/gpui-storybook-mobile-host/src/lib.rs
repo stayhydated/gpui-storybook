@@ -6,8 +6,14 @@
 //! an exclusive capture ticket through ADB observation and final validation.
 
 mod adb;
+mod application;
+pub use application::{AndroidLaunch, OwnedApplication, process_id};
+mod readiness;
+mod smoke;
 mod tasks;
 pub use adb::{AdbTransport, AdbTransportOptions, ShellOutput};
+pub use readiness::ReadinessOptions;
+pub use smoke::{SmokeOptions, SmokePlan, SmokeReport, SmokeRunner};
 
 use gpui_storybook_automation::{wire::*, *};
 use std::{

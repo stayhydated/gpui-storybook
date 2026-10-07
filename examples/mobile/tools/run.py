@@ -100,7 +100,7 @@ class Wire:
 
     def request(self, operation, **fields):
         self.id += 1
-        return {"protocol_version": 1, "session": self.session, "request_id": self.id,
+        return {"protocol_version": 2, "session": self.session, "request_id": self.id,
                 "command": {"operation": operation, **fields}}
 
     def call(self, operation, **fields):

@@ -8,6 +8,11 @@ pub mod snapshot;
 
 pub mod attachment;
 pub use attachment::{AttachedInteraction, AttachmentError, EmbeddedRoot, GpuiHostAttachment};
+mod route;
+pub use route::EmbeddedRoute;
 
 #[cfg(feature = "device")]
 pub mod device;
+
+#[cfg(all(feature = "android", target_os = "android"))]
+pub mod android;

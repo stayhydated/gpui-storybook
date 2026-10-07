@@ -51,10 +51,11 @@
 //!
 //! Feature boundaries:
 //!
+//! - `capture`: enables the gallery image capture backend
 //! - `macros`: re-exports proc macros from `gpui-storybook-macros`
 //! - `inspector`: adds GPUI Inspector activation and story-root metadata; the
 //!   Inspect tab's story key and source remain part of the base workbench
-//! - `mcp`: serves the live controller installed by [`init`] over MCP and
+//! - `mcp`: enables `capture`, serves the live controller installed by [`init`] over MCP and
 //!   re-exports automation and capture helpers. Generic remote input tools are
 //!   advertised only when
 //!   `GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1`; typed controls remain available
@@ -121,18 +122,21 @@ pub use gpui_storybook_core::registry::{
 pub use gpui_storybook_core::story_inspector::StoryInspectorState;
 #[cfg(not(target_family = "wasm"))]
 pub use gpui_storybook_core::tokio_bridge;
+#[cfg(not(target_family = "wasm"))]
+pub use gpui_storybook_core::tokio_bridge::Tokio;
 pub use gpui_storybook_core::{
     assets::Assets,
     automation::{
         AutomationBackend, AutomationCapabilities, AutomationCapability, BackendFuture,
-        SharedAutomationBackend, StoryActionSnapshot, StoryCaptureSnapshot,
-        StoryInteractionCaptureRequest, StoryInteractionDispatch, StoryInteractionObservation,
-        StoryInteractionPostcondition, StoryInteractionPostconditionSnapshot,
-        StoryInteractionRequest, StoryInteractionSnapshot, StoryInteractionStep,
-        StoryInteractionTargetBounds, StoryInteractionTargetSnapshot,
+        SharedAutomationBackend, SharedStorybookAutomation, StoryActionSnapshot,
+        StoryCaptureSnapshot, StoryInteractionCaptureRequest, StoryInteractionDispatch,
+        StoryInteractionObservation, StoryInteractionPostcondition,
+        StoryInteractionPostconditionSnapshot, StoryInteractionRequest, StoryInteractionSnapshot,
+        StoryInteractionStep, StoryInteractionTargetBounds, StoryInteractionTargetSnapshot,
         StoryInteractionTargetsSnapshot, StoryModifier, StoryModifiers, StoryMouseButton,
         StoryPoint, StoryPointSpace, StoryScenarioRunSnapshot, StoryScenariosSnapshot,
-        StorySemanticValueSnapshot, StorySemanticValuesSnapshot, StorybookAutomationError,
+        StorySemanticValueSnapshot, StorySemanticValuesSnapshot, StorybookAutomation,
+        StorybookAutomationError, default_storybook_automation,
     },
     capture_region::{
         StorybookElementExt, capture_route_slug, capture_substory, capture_substory_route_id,

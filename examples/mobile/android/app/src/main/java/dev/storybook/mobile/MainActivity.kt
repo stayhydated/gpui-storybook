@@ -5,6 +5,13 @@
  */
 package dev.storybook.mobile
 
+import android.content.pm.ApplicationInfo
+import dev.storybook.automation.NativeBridge
+import dev.storybook.automation.NativeFrame
+import dev.storybook.automation.NativeSelection
+import dev.storybook.automation.StorybookAutomation
+import org.json.JSONArray
+import org.json.JSONObject
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.os.Bundle
@@ -12,7 +19,6 @@ import android.text.Editable
 import android.text.InputType
 import android.text.Selection
 import android.text.TextWatcher
-import android.util.DisplayMetrics
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.Surface
@@ -38,12 +44,16 @@ class MainActivity : ComponentActivity(), SurfaceHolder.Callback {
     private var route = "embedded-counter"
     private var dark = false
     private var input: InputProxy? = null
+    private lateinit var automation: StorybookAutomation
+    private var optedIn = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         route = savedInstanceState?.getString("route", route) ?: route
         dark = savedInstanceState?.getBoolean("dark", false) ?: false
-        nativeStart(intent.getBooleanExtra("storybook_automation", false))
+        optedIn = applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0 &&
+            (savedInstanceState?.getBoolean("automation") ?: intent.getBooleanExtra("storybook_automation", false))
+        nativeStart(optedIn)
         shell = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setOnApplyWindowInsetsListener { view, insets ->
@@ -56,7 +66,7 @@ class MainActivity : ComponentActivity(), SurfaceHolder.Callback {
         compose = ComposeShell(
             this, route, dark, savedInstanceState?.getInt("composeCount", 0) ?: 0,
             selection = ::select,
-            changed = { surface.post { publishShell(0) } },
+            changed = { if (::automation.isInitialized) automation.stateChanged() },
         )
         shell.addView(compose.view)
         surface = SurfaceView(this).apply {
@@ -88,6 +98,11 @@ class MainActivity : ComponentActivity(), SurfaceHolder.Callback {
         }
         shell.addView(surface, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         setContentView(shell)
+        automation = StorybookAutomation(this, object : NativeBridge {
+            override fun publish(event: String) = nativeAutomationEvent(event)
+            override fun isCurrent(request: Long) = nativeSelectionCurrent(request)
+            override fun isInputAllowed() = nativeInputAllowed()
+        }, surface = { surface }, readCommittedFrame = ::nativeFrame, apply = ::applyNative)
         select(route, dark)
     }
 
@@ -99,68 +114,80 @@ class MainActivity : ComponentActivity(), SurfaceHolder.Callback {
             WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
         window.insetsController?.setSystemBarsAppearance(if (dark) 0 else lightBars, lightBars)
         shell.setBackgroundColor(if (dark) Color.rgb(24, 24, 27) else Color.rgb(250, 250, 250))
-        surface.post { publishShell(0) }
+        if (::automation.isInitialized) automation.stateChanged()
     }
 
-    fun gpuiSelect(next: String, nextDark: Boolean, request: Long, action: String) {
-        runOnUiThread {
-            if (!nativeSelectionCurrent(request)) {
-                nativeSelectionSettled(request, false)
-                return@runOnUiThread
-            }
-            select(next, nextDark)
-            when (action) {
-                "compose.increment" -> compose.increment()
-                "compose.reset" -> compose.reset()
-            }
-            // Observe Compose's committed frame before acknowledging native work.
-            compose.afterFrame {
-                publishShell(request)
-                nativeSelectionSettled(request, true)
-            }
+    /** Single stable JNI entry point implemented by the SDK adapter. */
+    fun storybookDispatch(encoded: String): Boolean = automation.dispatch(encoded)
+
+    private fun applyNative(selection: NativeSelection): Boolean {
+        if (selection.route !in setOf("embedded-counter", "embedded-notes") || selection.appearance !in setOf("light", "dark")) return false
+        val action = selection.action
+        if (action != null && (action.optString("action") != "invoke"
+            || action.optString("name") !in setOf("compose.increment", "compose.reset")
+            || action.optJSONObject("arguments")?.length() != 0)) return false
+        select(selection.route, selection.appearance == "dark")
+        when (action?.optString("name")) {
+            "compose.increment" -> compose.increment()
+            "compose.reset" -> compose.reset()
         }
+        return true
     }
 
-    @Suppress("DEPRECATION") // Full display geometry includes compositor system/IME regions.
-    private fun publishShell(request: Long) {
-        val position = IntArray(2)
-        surface.getLocationOnScreen(position)
-        val display = DisplayMetrics()
-        windowManager.defaultDisplay.getRealMetrics(display)
-        nativeShell(
-            route, dark, position[0], position[1], surface.width, surface.height,
-            resources.displayMetrics.density, display.widthPixels, display.heightPixels,
-            request, compose.count(),
-        )
+    private fun nativeFrame(): NativeFrame? {
+        if (!compose.isCommitted(route, dark)) return null
+        val actions = JSONArray()
+        for ((name, description) in listOf("compose.increment" to "Increment the Compose counter", "compose.reset" to "Reset the Compose counter")) {
+            val schema = JSONObject().put("type", "object").put("required", JSONArray(listOf("action", "name", "arguments")))
+                .put("properties", JSONObject().put("action", JSONObject().put("const", "invoke"))
+                    .put("name", JSONObject().put("const", name))
+                    .put("arguments", JSONObject().put("type", "object").put("additionalProperties", false)))
+                .put("additionalProperties", false)
+            actions.put(JSONObject().put("name", name).put("description", description).put("input_schema", schema))
+        }
+        val values = JSONArray().put(JSONObject().put("key", "native.compose-counter").put("label", "Compose counter")
+            .put("value", JSONObject().put("count", compose.count())))
+        return NativeFrame(route, if (dark) "dark" else "light", actions, values)
     }
 
     override fun surfaceCreated(holder: SurfaceHolder) {
         nativeSurface(holder.surface, resources.displayMetrics.density)
-        surface.post { publishShell(0) }
+        if (::automation.isInitialized) automation.stateChanged()
     }
 
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
         nativeSurface(holder.surface, resources.displayMetrics.density)
-        surface.post { publishShell(0) }
+        if (::automation.isInitialized) automation.stateChanged()
     }
 
-    override fun surfaceDestroyed(holder: SurfaceHolder) = nativeRelease()
+    override fun surfaceDestroyed(holder: SurfaceHolder) {
+        if (::automation.isInitialized) automation.surfaceReleased()
+        nativeRelease()
+    }
 
     override fun onResume() {
         super.onResume()
         nativeActive(true)
+        automation.setActive(true)
     }
 
     override fun onPause() {
+        automation.setActive(false)
         nativeActive(false)
         super.onPause()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
+        outState.putBoolean("automation", optedIn)
         outState.putString("route", route)
         outState.putBoolean("dark", dark)
         outState.putInt("composeCount", compose.count())
         super.onSaveInstanceState(outState)
+    }
+
+    override fun onDestroy() {
+        automation.close()
+        super.onDestroy()
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
@@ -356,14 +383,11 @@ class MainActivity : ComponentActivity(), SurfaceHolder.Callback {
     }
 
     private external fun nativeSelectionCurrent(request: Long): Boolean
-    private external fun nativeSelectionSettled(request: Long, applied: Boolean)
+    private external fun nativeAutomationEvent(event: String): Boolean
+    private external fun nativeInputAllowed(): Boolean
     private external fun nativeStart(automation: Boolean)
     private external fun nativeSurface(surface: Surface, scale: Float)
     private external fun nativeRelease()
-    private external fun nativeShell(
-        route: String, dark: Boolean, x: Int, y: Int, width: Int, height: Int,
-        scale: Float, displayWidth: Int, displayHeight: Int, request: Long, composeCount: Int,
-    )
     private external fun nativeTouch(action: Int, id: Int, x: Float, y: Float)
     private external fun nativeKey(code: Int, action: Int, meta: Int)
     private external fun nativeActive(active: Boolean)

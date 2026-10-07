@@ -16,6 +16,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -40,12 +41,18 @@ class ComposeShell(
 ) {
     private var route by mutableStateOf(initialRoute)
     private var dark by mutableStateOf(initialDark)
+    private var committed: Triple<String, Boolean, Int>? = null
     private var count by mutableIntStateOf(initialCount.coerceIn(0, MAX_COUNT))
 
     val view = ComposeView(activity).apply {
         id = dev.storybook.mobile.R.id.compose_shell
         setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
         setContent {
+            val nativeState = Triple(route, dark, count)
+            SideEffect {
+                committed = nativeState
+                changed()
+            }
             MaterialTheme(colorScheme = if (dark) darkColorScheme() else lightColorScheme()) {
                 Surface {
                     Column(Modifier.fillMaxWidth().semantics { testTagsAsResourceId = true }) {
@@ -93,6 +100,8 @@ class ComposeShell(
     }
 
     fun count(): Int = count
+    fun isCommitted(expectedRoute: String, expectedDark: Boolean): Boolean =
+        committed == Triple(expectedRoute, expectedDark, count)
 
     fun increment() {
         count = (count + 1).coerceAtMost(MAX_COUNT)
@@ -102,11 +111,6 @@ class ComposeShell(
     fun reset() {
         count = 0
         changed()
-    }
-
-    fun afterFrame(action: () -> Unit) {
-        view.viewTreeObserver.registerFrameCommitCallback(action)
-        view.invalidate()
     }
 
     private companion object {

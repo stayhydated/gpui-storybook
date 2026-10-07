@@ -328,7 +328,7 @@ fn finishing_pending_capture_revokes_its_frame_wait_and_releases_admission(
             let height = (f32::from(viewport.height) * scale).round() as u32;
             NativeShellSnapshot::builder()
                 .route(COUNTER_ROUTE.to_owned())
-                .dark(false)
+                .appearance(HostAppearance::light())
                 .revision(1)
                 .surface(1)
                 .active(true)
@@ -479,7 +479,7 @@ fn native_actions_preflight_and_retain_ownership_after_disconnect(cx: &mut TestA
     let snapshot = |ack| {
         NativeShellSnapshot::builder()
             .route(COUNTER_ROUTE.to_owned())
-            .dark(false)
+            .appearance(HostAppearance::light())
             .revision(ack + 1)
             .surface(1)
             .ack(ack)

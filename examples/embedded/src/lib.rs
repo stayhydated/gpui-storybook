@@ -12,7 +12,7 @@ use gpui_kit::{
 };
 use gpui_storybook_automation::*;
 use gpui_storybook_automation_gpui::{
-    EmbeddedRoot, GpuiHostAttachment,
+    EmbeddedRoot, EmbeddedRoute, GpuiHostAttachment,
     interaction::NoCaptureProvider,
     regions::{StorybookElementExt as _, capture_story_view_with_scroll},
 };
@@ -121,19 +121,17 @@ pub fn catalog() -> Vec<StorySnapshot> {
         (NOTES_ROUTE, "Notes", "DemoRoot", notes),
     ]
     .into_iter()
-    .map(|(key, title, story_name, scenario)| StorySnapshot {
-        key: key.to_owned(),
-        capture_route_id: key.to_owned(),
-        crate_name: env!("CARGO_PKG_NAME").to_owned(),
-        story_name: story_name.to_owned(),
-        title: title.to_owned(),
-        description: String::new(),
-        group: None,
-        section: None,
-        source_file: file!().to_owned(),
-        source_line: line!(),
-        default_size: StoryDefaultSize::default(),
-        scenarios: vec![scenario],
+    .map(|(key, title, story_name, scenario)| {
+        EmbeddedRoute::builder()
+            .key(key.to_owned())
+            .title(title.to_owned())
+            .crate_name(env!("CARGO_PKG_NAME").to_owned())
+            .story_name(story_name.to_owned())
+            .source_file(file!().to_owned())
+            .source_line(line!())
+            .scenarios(vec![scenario])
+            .build()
+            .into()
     })
     .collect()
 }

@@ -144,7 +144,7 @@ def main():
 
         def call(self, operation, **fields):
             self.id += 1
-            body = json.dumps({"protocol_version": 1, "session": self.session, "request_id": self.id,
+            body = json.dumps({"protocol_version": 2, "session": self.session, "request_id": self.id,
                                "command": {"operation": operation, **fields}}).encode()
             def exact(stream, count):
                 result = bytearray()

@@ -75,7 +75,7 @@ class NativeQualification : Instrumentation() {
     private fun command(operation: String): JSONObject = JSONObject().put("operation", operation)
 
     private fun response(command: JSONObject): JSONObject {
-        val request = JSONObject().put("protocol_version", 1).put("session", session)
+        val request = JSONObject().put("protocol_version", 2).put("session", session)
             .put("request_id", ++requestId).put("command", command)
         val data = request.toString().toByteArray(Charsets.UTF_8)
         verify(data.isNotEmpty() && data.size <= 1024 * 1024, "bounded request")
@@ -92,7 +92,7 @@ class NativeQualification : Instrumentation() {
             val body = ByteArray(size)
             input.readFully(body)
             val reply = JSONObject(body.toString(Charsets.UTF_8))
-            verify(reply.getInt("protocol_version") == 1, "response protocol")
+            verify(reply.getInt("protocol_version") == 2, "response protocol")
             verify(reply.getLong("request_id") == requestId, "response identity")
             verify(session.isEmpty() || session == reply.getString("session"), "response session")
             reply.getJSONObject("outcome")
@@ -103,7 +103,7 @@ class NativeQualification : Instrumentation() {
         val outcome = response(command)
         if (outcome.has("Err")) {
             when (outcome.getJSONObject("Err").optString("code")) {
-                "stale_host", "no_live_host" -> throw UnreadyObservation(outcome.toString())
+                "stale_host", "no_live_host", "host_not_ready" -> throw UnreadyObservation(outcome.toString())
                 else -> throw IOException(outcome.toString())
             }
         }
@@ -300,8 +300,19 @@ class NativeQualification : Instrumentation() {
         verify(device.executeShellCommand("pidof dev.storybook.mobile").trim() == pid, "retained process")
         report.put("rotation", landscape)
         device.pressHome()
-        val paused = response(command("get_host"))
-        verify(paused.getJSONObject("Err").getString("code") == "no_live_host", "paused endpoint")
+        val pausedDeadline = SystemClock.elapsedRealtime() + 10000
+        var background = false
+        while (SystemClock.elapsedRealtime() < pausedDeadline) {
+            session = ""
+            val paused = response(command("get_host"))
+            val error = paused.optJSONObject("Err")
+            if (error?.optString("code") == "host_not_ready" && error.optJSONObject("issue")?.optString("reason") == "background") {
+                background = true
+                break
+            }
+            SystemClock.sleep(50)
+        }
+        verify(background, "paused endpoint reports background lifecycle")
         device.executeShellCommand("am start -n dev.storybook.mobile/.MainActivity --ez storybook_automation true")
         ready()
         verify(state().getInt("count") == before + 1, "resume retains state")

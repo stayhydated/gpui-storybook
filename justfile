@@ -28,8 +28,20 @@ mobile-build abi="x86_64":
 # Install and launch the example on one selected device, then serve MCP.
 mobile-host serial abi="x86_64":
     cargo run -p gpui-storybook-mobile-host --locked -- \
-        --serial "{{serial}}" --allow-interaction \
-        --install "target/mobile-example/{{abi}}/storybook.apk" --launch-example
+        serve --serial "{{serial}}" --allow-interaction \
+        --config examples/mobile/storybook.toml \
+        --install "target/mobile-example/{{abi}}/storybook.apk" --launch
+
+# Inspect readiness of the declared Android application.
+mobile-doctor serial:
+    cargo run -p gpui-storybook-mobile-host --locked -- \
+        doctor --serial "{{serial}}" --config examples/mobile/storybook.toml
+
+# Run semantic/capture/lifecycle qualification on an exclusively owned emulator.
+mobile-smoke serial:
+    cargo run -p gpui-storybook-mobile-host --locked -- \
+        smoke --serial "{{serial}}" --config examples/mobile/storybook.toml \
+        --allow-interaction --lifecycle
 
 # Verify an already running, opted-in example on an owned emulator.
 mobile-test serial:

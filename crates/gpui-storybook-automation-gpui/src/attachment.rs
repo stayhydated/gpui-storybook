@@ -14,6 +14,14 @@ use tokio::sync::oneshot;
 /// Native shell adapters acknowledge their own state before selecting the GPUI
 /// route. Ad-hoc selection preserves state; fixture recreation is explicit.
 pub trait EmbeddedRoot: Render + 'static {
+    /// Application-owned availability of this public surface. Keep this a local
+    /// state check; authentication, loading, and permissions belong to the app.
+    fn readiness(
+        &self,
+        _cx: &App,
+    ) -> Result<(), gpui_storybook_automation::wire::HostReadinessIssue> {
+        Ok(())
+    }
     fn active_route(&self, cx: &App) -> String;
     /// Monotonic public state revision, including user-driven changes.
     fn revision(&self, cx: &App) -> u64;
@@ -23,35 +31,90 @@ pub trait EmbeddedRoot: Render + 'static {
         window: &mut Window,
         cx: &mut gpui::Context<Self>,
     ) -> Result<(), StorybookAutomationError>;
-    fn action_scope(&self, route: &str, cx: &App) -> BTreeSet<String>;
-    fn control_catalog(&self, route: &str, cx: &App) -> Vec<ControlSpec>;
-    fn read_control(&self, key: &str, cx: &App) -> Result<ControlValue, ControlError>;
+    /// Actions available on this route. The default exposes no actions.
+    fn action_scope(&self, _route: &str, _cx: &App) -> BTreeSet<String> {
+        BTreeSet::new()
+    }
+    /// Typed controls available on this route. The default exposes no controls.
+    fn control_catalog(&self, _route: &str, _cx: &App) -> Vec<ControlSpec> {
+        Vec::new()
+    }
+    fn read_control(&self, key: &str, _cx: &App) -> Result<ControlValue, ControlError> {
+        Err(ControlError::UnknownControl {
+            key: key.to_owned(),
+        })
+    }
     fn set_control(
         &mut self,
         key: &str,
-        value: ControlValue,
-        window: &mut Window,
-        cx: &mut gpui::Context<Self>,
-    ) -> Result<(), ControlError>;
+        _value: ControlValue,
+        _window: &mut Window,
+        _cx: &mut gpui::Context<Self>,
+    ) -> Result<(), ControlError> {
+        Err(ControlError::UnknownControl {
+            key: key.to_owned(),
+        })
+    }
     fn reset_control(
         &mut self,
         key: Option<&str>,
-        window: &mut Window,
-        cx: &mut gpui::Context<Self>,
-    ) -> Result<(), ControlError>;
+        _window: &mut Window,
+        _cx: &mut gpui::Context<Self>,
+    ) -> Result<(), ControlError> {
+        Err(ControlError::UnknownControl {
+            key: key.unwrap_or_default().to_owned(),
+        })
+    }
     fn apply_presentation(
         &mut self,
-        presentation: StoryPresentation,
-        window: &mut Window,
-        cx: &mut gpui::Context<Self>,
-    ) -> Result<(), StorybookAutomationError>;
+        _presentation: StoryPresentation,
+        _window: &mut Window,
+        _cx: &mut gpui::Context<Self>,
+    ) -> Result<(), StorybookAutomationError> {
+        Err(StorybookAutomationError::UnsupportedCapability {
+            capability: AutomationCapability::Presentation,
+        })
+    }
     fn recreate_fixture(
         &mut self,
-        route: &str,
+        _route: &str,
+        _window: &mut Window,
+        _cx: &mut gpui::Context<Self>,
+    ) -> Result<(), StorybookAutomationError> {
+        Err(StorybookAutomationError::UnsupportedCapability {
+            capability: AutomationCapability::FreshScenarios,
+        })
+    }
+    /// Apply an exact native appearance. Override this for application schemes
+    /// such as OLED; the default maps the standard light/dark IDs to a responsive canvas.
+    fn apply_host_appearance(
+        &mut self,
+        appearance: &gpui_storybook_automation::wire::HostAppearance,
         window: &mut Window,
         cx: &mut gpui::Context<Self>,
-    ) -> Result<(), StorybookAutomationError>;
+    ) -> Result<(), StorybookAutomationError> {
+        if !matches!(appearance.id(), "light" | "dark") {
+            return Err(StorybookAutomationError::UnsupportedCapability {
+                capability: AutomationCapability::Presentation,
+            });
+        }
+        self.apply_presentation(
+            StoryPresentation {
+                background: if appearance.is_dark() {
+                    StoryCanvasBackground::Dark
+                } else {
+                    StoryCanvasBackground::Light
+                },
+                viewport: StoryViewportPreset::Responsive,
+            },
+            window,
+            cx,
+        )
+    }
 }
+
+#[cfg(test)]
+mod tests;
 
 /// A batch admitted by the host's exclusive operation owner.
 /// Its lease moves into frame callbacks and survives response cancellation.
@@ -138,6 +201,17 @@ impl<R: EmbeddedRoot> GpuiHostAttachment<R> {
 
     pub fn capabilities(&self) -> &AutomationCapabilities {
         &self.capabilities
+    }
+    /// Check application availability before dispatching through a custom host.
+    pub fn check_readiness(
+        &self,
+        window: &Window,
+        cx: &App,
+    ) -> Result<(), StorybookAutomationError> {
+        self.root(window)?
+            .read(cx)
+            .readiness(cx)
+            .map_err(|issue| StorybookAutomationError::HostNotReady { issue })
     }
     pub fn stories(&self) -> Vec<StorySnapshot> {
         self.catalog.values().cloned().collect()

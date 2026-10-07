@@ -25,7 +25,8 @@ then open the window.
 
 - [Setup and configuration](references/setup-and-configuration.md): binary
   startup, locale adapter, preferences, optional workbench
-  features, and `storybook.toml`.
+  features, and `storybook.toml`. The facade `mcp` feature includes capture;
+  use its `Tokio` re-export for the installed runtime.
 - [Story authoring](references/story-authoring.md): registration style,
   metadata, typed controls, action scopes, scenarios, sections, and substories.
 - [Automation and capture](references/automation-and-capture.md): MCP tools,

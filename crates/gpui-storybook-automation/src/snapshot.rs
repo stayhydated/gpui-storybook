@@ -168,6 +168,16 @@ pub enum StorybookAutomationError {
     /// No live application host has attached automation execution.
     #[error("no live GPUI storybook host is attached")]
     NoLiveHost,
+    /// The endpoint is reachable, but its application cannot execute yet.
+    #[error("automation host is not ready: {issue}")]
+    HostNotReady { issue: wire::HostReadinessIssue },
+    #[error(
+        "device readiness deadline exceeded after {seconds} seconds; last observation: {last_observation}"
+    )]
+    DeviceReadinessTimedOut {
+        seconds: u64,
+        last_observation: Box<StorybookAutomationError>,
+    },
     /// The live host disappeared while a request was awaiting completion.
     #[error(
         "live GPUI storybook host disconnected after {steps_dispatched} dispatched step(s): {message}"

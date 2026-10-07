@@ -25,6 +25,9 @@ use gate::GateState;
 pub use gate::{MutationLease, MutationPermit, OperationGate};
 
 pub const DEVICE_PORT: u16 = 28437;
+/// SDK-owned Activity/SurfaceView adapter source. The host CLI exports this exact
+/// version for consumer builds; application JNI callbacks remain thin forwards.
+pub const ANDROID_ADAPTER_SOURCE: &str = include_str!("../android/StorybookAutomation.kt");
 const QUEUE_CAPACITY: usize = 32;
 const MAX_CONNECTIONS: usize = 4;
 const RECEIPT_CAPACITY: usize = 4096;
@@ -84,6 +87,20 @@ pub struct DeviceEndpoint {
     listener: Option<std::thread::JoinHandle<Vec<std::thread::JoinHandle<()>>>>,
 }
 impl DeviceEndpoint {
+    /// Allocate a process-unique session seed and bind an opted-in endpoint.
+    pub fn listen_fresh(port: u16) -> io::Result<Self> {
+        static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let time = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(io::Error::other)?
+            .as_nanos();
+        let seed = format!(
+            "{}-{time}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        );
+        Self::listen(port, seed)
+    }
     /// Bind only IPv4 loopback with a 30-second overall frame deadline. Supply a
     /// process-unique session seed of 1–107 bytes; this endpoint generates fresh
     /// generations on replacement. Drop closes sockets and joins transport threads.
@@ -306,8 +323,13 @@ fn serve_connection(mut stream: TcpStream, shared: &SharedEndpoint) -> io::Resul
             let mut state = shared.gate.0.lock().expect("operation gate");
             let session = state.session.clone();
             let admission = request.validate_identity(&session).and_then(|()| {
-                if shared.closed.load(Ordering::Acquire) || state.suspended {
+                if shared.closed.load(Ordering::Acquire) {
                     return Err(StorybookAutomationError::NoLiveHost);
+                }
+                if state.suspended {
+                    return Err(StorybookAutomationError::HostNotReady {
+                        issue: HostReadinessIssue::SurfaceUnavailable,
+                    });
                 }
                 if state.receipts.ids.contains(&request_id) {
                     return Err(StorybookAutomationError::StaleHost {
@@ -734,7 +756,9 @@ mod tests {
                 read_frame::<DeviceResponse>(&mut stream)
                     .unwrap()
                     .into_outcome(),
-                Err(StorybookAutomationError::NoLiveHost)
+                Err(StorybookAutomationError::HostNotReady {
+                    issue: HostReadinessIssue::SurfaceUnavailable
+                })
             ));
             assert!(endpoint.try_recv().is_none());
         }
