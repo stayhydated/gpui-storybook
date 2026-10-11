@@ -2,3 +2,6 @@
 
 [files]
 extend-exclude = [ "**/fixtures" ]
+
+[default.extend-identifiers]
+PNGs = "PNGs"

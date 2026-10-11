@@ -19,8 +19,8 @@ mcp = [ "dep:gpui-storybook-mcp" ]
 performance = [ "gpui-storybook-core/performance" ]
 
 [dependencies]
-gpui-kit = { workspace = true }
 gpui-es-fluent = { workspace = true }
+gpui-kit = { workspace = true }
 gpui-storybook-core = { workspace = true }
 gpui-storybook-macros = { optional = true, workspace = true }
 gpui-storybook-preferences = { workspace = true }

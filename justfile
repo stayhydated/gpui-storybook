@@ -8,20 +8,20 @@ fmt:
     rumdl fmt .
 
 clippy:
-    cargo clippy --workspace --all-features \
+    cargo clippy --workspace --all-features --all-targets --locked \
         --exclude gpui-storybook-example-story \
-        --exclude gpui-storybook-example-component
+        --exclude gpui-storybook-example-component -- -D warnings
 
 check:
-    cargo check --workspace --all-features \
+    cargo check --workspace --all-features --locked \
         --exclude gpui-storybook-example-story \
         --exclude gpui-storybook-example-component
 
 test:
-    cargo test --workspace --all-features
+    cargo test --workspace --all-features --locked
 
 cov:
-    cargo llvm-cov --workspace \
+    cargo llvm-cov --workspace --locked \
         --exclude gpui-storybook-example-story \
         --exclude gpui-storybook-example-component \
         --exclude xtask \
@@ -29,10 +29,10 @@ cov:
         --all-features --all-targets
 
 test-publish:
-    cargo publish --workspace --dry-run --allow-dirty
+    cargo publish --workspace --dry-run --locked --allow-dirty
 
 test-docs:
-    cargo doc --workspace --all-features --no-deps --open
+    cargo doc --workspace --all-features --no-deps --locked --open
 
 book:
     mdbook serve book

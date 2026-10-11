@@ -17,11 +17,11 @@ jobs:
   es-fluent:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Install Linux dependencies
         uses: ./.github/actions/install-linux-deps
       - name: Check FTL files
-        uses: stayhydated/es-fluent/crates/es-fluent-cli@es-fluent-cli-v0.21.0
+        uses: stayhydated/es-fluent/crates/es-fluent-cli@505b86623af5c3a2088becee8ac5dacc1f84bde2 # es-fluent-cli-v0.21.0
         with:
           path: .
           all_locales: true
@@ -39,13 +39,15 @@ jobs:
           - windows-latest
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: dtolnay/rust-toolchain@1.99.0
+      - uses: dtolnay/rust-toolchain@fb523f40495206854c36b250850817ae0f83e3d1 # 1.99.0
+        with:
+          toolchain: 1.99.0
 
       - name: Setup sccache
         if: runner.os != 'Windows'
-        uses: mozilla-actions/sccache-action@v0.0.11
+        uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
         with:
           version: "v0.16.0"
 
@@ -76,10 +78,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: dtolnay/rust-toolchain@1.99.0
+      - uses: dtolnay/rust-toolchain@fb523f40495206854c36b250850817ae0f83e3d1 # 1.99.0
         with:
+          toolchain: 1.99.0
           components: rustfmt
 
       - name: Check formatting
@@ -89,14 +92,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: dtolnay/rust-toolchain@1.99.0
+      - uses: dtolnay/rust-toolchain@fb523f40495206854c36b250850817ae0f83e3d1 # 1.99.0
         with:
+          toolchain: 1.99.0
           components: clippy
 
       - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.11
+        uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
         with:
           version: "v0.16.0"
 
@@ -104,18 +108,24 @@ jobs:
         uses: ./.github/actions/install-linux-deps
 
       - name: Lint code
-        run: cargo clippy --workspace --all-features
+        run: >-
+          cargo clippy --workspace --all-features --all-targets --locked
+          --exclude gpui-storybook-example-story
+          --exclude gpui-storybook-example-component
+          -- -D warnings
 
   docs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: dtolnay/rust-toolchain@1.99.0
+      - uses: dtolnay/rust-toolchain@fb523f40495206854c36b250850817ae0f83e3d1 # 1.99.0
+        with:
+          toolchain: 1.99.0
 
       - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.11
+        uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
         with:
           version: "v0.16.0"
 
@@ -129,62 +139,65 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: dtolnay/rust-toolchain@1.99.0
+      - uses: dtolnay/rust-toolchain@fb523f40495206854c36b250850817ae0f83e3d1 # 1.99.0
+        with:
+          toolchain: 1.99.0
 
       - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.11
+        uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
         with:
           version: "v0.16.0"
 
       - name: Install Linux dependencies
         uses: ./.github/actions/install-linux-deps
 
-      - name: Check package contents
-        run: cargo package --workspace --list
+      - name: Verify publishable packages and their release graph
+        run: cargo publish --workspace --dry-run --locked
 
   machete:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Machete
-        uses: bnjbvr/cargo-machete@main
+        uses: bnjbvr/cargo-machete@135555c9cd9f3b4723dee2766f0cacb99aac092b # main
 
   rust-coverage:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: dtolnay/rust-toolchain@1.99.0
+      - uses: dtolnay/rust-toolchain@fb523f40495206854c36b250850817ae0f83e3d1 # 1.99.0
         with:
+          toolchain: 1.99.0
           components: rust-analyzer, rust-src
 
       - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.11
+        uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
         with:
           version: "v0.16.0"
 
       - name: Install Linux dependencies
         uses: ./.github/actions/install-linux-deps
 
-      - uses: cargo-bins/cargo-binstall@main
+      - uses: cargo-bins/cargo-binstall@3be4ad2b146f3302f92e5956c54fedbb6ae8cccc # main
 
       - name: Install cargo-llvm-cov
         shell: bash
-        run: cargo binstall cargo-llvm-cov --locked --no-confirm
+        run: cargo binstall cargo-llvm-cov --version 0.9.1 --locked --no-confirm
 
       - name: Run coverage
         shell: bash
         run: |
           cargo llvm-cov clean --workspace
-          cargo llvm-cov --workspace --all-features --cobertura --output-path=target/cobertura.xml --exclude gpui-storybook-example-story --exclude gpui-storybook-example-component
+          cargo llvm-cov --workspace --all-features --locked --cobertura --output-path=target/cobertura.xml --exclude gpui-storybook-example-story --exclude gpui-storybook-example-component
 
       - name: Codecov publish
-        uses: codecov/codecov-action@v7
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7
         with:
           files: target/cobertura.xml
           disable_search: true
@@ -195,10 +208,107 @@ jobs:
         run: |
           rm -f codecov codecov.SHA256SUM codecov.SHA256SUM.sig
 
+  quality:
+    runs-on: ubuntu-latest
+    env:
+      RUSTC_WRAPPER: ""
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: dtolnay/rust-toolchain@fb523f40495206854c36b250850817ae0f83e3d1 # 1.99.0
+        with:
+          toolchain: 1.99.0
+      - uses: cargo-bins/cargo-binstall@3be4ad2b146f3302f92e5956c54fedbb6ae8cccc # main
+      - name: Install pinned formatters
+        run: |
+          cargo binstall taplo-cli --version 0.10.0 --locked --no-confirm
+          cargo binstall rumdl --version 0.2.78 --locked --no-confirm
+          cargo binstall cargo-sort-derives --version 0.13.0 --locked --no-confirm
+      - name: Install pinned workflow and spelling tools
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/ci-bin"
+          curl -fsSL https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz -o "$RUNNER_TEMP/actionlint.tar.gz"
+          printf '%s  %s\n' 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8 "$RUNNER_TEMP/actionlint.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP/ci-bin" actionlint
+          curl -fsSL https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.linux.x86_64.tar.xz -o "$RUNNER_TEMP/shellcheck.tar.xz"
+          printf '%s  %s\n' 8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198 "$RUNNER_TEMP/shellcheck.tar.xz" | sha256sum --check
+          tar -xJf "$RUNNER_TEMP/shellcheck.tar.xz" -C "$RUNNER_TEMP/ci-bin" --strip-components=1 shellcheck-v0.11.0/shellcheck
+          curl -fsSL https://github.com/crate-ci/typos/releases/download/v1.42.3/typos-v1.42.3-x86_64-unknown-linux-musl.tar.gz -o "$RUNNER_TEMP/typos.tar.gz"
+          printf '%s  %s\n' e083bf917d840563e77b35b64f43924d98fcb77acb69691455099d39e347d67d "$RUNNER_TEMP/typos.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/typos.tar.gz" -C "$RUNNER_TEMP/ci-bin" typos
+          echo "$RUNNER_TEMP/ci-bin" >> "$GITHUB_PATH"
+      - name: Check formatting, spelling, workflows and scripts
+        run: bash scripts/check-quality.sh
+
+  dependencies:
+    runs-on: ubuntu-latest
+    env:
+      RUSTC_WRAPPER: ""
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: dtolnay/rust-toolchain@fb523f40495206854c36b250850817ae0f83e3d1 # 1.99.0
+        with:
+          toolchain: 1.99.0
+      - uses: cargo-bins/cargo-binstall@3be4ad2b146f3302f92e5956c54fedbb6ae8cccc # main
+      - name: Install cargo-deny
+        run: cargo binstall cargo-deny --version 0.20.2 --locked --no-confirm
+      - name: Check advisories and reviewed dependency sources
+        run: cargo deny --workspace --locked --all-features check advisories sources
+
+  features:
+    name: facade (${{ matrix.selection }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        selection: [default, no-default, macros, inspector, performance, mcp]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: dtolnay/rust-toolchain@fb523f40495206854c36b250850817ae0f83e3d1 # 1.99.0
+        with:
+          toolchain: 1.99.0
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
+        with:
+          version: "v0.16.0"
+      - name: Install Linux dependencies
+        uses: ./.github/actions/install-linux-deps
+      - name: Compile an isolated facade consumer
+        run: bash scripts/check-features.sh '${{ matrix.selection }}'
+
+  publication:
+    runs-on: ubuntu-latest
+    env:
+      RUSTC_WRAPPER: ""
+      TRUNK_SKIP_VERSION_CHECK: "true"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: dtolnay/rust-toolchain@fb523f40495206854c36b250850817ae0f83e3d1 # 1.99.0
+        with:
+          toolchain: 1.99.0
+          targets: wasm32-unknown-unknown
+      - name: Install Linux dependencies
+        uses: ./.github/actions/install-linux-deps
+      - name: Install nightly for the GPUI demo
+        run: |
+          rustup toolchain install nightly --profile minimal
+          rustup target add wasm32-unknown-unknown --toolchain nightly
+      - uses: cargo-bins/cargo-binstall@3be4ad2b146f3302f92e5956c54fedbb6ae8cccc # main
+      - name: Install publication tools
+        run: |
+          cargo binstall dioxus-cli --version 0.7.9 --locked --no-confirm
+          cargo binstall trunk --version 0.21.14 --locked --no-confirm
+      - name: Build demo, book, LLM text and site
+        run: |
+          cargo run --locked -p xtask -- build gpui-demo
+          cargo run --locked -p xtask -- build book
+          cargo run --locked -p xtask -- build llms-txt
+          cargo run --locked -p xtask -- build web
+
   release:
     name: release
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-    needs: [es-fluent, test, fmt, clippy, docs, package, machete, rust-coverage]
+    needs: [es-fluent, test, fmt, clippy, docs, package, machete, rust-coverage, quality, dependencies, features, publication]
     runs-on: ubuntu-latest
     environment: release
     permissions:
@@ -210,15 +320,17 @@ jobs:
       cancel-in-progress: false
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: dtolnay/rust-toolchain@1.99.0
+      - uses: dtolnay/rust-toolchain@fb523f40495206854c36b250850817ae0f83e3d1 # 1.99.0
+        with:
+          toolchain: 1.99.0
 
       - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.11
+        uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
         with:
           version: "v0.16.0"
 
@@ -226,7 +338,7 @@ jobs:
         uses: ./.github/actions/install-linux-deps
 
       - name: Publish unpublished crate versions
-        uses: release-plz/action@v0.5.133
+        uses: release-plz/action@aec534bbd8631793b9b3b8f1ee6cd886c322e17f # v0.5.133
         with:
           command: release
           version: 0.3.162

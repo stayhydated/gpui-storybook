@@ -96,6 +96,10 @@ unexecuted or failed checks.
 | Change | Validation |
 |---|---|
 | Markdown | `rumdl check` with the edited paths |
+| Repository quality | `bash scripts/check-quality.sh` with the pinned CI tools installed |
+| Facade features | `bash scripts/check-features.sh <selection>` with `default`, `no-default`, `macros`, `inspector`, `performance`, or `mcp` |
+| Publishable packages | `cargo publish --workspace --dry-run --locked` |
+| Dependency policy | `cargo deny --workspace --locked --all-features check advisories sources` |
 | Book or LLM text | `cargo xtask build book` and `cargo xtask build llms-txt` |
 | Macro expansion | `cargo test -p gpui-storybook-macros --locked` |
 | Preference storage or resolution | `cargo test -p gpui-storybook-preferences --locked` |
