@@ -61,7 +61,7 @@ fn apply_font_families(cx: &mut App) {
 
 #[cfg(test)]
 mod tests {
-    use read_fonts::{FontRef, TableProvider, tables::name::NameId};
+    use read_fonts::{FontRef, TableProvider as _, tables::name::NameId};
 
     use super::*;
 
