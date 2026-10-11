@@ -1,5 +1,6 @@
 # Check advisories and dependency sources without inventing a license policy.
 [advisories]
+unmaintained = "workspace"
 
 [sources]
 allow-git = [ "https://github.com/DioxusLabs/components", "https://github.com/stayhydated/shared" ]

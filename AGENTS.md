@@ -96,7 +96,7 @@ unexecuted or failed checks.
 | Change | Validation |
 |---|---|
 | Markdown | `rumdl check` with the edited paths |
-| Repository quality | `just quality` with the pinned CI tools installed |
+| Repository quality | `just quality` with the versioned CI tools installed and Docker available |
 | Facade features | `bash scripts/check-features.sh <selection>` with `default`, `no-default`, `macros`, `inspector`, `performance`, or `mcp` |
 | Publishable packages | `cargo publish --workspace --dry-run --locked` |
 | Dependency policy | `cargo deny --workspace --locked --all-features check advisories sources` |
@@ -115,3 +115,10 @@ assembles all publication artifacts.
 CI tests all features on Linux. On macOS it excludes the Linux-only launcher;
 on Windows it uses default features and excludes the launcher and MCP crate.
 Use the matching platform scope when reproducing those jobs.
+
+The dependency policy checks unmaintained advisories for immediate normal,
+development, and build dependencies of workspace members. Vulnerability,
+yanked-package, and source checks still cover the full dependency graph.
+
+Workflow Actions use verified version tags. The local quality recipe and CI
+both use `rhysd/actionlint:1.7.12`, including ShellCheck and pyflakes.

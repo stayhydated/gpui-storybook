@@ -7,13 +7,13 @@ fmt:
     taplo fmt
     rumdl fmt .
 
-# Run with the pinned CI quality tools installed.
+# Run with the versioned CI quality tools installed and Docker available.
 quality:
     taplo fmt --check
     rumdl check .
     typos
     cargo sort-derives --check
-    actionlint
+    docker run --rm -v "{{justfile_directory()}}:/repo" -w /repo rhysd/actionlint:1.7.12
     git ls-files -z '*.sh' '*.bash' | xargs -0 --no-run-if-empty shellcheck
 
 clippy:
