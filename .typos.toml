@@ -5,3 +5,5 @@ extend-exclude = [ "**/fixtures" ]
 
 [default.extend-identifiers]
 PNGs = "PNGs"
+# OpenType glyph-location table and read-fonts API.
+loca = "loca"

@@ -102,6 +102,29 @@ mod tests {
 
         for face in &faces {
             assert!(
+                face.head().is_ok(),
+                "embedded web fonts should carry a valid font header"
+            );
+            assert!(
+                face.hhea().is_ok(),
+                "embedded web fonts should carry valid horizontal metrics"
+            );
+            let maxp = face
+                .maxp()
+                .expect("embedded web fonts should carry a valid maximum profile");
+            assert!(
+                maxp.num_glyphs() > 0,
+                "embedded web fonts should contain glyphs"
+            );
+            let loca = face
+                .loca(None)
+                .expect("embedded web fonts should carry valid glyph locations");
+            assert_eq!(
+                loca.len(),
+                usize::from(maxp.num_glyphs()),
+                "embedded web fonts should have one location range per glyph"
+            );
+            assert!(
                 face.glyf().is_ok(),
                 "embedded web fonts should carry TrueType outlines"
             );
