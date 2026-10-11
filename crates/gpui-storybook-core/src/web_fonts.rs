@@ -61,6 +61,8 @@ fn apply_font_families(cx: &mut App) {
 
 #[cfg(test)]
 mod tests {
+    use read_fonts::{FontRef, TableProvider, tables::name::NameId};
+
     use super::*;
 
     #[gpui_kit::test]
@@ -73,19 +75,21 @@ mod tests {
         assert_eq!(theme.mono_font_family, MONO_FONT_FAMILY);
     }
 
-    fn family_name(face: &ttf_parser::Face<'_>) -> Option<String> {
-        let names = face.names();
-        [
-            ttf_parser::name_id::TYPOGRAPHIC_FAMILY,
-            ttf_parser::name_id::FAMILY,
-        ]
-        .into_iter()
-        .find_map(|wanted| {
-            names
-                .into_iter()
-                .filter(|name| name.name_id == wanted)
-                .find_map(|name| name.to_string())
-        })
+    fn family_name(face: &FontRef<'_>) -> Option<String> {
+        let names = face.name().ok()?;
+        [NameId::TYPOGRAPHIC_FAMILY_NAME, NameId::FAMILY_NAME]
+            .into_iter()
+            .find_map(|wanted| {
+                names
+                    .name_record()
+                    .iter()
+                    .filter(|name| name.name_id() == wanted && name.is_unicode())
+                    .find_map(|name| {
+                        name.string(names.string_data())
+                            .ok()
+                            .map(|name| name.to_string())
+                    })
+            })
     }
 
     #[test]
@@ -93,12 +97,12 @@ mod tests {
         let decoded = embedded_web_fonts().map(decode_font);
         let faces = decoded
             .iter()
-            .map(|font| ttf_parser::Face::parse(font, 0).expect("embedded web font should parse"))
+            .map(|font| FontRef::from_index(font, 0).expect("embedded web font should parse"))
             .collect::<Vec<_>>();
 
         for face in &faces {
             assert!(
-                face.tables().glyf.is_some(),
+                face.glyf().is_ok(),
                 "embedded web fonts should carry TrueType outlines"
             );
         }

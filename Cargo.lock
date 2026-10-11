@@ -4866,6 +4866,7 @@ dependencies = [
  "inventory",
  "koruma",
  "libc",
+ "read-fonts 0.41.0",
  "rust-embed",
  "schemars",
  "serde",
@@ -4875,7 +4876,6 @@ dependencies = [
  "thiserror 2.0.21",
  "tokio",
  "tracing",
- "ttf-parser",
  "unic-langid",
  "url",
 ]
