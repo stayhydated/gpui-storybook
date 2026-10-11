@@ -18,6 +18,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - name: Install Linux dependencies
         uses: ./.github/actions/install-linux-deps
       - name: Check FTL files
@@ -40,6 +42,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       - uses: dtolnay/rust-toolchain@fb523f40495206854c36b250850817ae0f83e3d1 # 1.99.0
         with:
@@ -79,6 +83,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       - uses: dtolnay/rust-toolchain@fb523f40495206854c36b250850817ae0f83e3d1 # 1.99.0
         with:
@@ -93,6 +99,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       - uses: dtolnay/rust-toolchain@fb523f40495206854c36b250850817ae0f83e3d1 # 1.99.0
         with:
@@ -108,17 +116,15 @@ jobs:
         uses: ./.github/actions/install-linux-deps
 
       - name: Lint code
-        run: >-
-          cargo clippy --workspace --all-features --all-targets --locked
-          --exclude gpui-storybook-example-story
-          --exclude gpui-storybook-example-component
-          -- -D warnings
+        run: cargo clippy --workspace --all-features --all-targets --locked -- -D warnings
 
   docs:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       - uses: dtolnay/rust-toolchain@fb523f40495206854c36b250850817ae0f83e3d1 # 1.99.0
         with:
@@ -140,6 +146,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       - uses: dtolnay/rust-toolchain@fb523f40495206854c36b250850817ae0f83e3d1 # 1.99.0
         with:
@@ -158,18 +166,30 @@ jobs:
 
   machete:
     runs-on: ubuntu-latest
-
+    env:
+      RUSTC_WRAPPER: ""
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-
-      - name: Machete
-        uses: bnjbvr/cargo-machete@135555c9cd9f3b4723dee2766f0cacb99aac092b # main
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@fb523f40495206854c36b250850817ae0f83e3d1 # 1.99.0
+        with:
+          toolchain: "1.99.0"
+      - uses: cargo-bins/cargo-binstall@3be4ad2b146f3302f92e5956c54fedbb6ae8cccc # main
+        with:
+          version: "1.25.1"
+      - name: Install cargo-machete
+        run: cargo binstall cargo-machete --version '=0.9.2' --locked --no-confirm
+      - name: Check unused dependencies
+        run: cargo machete
 
   rust-coverage:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       - uses: dtolnay/rust-toolchain@fb523f40495206854c36b250850817ae0f83e3d1 # 1.99.0
         with:
@@ -190,7 +210,7 @@ jobs:
 
       - name: Install cargo-llvm-cov
         shell: bash
-        run: cargo binstall cargo-llvm-cov --version 0.9.1 --locked --no-confirm
+        run: cargo binstall cargo-llvm-cov --version '=0.9.1' --locked --no-confirm
 
       - name: Run coverage
         shell: bash
@@ -216,33 +236,43 @@ jobs:
       RUSTC_WRAPPER: ""
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - uses: dtolnay/rust-toolchain@fb523f40495206854c36b250850817ae0f83e3d1 # 1.99.0
         with:
-          toolchain: 1.99.0
+          toolchain: "1.99.0"
+      - name: Install Taplo and ShellCheck
+        uses: taiki-e/install-action@ab6895351a88b908e96a4697860d4ffea5e57dbe # v2.87.27
+        with:
+          tool: "taplo@0.10.0,shellcheck@0.11.0"
+          checksum: true
+          fallback: none
+      - name: Check TOML formatting
+        run: taplo fmt --check
+      - name: Check Markdown
+        uses: rvben/rumdl@a7a8434abe60f64239ea05624885f9bad66a1026 # action v0.2.79
+        with:
+          version: "0.2.78"
+          command: check
+          path: "."
+          fail-on-error: "true"
+      - name: Prevent checkout-controlled typos executable reuse
+        run: test ! -e typos && test ! -L typos
+      - name: Check spelling
+        uses: crate-ci/typos@06d010dfe4c84fdab1a25ea02b57b3585018ba80 # v1.42.3
+        with:
+          write_changes: false
       - uses: cargo-bins/cargo-binstall@3be4ad2b146f3302f92e5956c54fedbb6ae8cccc # main
         with:
           version: "1.25.1"
-      - name: Install pinned formatters
-        run: |
-          cargo binstall taplo-cli --version 0.10.0 --locked --no-confirm
-          cargo binstall rumdl --version 0.2.78 --locked --no-confirm
-          cargo binstall cargo-sort-derives --version 0.13.0 --locked --no-confirm
-      - name: Install pinned workflow and spelling tools
-        shell: bash
-        run: |
-          mkdir -p "$RUNNER_TEMP/ci-bin"
-          curl -fsSL https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz -o "$RUNNER_TEMP/actionlint.tar.gz"
-          printf '%s  %s\n' 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8 "$RUNNER_TEMP/actionlint.tar.gz" | sha256sum --check
-          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP/ci-bin" actionlint
-          curl -fsSL https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.linux.x86_64.tar.xz -o "$RUNNER_TEMP/shellcheck.tar.xz"
-          printf '%s  %s\n' 8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198 "$RUNNER_TEMP/shellcheck.tar.xz" | sha256sum --check
-          tar -xJf "$RUNNER_TEMP/shellcheck.tar.xz" -C "$RUNNER_TEMP/ci-bin" --strip-components=1 shellcheck-v0.11.0/shellcheck
-          curl -fsSL https://github.com/crate-ci/typos/releases/download/v1.42.3/typos-v1.42.3-x86_64-unknown-linux-musl.tar.gz -o "$RUNNER_TEMP/typos.tar.gz"
-          printf '%s  %s\n' e083bf917d840563e77b35b64f43924d98fcb77acb69691455099d39e347d67d "$RUNNER_TEMP/typos.tar.gz" | sha256sum --check
-          tar -xzf "$RUNNER_TEMP/typos.tar.gz" -C "$RUNNER_TEMP/ci-bin" typos
-          echo "$RUNNER_TEMP/ci-bin" >> "$GITHUB_PATH"
-      - name: Check formatting, spelling, workflows and scripts
-        run: bash scripts/check-quality.sh
+      - name: Install derive sorter
+        run: cargo binstall cargo-sort-derives --version '=0.13.0' --locked --no-confirm
+      - name: Check derive order
+        run: cargo sort-derives --check
+      - name: Check workflows
+        uses: docker://rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 # 1.7.12, includes ShellCheck and pyflakes
+      - name: Check shell scripts
+        run: git ls-files -z '*.sh' '*.bash' | xargs -0 --no-run-if-empty shellcheck
 
   dependencies:
     runs-on: ubuntu-latest
@@ -250,16 +280,15 @@ jobs:
       RUSTC_WRAPPER: ""
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: dtolnay/rust-toolchain@fb523f40495206854c36b250850817ae0f83e3d1 # 1.99.0
         with:
-          toolchain: 1.99.0
-      - uses: cargo-bins/cargo-binstall@3be4ad2b146f3302f92e5956c54fedbb6ae8cccc # main
+          persist-credentials: false
+      - name: Check dependency advisories and sources
+        uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1, cargo-deny 0.20.2
         with:
-          version: "1.25.1"
-      - name: Install cargo-deny
-        run: cargo binstall cargo-deny --version 0.20.2 --locked --no-confirm
-      - name: Check advisories and reviewed dependency sources
-        run: cargo deny --workspace --locked --all-features check advisories sources
+          rust-version: "1.99.0"
+          arguments: "--workspace --all-features --locked"
+          command: check
+          command-arguments: "advisories sources"
 
   features:
     name: facade (${{ matrix.selection }})
@@ -270,6 +299,8 @@ jobs:
         selection: [default, no-default, macros, inspector, performance, mcp]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - uses: dtolnay/rust-toolchain@fb523f40495206854c36b250850817ae0f83e3d1 # 1.99.0
         with:
           toolchain: 1.99.0
@@ -287,8 +318,11 @@ jobs:
     env:
       RUSTC_WRAPPER: ""
       TRUNK_SKIP_VERSION_CHECK: "true"
+      TRUNK_BUILD_LOCKED: "true"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - uses: dtolnay/rust-toolchain@fb523f40495206854c36b250850817ae0f83e3d1 # 1.99.0
         with:
           toolchain: 1.99.0
@@ -304,14 +338,18 @@ jobs:
           version: "1.25.1"
       - name: Install publication tools
         run: |
-          cargo binstall dioxus-cli --version 0.7.10 --locked --no-confirm
-          cargo binstall trunk --version 0.21.14 --locked --no-confirm
+          cargo binstall dioxus-cli --version '=0.7.9' --locked --no-confirm
+          cargo binstall trunk --version '=0.21.14' --locked --no-confirm
+      - name: Verify locked publication dependency graph
+        run: cargo metadata --locked --format-version 1 > /dev/null
       - name: Build demo, book, LLM text and site
         run: |
           cargo run --locked -p xtask -- build gpui-demo
           cargo run --locked -p xtask -- build book
           cargo run --locked -p xtask -- build llms-txt
           cargo run --locked -p xtask -- build web
+      - name: Check publication dependency lockfiles
+        run: git diff --exit-code -- Cargo.lock ':(glob)**/Cargo.lock'
 
   release:
     name: release

@@ -96,7 +96,7 @@ unexecuted or failed checks.
 | Change | Validation |
 |---|---|
 | Markdown | `rumdl check` with the edited paths |
-| Repository quality | `bash scripts/check-quality.sh` with the pinned CI tools installed |
+| Repository quality | `just quality` with the pinned CI tools installed |
 | Facade features | `bash scripts/check-features.sh <selection>` with `default`, `no-default`, `macros`, `inspector`, `performance`, or `mcp` |
 | Publishable packages | `cargo publish --workspace --dry-run --locked` |
 | Dependency policy | `cargo deny --workspace --locked --all-features check advisories sources` |
@@ -108,8 +108,8 @@ unexecuted or failed checks.
 | GPUI demo | `cargo xtask build gpui-demo` |
 | Catalog | `cargo xtask build web` |
 
-`just fmt` formats Rust, TOML, and Markdown. `just check` and `just clippy`
-exclude the two example packages; `just test` includes them. `just web-build`
+`just fmt` formats Rust, TOML, and Markdown. `just check` excludes the two
+example packages; `just clippy` and `just test` include them. `just web-build`
 assembles all publication artifacts.
 
 CI tests all features on Linux. On macOS it excludes the Linux-only launcher;
