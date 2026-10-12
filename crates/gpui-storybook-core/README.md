@@ -13,8 +13,7 @@ Requires Rust 1.99 or newer and GPUI Kit 0.7.
 
 The crate owns the gallery layout, story containers, controls and
 workbench state, theme and preference UI, viewport presentation, localization,
-and the shared automation controller. Its optional `capture`, `inspector`, and
-`performance` features expose the corresponding lower-level runtime surfaces.
+and the shared automation controller.
 
 See the [runtime API reference][api] for frame-aware automation, scenario
 execution, and capture semantics shared by the facade, MCP integration, and test

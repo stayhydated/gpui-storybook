@@ -8,9 +8,8 @@ from the [`gpui-storybook` facade][facade].
 
 Requires Rust 1.99 or newer.
 
-See the [repository API reference][api] for persistence modes, cancellation,
-recovery, and saved-versus-resolved preference semantics. Direct consumers are
-Storybook's runtime and persistence tests.
+See the [preference API source][api] for persistence modes, cancellation,
+recovery, and saved-versus-resolved preference semantics.
 
 [facade]: https://crates.io/crates/gpui-storybook
-[api]: https://docs.rs/gpui-storybook-preferences
+[api]: https://github.com/stayhydated/gpui-storybook/blob/master/crates/gpui-storybook-preferences/src/lib.rs

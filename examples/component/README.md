@@ -34,8 +34,8 @@ From the workspace root, with the native GPUI prerequisites available:
 cargo run -p gpui-storybook-example-component
 ```
 
-This opens the gallery with this package's linked registrations. The
-[maintained source][example] contains the complete declaration and render code.
+This opens the gallery with [`WelcomeCard`][example] and this package's other
+linked registrations.
 For MCP sessions, Linux uses `gpui-storybook-launch` and a private Sway compositor.
 
 [example]: https://github.com/stayhydated/gpui-storybook/blob/master/examples/component/src/components/welcome_card.rs

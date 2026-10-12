@@ -26,8 +26,7 @@ gpui-storybook-launch -- cargo run -p gpui-storybook-example-story --features mc
 The launcher uses `sway` from `PATH` by default. `GPUI_STORYBOOK_SWAY` and the
 `--sway` option select a different executable. It inherits the child's standard
 streams, returns its exit status, and stops the private compositor when the
-child exits. Startup errors include available Sway diagnostics, retaining logs
-that contain invalid UTF-8.
+child exits. Startup errors include available Sway diagnostics.
 
 [crate-badge]: https://img.shields.io/crates/v/gpui-storybook-launch.svg?label=gpui-storybook-launch
 [crate]: https://crates.io/crates/gpui-storybook-launch
