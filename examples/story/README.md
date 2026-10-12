@@ -3,6 +3,9 @@
 `gpui-storybook-example-story` demonstrates `#[story]` registrations for
 previews that own GPUI state, focus, actions, lifecycle, or custom wrapper UI.
 
+Requires Rust 1.99 or newer, GPUI Kit 0.7, and a native GPUI display for the
+interactive gallery. This example package is not published.
+
 ## Overview
 
 The example covers typed `StoryControls`, stable `Substory` routes, grouped
@@ -12,6 +15,28 @@ scenarios, static catalog export, and semantic automation targets and values.
 checks, while `ActionsAndScenariosStory` demonstrates one command model shared
 by buttons, key bindings, workbench actions, and fresh scenario runs.
 
-The `inspector`, `performance`, and `mcp` features forward the corresponding
-facade capabilities. MCP sessions are supported on Linux and macOS; Linux uses
-`gpui-storybook-launch` and a private Sway compositor.
+## Features
+
+No optional workbench features are enabled by default. The facade's normal
+`macros` feature remains enabled.
+
+| Feature | Default | Purpose |
+| --- | --- | --- |
+| `default` | Yes | Empty; enables none of this package's optional features. |
+| `inspector` | No | Forwards `gpui-storybook/inspector`. |
+| `mcp` | No | Forwards `gpui-storybook/mcp`; supported on Linux and macOS. |
+| `performance` | No | Forwards `gpui-storybook/performance`. |
+
+## Commands
+
+From the workspace root, with the native GPUI prerequisites available:
+
+```sh
+cargo run -p gpui-storybook-example-story
+```
+
+This opens the gallery with this package's linked registrations. The
+[maintained source][example] contains the complete declaration and render code.
+For MCP sessions, Linux uses `gpui-storybook-launch` and a private Sway compositor.
+
+[example]: https://github.com/stayhydated/gpui-storybook/blob/master/examples/story/src/stories/hello.rs

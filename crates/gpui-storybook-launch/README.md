@@ -6,14 +6,17 @@
 session on Linux, supplying the compositor-driven frame callbacks required by
 GPUI Storybook MCP and startup capture without using the physical display.
 
+Requires Rust 1.99 or newer, Linux, Sway on `PATH`, and a working Wgpu adapter
+for the child GPUI application.
+
 Storybook's Wayland window capture requires the GPUI Git patches from the
-[`wayland-render-image` branch](https://github.com/stayhydated/gpui-storybook/blob/wayland-render-image/Cargo.toml)
+[`wayland-render-image` branch][wayland-patches]
 in the child application's workspace root.
 
-## Example
+## Commands
 
-From the GPUI Storybook workspace, place environment variables before the
-launcher and the example's child command after `--`:
+From the GPUI Storybook workspace, with Sway and the native rendering
+prerequisites available, run the story example as the child command after `--`:
 
 ```sh
 GPUI_STORYBOOK_MCP_STDIO=1 \
@@ -28,3 +31,4 @@ that contain invalid UTF-8.
 
 [crate-badge]: https://img.shields.io/crates/v/gpui-storybook-launch.svg?label=gpui-storybook-launch
 [crate]: https://crates.io/crates/gpui-storybook-launch
+[wayland-patches]: https://github.com/stayhydated/gpui-storybook/blob/wayland-render-image/Cargo.toml
