@@ -96,6 +96,10 @@ unexecuted or failed checks.
 | Change | Validation |
 |---|---|
 | Markdown | `rumdl check` with the edited paths |
+| Repository quality | `just quality` with the versioned CI tools installed and Docker available |
+| Facade features | `bash scripts/check-features.sh <selection>` with `default`, `no-default`, `macros`, `inspector`, `performance`, or `mcp` |
+| Publishable packages | `cargo publish --workspace --dry-run --locked` |
+| Dependency policy | `cargo deny --workspace --locked --all-features check advisories sources` |
 | Book or LLM text | `cargo xtask build book` and `cargo xtask build llms-txt` |
 | Macro expansion | `cargo test -p gpui-storybook-macros --locked` |
 | Preference storage or resolution | `cargo test -p gpui-storybook-preferences --locked` |
@@ -104,10 +108,17 @@ unexecuted or failed checks.
 | GPUI demo | `cargo xtask build gpui-demo` |
 | Catalog | `cargo xtask build web` |
 
-`just fmt` formats Rust, TOML, and Markdown. `just check` and `just clippy`
-exclude the two example packages; `just test` includes them. `just web-build`
+`just fmt` formats Rust, TOML, and Markdown. `just check` excludes the two
+example packages; `just clippy` and `just test` include them. `just web-build`
 assembles all publication artifacts.
 
 CI tests all features on Linux. On macOS it excludes the Linux-only launcher;
 on Windows it uses default features and excludes the launcher and MCP crate.
 Use the matching platform scope when reproducing those jobs.
+
+The dependency policy checks unmaintained advisories for immediate normal,
+development, and build dependencies of workspace members. Vulnerability,
+yanked-package, and source checks still cover the full dependency graph.
+
+Workflow Actions use verified version tags. The local quality recipe and CI
+both use `rhysd/actionlint:1.7.12`, including ShellCheck and pyflakes.
