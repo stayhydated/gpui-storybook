@@ -41,9 +41,9 @@ es-fluent-manager-core = "0.21.0"
 es-fluent-manager-embedded = "0.21.0"
 fluent-langneg = "=0.14.2"
 frame-capture = "0.2.3"
-gpui = { package = "gpui-pre", version = "=0.3.7" }
+gpui = { package = "gpui-pre", version = "=0.3.9" }
 gpui-es-fluent = "0.3.0"
-gpui-kit = "0.7.0"
+gpui-kit = "0.7.3"
 gpui-storybook = { path = "crates/gpui-storybook", version = "0.7.1" }
 gpui-storybook-core = { path = "crates/gpui-storybook-core", version = "0.7.1" }
 gpui-storybook-launch = { path = "crates/gpui-storybook-launch", version = "0.7.1" }
@@ -57,8 +57,8 @@ gpui_platform = { features = [
   "x11",
   "wayland",
   "runtime_shaders",
-], package = "gpui-pre-platform", version = "=0.3.7" }
-gpui_wgpu = { features = [ "font-kit" ], package = "gpui-pre-wgpu", version = "=0.3.7" }
+], package = "gpui-pre-platform", version = "=0.3.9" }
+gpui_wgpu = { features = [ "font-kit" ], package = "gpui-pre-wgpu", version = "=0.3.9" }
 heck = "0.5"
 image = { default-features = false, features = [ "png" ], version = "0.25" }
 insta = "1.49"
@@ -70,7 +70,7 @@ prettyplease = "0.3"
 proc-macro2 = "1.0"
 quote = "1.0"
 read-fonts = "0.41"
-reqwest_client = { package = "gpui-pre-reqwest-client", version = "=0.3.7" }
+reqwest_client = { package = "gpui-pre-reqwest-client", version = "=0.3.9" }
 rmcp = "3.5.0"
 rust-embed = "8.12"
 schemars = "1.2.2"

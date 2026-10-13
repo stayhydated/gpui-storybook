@@ -8,5 +8,5 @@ publish = false
 rust-version = "1.99"
 
 [dependencies]
-gpui-kit = "0.7.0"
+gpui-kit = "0.7.3"
 gpui-storybook = { path = "../../.." }
