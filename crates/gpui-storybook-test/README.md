@@ -34,7 +34,6 @@ The default feature set enables `capture`.
 | Feature | Default | Purpose |
 | --- | --- | --- |
 | `capture` | Yes | Enables the core image-capture backend used by portable captures. |
-| `default` | Yes | Enables `capture`. |
 | `performance` | No | Enables `gpui-pre/profiler` for frame samples and performance budgets. |
 
 ## Example

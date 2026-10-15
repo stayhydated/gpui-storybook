@@ -281,6 +281,7 @@ language, and named control axes. Keep baseline policy explicit: use `Check`
 in verification, and expose `Update` only through a deliberate acceptance
 workflow. With the `performance` feature, require enough native GPUI profiler
 samples before enforcing draw or dirty-to-present p95 and maximum budgets.
+`PerformanceBudget` duration setters saturate at `u64::MAX` nanoseconds.
 
 In the pinned `gpui-pre` 0.3.9 stack, `current_headless_renderer` returns a
 Metal renderer on macOS and a Wgpu renderer on Linux, so runner captures run on
