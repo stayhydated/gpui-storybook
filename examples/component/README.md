@@ -21,7 +21,6 @@ No optional workbench features are enabled by default. The facade's normal
 
 | Feature | Default | Purpose |
 | --- | --- | --- |
-| `default` | Yes | Empty; enables none of this package's optional features. |
 | `inspector` | No | Forwards `gpui-storybook/inspector`. |
 | `mcp` | No | Forwards `gpui-storybook/mcp`; supported on Linux and macOS. |
 | `performance` | No | Forwards `gpui-storybook/performance`. |

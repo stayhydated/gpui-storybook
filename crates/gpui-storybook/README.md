@@ -37,7 +37,6 @@ The default feature set enables `macros`.
 
 | Feature | Default | Purpose |
 | --- | --- | --- |
-| `default` | Yes | Enables `macros`. |
 | `inspector` | No | Forwards the core Inspector feature and re-exports `StoryInspectorState`. |
 | `macros` | Yes | Re-exports registration, control, substory, and initialization macros. |
 | `mcp` | No | Enables live MCP serving and re-exports automation/capture helpers on Linux and macOS. |

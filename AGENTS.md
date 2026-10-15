@@ -67,6 +67,9 @@ instructions and book or API navigation to those linked surfaces.
   affected FTL catalogs, and locale setup instructions aligned when message keys
   or locale wiring change.
 
+Set `MDBOOK_BUILD__CREATE_MISSING=false` when validating book changes so a
+missing navigation target fails validation instead of creating a chapter.
+
 Build publication artifacts through `cargo xtask`: the sources are `book/src`,
 `web/src`, and `examples/story`. The generated book, LLM text, demo, and site
 outputs are not independent editing surfaces.
