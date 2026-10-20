@@ -1420,6 +1420,7 @@ dependencies = [
 [[package]]
 name = "component-shape"
 version = "0.3.4"
+source = "git+https://github.com/stayhydated/component-shape?rev=520e91ec37b52b3ef48a098fb7b12a52453366fe#520e91ec37b52b3ef48a098fb7b12a52453366fe"
 dependencies = [
  "derive_more",
  "heck 0.5.0",
@@ -1431,6 +1432,7 @@ dependencies = [
 [[package]]
 name = "component-shape-mcp"
 version = "0.3.4"
+source = "git+https://github.com/stayhydated/component-shape?rev=520e91ec37b52b3ef48a098fb7b12a52453366fe#520e91ec37b52b3ef48a098fb7b12a52453366fe"
 dependencies = [
  "component-shape",
  "component-shape-mcp-macros",
@@ -1447,6 +1449,7 @@ dependencies = [
 [[package]]
 name = "component-shape-mcp-macros"
 version = "0.3.4"
+source = "git+https://github.com/stayhydated/component-shape?rev=520e91ec37b52b3ef48a098fb7b12a52453366fe#520e91ec37b52b3ef48a098fb7b12a52453366fe"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
@@ -4135,6 +4138,7 @@ dependencies = [
 [[package]]
 name = "gpui-es-fluent"
 version = "0.3.0"
+source = "git+https://github.com/stayhydated/gpui-es-fluent?rev=031353b82729dcf84023c84205a2f462a670f1a5#031353b82729dcf84023c84205a2f462a670f1a5"
 dependencies = [
  "es-fluent",
  "es-fluent-manager-embedded",
@@ -13202,203 +13206,3 @@ dependencies = [
  "syn 3.0.9",
  "winnow 1.0.4",
 ]
-
-[[patch.unused]]
-name = "gpui-table"
-version = "0.8.0"
-
-[[patch.unused]]
-name = "gpui-table-component"
-version = "0.8.0"
-
-[[patch.unused]]
-name = "gpui-table-core"
-version = "0.8.0"
-
-[[patch.unused]]
-name = "gpui-table-derive"
-version = "0.8.0"
-
-[[patch.unused]]
-name = "gpui-table-mcp"
-version = "0.8.0"
-
-[[patch.unused]]
-name = "gpui-table-prototyping-core"
-version = "0.8.0"
-
-[[patch.unused]]
-name = "gpui-table-runtime"
-version = "0.8.0"
-
-[[patch.unused]]
-name = "gpui-table-schema"
-version = "0.8.0"
-
-[[patch.unused]]
-name = "gpui-storybook-duplicate-fixture"
-version = "0.0.0"
-
-[[patch.unused]]
-name = "component-shape-codegen"
-version = "0.3.4"
-
-[[patch.unused]]
-name = "component-shape-gpui"
-version = "0.3.4"
-
-[[patch.unused]]
-name = "component-shape-gpui-macros"
-version = "0.3.4"
-
-[[patch.unused]]
-name = "component-shape-codegen"
-version = "0.3.4"
-
-[[patch.unused]]
-name = "component-shape-gpui"
-version = "0.3.4"
-
-[[patch.unused]]
-name = "component-shape-gpui-macros"
-version = "0.3.4"
-
-[[patch.unused]]
-name = "gpui-form"
-version = "0.8.0"
-
-[[patch.unused]]
-name = "gpui-form-codegen"
-version = "0.8.0"
-
-[[patch.unused]]
-name = "gpui-form-collection"
-version = "0.8.0"
-
-[[patch.unused]]
-name = "gpui-form-collection-derive"
-version = "0.8.0"
-
-[[patch.unused]]
-name = "gpui-form-component"
-version = "0.8.0"
-
-[[patch.unused]]
-name = "gpui-form-component-derive"
-version = "0.8.0"
-
-[[patch.unused]]
-name = "gpui-form-component-story"
-version = "0.8.0"
-
-[[patch.unused]]
-name = "gpui-form-core"
-version = "0.8.0"
-
-[[patch.unused]]
-name = "gpui-form-derive"
-version = "0.8.0"
-
-[[patch.unused]]
-name = "gpui-form-mcp"
-version = "0.8.0"
-
-[[patch.unused]]
-name = "gpui-form-prototyping-core"
-version = "0.8.0"
-
-[[patch.unused]]
-name = "gpui-form-runtime"
-version = "0.8.0"
-
-[[patch.unused]]
-name = "gpui-form-schema"
-version = "0.8.0"
-
-[[patch.unused]]
-name = "gpui-storybook-duplicate-fixture"
-version = "0.0.0"
-
-[[patch.unused]]
-name = "gpui-table"
-version = "0.8.0"
-
-[[patch.unused]]
-name = "gpui-table-component"
-version = "0.8.0"
-
-[[patch.unused]]
-name = "gpui-table-core"
-version = "0.8.0"
-
-[[patch.unused]]
-name = "gpui-table-derive"
-version = "0.8.0"
-
-[[patch.unused]]
-name = "gpui-table-mcp"
-version = "0.8.0"
-
-[[patch.unused]]
-name = "gpui-table-prototyping-core"
-version = "0.8.0"
-
-[[patch.unused]]
-name = "gpui-table-runtime"
-version = "0.8.0"
-
-[[patch.unused]]
-name = "gpui-table-schema"
-version = "0.8.0"
-
-[[patch.unused]]
-name = "gpui-form"
-version = "0.8.0"
-
-[[patch.unused]]
-name = "gpui-form-codegen"
-version = "0.8.0"
-
-[[patch.unused]]
-name = "gpui-form-collection"
-version = "0.8.0"
-
-[[patch.unused]]
-name = "gpui-form-collection-derive"
-version = "0.8.0"
-
-[[patch.unused]]
-name = "gpui-form-component"
-version = "0.8.0"
-
-[[patch.unused]]
-name = "gpui-form-component-derive"
-version = "0.8.0"
-
-[[patch.unused]]
-name = "gpui-form-component-story"
-version = "0.8.0"
-
-[[patch.unused]]
-name = "gpui-form-core"
-version = "0.8.0"
-
-[[patch.unused]]
-name = "gpui-form-derive"
-version = "0.8.0"
-
-[[patch.unused]]
-name = "gpui-form-mcp"
-version = "0.8.0"
-
-[[patch.unused]]
-name = "gpui-form-prototyping-core"
-version = "0.8.0"
-
-[[patch.unused]]
-name = "gpui-form-runtime"
-version = "0.8.0"
-
-[[patch.unused]]
-name = "gpui-form-schema"
-version = "0.8.0"

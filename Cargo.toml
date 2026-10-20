@@ -135,3 +135,10 @@ opt-level = 3
 codegen-units = 1
 lto = "thin"
 opt-level = 3
+
+# Use the reviewed GPUI Kit 0.8 companion commits until compatible releases are available.
+[patch.crates-io]
+component-shape = { git = "https://github.com/stayhydated/component-shape", rev = "520e91ec37b52b3ef48a098fb7b12a52453366fe" }
+component-shape-mcp = { git = "https://github.com/stayhydated/component-shape", rev = "520e91ec37b52b3ef48a098fb7b12a52453366fe" }
+component-shape-mcp-macros = { git = "https://github.com/stayhydated/component-shape", rev = "520e91ec37b52b3ef48a098fb7b12a52453366fe" }
+gpui-es-fluent = { git = "https://github.com/stayhydated/gpui-es-fluent", rev = "031353b82729dcf84023c84205a2f462a670f1a5" }
