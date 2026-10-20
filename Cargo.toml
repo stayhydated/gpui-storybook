@@ -43,7 +43,7 @@ fluent-langneg = "=0.14.2"
 frame-capture = "0.2.3"
 gpui = { package = "gpui-pre", version = "=0.3.9" }
 gpui-es-fluent = "0.3.0"
-gpui-kit = "0.7.3"
+gpui-kit = "0.8.0"
 gpui-storybook = { path = "crates/gpui-storybook", version = "0.7.1" }
 gpui-storybook-core = { path = "crates/gpui-storybook-core", version = "0.7.1" }
 gpui-storybook-launch = { path = "crates/gpui-storybook-launch", version = "0.7.1" }

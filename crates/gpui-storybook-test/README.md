@@ -6,7 +6,7 @@
 registrations, aimed at integration tests and CI jobs that need isolated
 captures, visual baselines, capture matrices, or frame budgets.
 
-Requires Rust 1.99 or newer and GPUI Kit 0.7. Headless image capture uses a
+Requires Rust 1.99 or newer and GPUI Kit 0.8.0. Headless image capture uses a
 working Wgpu adapter on Linux or the Metal renderer on macOS; the pinned GPUI
 stack provides no Windows headless renderer.
 

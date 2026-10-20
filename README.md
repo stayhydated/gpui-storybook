@@ -10,7 +10,7 @@ for developing, inspecting, and exercising GPUI components outside
 the rest of their application.
 
 Requires Rust 1.99 or newer across the workspace. Native applications use GPUI
-Kit 0.7.3; the capture integrations target published `gpui-pre =0.3.9`. Live MCP
+Kit 0.8.0; the capture integrations target published `gpui-pre =0.3.9`. Live MCP
 sessions support Linux and macOS; the Sway launcher is Linux-only.
 
 ## Overview

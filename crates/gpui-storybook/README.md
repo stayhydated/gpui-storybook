@@ -7,7 +7,7 @@
 GPUI component gallery with typed controls, scoped actions,
 themes, viewports, and repeatable scenarios.
 
-Requires Rust 1.99 or newer and GPUI Kit 0.7. The optional `mcp` feature
+Requires Rust 1.99 or newer and GPUI Kit 0.8.0. The optional `mcp` feature
 supports Linux and macOS; other targets reject that feature.
 
 ## Overview
