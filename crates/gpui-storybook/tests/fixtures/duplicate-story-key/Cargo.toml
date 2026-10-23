@@ -8,5 +8,9 @@ publish = false
 rust-version = "1.99"
 
 [dependencies]
-gpui-kit = "0.7.3"
+gpui-kit = "0.8.0"
 gpui-storybook = { path = "../../.." }
+
+# Use the reviewed GPUI Kit 0.8 companion commits until compatible releases are available.
+[patch.crates-io]
+gpui-es-fluent = { git = "https://github.com/stayhydated/gpui-es-fluent", rev = "031353b82729dcf84023c84205a2f462a670f1a5" }

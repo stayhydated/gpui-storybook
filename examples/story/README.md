@@ -3,7 +3,7 @@
 `gpui-storybook-example-story` demonstrates `#[story]` registrations for
 previews that own GPUI state, focus, actions, lifecycle, or custom wrapper UI.
 
-Requires Rust 1.99 or newer, GPUI Kit 0.7, and a native GPUI display for the
+Requires Rust 1.99 or newer, GPUI Kit 0.8.0, and a native GPUI display for the
 interactive gallery. This example package is not published.
 
 ## Overview

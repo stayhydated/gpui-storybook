@@ -7,7 +7,7 @@
 developers building a custom GPUI Storybook host. Applications using the
 standard initialization and discovery flow should use [`gpui-storybook`][facade].
 
-Requires Rust 1.99 or newer and GPUI Kit 0.7.
+Requires Rust 1.99 or newer and GPUI Kit 0.8.0.
 
 ## Overview
 
