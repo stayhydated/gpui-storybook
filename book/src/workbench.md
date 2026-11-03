@@ -176,7 +176,8 @@ commands stay out of the list. A story without an action scope shows no inferred
 actions.
 
 Each row includes action documentation, its registered JSON argument schema,
-and every effective key binding resolved for the action scope. **Dispatch**
+and every effective key binding resolved for the action scope. Binding labels
+follow the runtime host OS, including when Storybook runs in a browser. **Dispatch**
 sends the action directly to the same scope through GPUI's normal action
 dispatcher. The sticky toolbar keeps **Reset** available while action rows
 scroll; Reset recreates the selected story and rebinds its action scope before

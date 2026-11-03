@@ -13,7 +13,9 @@ The `mcp` feature is unsupported on Windows and produces a compile-time error
 there. Set `GPUI_STORYBOOK_MCP_STDIO=1` to serve MCP over stdio. Route tracing
 and diagnostic logs to standard error.
 
-For Linux Wayland window capture, copy the three `[patch.crates-io]` entries
+Live Wayland window capture belongs to the older `gpui-pre =0.3.7` stack.
+Only applications using that complete legacy stack should copy its three
+`[patch.crates-io]` entries
 from GPUI Storybook's
 [`wayland-render-image` branch](https://github.com/stayhydated/gpui-storybook/blob/wayland-render-image/Cargo.toml)
 into the application's workspace root. They pin `gpui-pre-linux`,
@@ -21,7 +23,9 @@ into the application's workspace root. They pin `gpui-pre-linux`,
 `gpui-pre =0.3.7` for compatibility with `gpui-kit`. Commit the resolved
 `Cargo.lock`; Cargo patches are not inherited from dependencies. Verify the
 pinned path on that branch with `just wayland-capture-test`. The `master` branch
-uses published GPUI packages, including for portable headless capture.
+uses Kit 0.9 with published `gpui-pre =0.3.11`; the legacy patches are
+incompatible with it. Published Linux supports inspection and interaction plus
+portable headless capture, but not live Wayland window readback.
 
 On Linux, install Sway plus `libgl1-mesa-dri` and `mesa-vulkan-drivers`, then
 install the reusable launcher and run stdio and startup-capture sessions
@@ -189,6 +193,9 @@ capture. Step types are `focus_next`, `focus_previous`, `blur`, `keystrokes`,
 `wait_frames`. Supplying a `story_key` focuses the selected story's focus handle
 before the first step.
 
+Keystroke strings follow the runtime host OS, including browser hosts:
+`secondary-` means Command on macOS and Control elsewhere.
+
 GPUI defers registered-action dispatch; the executor resumes with the next step
 after that dispatch is delivered. Use `wait_frames` before a later action when
 earlier widget input schedules its own next-frame state change.
@@ -283,12 +290,13 @@ workflow. With the `performance` feature, require enough native GPUI profiler
 samples before enforcing draw or dirty-to-present p95 and maximum budgets.
 `PerformanceBudget` duration setters saturate at `u64::MAX` nanoseconds.
 
-In the pinned `gpui-pre` 0.3.9 stack, `current_headless_renderer` returns a
+In the pinned `gpui-pre` 0.3.11 stack, `current_headless_renderer` returns a
 Metal renderer on macOS and a Wgpu renderer on Linux, so runner captures run on
 both. Windows gets `Ok(None)`; its DirectX renderer reaches `render_to_image`
 only through a real window, outside the runner's headless context. Linux
-Wayland application captures use the Git-patched Wgpu window renderer and
-private Sway. The `mcp` feature supports Linux and macOS; the
+Wayland application captures require the older `gpui-pre` 0.3.7 branch's fixed
+Git-patched Wgpu window renderer and private Sway; those patches do not apply
+to Kit 0.9. The `mcp` feature supports Linux and macOS; the
 `wayland-render-image` branch verifies application capture at desktop, tablet,
 mobile, and custom sizes.
 Treat renderer, fonts, assets, and CI hardware as part of the baseline or timing

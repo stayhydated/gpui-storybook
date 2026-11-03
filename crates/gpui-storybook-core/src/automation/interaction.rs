@@ -11,7 +11,7 @@ use crate::{
 };
 use gpui_kit::{
     Action, App, Keystroke, Modifiers, MouseDownEvent, MouseMoveEvent, MouseUpEvent, PlatformInput,
-    ScrollDelta, ScrollWheelEvent, TouchPhase, Window, point, px,
+    ScrollDelta, ScrollEvent, ScrollSource, TouchPhase, Window, point, px,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -118,7 +118,8 @@ pub enum StoryInteractionStep {
     Blur,
     /// Parse and dispatch GPUI key-binding strings in order.
     Keystrokes {
-        /// GPUI keystroke strings such as `enter` or `shift-tab`.
+        /// GPUI keystroke strings such as `enter`, `shift-tab`, or `secondary-k`.
+        /// Modifier aliases follow the application's runtime host OS.
         keys: Vec<String>,
     },
     /// Insert one UTF-8 value into the focused basic text input.

@@ -7,7 +7,7 @@
 GPUI component gallery with typed controls, scoped actions,
 themes, viewports, and repeatable scenarios.
 
-Requires Rust 1.99 or newer and GPUI Kit 0.8.0. The optional `mcp` feature
+Requires Rust 1.99 or newer and GPUI Kit 0.9.0. The optional `mcp` feature
 supports Linux and macOS; other targets reject that feature.
 
 ## Overview
@@ -27,9 +27,10 @@ through the application's locale context.
 Live captures size the story canvas to a named viewport or explicit pixel
 dimensions and crop gallery chrome from the PNG.
 
-Linux Wayland window capture requires the GPUI Git patches from the
-[`wayland-render-image` branch][wayland-patches]
-in the application's workspace root.
+Portable headless captures work on Linux and macOS with the published GPUI
+stack. Live Wayland window capture belongs to the older `gpui-pre =0.3.7`
+[`wayland-render-image` branch][wayland-patches]; its Git patches do not apply
+to Kit 0.9. Live macOS capture uses the native renderer.
 
 ## Features
 

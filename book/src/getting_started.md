@@ -13,7 +13,9 @@ You need:
 - embedded Fluent resources and a typed language enum;
 - compatible versions of GPUI Kit and the Fluent integration crates.
 
-The workspace targets Rust 1.99 and edition 2024.
+The workspace targets Rust 1.99 and edition 2024. The upcoming Storybook 0.8
+line uses GPUI Kit 0.9.0, gpui-es-fluent 0.4 and the es-fluent 0.21.2 family.
+Storybook 0.7 targets Kit 0.8; keep these public GPUI type families together.
 
 ## Add the Storybook package dependencies
 

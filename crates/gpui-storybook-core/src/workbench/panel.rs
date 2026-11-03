@@ -535,7 +535,7 @@ impl StoryWorkbench {
     /// without a horizontal wheel.
     pub(super) fn scroll_tabs(
         &mut self,
-        event: &ScrollWheelEvent,
+        event: &ScrollEvent,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {

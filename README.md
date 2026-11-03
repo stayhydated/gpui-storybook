@@ -10,8 +10,9 @@ for developing, inspecting, and exercising GPUI components outside
 the rest of their application.
 
 Requires Rust 1.99 or newer across the workspace. Native applications use GPUI
-Kit 0.8.0; the capture integrations target published `gpui-pre =0.3.9`. Live MCP
+Kit 0.9.0; the capture integrations target published `gpui-pre =0.3.11`. Live MCP
 sessions support Linux and macOS; the Sway launcher is Linux-only.
+The upcoming Storybook 0.8 line uses Kit 0.9; Storybook 0.7 uses Kit 0.8.
 
 ## Overview
 
@@ -25,10 +26,10 @@ sessions support Linux and macOS; the Sway launcher is Linux-only.
 Live captures size the story canvas to desktop, tablet, mobile, or explicit
 pixel dimensions and crop gallery chrome from the PNG.
 
-Linux Wayland window capture uses the GPUI Git patches pinned on the
-[`wayland-render-image` branch][wayland-patches].
-Applications using Storybook as a dependency must apply those patches in their
-own workspace root.
+Published GPUI supports portable headless capture on Linux and macOS. Live
+Wayland window capture belongs to the older `gpui-pre =0.3.7` stack on the
+[`wayland-render-image` branch][wayland-patches]; its fixed Git patches are
+incompatible with the Kit 0.9 stack. Live macOS capture uses the native renderer.
 
 ## Crates
 

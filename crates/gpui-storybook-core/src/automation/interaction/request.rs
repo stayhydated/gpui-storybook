@@ -245,7 +245,7 @@ pub(crate) fn prepare_interaction_steps(
             StoryInteractionStep::Keystrokes { keys } => keys
                 .iter()
                 .map(|key| {
-                    Keystroke::parse(key).map_err(|error| {
+                    Keystroke::parse_with_os(key, cx.platform_info().os).map_err(|error| {
                         StorybookAutomationError::InvalidInteractionStep {
                             step_index,
                             message: format!("invalid keystroke `{key}`: {error}"),

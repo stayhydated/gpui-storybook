@@ -9,9 +9,11 @@ GPUI Storybook MCP and startup capture without using the physical display.
 Requires Rust 1.99 or newer, Linux, Sway on `PATH`, and a working Wgpu adapter
 for the child GPUI application.
 
-Storybook's Wayland window capture requires the GPUI Git patches from the
-[`wayland-render-image` branch][wayland-patches]
-in the child application's workspace root.
+The launcher supports inspection and interaction on the published Kit 0.9
+stack. Live Wayland window capture belongs to the older `gpui-pre =0.3.7`
+[`wayland-render-image` branch][wayland-patches]; those fixed Git patches are
+incompatible with Kit 0.9. Use `gpui-storybook-test` for published headless
+captures on Linux.
 
 ## Commands
 
