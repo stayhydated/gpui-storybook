@@ -5,12 +5,13 @@
 tests, PNG capture, visual baselines, capture matrices, and optional GPUI frame
 budgets without opening the gallery shell.
 
-Add it as a development dependency. Enable `performance` only when tests need
+For the upcoming Storybook 0.8 / Kit 0.9 line, add it as a development
+dependency. Enable `performance` only when tests need
 GPUI profiler samples and budgets:
 
 ```toml
 [dev-dependencies]
-gpui-storybook-test = { version = "0.7", features = ["performance"] }
+gpui-storybook-test = { version = "0.8", features = ["performance"] }
 ```
 
 Keep the crate that contains the story registrations linked from the test
@@ -126,7 +127,7 @@ comparing either pixels or frame timing.
 ## Platform expectations
 
 The runner asks `gpui_platform` for the current headless renderer. In the
-pinned `gpui-pre` 0.3.9 stack, `current_headless_renderer` returns a Metal
+pinned `gpui-pre` 0.3.11 stack, `current_headless_renderer` returns a Metal
 renderer on macOS and a Wgpu renderer on Linux, so an explicit headless runner
 capture runs on both. Windows gets `Ok(None)`, and its DirectX renderer reaches
 `render_to_image` only through a real window, which the runner's headless
@@ -137,7 +138,7 @@ Headless capture therefore follows one path per platform:
 | Platform | Portable runner capture | Application capture |
 |---|---|---|
 | macOS | Metal headless renderer | Metal window renderer |
-| Linux | Wgpu headless renderer (gpui-pre 0.3.9) | Wayland Wgpu window renderer with consumer-owned Git patches |
+| Linux | Wgpu headless renderer (gpui-pre 0.3.11) | Legacy `gpui-pre` 0.3.7 branch with its fixed Git patches |
 | Windows | Not available (`Ok(None)`) | DirectX window readback on an unshown window |
 
 The runner owns its offscreen window and renderer inside a fresh
@@ -149,7 +150,7 @@ or a Mesa software Vulkan/GL driver such as `mesa-vulkan-drivers` and
 application and MCP path, which is separate from the runner.
 
 For Wayland application capture, apply the GPUI patches described in
-[Automation and capture](automation.md#pin-the-wayland-capture-backends).
+[Automation and capture](automation.md#legacy-wayland-capture-branch).
 The `mcp` feature supports Linux and macOS. The `wayland-render-image` branch
 also verifies application capture through private Sway at desktop, tablet,
 mobile, and custom sizes. Visual baselines are renderer- and font-sensitive, so

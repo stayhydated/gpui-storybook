@@ -11,6 +11,38 @@ use gpui_kit::{
 };
 use std::sync::atomic::AtomicBool;
 
+#[gpui_kit::test]
+fn interaction_keystrokes_follow_the_runtime_host(cx: &mut gpui_kit::TestAppContext) {
+    use gpui_kit::{OperatingSystem, PlatformInfo, PlatformTarget};
+
+    for os in [
+        OperatingSystem::Mac,
+        OperatingSystem::Linux,
+        OperatingSystem::Windows,
+    ] {
+        cx.set_platform_info(PlatformInfo {
+            os,
+            target: PlatformTarget::Web,
+        });
+        let steps: Vec<StoryInteractionStep> =
+            serde_json::from_str(r#"[{"type":"keystrokes","keys":["secondary-k","ctrl-k"]}]"#)
+                .expect("owned interaction request");
+        let prepared = cx
+            .update(|cx| prepare_interaction_steps(&steps, cx))
+            .expect("runtime host keystrokes should parse");
+        drop(steps);
+
+        let PreparedInteractionStep::Keystrokes(keys) = &prepared[0] else {
+            panic!("expected prepared keystrokes");
+        };
+        assert_eq!(keys[0].key, "k");
+        assert_eq!(keys[0].modifiers.platform, os == OperatingSystem::Mac);
+        assert_eq!(keys[0].modifiers.control, os != OperatingSystem::Mac);
+        assert!(keys[1].modifiers.control);
+        assert!(!keys[1].modifiers.platform);
+    }
+}
+
 /// Sets the harness counter to a caller-provided value.
 #[derive(gpui_kit::Action, Clone, Debug, Deserialize, Eq, schemars::JsonSchema, PartialEq)]
 #[action(namespace = storybook_interaction_test)]

@@ -44,7 +44,7 @@ fn workbench_tabs_scroll_horizontally() {
         .debug_bounds("workbench-tab-controls")
         .expect("controls tab should render")
         .center();
-    cx.simulate_event(ScrollWheelEvent {
+    cx.simulate_event(ScrollEvent {
         position,
         delta: ScrollDelta::Pixels(point(px(-60.), px(0.))),
         ..Default::default()
@@ -83,7 +83,7 @@ fn workbench_tabs_scroll_with_a_vertical_wheel() {
         .debug_bounds("workbench-tabs-scroll")
         .expect("tab strip should render")
         .center();
-    cx.simulate_event(ScrollWheelEvent {
+    cx.simulate_event(ScrollEvent {
         position,
         delta: ScrollDelta::Pixels(point(px(0.), px(-60.))),
         ..Default::default()

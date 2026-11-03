@@ -3,7 +3,7 @@ use super::*;
 use crate::registry::{StoryKey, StoryName, StorySectionName};
 use crate::workbench::WorkbenchState;
 use gpui_kit::{
-    Modifiers, MouseButton, ScrollDelta, ScrollWheelEvent, TestAppContext, VisualTestContext, div,
+    Modifiers, MouseButton, ScrollDelta, ScrollEvent, TestAppContext, VisualTestContext, div,
     point, px,
 };
 
@@ -300,7 +300,7 @@ fn tall_stories_scroll_inside_canvas_without_panning_viewport_frame() {
         assert_eq!(container.scroll_handle.max_offset(), point(px(0.), px(0.)));
     });
 
-    cx.simulate_event(ScrollWheelEvent {
+    cx.simulate_event(ScrollEvent {
         position: story_viewport.center(),
         delta: ScrollDelta::Pixels(point(px(0.), px(-120.))),
         ..Default::default()
@@ -533,12 +533,12 @@ fn viewport_presets_size_and_center_the_canvas() {
 
     let scroll_region =
         cx.update(|window, _| gpui_kit::Bounds::new(point(px(0.), px(0.)), window.viewport_size()));
-    cx.simulate_event(ScrollWheelEvent {
+    cx.simulate_event(ScrollEvent {
         position: scroll_region.center(),
         delta: ScrollDelta::Pixels(point(px(-5000.), px(0.))),
         ..Default::default()
     });
-    cx.simulate_event(ScrollWheelEvent {
+    cx.simulate_event(ScrollEvent {
         position: scroll_region.center(),
         delta: ScrollDelta::Pixels(point(px(0.), px(-5000.))),
         ..Default::default()

@@ -489,11 +489,12 @@ fn dispatch_step(
             delta_x,
             delta_y,
         } => vec![dispatch_platform_event(
-            PlatformInput::ScrollWheel(ScrollWheelEvent {
+            PlatformInput::Scroll(ScrollEvent {
                 position: window_point(story_point),
                 delta: ScrollDelta::Pixels(point(px(delta_x), px(delta_y))),
                 modifiers: Modifiers::none(),
                 touch_phase: TouchPhase::Moved,
+                source: ScrollSource::Pointer,
             }),
             window,
             cx,

@@ -113,7 +113,7 @@ impl Render for StoryWorkbench {
                     .w_full()
                     .min_w_0()
                     .debug_selector(|| "workbench-tabs-scroll".to_owned())
-                    .on_scroll_wheel(cx.listener(Self::scroll_tabs))
+                    .on_scroll(cx.listener(Self::scroll_tabs))
                     .child(
                         TabBar::new("workbench-tabs")
                             .track_scroll(&self.tab_scroll_handle)

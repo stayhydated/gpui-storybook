@@ -28,7 +28,7 @@ fn theme_header_stays_fixed_while_color_items_scroll() {
         .debug_bounds("workbench-theme-first-item")
         .expect("theme color items should render");
 
-    cx.simulate_event(ScrollWheelEvent {
+    cx.simulate_event(ScrollEvent {
         position: items.center(),
         delta: ScrollDelta::Pixels(point(px(0.), px(-120.))),
         ..Default::default()
