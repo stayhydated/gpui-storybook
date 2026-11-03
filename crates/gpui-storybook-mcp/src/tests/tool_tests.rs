@@ -633,3 +633,24 @@ fn async_tools_return_structured_live_host_errors() {
         "decode_field"
     );
 }
+
+#[test]
+fn settlement_failures_publish_both_typed_outcomes() {
+    let error = StorybookAutomationError::SettlementFailed {
+        operation: Box::new(StorybookAutomationError::OutcomeUnknown {
+            request_id: 91,
+            message: "reply lost".to_owned(),
+        }),
+        cleanup: Box::new(StorybookAutomationError::CaptureUnavailable {
+            message: "cleanup failed".to_owned(),
+        }),
+    };
+    let result = serde_json::to_value(interaction_automation_tool_error(error)).unwrap();
+    assert_eq!(result["isError"], true);
+    let detail = &result["structuredContent"]["error"]["details"][0];
+    assert_eq!(detail["code"], "settlement_failed");
+    assert_eq!(detail["operation"]["code"], "outcome_unknown");
+    assert_eq!(detail["operation"]["request_id"], 91);
+    assert_eq!(detail["cleanup"]["code"], "capture_unavailable");
+    assert_eq!(detail["cleanup"]["message"], "cleanup failed");
+}

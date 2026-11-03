@@ -7,6 +7,7 @@ impl Gallery {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Result<StorySnapshot, StorybookAutomationError> {
+        self.sync_story_activation(window, cx);
         self.workbench_state
             .update(cx, |state, cx| state.apply_controls(&request.controls, cx))?;
         let story = self

@@ -1,25 +1,23 @@
 use super::*;
+use gpui::{ScrollHandle, div, point, px, size};
 use gpui_kit::component::button::Button;
-use gpui_kit::{ScrollHandle, div, point, px, size};
-
-fn clear_registry() {
-    CAPTURE_REGIONS.with_borrow_mut(|registry| *registry = CaptureRegionRegistry::default());
-}
 
 #[test]
 fn resetting_one_story_drops_its_stale_routes_and_keeps_other_stories() {
-    clear_registry();
+    let regions = RenderedRegions::default();
     let bounds = Bounds {
         origin: point(px(0.), px(0.)),
         size: size(px(100.), px(50.)),
     };
     let story_a_scope = CaptureScope {
+        regions: regions.clone(),
         story_key: Some("story-a".to_owned()),
         route_id: Some("story-a".to_owned()),
         viewport_bounds: Some(bounds),
         scroll_handle: None,
     };
     let story_b_scope = CaptureScope {
+        regions: regions.clone(),
         story_key: Some("story-b".to_owned()),
         route_id: Some("story-b".to_owned()),
         viewport_bounds: Some(bounds),
@@ -33,6 +31,7 @@ fn resetting_one_story_drops_its_stale_routes_and_keeps_other_stories() {
         bounds.size,
     );
     record_semantic_value(
+        &regions,
         "story-a/old".to_owned(),
         "status".to_owned(),
         "Status".to_owned(),
@@ -40,23 +39,25 @@ fn resetting_one_story_drops_its_stale_routes_and_keeps_other_stories() {
     );
     record_region("story-b".to_owned(), bounds, &story_b_scope, bounds.size);
     record_semantic_value(
+        &regions,
         "story-b".to_owned(),
         "status".to_owned(),
         "Status".to_owned(),
         serde_json::json!("current"),
     );
 
-    reset_capture_regions_for_story("story-a");
+    regions.reset_story("story-a");
 
-    assert!(capture_region_bounds("story-a").is_none());
-    assert!(capture_region_bounds("story-a/old").is_none());
+    assert!(regions.bounds("story-a").is_none());
+    assert!(regions.bounds("story-a/old").is_none());
     assert!(matches!(
-        semantic_values("story-a/old"),
+        regions.values("story-a/old"),
         Err(SemanticValueLookupError::RouteNotRendered)
     ));
-    assert!(capture_region_bounds("story-b").is_some());
+    assert!(regions.bounds("story-b").is_some());
     assert_eq!(
-        semantic_values("story-b")
+        regions
+            .values("story-b")
             .expect("unrelated story values remain")
             .len(),
         1
@@ -93,8 +94,9 @@ fn route_slugs_normalize_separators_and_blank_titles() {
 
 #[test]
 fn scopes_restore_previous_state_and_record_region_bounds() {
-    clear_registry();
+    let regions = RenderedRegions::default();
     let outer = CaptureScope {
+        regions: regions.clone(),
         story_key: Some("story-key".to_string()),
         route_id: Some("story-key".to_string()),
         viewport_bounds: None,
@@ -102,7 +104,7 @@ fn scopes_restore_previous_state_and_record_region_bounds() {
     };
     let bounds = Bounds {
         origin: point(px(10.), px(20.)),
-        size: gpui_kit::size(px(100.), px(50.)),
+        size: gpui::size(px(100.), px(50.)),
     };
 
     assert!(current_scope().is_none());
@@ -116,25 +118,28 @@ fn scopes_restore_previous_state_and_record_region_bounds() {
     });
     assert!(current_scope().is_none());
 
-    let recorded = capture_region_bounds("story-key").expect("region should be recorded");
+    let recorded = regions
+        .bounds("story-key")
+        .expect("region should be recorded");
     assert_eq!(recorded.bounds, bounds);
     assert_eq!(recorded.viewport_bounds, bounds);
     assert!(recorded.scroll_handle.is_none());
-    assert!(scroll_capture_region_into_view("story-key"));
-    assert!(!scroll_capture_region_into_view("missing"));
+    assert!(regions.scroll_into_view("story-key"));
+    assert!(!regions.scroll_into_view("missing"));
 }
 
 #[test]
 fn scrolling_recorded_region_aligns_it_with_viewport() {
-    clear_registry();
+    let regions = RenderedRegions::default();
     let handle = ScrollHandle::new();
     handle.set_offset(point(px(5.), px(10.)));
     let scope = CaptureScope {
+        regions: regions.clone(),
         story_key: Some("story-key".to_string()),
         route_id: Some("story-key".to_string()),
         viewport_bounds: Some(Bounds {
             origin: point(px(20.), px(30.)),
-            size: gpui_kit::size(px(100.), px(100.)),
+            size: gpui::size(px(100.), px(100.)),
         }),
         scroll_handle: Some(handle.clone()),
     };
@@ -142,13 +147,13 @@ fn scrolling_recorded_region_aligns_it_with_viewport() {
         "story-key/section".to_string(),
         Bounds {
             origin: point(px(50.), px(70.)),
-            size: gpui_kit::size(px(40.), px(20.)),
+            size: gpui::size(px(40.), px(20.)),
         },
         &scope,
         size(px(100.), px(100.)),
     );
 
-    assert!(scroll_capture_region_into_view("story-key/section"));
+    assert!(regions.scroll_into_view("story-key/section"));
     assert_eq!(handle.offset(), point(px(-25.), px(-30.)));
 
     with_scope(scope, || {
@@ -219,8 +224,9 @@ fn implicit_automation_identity_requires_an_element_id() {
 
 #[test]
 fn interaction_targets_are_relative_to_route_and_sorted_by_key() {
-    clear_registry();
+    let regions = RenderedRegions::default();
     let scope = CaptureScope {
+        regions: regions.clone(),
         story_key: Some("story-key".to_string()),
         route_id: Some("story-key".to_string()),
         viewport_bounds: None,
@@ -228,7 +234,7 @@ fn interaction_targets_are_relative_to_route_and_sorted_by_key() {
     };
     let route_bounds = Bounds {
         origin: point(px(10.), px(20.)),
-        size: gpui_kit::size(px(200.), px(100.)),
+        size: gpui::size(px(200.), px(100.)),
     };
     record_region(
         "story-key".to_string(),
@@ -237,25 +243,29 @@ fn interaction_targets_are_relative_to_route_and_sorted_by_key() {
         route_bounds.size,
     );
     record_interaction_target(
+        &regions,
         "story-key".to_string(),
         "second".to_string(),
         "Second".to_string(),
         Bounds {
             origin: point(px(40.), px(50.)),
-            size: gpui_kit::size(px(60.), px(20.)),
+            size: gpui::size(px(60.), px(20.)),
         },
     );
     record_interaction_target(
+        &regions,
         "story-key".to_string(),
         "first".to_string(),
         "First".to_string(),
         Bounds {
             origin: point(px(20.), px(30.)),
-            size: gpui_kit::size(px(30.), px(10.)),
+            size: gpui::size(px(30.), px(10.)),
         },
     );
 
-    let targets = interaction_targets("story-key").expect("targets should resolve");
+    let targets = regions
+        .targets("story-key")
+        .expect("targets should resolve");
     assert_eq!(targets[0].key, "first");
     assert_eq!(targets[0].bounds.x, 10.0);
     assert_eq!(targets[0].bounds.y, 10.0);
@@ -264,8 +274,9 @@ fn interaction_targets_are_relative_to_route_and_sorted_by_key() {
 
 #[test]
 fn duplicate_interaction_target_keys_are_rejected() {
-    clear_registry();
+    let regions = RenderedRegions::default();
     let scope = CaptureScope {
+        regions: regions.clone(),
         story_key: Some("story-key".to_string()),
         route_id: Some("story-key".to_string()),
         viewport_bounds: None,
@@ -273,16 +284,18 @@ fn duplicate_interaction_target_keys_are_rejected() {
     };
     let bounds = Bounds {
         origin: point(px(0.), px(0.)),
-        size: gpui_kit::size(px(10.), px(10.)),
+        size: gpui::size(px(10.), px(10.)),
     };
     record_region("story-key".to_string(), bounds, &scope, bounds.size);
     record_interaction_target(
+        &regions,
         "story-key".to_string(),
         "duplicate".to_string(),
         "First".to_string(),
         bounds,
     );
     record_interaction_target(
+        &regions,
         "story-key".to_string(),
         "duplicate".to_string(),
         "Second".to_string(),
@@ -290,15 +303,16 @@ fn duplicate_interaction_target_keys_are_rejected() {
     );
 
     assert!(matches!(
-        interaction_targets("story-key"),
+        regions.targets("story-key"),
         Err(InteractionTargetLookupError::DuplicateKey(key)) if key == "duplicate"
     ));
 }
 
 #[test]
 fn semantic_values_are_structured_and_sorted_by_key() {
-    clear_registry();
+    let regions = RenderedRegions::default();
     let scope = CaptureScope {
+        regions: regions.clone(),
         story_key: Some("story-key".to_string()),
         route_id: Some("story-key".to_string()),
         viewport_bounds: None,
@@ -311,19 +325,21 @@ fn semantic_values_are_structured_and_sorted_by_key() {
         size(px(100.), px(100.)),
     );
     record_semantic_value(
+        &regions,
         "story-key".to_string(),
         "status".to_string(),
         "Status".to_string(),
         serde_json::json!({ "ready": true }),
     );
     record_semantic_value(
+        &regions,
         "story-key".to_string(),
         "response".to_string(),
         "Response".to_string(),
         serde_json::json!({ "position": 12.5 }),
     );
 
-    let values = semantic_values("story-key").expect("values should resolve");
+    let values = regions.values("story-key").expect("values should resolve");
     assert_eq!(values[0].key, "response");
     assert_eq!(values[0].value, serde_json::json!({ "position": 12.5 }));
     assert_eq!(values[1].key, "status");
@@ -331,8 +347,9 @@ fn semantic_values_are_structured_and_sorted_by_key() {
 
 #[test]
 fn duplicate_semantic_value_keys_are_rejected() {
-    clear_registry();
+    let regions = RenderedRegions::default();
     let scope = CaptureScope {
+        regions: regions.clone(),
         story_key: Some("story-key".to_string()),
         route_id: Some("story-key".to_string()),
         viewport_bounds: None,
@@ -345,12 +362,14 @@ fn duplicate_semantic_value_keys_are_rejected() {
         size(px(100.), px(100.)),
     );
     record_semantic_value(
+        &regions,
         "story-key".to_string(),
         "response".to_string(),
         "First".to_string(),
         serde_json::json!(1),
     );
     record_semantic_value(
+        &regions,
         "story-key".to_string(),
         "response".to_string(),
         "Second".to_string(),
@@ -358,7 +377,7 @@ fn duplicate_semantic_value_keys_are_rejected() {
     );
 
     assert!(matches!(
-        semantic_values("story-key"),
+        regions.values("story-key"),
         Err(SemanticValueLookupError::DuplicateKey(key)) if key == "response"
     ));
 }
@@ -366,8 +385,9 @@ fn duplicate_semantic_value_keys_are_rejected() {
 #[cfg(feature = "capture")]
 #[test]
 fn route_image_crop_scales_logical_bounds_to_physical_pixels() {
-    clear_registry();
+    let regions = RenderedRegions::default();
     let scope = CaptureScope {
+        regions: regions.clone(),
         story_key: Some("story-key".to_owned()),
         route_id: Some("story-key/details".to_owned()),
         viewport_bounds: None,
@@ -377,7 +397,7 @@ fn route_image_crop_scales_logical_bounds_to_physical_pixels() {
         "story-key/details".to_owned(),
         Bounds {
             origin: point(px(10.), px(5.)),
-            size: gpui_kit::size(px(20.), px(10.)),
+            size: gpui::size(px(20.), px(10.)),
         },
         &scope,
         size(px(100.), px(100.)),
@@ -385,9 +405,10 @@ fn route_image_crop_scales_logical_bounds_to_physical_pixels() {
     let image = image::RgbaImage::from_pixel(200, 100, image::Rgba([1, 2, 3, 255]));
 
     let cropped = crop_capture_region_image(
+        &regions,
         "story-key/details",
         image,
-        gpui_kit::size(px(100.), px(50.)),
+        gpui::size(px(100.), px(50.)),
     )
     .expect("registered route should crop");
 
@@ -397,11 +418,12 @@ fn route_image_crop_scales_logical_bounds_to_physical_pixels() {
 #[cfg(feature = "capture")]
 #[test]
 fn route_image_crop_rejects_an_unrendered_route() {
-    clear_registry();
+    let regions = RenderedRegions::default();
     let error = crop_capture_region_image(
+        &regions,
         "story-key/missing",
         image::RgbaImage::new(10, 10),
-        gpui_kit::size(px(10.), px(10.)),
+        gpui::size(px(10.), px(10.)),
     )
     .expect_err("missing route should fail");
 
@@ -411,4 +433,128 @@ fn route_image_crop_rejects_an_unrendered_route() {
             route_id: "story-key/missing".to_owned(),
         }
     );
+}
+
+struct WindowProbe {
+    value: usize,
+    target_visible: bool,
+}
+
+impl gpui::Render for WindowProbe {
+    fn render(&mut self, _: &mut Window, _: &mut gpui::Context<Self>) -> impl IntoElement {
+        use gpui::{ParentElement as _, Styled as _};
+        let content = div()
+            .size_full()
+            .child(div().id("value").storybook_value(self.value));
+        let content = if self.target_visible {
+            content.child(div().id("increment").storybook_target())
+        } else {
+            content
+        };
+        capture_story_view_with_scroll("shared-route", None, content)
+    }
+}
+
+fn open_probe(app: &gpui::TestAppContext, value: usize) -> gpui::WindowHandle<WindowProbe> {
+    app.update(|cx| {
+        cx.open_window(Default::default(), |_, cx| {
+            use gpui::AppContext as _;
+            cx.new(|_| WindowProbe {
+                value,
+                target_visible: true,
+            })
+        })
+        .unwrap()
+    })
+}
+
+fn draw_probe(app: &gpui::TestAppContext, window: gpui::WindowHandle<WindowProbe>) {
+    use gpui::AppContext as _;
+    app.update(|cx| {
+        cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
+            .unwrap()
+    });
+}
+
+#[test]
+fn rendered_windows_and_app_contexts_keep_same_route_keys_independent() {
+    let first_app = gpui::TestAppContext::single();
+    let first = open_probe(&first_app, 11);
+    let second = open_probe(&first_app, 22);
+    let second_app = gpui::TestAppContext::single();
+    let third = open_probe(&second_app, 33);
+    draw_probe(&first_app, first);
+    draw_probe(&first_app, second);
+    draw_probe(&second_app, third);
+    for (app, window, expected) in [
+        (&first_app, first, 11),
+        (&first_app, second, 22),
+        (&second_app, third, 33),
+    ] {
+        let values = app
+            .update(|cx| {
+                window
+                    .update(cx, |_, window, cx| {
+                        semantic_values("shared-route", window, cx)
+                    })
+                    .unwrap()
+            })
+            .unwrap();
+        assert_eq!(values[0].value, serde_json::json!(expected));
+    }
+
+    first_app.update(|cx| {
+        first
+            .update(cx, |probe, _, _| probe.target_visible = false)
+            .unwrap()
+    });
+    draw_probe(&first_app, first);
+    let targets = first_app
+        .update(|cx| {
+            first
+                .update(cx, |_, window, cx| {
+                    interaction_targets("shared-route", window, cx)
+                })
+                .unwrap()
+        })
+        .unwrap();
+    assert!(targets.is_empty());
+    let targets = first_app
+        .update(|cx| {
+            second
+                .update(cx, |_, window, cx| {
+                    interaction_targets("shared-route", window, cx)
+                })
+                .unwrap()
+        })
+        .unwrap();
+    assert_eq!(targets[0].key, "increment");
+
+    first_app.update(|cx| {
+        first
+            .update(cx, |_, window, cx| invalidate_window_regions(window, cx))
+            .unwrap()
+    });
+    let missing = first_app.update(|cx| {
+        first
+            .update(cx, |_, window, cx| {
+                semantic_values("shared-route", window, cx)
+            })
+            .unwrap()
+    });
+    assert!(matches!(
+        missing,
+        Err(SemanticValueLookupError::RouteNotRendered)
+    ));
+    draw_probe(&first_app, first);
+    let values = first_app
+        .update(|cx| {
+            first
+                .update(cx, |_, window, cx| {
+                    semantic_values("shared-route", window, cx)
+                })
+                .unwrap()
+        })
+        .unwrap();
+    assert_eq!(values[0].value, serde_json::json!(11));
 }

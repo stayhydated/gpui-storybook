@@ -1,6 +1,8 @@
 [workspace]
 default-members = [ "examples/story" ]
 members = [
+  "crates/gpui-storybook-automation",
+  "crates/gpui-storybook-automation-gpui",
   "crates/gpui-storybook",
   "crates/gpui-storybook-core",
   "crates/gpui-storybook-macros",
@@ -26,6 +28,10 @@ rust-version = "1.99"
 version = "0.8.0"
 
 [workspace.dependencies]
+bon = "3.10.3"
+proptest = "1.12.0"
+gpui-storybook-automation = { path = "crates/gpui-storybook-automation", version = "0.8.0" }
+gpui-storybook-automation-gpui = { path = "crates/gpui-storybook-automation-gpui", version = "0.8.0" }
 anyhow = "1.0.104"
 base64 = "0.23.1"
 clap = "4.6.7"

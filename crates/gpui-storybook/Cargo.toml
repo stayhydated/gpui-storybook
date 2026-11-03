@@ -12,10 +12,11 @@ repository.workspace = true
 readme = "README.md"
 
 [features]
+capture = [ "gpui-storybook-core/capture" ]
 default = [ "macros" ]
 inspector = [ "gpui-storybook-core/inspector" ]
 macros = [ "dep:gpui-storybook-macros" ]
-mcp = [ "dep:gpui-storybook-mcp" ]
+mcp = [ "capture", "dep:gpui-storybook-mcp" ]
 performance = [ "gpui-storybook-core/performance" ]
 
 [dependencies]

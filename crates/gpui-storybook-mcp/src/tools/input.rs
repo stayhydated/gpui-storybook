@@ -3,13 +3,9 @@
 use std::{collections::BTreeMap, path::PathBuf};
 
 use component_shape_mcp::{McpJsonSchema, McpSchema, McpToolError, McpToolInput};
-use gpui_storybook_core::{
-    automation::{
-        StoryActionSnapshot, StoryInteractionCaptureRequest, StoryInteractionStep,
-        StoryScenarioSnapshot, StorySemanticValueSnapshot, StorySnapshot,
-    },
-    controls::ControlValue,
-    presentation::StoryViewportPreset,
+use gpui_storybook_automation::{
+    ControlValue, StoryActionSnapshot, StoryInteractionCaptureRequest, StoryInteractionStep,
+    StoryScenarioSnapshot, StorySemanticValueSnapshot, StorySnapshot, StoryViewportPreset,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};

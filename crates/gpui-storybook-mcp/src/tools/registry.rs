@@ -3,15 +3,13 @@
 use super::*;
 
 /// Build the Storybook MCP tool registry.
-pub fn tool_registry(
-    automation: SharedStorybookAutomation,
-) -> Result<McpToolRegistry, McpToolError> {
+pub fn tool_registry(automation: SharedAutomationBackend) -> Result<McpToolRegistry, McpToolError> {
     tool_registry_with_options(automation, StorybookMcpServerOptions::from_env())
 }
 
 /// Build the Storybook tool registry with explicit runtime capabilities.
 pub fn tool_registry_with_options(
-    automation: SharedStorybookAutomation,
+    automation: SharedAutomationBackend,
     options: StorybookMcpServerOptions,
 ) -> Result<McpToolRegistry, McpToolError> {
     let mut tools = McpToolRegistry::new();
@@ -21,7 +19,7 @@ pub fn tool_registry_with_options(
 
 pub fn register_tools(
     tools: &mut McpToolRegistry,
-    automation: SharedStorybookAutomation,
+    automation: SharedAutomationBackend,
 ) -> Result<(), McpToolError> {
     register_tools_with_options(tools, automation, StorybookMcpServerOptions::from_env())
 }
@@ -29,9 +27,11 @@ pub fn register_tools(
 /// Register Storybook tools with explicit runtime capabilities.
 pub fn register_tools_with_options(
     tools: &mut McpToolRegistry,
-    automation: SharedStorybookAutomation,
+    automation: SharedAutomationBackend,
     options: StorybookMcpServerOptions,
 ) -> Result<(), McpToolError> {
+    let capabilities = automation.capabilities();
+    host::register_host_tools(tools, automation.clone(), options)?;
     tools.add_typed_tool_async(
         tool::<EmptyInput>(
             TOOL_LIST_STORIES,
@@ -45,18 +45,22 @@ pub fn register_tools_with_options(
             move |_input| {
                 let automation = automation.clone();
                 async move {
-                    if let Err(error) = await_automation_startup(&automation).await {
+                    if let Err(error) = await_automation_startup(automation.as_ref()).await {
                         return automation_tool_error(error);
                     }
                     tool_structured_result(json!(ListStoriesOutput {
-                        stories: automation.stories(),
+                        stories: match automation.stories().await {
+                            Ok(stories) => stories,
+                            Err(error) => return automation_tool_error(error),
+                        },
                     }))
                 }
             }
         },
     )?;
 
-    tools.add_typed_tool_async(
+    if capabilities.contains(AutomationCapability::FreshScenarios) {
+        tools.add_typed_tool_async(
         tool::<ListScenariosInput>(
             TOOL_LIST_SCENARIOS,
             "List Scenarios",
@@ -69,13 +73,10 @@ pub fn register_tools_with_options(
             move |input| {
                 let automation = automation.clone();
                 async move {
-                    if let Err(error) = await_automation_startup(&automation).await {
+                    if let Err(error) = await_automation_startup(automation.as_ref()).await {
                         return automation_tool_error(error);
                     }
-                    let result = input.story_key.as_deref().map_or_else(
-                        || automation.list_scenarios(),
-                        |story_key| automation.list_scenarios_for(story_key),
-                    );
+                    let result = automation.list_scenarios(input.story_key).await;
                     match result {
                         Ok(snapshot) => tool_structured_result(json!(ListScenariosOutput {
                             story: snapshot.story,
@@ -87,6 +88,7 @@ pub fn register_tools_with_options(
             }
         },
     )?;
+    }
 
     tools.add_typed_tool_async(
         tool::<StoryKeyInput>(
@@ -101,10 +103,10 @@ pub fn register_tools_with_options(
             move |input| {
                 let automation = automation.clone();
                 async move {
-                    if let Err(error) = await_automation_startup(&automation).await {
+                    if let Err(error) = await_automation_startup(automation.as_ref()).await {
                         return automation_tool_error(error);
                     }
-                    match automation.get_story(&input.story_key) {
+                    match automation.get_story(input.story_key).await {
                         Ok(story) => tool_structured_result(json!(StoryOutput { story })),
                         Err(error) => automation_tool_error(error),
                     }
@@ -126,32 +128,10 @@ pub fn register_tools_with_options(
             move |_input| {
                 let automation = automation.clone();
                 async move {
-                    if let Err(error) = await_automation_startup(&automation).await {
+                    if let Err(error) = await_automation_startup(automation.as_ref()).await {
                         return automation_tool_error(error);
                     }
-                    tool_structured_result(json!(automation.current_story()))
-                }
-            }
-        },
-    )?;
-
-    tools.add_typed_tool_async(
-        tool::<StoryKeyInput>(
-            TOOL_OPEN_STORY,
-            "Open Story",
-            "Open one registered story or sub-story route in the live storybook window.",
-            current_story_output_schema(),
-            ToolHints::mutation(true, false),
-        )?,
-        {
-            let automation = automation.clone();
-            move |input| {
-                let automation = automation.clone();
-                async move {
-                    if let Err(error) = await_automation_startup(&automation).await {
-                        return automation_tool_error(error);
-                    }
-                    match automation.open_story(input.story_key).await {
+                    match automation.current_story().await {
                         Ok(snapshot) => tool_structured_result(json!(snapshot)),
                         Err(error) => automation_tool_error(error),
                     }
@@ -160,7 +140,35 @@ pub fn register_tools_with_options(
         },
     )?;
 
-    tools.add_typed_tool_async(
+    if capabilities.contains(AutomationCapability::Navigation) {
+        tools.add_typed_tool_async(
+            tool::<StoryKeyInput>(
+                TOOL_OPEN_STORY,
+                "Open Story",
+                "Open one registered story or sub-story route in the live storybook window.",
+                current_story_output_schema(),
+                ToolHints::mutation(true, false),
+            )?,
+            {
+                let automation = automation.clone();
+                move |input| {
+                    let automation = automation.clone();
+                    async move {
+                        if let Err(error) = await_automation_startup(automation.as_ref()).await {
+                            return automation_tool_error(error);
+                        }
+                        match automation.open_story(input.story_key).await {
+                            Ok(snapshot) => tool_structured_result(json!(snapshot)),
+                            Err(error) => automation_tool_error(error),
+                        }
+                    }
+                }
+            },
+        )?;
+    }
+
+    if capabilities.contains(AutomationCapability::SemanticValues) {
+        tools.add_typed_tool_async(
         tool::<EmptyInput>(
             TOOL_READ_SEMANTIC_VALUES,
             "Read Semantic Values",
@@ -173,7 +181,7 @@ pub fn register_tools_with_options(
             move |_input| {
                 let automation = automation.clone();
                 async move {
-                    if let Err(error) = await_automation_startup(&automation).await {
+                    if let Err(error) = await_automation_startup(automation.as_ref()).await {
                         return automation_tool_error(error);
                     }
                     match automation.read_semantic_values().await {
@@ -184,8 +192,10 @@ pub fn register_tools_with_options(
             }
         },
     )?;
+    }
 
-    tools.add_typed_tool_async(
+    if capabilities.contains(AutomationCapability::SemanticValues) {
+        tools.add_typed_tool_async(
         tool::<ReadValueInput>(
             TOOL_READ_VALUE,
             "Read Value",
@@ -198,10 +208,10 @@ pub fn register_tools_with_options(
             move |input| {
                 let automation = automation.clone();
                 async move {
-                    if let Err(error) = await_automation_startup(&automation).await {
+                    if let Err(error) = await_automation_startup(automation.as_ref()).await {
                         return automation_tool_error(error);
                     }
-                    match read_semantic_value(&automation, &input.value_key).await {
+                    match read_semantic_value(automation.as_ref(), &input.value_key).await {
                         Ok(output) => tool_structured_result(json!(output)),
                         Err(error) => automation_tool_error(error),
                     }
@@ -209,28 +219,32 @@ pub fn register_tools_with_options(
             }
         },
     )?;
+    }
 
-    tools.add_typed_tool_async(wait_for_value_tool()?, {
-        let automation = automation.clone();
-        move |input| {
+    if capabilities.contains(AutomationCapability::SemanticValues) {
+        tools.add_typed_tool_async(wait_for_value_tool()?, {
             let automation = automation.clone();
-            async move {
-                if let Err(error) = validate_wait_for_value_input(&input) {
-                    return tool_error_result_for(error);
-                }
-                if let Err(error) = await_automation_startup(&automation).await {
-                    return automation_tool_error(error);
-                }
-                match wait_for_semantic_value(&automation, input).await {
-                    Ok(output) => tool_structured_result(json!(output)),
-                    Err(error) => automation_tool_error(error),
+            move |input| {
+                let automation = automation.clone();
+                async move {
+                    if let Err(error) = validate_wait_for_value_input(&input) {
+                        return tool_error_result_for(error);
+                    }
+                    if let Err(error) = await_automation_startup(automation.as_ref()).await {
+                        return automation_tool_error(error);
+                    }
+                    match wait_for_semantic_value(automation.as_ref(), input).await {
+                        Ok(output) => tool_structured_result(json!(output)),
+                        Err(error) => automation_tool_error(error),
+                    }
                 }
             }
-        }
-    })?;
+        })?;
+    }
 
     if options.interaction_enabled() {
-        tools.add_typed_tool_async(
+        if capabilities.contains(AutomationCapability::Actions) {
+            tools.add_typed_tool_async(
             tool::<EmptyInput>(
                 TOOL_LIST_ACTIONS,
                 "List Actions",
@@ -243,7 +257,7 @@ pub fn register_tools_with_options(
                 move |_input| {
                     let automation = automation.clone();
                     async move {
-                        if let Err(error) = await_automation_startup(&automation).await {
+                        if let Err(error) = await_automation_startup(automation.as_ref()).await {
                             return automation_tool_error(error);
                         }
                         match automation.list_actions().await {
@@ -256,8 +270,10 @@ pub fn register_tools_with_options(
                 }
             },
         )?;
+        }
 
-        tools.add_typed_tool_async(
+        if capabilities.contains(AutomationCapability::SemanticTargets) {
+            tools.add_typed_tool_async(
             tool::<EmptyInput>(
                 TOOL_LIST_INTERACTION_TARGETS,
                 "List Interaction Targets",
@@ -270,7 +286,7 @@ pub fn register_tools_with_options(
                 move |_input| {
                     let automation = automation.clone();
                     async move {
-                        if let Err(error) = await_automation_startup(&automation).await {
+                        if let Err(error) = await_automation_startup(automation.as_ref()).await {
                             return automation_tool_error(error);
                         }
                         match automation.list_interaction_targets().await {
@@ -281,8 +297,12 @@ pub fn register_tools_with_options(
                 }
             },
         )?;
+        }
 
-        tools.add_typed_tool_async(
+        if capabilities.contains(AutomationCapability::SemanticTargets)
+            && capabilities.contains(AutomationCapability::Pointer)
+        {
+            tools.add_typed_tool_async(
             tool::<ClickTargetInput>(
                 TOOL_CLICK_TARGET,
                 "Click Target",
@@ -295,11 +315,11 @@ pub fn register_tools_with_options(
                 move |input| {
                     let automation = automation.clone();
                     async move {
-                        if let Err(error) = await_automation_startup(&automation).await {
+                        if let Err(error) = await_automation_startup(automation.as_ref()).await {
                             return automation_tool_error(error);
                         }
                         let request = click_target_request(input);
-                        match automation.run_steps(request).await {
+                        match run_backend_steps(automation.as_ref(), request).await {
                             Ok(snapshot) => tool_structured_result(json!(snapshot)),
                             Err(error) => interaction_automation_tool_error(error),
                         }
@@ -307,8 +327,10 @@ pub fn register_tools_with_options(
                 }
             },
         )?;
+        }
 
-        tools.add_typed_tool_async(
+        if capabilities.contains(AutomationCapability::FreshScenarios) {
+            tools.add_typed_tool_async(
             tool::<RunScenarioInput>(
                 TOOL_RUN_SCENARIO,
                 "Run Scenario",
@@ -321,12 +343,10 @@ pub fn register_tools_with_options(
                 move |input| {
                     let automation = automation.clone();
                     async move {
-                        if let Err(error) = await_automation_startup(&automation).await {
+                        if let Err(error) = await_automation_startup(automation.as_ref()).await {
                             return automation_tool_error(error);
                         }
-                        match automation
-                            .run_scenario(input.story_key, input.scenario_key)
-                            .await
+                        match run_backend_scenario(automation.as_ref(), input.story_key, input.scenario_key).await
                         {
                             Ok(snapshot) => tool_structured_result(json!(snapshot)),
                             Err(error) => interaction_automation_tool_error(error),
@@ -335,51 +355,68 @@ pub fn register_tools_with_options(
                 }
             },
         )?;
+        }
 
-        tools.add_typed_tool_async(interaction_tool()?, {
-            let automation = automation.clone();
-            move |input| {
+        if [
+            AutomationCapability::Focus,
+            AutomationCapability::Keystrokes,
+            AutomationCapability::TextInsertion,
+            AutomationCapability::Actions,
+            AutomationCapability::Pointer,
+            AutomationCapability::Scroll,
+            AutomationCapability::FrameWaits,
+        ]
+        .into_iter()
+        .any(|capability| capabilities.contains(capability))
+        {
+            tools.add_typed_tool_async(interaction_tool()?, {
                 let automation = automation.clone();
-                async move {
-                    if let Err(error) = await_automation_startup(&automation).await {
-                        return automation_tool_error(error);
-                    }
-                    let request = decode_interaction_request(input);
-                    match automation.run_steps(request).await {
-                        Ok(snapshot) => tool_structured_result(json!(snapshot)),
-                        Err(error) => interaction_automation_tool_error(error),
+                move |input| {
+                    let automation = automation.clone();
+                    async move {
+                        if let Err(error) = await_automation_startup(automation.as_ref()).await {
+                            return automation_tool_error(error);
+                        }
+                        let request = decode_interaction_request(input);
+                        match run_backend_steps(automation.as_ref(), request).await {
+                            Ok(snapshot) => tool_structured_result(json!(snapshot)),
+                            Err(error) => interaction_automation_tool_error(error),
+                        }
                     }
                 }
-            }
-        })?;
+            })?;
+        }
     }
 
-    tools.add_typed_tool_async(
-        tool::<EmptyInput>(
-            TOOL_READ_CONTROLS,
-            "Read Controls",
-            "Read control metadata and values from the active concrete story instance.",
-            story_controls_output_schema(),
-            ToolHints::read_only(),
-        )?,
-        {
-            let automation = automation.clone();
-            move |_input| {
+    if capabilities.contains(AutomationCapability::Controls) {
+        tools.add_typed_tool_async(
+            tool::<EmptyInput>(
+                TOOL_READ_CONTROLS,
+                "Read Controls",
+                "Read control metadata and values from the active concrete story instance.",
+                story_controls_output_schema(),
+                ToolHints::read_only(),
+            )?,
+            {
                 let automation = automation.clone();
-                async move {
-                    if let Err(error) = await_automation_startup(&automation).await {
-                        return automation_tool_error(error);
-                    }
-                    match automation.read_controls().await {
-                        Ok(snapshot) => tool_structured_result(json!(snapshot)),
-                        Err(error) => automation_tool_error(error),
+                move |_input| {
+                    let automation = automation.clone();
+                    async move {
+                        if let Err(error) = await_automation_startup(automation.as_ref()).await {
+                            return automation_tool_error(error);
+                        }
+                        match automation.read_controls().await {
+                            Ok(snapshot) => tool_structured_result(json!(snapshot)),
+                            Err(error) => automation_tool_error(error),
+                        }
                     }
                 }
-            }
-        },
-    )?;
+            },
+        )?;
+    }
 
-    tools.add_typed_tool_async(
+    if capabilities.contains(AutomationCapability::ControlMutation) {
+        tools.add_typed_tool_async(
         tool::<SetControlInput>(
             TOOL_SET_CONTROL,
             "Set Control",
@@ -392,7 +429,7 @@ pub fn register_tools_with_options(
             move |input| {
                 let automation = automation.clone();
                 async move {
-                    if let Err(error) = await_automation_startup(&automation).await {
+                    if let Err(error) = await_automation_startup(automation.as_ref()).await {
                         return automation_tool_error(error);
                     }
                     match automation
@@ -406,65 +443,74 @@ pub fn register_tools_with_options(
             }
         },
     )?;
+    }
 
-    tools.add_typed_tool_async(
-        tool::<ResetControlInput>(
-            TOOL_RESET_CONTROL,
-            "Reset Control",
-            "Reset one active-story control, or every control when no control_key is supplied.",
-            story_controls_output_schema(),
-            ToolHints::mutation(true, false),
-        )?,
-        {
-            let automation = automation.clone();
+    if capabilities.contains(AutomationCapability::ControlMutation) {
+        tools.add_typed_tool_async(
+            tool::<ResetControlInput>(
+                TOOL_RESET_CONTROL,
+                "Reset Control",
+                "Reset one active-story control, or every control when no control_key is supplied.",
+                story_controls_output_schema(),
+                ToolHints::mutation(true, false),
+            )?,
+            {
+                let automation = automation.clone();
+                move |input| {
+                    let automation = automation.clone();
+                    async move {
+                        if let Err(error) = await_automation_startup(automation.as_ref()).await {
+                            return automation_tool_error(error);
+                        }
+                        match automation.reset_control(input.control_key).await {
+                            Ok(snapshot) => tool_structured_result(json!(snapshot)),
+                            Err(error) => automation_tool_error(error),
+                        }
+                    }
+                }
+            },
+        )?;
+    }
+
+    if capabilities.contains(AutomationCapability::StoryCapture) {
+        tools.add_typed_tool_async(
+            capture_tool::<CaptureCurrentStoryInput>(
+                TOOL_CAPTURE_CURRENT_STORY,
+                "Capture Current Story",
+                "Capture the current story view to a PNG, excluding storybook chrome.",
+                capture_story_output_schema(),
+                ToolHints::mutation(false, true),
+                false,
+            )?,
             move |input| {
                 let automation = automation.clone();
                 async move {
-                    if let Err(error) = await_automation_startup(&automation).await {
+                    if let Err(error) = await_automation_startup(automation.as_ref()).await {
                         return automation_tool_error(error);
                     }
-                    match automation.reset_control(input.control_key).await {
+                    let request = StoryScreenshotRequest {
+                        output_path: input.output_path,
+                        width: input.width,
+                        height: input.height,
+                        viewport: input.viewport.map(SchemarsValue::into_inner),
+                        controls: decode_control_map(input.controls),
+                        quit_after_capture: false,
+                    };
+
+                    if let Err(error) = automation.capabilities().validate_capture(&request) {
+                        return automation_tool_error(error);
+                    }
+                    match automation.capture_current_story(request).await {
                         Ok(snapshot) => tool_structured_result(json!(snapshot)),
                         Err(error) => automation_tool_error(error),
                     }
                 }
-            }
-        },
-    )?;
+            },
+        )?;
+    }
 
-    tools.add_typed_tool_async(
-        capture_tool::<CaptureCurrentStoryInput>(
-            TOOL_CAPTURE_CURRENT_STORY,
-            "Capture Current Story",
-            "Capture the current story view to a PNG, excluding storybook chrome.",
-            capture_story_output_schema(),
-            ToolHints::mutation(false, true),
-            false,
-        )?,
-        move |input| {
-            let automation = automation.clone();
-            async move {
-                if let Err(error) = await_automation_startup(&automation).await {
-                    return automation_tool_error(error);
-                }
-                let request = StoryScreenshotRequest {
-                    output_path: input.output_path,
-                    width: input.width,
-                    height: input.height,
-                    viewport: input.viewport.map(SchemarsValue::into_inner),
-                    controls: decode_control_map(input.controls),
-                    quit_after_capture: false,
-                };
-
-                match automation.capture_current_story(request).await {
-                    Ok(snapshot) => tool_structured_result(json!(snapshot)),
-                    Err(error) => automation_tool_error(error),
-                }
-            }
-        },
-    )?;
-
-    tools.add_typed_tool(
+    if capabilities.contains(AutomationCapability::DesktopLaunch) {
+        tools.add_typed_tool(
         capture_tool::<CaptureLaunchEnvInput>(
             TOOL_CAPTURE_LAUNCH_ENV,
             "Capture Launch Env",
@@ -481,6 +527,7 @@ pub fn register_tools_with_options(
             )),
         },
     )?;
+    }
 
     Ok(())
 }

@@ -26,6 +26,9 @@ impl Gallery {
         match command {
             StorybookAutomationCommand::OpenStory { key, response, .. } => {
                 let result = self.set_active_story_by_key(&key, cx);
+                if result.is_ok() {
+                    self.sync_story_activation(window, cx);
+                }
                 cx.notify();
                 let _ = response.send(result);
             },
@@ -95,7 +98,10 @@ impl Gallery {
                 match result {
                     Ok(story) => {
                         crate::automation::interaction::schedule_interaction_target_listing(
-                            story, response, window,
+                            story,
+                            response,
+                            std::rc::Rc::new(crate::automation::capture::DesktopCaptureProvider),
+                            window,
                         );
                     },
                     Err(error) => {
@@ -139,6 +145,7 @@ impl Gallery {
                     if let Some(route) = &request.story_key {
                         self.set_active_story_by_key(route, cx)?;
                     }
+                    self.sync_story_activation(window, cx);
                     if fresh_story {
                         let story_entity = self
                             .workbench_state
@@ -185,16 +192,19 @@ impl Gallery {
                             return;
                         }
                         crate::automation::interaction::schedule_story_interaction(
-                            crate::automation::interaction::PreparedStoryInteraction {
-                                request_id,
-                                story,
-                                steps,
-                                postconditions,
-                                capture,
-                                response,
-                                progress,
-                                operation,
-                            },
+                            crate::automation::interaction::PreparedStoryInteraction::builder()
+                                .provider(std::rc::Rc::new(
+                                    crate::automation::capture::DesktopCaptureProvider,
+                                ))
+                                .request_id(request_id)
+                                .story(story)
+                                .steps(steps)
+                                .postconditions(postconditions)
+                                .maybe_capture(capture)
+                                .response(response)
+                                .progress(progress)
+                                .operation(operation)
+                                .build(),
                             window,
                         );
                     },

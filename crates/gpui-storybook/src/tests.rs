@@ -1,4 +1,14 @@
 use super::*;
+
+#[cfg(feature = "capture")]
+#[test]
+fn facade_capture_exposes_the_gallery_image_backend() {
+    let backend = StorybookAutomation::new();
+    let capabilities = backend.capabilities();
+    assert!(capabilities.contains(AutomationCapability::StoryCapture));
+    assert!(capabilities.contains(AutomationCapability::CaptureControls));
+    assert!(capabilities.contains(AutomationCapability::InteractionCapture));
+}
 use es_fluent::{FluentMessage, FluentMessageLookup};
 use std::{
     convert::Infallible,
@@ -145,6 +155,7 @@ fn runtime_config(allow: &[&str]) -> gpui_storybook_toml::StorybookToml {
         allow: Some(allow.iter().map(|group| (*group).to_string()).collect()),
         disable_story: Vec::new(),
         overrides: gpui_storybook_toml::StorybookPreferenceOverrides::default(),
+        android: None,
     }
 }
 

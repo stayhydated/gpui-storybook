@@ -8,7 +8,7 @@ use std::{
 };
 
 use component_shape_mcp::{McpServer, McpToolError, ServeStdioResult};
-use gpui_storybook_core::automation::SharedStorybookAutomation;
+use gpui_storybook_automation::SharedAutomationBackend;
 use tokio::sync::oneshot;
 
 use crate::{ALLOW_INTERACTION_ENV_VAR, STDIO_ENV_VAR, tools::tool_registry_with_options};
@@ -67,7 +67,7 @@ impl Future for StorybookStdioCompletion {
 }
 
 pub fn start_stdio(
-    automation: SharedStorybookAutomation,
+    automation: SharedAutomationBackend,
 ) -> std::io::Result<StorybookStdioCompletion> {
     let (result_tx, receiver) = oneshot::channel();
     thread::Builder::new()
@@ -82,13 +82,13 @@ pub fn start_stdio(
     Ok(StorybookStdioCompletion { receiver })
 }
 
-pub fn server(automation: SharedStorybookAutomation) -> Result<McpServer, McpToolError> {
+pub fn server(automation: SharedAutomationBackend) -> Result<McpServer, McpToolError> {
     server_with_options(automation, StorybookMcpServerOptions::from_env())
 }
 
 /// Build an MCP server with explicit runtime capabilities.
 pub fn server_with_options(
-    automation: SharedStorybookAutomation,
+    automation: SharedAutomationBackend,
     options: StorybookMcpServerOptions,
 ) -> Result<McpServer, McpToolError> {
     Ok(McpServer::from_tool_registry(

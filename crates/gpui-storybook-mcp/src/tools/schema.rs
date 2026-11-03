@@ -163,10 +163,10 @@ pub(crate) fn interaction_step_schema() -> McpSchema {
                 "keys".to_owned(),
                 McpSchema::array(McpSchema::string().with_extension(
                     "maxLength",
-                    json!(gpui_storybook_core::automation::MAX_INTERACTION_TEXT_BYTES),
+                    json!(gpui_storybook_automation::MAX_INTERACTION_TEXT_BYTES),
                 ))
                 .with_min_items(1)
-                .with_max_items(gpui_storybook_core::automation::MAX_INTERACTION_STEPS),
+                .with_max_items(gpui_storybook_automation::MAX_INTERACTION_STEPS),
             )],
             ["keys"],
         ),
@@ -176,7 +176,7 @@ pub(crate) fn interaction_step_schema() -> McpSchema {
                 "value".to_owned(),
                 McpSchema::string().with_extension(
                     "maxLength",
-                    json!(gpui_storybook_core::automation::MAX_INTERACTION_TEXT_BYTES),
+                    json!(gpui_storybook_automation::MAX_INTERACTION_TEXT_BYTES),
                 ),
             )],
             ["value"],
@@ -227,7 +227,7 @@ pub(crate) fn interaction_step_schema() -> McpSchema {
                         .with_extension("minLength", json!(1))
                         .with_extension(
                             "maxLength",
-                            json!(gpui_storybook_core::automation::MAX_INTERACTION_TEXT_BYTES),
+                            json!(gpui_storybook_automation::MAX_INTERACTION_TEXT_BYTES),
                         ),
                 ),
                 (
@@ -265,7 +265,7 @@ pub(crate) fn interaction_step_schema() -> McpSchema {
                 "count".to_owned(),
                 McpSchema::integer().with_minimum(1_u64).with_extension(
                     "maximum",
-                    json!(gpui_storybook_core::automation::MAX_INTERACTION_WAITED_FRAMES),
+                    json!(gpui_storybook_automation::MAX_INTERACTION_WAITED_FRAMES),
                 ),
             )],
             ["count"],
@@ -276,7 +276,7 @@ pub(crate) fn interaction_step_schema() -> McpSchema {
 pub(crate) fn interaction_steps_schema() -> McpSchema {
     McpSchema::array(interaction_step_schema())
         .with_min_items(1)
-        .with_max_items(gpui_storybook_core::automation::MAX_INTERACTION_STEPS)
+        .with_max_items(gpui_storybook_automation::MAX_INTERACTION_STEPS)
 }
 
 pub(crate) fn interaction_capture_request_schema() -> McpSchema {

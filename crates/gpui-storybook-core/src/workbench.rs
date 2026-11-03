@@ -2,7 +2,7 @@
 
 use crate::{
     automation::{
-        SharedStorybookAutomation, StoryControlsSnapshot, StoryScenarioRunSnapshot, StorySnapshot,
+        SharedStorybookAutomation, StoryControlsSnapshot, StoryScenarioRunSnapshot,
         StorybookAutomationError,
     },
     controls::{ControlKind, ControlSpec, ControlTarget, ControlValue},

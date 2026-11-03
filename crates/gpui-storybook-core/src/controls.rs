@@ -1,150 +1,31 @@
 //! Typed story controls shared by the workbench and automation surfaces.
 
 use gpui_kit::{App, Entity, Hsla, SharedString};
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 use std::{rc::Rc, str::FromStr};
-use thiserror::Error;
 
-/// A serializable color used by story controls and automation.
-#[derive(Clone, Copy, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
-#[schemars(deny_unknown_fields)]
-pub struct ControlColor {
-    pub h: f32,
-    pub s: f32,
-    pub l: f32,
-    pub a: f32,
-}
+pub use gpui_storybook_automation::{
+    ControlBounds, ControlColor, ControlError, ControlKind, ControlSnapshot, ControlSpec,
+    ControlValue, validate_control_value,
+};
 
-impl From<Hsla> for ControlColor {
-    fn from(value: Hsla) -> Self {
-        Self {
-            h: value.h,
-            s: value.s,
-            l: value.l,
-            a: value.a,
-        }
+/// Projects GPUI color components into the portable control representation.
+pub fn control_color(value: Hsla) -> ControlColor {
+    ControlColor {
+        h: value.h,
+        s: value.s,
+        l: value.l,
+        a: value.a,
     }
 }
 
-impl From<ControlColor> for Hsla {
-    fn from(value: ControlColor) -> Self {
-        Self {
-            h: value.h,
-            s: value.s,
-            l: value.l,
-            a: value.a,
-        }
+/// Builds a GPUI color from the portable control representation.
+pub fn hsla_color(value: ControlColor) -> Hsla {
+    Hsla {
+        h: value.h,
+        s: value.s,
+        l: value.l,
+        a: value.a,
     }
-}
-
-/// A value that can be edited by the Storybook workbench.
-#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
-#[serde(tag = "type", content = "value", rename_all = "snake_case")]
-#[schemars(deny_unknown_fields)]
-pub enum ControlValue {
-    Boolean(bool),
-    Integer(i64),
-    Float(f64),
-    Text(String),
-    Color(ControlColor),
-    Choice(String),
-    Json(serde_json::Value),
-}
-
-impl ControlValue {
-    fn kind_name(&self) -> &'static str {
-        match self {
-            Self::Boolean(_) => "boolean",
-            Self::Integer(_) => "integer",
-            Self::Float(_) => "float",
-            Self::Text(_) => "text",
-            Self::Color(_) => "color",
-            Self::Choice(_) => "choice",
-            Self::Json(_) => "json",
-        }
-    }
-
-    fn numeric_value(&self) -> Option<f64> {
-        match self {
-            Self::Integer(value) => Some(*value as f64),
-            Self::Float(value) => Some(*value),
-            _ => None,
-        }
-    }
-}
-
-/// The editor presented for a control.
-#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ControlKind {
-    Checkbox,
-    Number,
-    Range,
-    Text,
-    ColorPicker,
-    Select,
-    Custom(String),
-}
-
-/// Numeric limits applied before a value reaches a story instance.
-#[derive(Clone, Copy, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
-#[schemars(deny_unknown_fields)]
-pub struct ControlBounds {
-    pub min: Option<f64>,
-    pub max: Option<f64>,
-    pub step: Option<f64>,
-}
-
-/// Metadata and default value for one story control.
-#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
-#[schemars(deny_unknown_fields)]
-pub struct ControlSpec {
-    pub key: String,
-    pub label: String,
-    pub description: String,
-    pub category: String,
-    pub kind: ControlKind,
-    pub default: ControlValue,
-    pub bounds: ControlBounds,
-    pub options: Vec<String>,
-}
-
-/// A current control value paired with its metadata.
-#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
-#[schemars(deny_unknown_fields)]
-pub struct ControlSnapshot {
-    pub spec: ControlSpec,
-    pub value: ControlValue,
-}
-
-/// Structured failures produced while reading or editing story controls.
-#[derive(Clone, Debug, Error, PartialEq)]
-pub enum ControlError {
-    #[error("unknown story control `{key}`")]
-    UnknownControl { key: String },
-    #[error("story control `{key}` expected {expected}, received {actual}")]
-    InvalidValue {
-        key: String,
-        expected: &'static str,
-        actual: &'static str,
-    },
-    #[error(
-        "story control `{key}` rejected choice `{value}`; expected one of {}",
-        .options.join(", ")
-    )]
-    InvalidChoice {
-        key: String,
-        value: String,
-        options: Vec<String>,
-    },
-    #[error("story control `{key}` value {value} is outside bounds {min:?}..={max:?}")]
-    RangeViolation {
-        key: String,
-        value: f64,
-        min: Option<f64>,
-        max: Option<f64>,
-    },
 }
 
 /// Typed access generated for a story's controllable fields.
@@ -259,56 +140,6 @@ impl<S: StoryControls> ControlTarget for EntityControlTarget<S> {
             Ok(())
         })
     }
-}
-
-fn validate_control_value(spec: &ControlSpec, value: &ControlValue) -> Result<(), ControlError> {
-    if !spec.options.is_empty() {
-        let choice = match value {
-            ControlValue::Choice(choice) => choice,
-            _ => {
-                return Err(ControlError::InvalidValue {
-                    key: spec.key.clone(),
-                    expected: "choice",
-                    actual: value.kind_name(),
-                });
-            },
-        };
-        if !spec.options.contains(choice) {
-            return Err(ControlError::InvalidChoice {
-                key: spec.key.clone(),
-                value: choice.clone(),
-                options: spec.options.clone(),
-            });
-        }
-    }
-
-    if spec.bounds.min.is_some() || spec.bounds.max.is_some() {
-        let Some(numeric_value) = value.numeric_value() else {
-            return Err(ControlError::InvalidValue {
-                key: spec.key.clone(),
-                expected: "number",
-                actual: value.kind_name(),
-            });
-        };
-        if spec
-            .bounds
-            .min
-            .is_some_and(|minimum| numeric_value < minimum)
-            || spec
-                .bounds
-                .max
-                .is_some_and(|maximum| numeric_value > maximum)
-        {
-            return Err(ControlError::RangeViolation {
-                key: spec.key.clone(),
-                value: numeric_value,
-                min: spec.bounds.min,
-                max: spec.bounds.max,
-            });
-        }
-    }
-
-    Ok(())
 }
 
 /// Conversion contract used by generated controls for supported field types.
@@ -448,12 +279,12 @@ impl ControlValueField for Hsla {
     }
 
     fn to_control_value(&self) -> ControlValue {
-        ControlValue::Color((*self).into())
+        ControlValue::Color(control_color(*self))
     }
 
     fn from_control_value(key: &str, value: ControlValue) -> Result<Self, ControlError> {
         match value {
-            ControlValue::Color(value) => Ok(value.into()),
+            ControlValue::Color(value) => Ok(hsla_color(value)),
             value => Err(invalid_field_value(key, "color", &value)),
         }
     }
@@ -498,7 +329,7 @@ where
 mod tests {
     use super::{
         ControlBounds, ControlError, ControlKind, ControlSpec, ControlTarget, ControlValue,
-        EntityControlTarget, StoryControls, validate_control_value,
+        EntityControlTarget, StoryControls,
     };
     use gpui_kit::{App, AppContext as _};
     use std::rc::Rc;
@@ -576,60 +407,6 @@ mod tests {
             },
             options: Vec::new(),
         }
-    }
-
-    #[test]
-    fn values_round_trip_through_json() {
-        let value = ControlValue::Choice("primary".to_owned());
-        let json = serde_json::to_string(&value).expect("control value serializes");
-        let decoded: ControlValue =
-            serde_json::from_str(&json).expect("control value deserializes");
-
-        assert_eq!(decoded, value);
-    }
-
-    #[test]
-    fn range_validation_accepts_bounds() {
-        assert_eq!(
-            validate_control_value(&range_spec(), &ControlValue::Float(16.0)),
-            Ok(())
-        );
-    }
-
-    #[test]
-    fn range_validation_reports_typed_violation() {
-        assert_eq!(
-            validate_control_value(&range_spec(), &ControlValue::Float(64.0)),
-            Err(ControlError::RangeViolation {
-                key: "padding".to_owned(),
-                value: 64.0,
-                min: Some(0.0),
-                max: Some(32.0),
-            })
-        );
-    }
-
-    #[test]
-    fn select_validation_rejects_unknown_option() {
-        let spec = ControlSpec {
-            key: "kind".to_owned(),
-            label: "Kind".to_owned(),
-            description: String::new(),
-            category: "Properties".to_owned(),
-            kind: ControlKind::Select,
-            default: ControlValue::Choice("primary".to_owned()),
-            bounds: ControlBounds::default(),
-            options: vec!["primary".to_owned(), "danger".to_owned()],
-        };
-
-        assert_eq!(
-            validate_control_value(&spec, &ControlValue::Choice("quiet".to_owned())),
-            Err(ControlError::InvalidChoice {
-                key: "kind".to_owned(),
-                value: "quiet".to_owned(),
-                options: vec!["primary".to_owned(), "danger".to_owned()],
-            })
-        );
     }
 
     #[gpui_kit::test]
