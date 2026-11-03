@@ -5035,7 +5035,7 @@ checksum = "99b18b06f5026b3d312488eacfdddbe78f82b4bf32bb2d2bc3186e31e552b797"
 
 [[package]]
 name = "gpui-storybook"
-version = "0.7.2"
+version = "0.8.0"
 dependencies = [
  "es-fluent",
  "gpui-es-fluent",
@@ -5056,7 +5056,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-storybook-core"
-version = "0.7.2"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "base64 0.23.1",
@@ -5091,7 +5091,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-storybook-example-component"
-version = "0.7.2"
+version = "0.8.0"
 dependencies = [
  "es-fluent",
  "es-fluent-build",
@@ -5109,7 +5109,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-storybook-example-story"
-version = "0.7.2"
+version = "0.8.0"
 dependencies = [
  "console_error_panic_hook",
  "es-fluent",
@@ -5134,14 +5134,14 @@ dependencies = [
 
 [[package]]
 name = "gpui-storybook-launch"
-version = "0.7.2"
+version = "0.8.0"
 dependencies = [
  "tempfile",
 ]
 
 [[package]]
 name = "gpui-storybook-macros"
-version = "0.7.2"
+version = "0.8.0"
 dependencies = [
  "darling 0.24.1",
  "heck 0.5.0",
@@ -5154,7 +5154,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-storybook-mcp"
-version = "0.7.2"
+version = "0.8.0"
 dependencies = [
  "component-shape-mcp",
  "frame-capture",
@@ -5169,7 +5169,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-storybook-preferences"
-version = "0.7.2"
+version = "0.8.0"
 dependencies = [
  "fluent-langneg 0.14.2",
  "gpui-kit",
@@ -5187,7 +5187,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-storybook-test"
-version = "0.7.2"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "gpui-kit",
@@ -5208,7 +5208,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-storybook-toml"
-version = "0.7.2"
+version = "0.8.0"
 dependencies = [
  "serde",
  "toml 1.1.8+spec-1.1.0",
@@ -11632,7 +11632,7 @@ dependencies = [
 
 [[package]]
 name = "web"
-version = "0.7.2"
+version = "0.8.0"
 dependencies = [
  "dioxus",
  "stayhydated-dioxus",
@@ -12733,7 +12733,7 @@ checksum = "ec7a2a501ed189703dba8b08142f057e887dfc4b2cc4db2d343ac6376ba3e0b9"
 
 [[package]]
 name = "xtask"
-version = "0.7.2"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "clap",

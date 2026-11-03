@@ -5,7 +5,7 @@
 tests, PNG capture, visual baselines, capture matrices, and optional GPUI frame
 budgets without opening the gallery shell.
 
-For the upcoming Storybook 0.8 / Kit 0.9 line, add it as a development
+For the Storybook 0.8 / Kit 0.9 line, add it as a development
 dependency. Enable `performance` only when tests need
 GPUI profiler samples and budgets:
 

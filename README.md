@@ -12,7 +12,7 @@ the rest of their application.
 Requires Rust 1.99 or newer across the workspace. Native applications use GPUI
 Kit 0.9.0; the capture integrations target published `gpui-pre =0.3.11`. Live MCP
 sessions support Linux and macOS; the Sway launcher is Linux-only.
-The upcoming Storybook 0.8 line uses Kit 0.9; Storybook 0.7 uses Kit 0.8.
+The Storybook 0.8 line uses Kit 0.9; Storybook 0.7 uses Kit 0.8.
 
 ## Overview
 
