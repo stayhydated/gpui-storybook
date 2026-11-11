@@ -420,7 +420,6 @@ async fn postcondition_retries_a_missing_value_until_it_is_rendered(
                             .max_frames(3),
                     ],
                     postcondition_index: 0,
-                    postcondition_frames_waited: 0,
                     postcondition_results: Vec::new(),
                     capture: None,
                     response,
@@ -509,7 +508,6 @@ async fn postcondition_timeout_preserves_dispatched_progress(cx: &mut gpui_kit::
                             .max_frames(2),
                     ],
                     postcondition_index: 0,
-                    postcondition_frames_waited: 0,
                     postcondition_results: Vec::new(),
                     capture: None,
                     response,
@@ -927,4 +925,279 @@ fn keystroke_batches_release_native_buttons_once(cx: &mut gpui_kit::TestAppConte
         visual.run_until_parked();
         visual.update(|_, cx| assert_eq!(view.read(cx).activations, expected, "key {key}"));
     }
+}
+
+struct SemanticWaitTest {
+    window: gpui_kit::WindowHandle<InteractionHarness>,
+    harness: gpui_kit::Entity<InteractionHarness>,
+    receiver: oneshot::Receiver<Result<StoryInteractionSnapshot, StorybookAutomationError>>,
+    progress: Arc<AtomicUsize>,
+    pending: Arc<AtomicBool>,
+}
+
+fn start_semantic_wait(
+    max_frames: u16,
+    provider: Rc<dyn InteractionCaptureProvider>,
+    cx: &mut gpui_kit::TestAppContext,
+) -> SemanticWaitTest {
+    cx.update(|cx| {
+        let mut harness = None;
+        let window = cx
+            .open_window(Default::default(), |_, cx| {
+                let entity = cx.new(|cx| InteractionHarness {
+                    focus_handle: cx.focus_handle().tab_stop(true),
+                    text: String::new(),
+                    clicks: 0,
+                    hovered: false,
+                    action_value: 0,
+                    events: Vec::new(),
+                    semantic_value: None,
+                });
+                harness = Some(entity.clone());
+                entity
+            })
+            .expect("semantic wait test window should open");
+        let harness = harness.expect("harness should be created");
+        let (response, receiver) = oneshot::channel();
+        let progress = Arc::new(AtomicUsize::new(0));
+        let pending = Arc::new(AtomicBool::new(true));
+        cx.update_window(window.into(), |_, window, cx| {
+            let click = || StoryInteractionStep::ClickTarget {
+                target_key: "harness".to_owned(),
+                button: StoryMouseButton::Left,
+                click_count: 1,
+                modifiers: StoryModifiers::default(),
+            };
+            let steps = vec![
+                click(),
+                StoryInteractionStep::WaitForValue {
+                    value_key: "late-value".to_owned(),
+                    json_pointer: Some(String::new()),
+                    expected: serde_json::json!(42),
+                    max_frames: Some(max_frames),
+                },
+                click(),
+            ];
+            schedule_story_interaction(
+                PreparedStoryInteraction::builder()
+                    .request_id(16)
+                    .story(interaction_story_snapshot())
+                    .steps(
+                        prepare_test_steps(&steps, cx).expect("semantic wait steps should prepare"),
+                    )
+                    .postconditions(Vec::new())
+                    .maybe_capture(None)
+                    .response(response)
+                    .progress(progress.clone())
+                    .provider(provider)
+                    .operation(TestOperationGuard {
+                        pending: pending.clone(),
+                    })
+                    .build(),
+                window,
+            );
+            window.refresh();
+        })
+        .expect("semantic wait should schedule");
+        SemanticWaitTest {
+            window,
+            harness,
+            receiver,
+            progress,
+            pending,
+        }
+    })
+}
+
+fn advance_semantic_wait_frame(
+    window: gpui_kit::WindowHandle<InteractionHarness>,
+    cx: &mut gpui_kit::TestAppContext,
+) {
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
+        .expect("semantic wait frame should draw");
+    cx.update_window(window.into(), |_, window, cx| {
+        window.simulate_next_frame(cx)
+    })
+    .expect("semantic wait callback should run");
+}
+
+#[gpui_kit::test]
+async fn semantic_wait_blocks_later_input_until_a_fresh_value_matches(
+    cx: &mut gpui_kit::TestAppContext,
+) {
+    let test = start_semantic_wait(3, Rc::new(NoCaptureProvider), cx);
+    // Route preparation and the first click precede the first semantic check.
+    for _ in 0..3 {
+        advance_semantic_wait_frame(test.window, cx);
+    }
+    assert_eq!(test.progress.load(Ordering::SeqCst), 1);
+    assert!(test.pending.load(Ordering::SeqCst));
+    cx.update(|cx| {
+        assert_eq!(test.harness.read(cx).clicks, 1);
+        test.harness.update(cx, |harness, cx| {
+            harness.semantic_value = Some(41);
+            cx.notify();
+        });
+    });
+    advance_semantic_wait_frame(test.window, cx);
+    assert_eq!(
+        test.progress.load(Ordering::SeqCst),
+        1,
+        "a nonmatching value cannot release input"
+    );
+    cx.update(|cx| {
+        assert_eq!(test.harness.read(cx).clicks, 1);
+        test.harness.update(cx, |harness, cx| {
+            harness.semantic_value = Some(42);
+            cx.notify();
+        });
+    });
+    advance_semantic_wait_frame(test.window, cx);
+    assert_eq!(test.progress.load(Ordering::SeqCst), 3);
+    assert!(
+        test.pending.load(Ordering::SeqCst),
+        "lease covers the final settled frame"
+    );
+    advance_semantic_wait_frame(test.window, cx);
+    let snapshot = test
+        .receiver
+        .await
+        .expect("runner should respond")
+        .expect("readiness should match");
+    assert_eq!(snapshot.steps_dispatched, 3);
+    assert!(
+        snapshot.postconditions.is_empty(),
+        "an intermediate wait is not a final postcondition"
+    );
+    let observation = &snapshot.observations[1];
+    assert_eq!(observation.step_index, 1);
+    assert!(
+        observation.dispatches.is_empty(),
+        "a semantic wait dispatches no input"
+    );
+    let matched = observation
+        .value_match
+        .as_ref()
+        .expect("receipt should include the matched value");
+    assert_eq!(matched.value_key, "late-value");
+    assert_eq!(matched.json_pointer.as_deref(), Some(""));
+    assert_eq!(matched.actual.value, serde_json::json!(42));
+    assert_eq!(matched.expected, serde_json::json!(42));
+    assert_eq!(matched.frames_waited, 3);
+    cx.update(|cx| {
+        assert_eq!(
+            test.harness.read(cx).clicks,
+            2,
+            "each click occurs exactly once"
+        )
+    });
+    assert!(!test.pending.load(Ordering::SeqCst));
+}
+
+#[gpui_kit::test]
+async fn semantic_wait_timeout_preserves_progress_and_never_dispatches_later_input(
+    cx: &mut gpui_kit::TestAppContext,
+) {
+    let test = start_semantic_wait(2, Rc::new(NoCaptureProvider), cx);
+    for _ in 0..4 {
+        advance_semantic_wait_frame(test.window, cx);
+    }
+    assert!(matches!(
+        test.receiver.await.expect("runner should respond"),
+        Err(StorybookAutomationError::InteractionFailed {
+            request_id: 16, steps_dispatched: 1, message,
+        }) if message.contains("late-value") && message.contains("2 frame(s)")
+    ));
+    assert_eq!(test.progress.load(Ordering::SeqCst), 1);
+    assert!(!test.pending.load(Ordering::SeqCst));
+    cx.update(|cx| {
+        test.harness.update(cx, |harness, cx| {
+            harness.semantic_value = Some(42);
+            cx.notify();
+        })
+    });
+    advance_semantic_wait_frame(test.window, cx);
+    cx.update(|cx| {
+        assert_eq!(
+            test.harness.read(cx).clicks,
+            1,
+            "late readiness cannot resume a failed batch"
+        )
+    });
+}
+
+struct RetiringSemanticHost(Rc<std::cell::Cell<bool>>);
+
+impl InteractionCaptureProvider for RetiringSemanticHost {
+    fn validate_host(&self, _: &str, _: &Window, _: &App) -> Result<(), StorybookAutomationError> {
+        self.0
+            .get()
+            .then_some(())
+            .ok_or(StorybookAutomationError::NoLiveHost)
+    }
+    fn ensure_visible(
+        &self,
+        route: &str,
+        window: &mut Window,
+        cx: &App,
+    ) -> Result<bool, StorybookAutomationError> {
+        NoCaptureProvider.ensure_visible(route, window, cx)
+    }
+    fn capture(
+        &self,
+        request_id: u64,
+        request: StoryScreenshotRequest,
+        story: StorySnapshot,
+        window: &mut Window,
+        cx: &App,
+    ) -> Result<StoryCaptureSnapshot, StorybookAutomationError> {
+        NoCaptureProvider.capture(request_id, request, story, window, cx)
+    }
+}
+
+#[gpui_kit::test]
+async fn semantic_wait_revalidates_the_host_before_dispatching_later_input(
+    cx: &mut gpui_kit::TestAppContext,
+) {
+    let live = Rc::new(std::cell::Cell::new(true));
+    let test = start_semantic_wait(3, Rc::new(RetiringSemanticHost(live.clone())), cx);
+    for _ in 0..3 {
+        advance_semantic_wait_frame(test.window, cx);
+    }
+    live.set(false);
+    cx.update(|cx| {
+        test.harness.update(cx, |harness, cx| {
+            harness.semantic_value = Some(42);
+            cx.notify();
+        })
+    });
+    advance_semantic_wait_frame(test.window, cx);
+    assert!(matches!(
+        test.receiver.await.expect("runner should respond"),
+        Err(StorybookAutomationError::InteractionFailed {
+            steps_dispatched: 1,
+            ..
+        })
+    ));
+    cx.update(|cx| assert_eq!(test.harness.read(cx).clicks, 1));
+    assert!(!test.pending.load(Ordering::SeqCst));
+}
+
+#[gpui_kit::test]
+fn semantic_wait_keeps_its_lease_after_the_client_drops_its_receiver(
+    cx: &mut gpui_kit::TestAppContext,
+) {
+    let test = start_semantic_wait(2, Rc::new(NoCaptureProvider), cx);
+    for _ in 0..3 {
+        advance_semantic_wait_frame(test.window, cx);
+    }
+    drop(test.receiver);
+    assert!(test.pending.load(Ordering::SeqCst));
+    advance_semantic_wait_frame(test.window, cx);
+    assert!(
+        !test.pending.load(Ordering::SeqCst),
+        "the bounded wait settles despite receiver cancellation"
+    );
+    assert_eq!(test.progress.load(Ordering::SeqCst), 1);
+    cx.update(|cx| assert_eq!(test.harness.read(cx).clicks, 1));
 }

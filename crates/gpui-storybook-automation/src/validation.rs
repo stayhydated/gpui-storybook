@@ -88,6 +88,18 @@ pub fn validate_interaction_request(
                     return invalid_step(step_index, "scroll deltas must be finite");
                 }
             },
+            StoryInteractionStep::WaitForValue {
+                value_key,
+                json_pointer,
+                max_frames,
+                ..
+            } => {
+                validate_semantic_condition(value_key, json_pointer.as_deref(), *max_frames)
+                    .map_err(|message| StorybookAutomationError::InvalidInteractionStep {
+                        step_index,
+                        message,
+                    })?;
+            },
             StoryInteractionStep::WaitFrames { count: 0 } => {
                 return invalid_step(step_index, "wait frame count must be greater than zero");
             },
@@ -99,28 +111,17 @@ pub fn validate_interaction_request(
     }
 
     for (postcondition_index, postcondition) in request.postconditions.iter().enumerate() {
-        if postcondition.value_key.trim().is_empty() {
-            return invalid_postcondition(postcondition_index, "value key must not be empty");
-        }
-        if postcondition
-            .json_pointer
-            .as_deref()
-            .is_some_and(|pointer| !pointer.is_empty() && !pointer.starts_with('/'))
-        {
-            return invalid_postcondition(
+        validate_semantic_condition(
+            &postcondition.value_key,
+            postcondition.json_pointer.as_deref(),
+            postcondition.max_frames,
+        )
+        .map_err(
+            |message| StorybookAutomationError::InvalidInteractionPostcondition {
                 postcondition_index,
-                "JSON Pointers must be empty or start with `/`",
-            );
-        }
-        if postcondition
-            .max_frames
-            .is_some_and(|frames| frames == 0 || frames > MAX_INTERACTION_WAITED_FRAMES)
-        {
-            return invalid_postcondition(
-                postcondition_index,
-                format!("max_frames must be between 1 and {MAX_INTERACTION_WAITED_FRAMES}"),
-            );
-        }
+                message,
+            },
+        )?;
     }
 
     if text_bytes > MAX_INTERACTION_TEXT_BYTES {
@@ -172,14 +173,23 @@ fn invalid_step<T>(
     })
 }
 
-fn invalid_postcondition<T>(
-    postcondition_index: usize,
-    message: impl Into<String>,
-) -> Result<T, StorybookAutomationError> {
-    Err(StorybookAutomationError::InvalidInteractionPostcondition {
-        postcondition_index,
-        message: message.into(),
-    })
+fn validate_semantic_condition(
+    value_key: &str,
+    json_pointer: Option<&str>,
+    max_frames: Option<u16>,
+) -> Result<(), String> {
+    if value_key.trim().is_empty() {
+        return Err("value key must not be empty".to_owned());
+    }
+    if json_pointer.is_some_and(|pointer| !pointer.is_empty() && !pointer.starts_with('/')) {
+        return Err("JSON Pointers must be empty or start with `/`".to_owned());
+    }
+    if max_frames.is_some_and(|frames| frames == 0 || frames > MAX_INTERACTION_WAITED_FRAMES) {
+        return Err(format!(
+            "max_frames must be between 1 and {MAX_INTERACTION_WAITED_FRAMES}"
+        ));
+    }
+    Ok(())
 }
 
 pub fn validate_capture_target_size(

@@ -42,6 +42,7 @@ pub enum PreparedInteractionStep {
         delta_x: f32,
         delta_y: f32,
     },
+    WaitForValue(StoryInteractionPostcondition),
     WaitFrames(u16),
 }
 
@@ -124,6 +125,19 @@ pub fn prepare_interaction_steps(
                 delta_x: *delta_x,
                 delta_y: *delta_y,
             }),
+            StoryInteractionStep::WaitForValue {
+                value_key,
+                json_pointer,
+                expected,
+                max_frames,
+            } => Ok(PreparedInteractionStep::WaitForValue(
+                StoryInteractionPostcondition {
+                    value_key: value_key.clone(),
+                    json_pointer: json_pointer.clone(),
+                    expected: expected.clone(),
+                    max_frames: *max_frames,
+                },
+            )),
             StoryInteractionStep::WaitFrames { count } => {
                 Ok(PreparedInteractionStep::WaitFrames(*count))
             },

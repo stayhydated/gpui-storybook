@@ -143,7 +143,6 @@ pub(super) struct InteractionRunner<Lease: 'static> {
     pub(super) steps: VecDeque<(usize, PreparedInteractionStep)>,
     pub(super) postconditions: Vec<StoryInteractionPostcondition>,
     pub(super) postcondition_index: usize,
-    pub(super) postcondition_frames_waited: u16,
     pub(super) postcondition_results: Vec<StoryInteractionPostconditionSnapshot>,
     pub(super) capture: Option<StoryInteractionCaptureRequest>,
     pub(super) response:
@@ -199,7 +198,6 @@ fn start_interaction_runner<Lease: 'static>(
             steps,
             postconditions: interaction.postconditions,
             postcondition_index: 0,
-            postcondition_frames_waited: 0,
             postcondition_results: Vec::new(),
             capture: interaction.capture,
             response: interaction.response,
@@ -384,10 +382,23 @@ fn run_interaction<Lease: 'static>(
     }
 
     while let Some((step_index, step)) = runner.steps.pop_front() {
-        if let PreparedInteractionStep::WaitFrames(count) = step {
-            schedule_wait_frames(runner, step_index, count, window);
-            return;
-        }
+        let step = match step {
+            PreparedInteractionStep::WaitFrames(count) => {
+                schedule_wait_frames(runner, step_index, count, window);
+                return;
+            },
+            PreparedInteractionStep::WaitForValue(condition) => {
+                schedule_semantic_check(
+                    runner,
+                    condition,
+                    0,
+                    SemanticContinuation::Step(step_index),
+                    window,
+                );
+                return;
+            },
+            step => step,
+        };
 
         let step = match resolve_target_click(step, step_index, &runner.story, window, cx) {
             Ok(step) => step,
@@ -402,6 +413,7 @@ fn run_interaction<Lease: 'static>(
         runner.observations.push(StoryInteractionObservation {
             step_index,
             dispatches,
+            value_match: None,
         });
         runner.progress.fetch_add(1, Ordering::SeqCst);
         if defer_continuation {
@@ -440,6 +452,7 @@ fn schedule_wait_frames<Lease: 'static>(
             runner.observations.push(StoryInteractionObservation {
                 step_index,
                 dispatches: vec![StoryInteractionDispatch::Dispatched],
+                value_match: None,
             });
             runner.progress.fetch_add(1, Ordering::SeqCst);
             run_interaction(runner, window, cx);
@@ -553,7 +566,9 @@ pub(super) fn dispatch_step(
         PreparedInteractionStep::ClickTarget { .. } => {
             unreachable!("semantic target clicks are resolved at dispatch")
         },
-        PreparedInteractionStep::WaitFrames(_) => unreachable!("wait steps are scheduled"),
+        PreparedInteractionStep::WaitFrames(_) | PreparedInteractionStep::WaitForValue(_) => {
+            unreachable!("wait steps are scheduled")
+        },
     }
 }
 
@@ -609,11 +624,33 @@ fn finish_interaction<Lease: 'static>(
     finish_interaction_capture(runner, window, cx);
 }
 
+enum SemanticContinuation {
+    Step(usize),
+    Postcondition,
+}
+
 pub(super) fn schedule_postcondition_check<Lease: 'static>(
-    mut runner: InteractionRunner<Lease>,
+    runner: InteractionRunner<Lease>,
     window: &mut Window,
 ) {
-    runner.postcondition_frames_waited = runner.postcondition_frames_waited.saturating_add(1);
+    let condition = runner.postconditions[runner.postcondition_index].clone();
+    schedule_semantic_check(
+        runner,
+        condition,
+        0,
+        SemanticContinuation::Postcondition,
+        window,
+    );
+}
+
+fn schedule_semantic_check<Lease: 'static>(
+    mut runner: InteractionRunner<Lease>,
+    condition: StoryInteractionPostcondition,
+    frames_waited: u16,
+    continuation: SemanticContinuation,
+    window: &mut Window,
+) {
+    let frames_waited = frames_waited.saturating_add(1);
     window.refresh();
     window.on_next_frame(move |window, cx| {
         if let Err(error) =
@@ -625,16 +662,6 @@ pub(super) fn schedule_postcondition_check<Lease: 'static>(
             return;
         }
 
-        let (value_key, json_pointer, expected, frame_limit) = {
-            let postcondition = &runner.postconditions[runner.postcondition_index];
-            (
-                postcondition.value_key.clone(),
-                postcondition.json_pointer.clone(),
-                postcondition.expected.clone(),
-                postcondition.frame_limit(),
-            )
-        };
-        let route = runner.story.capture_route_id.clone();
         let values = match rendered_semantic_values(runner.story.clone(), window, cx) {
             Ok(snapshot) => snapshot.values,
             Err(error) => {
@@ -642,45 +669,57 @@ pub(super) fn schedule_postcondition_check<Lease: 'static>(
                 return;
             },
         };
-        if let Some(actual) = values.into_iter().find(|value| value.key == value_key) {
-            let actual_value = json_pointer
+        if let Some(actual) = values
+            .into_iter()
+            .find(|value| value.key == condition.value_key)
+        {
+            let actual_value = condition
+                .json_pointer
                 .as_deref()
                 .map_or(Some(&actual.value), |pointer| actual.value.pointer(pointer));
-            if actual_value == Some(&expected) {
-                runner
-                    .postcondition_results
-                    .push(StoryInteractionPostconditionSnapshot {
-                        value_key,
-                        json_pointer,
-                        expected,
-                        actual,
-                        frames_waited: runner.postcondition_frames_waited,
-                    });
-                runner.postcondition_index += 1;
-                runner.postcondition_frames_waited = 0;
-
-                if runner.postcondition_index == runner.postconditions.len() {
-                    finish_interaction_capture(runner, window, cx);
-                } else {
-                    schedule_postcondition_check(runner, window);
+            if actual_value == Some(&condition.expected) {
+                let result = StoryInteractionPostconditionSnapshot {
+                    value_key: condition.value_key,
+                    json_pointer: condition.json_pointer,
+                    expected: condition.expected,
+                    actual,
+                    frames_waited,
+                };
+                match continuation {
+                    SemanticContinuation::Step(step_index) => {
+                        runner.observations.push(StoryInteractionObservation {
+                            step_index,
+                            dispatches: Vec::new(),
+                            value_match: Some(result),
+                        });
+                        runner.progress.fetch_add(1, Ordering::SeqCst);
+                        run_interaction(runner, window, cx);
+                    },
+                    SemanticContinuation::Postcondition => {
+                        runner.postcondition_results.push(result);
+                        runner.postcondition_index += 1;
+                        if runner.postcondition_index == runner.postconditions.len() {
+                            finish_interaction_capture(runner, window, cx);
+                        } else {
+                            schedule_postcondition_check(runner, window);
+                        }
+                    },
                 }
                 return;
             }
         }
 
-        if runner.postcondition_frames_waited >= frame_limit {
-            send_interaction_failure(
-                runner,
-                StorybookAutomationError::SemanticValueWaitTimedOut {
-                    route,
-                    key: value_key,
-                    max_frames: frame_limit,
-                },
-            );
+        if frames_waited >= condition.frame_limit() {
+            let max_frames = condition.frame_limit();
+            let error = StorybookAutomationError::SemanticValueWaitTimedOut {
+                route: runner.story.capture_route_id.clone(),
+                key: condition.value_key,
+                max_frames,
+            };
+            send_interaction_failure(runner, error);
             return;
         }
-
-        schedule_postcondition_check(runner, window);
+        schedule_semantic_check(runner, condition, frames_waited, continuation, window);
     });
 }
 

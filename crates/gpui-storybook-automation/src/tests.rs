@@ -431,3 +431,61 @@ fn scenario_lookup_rejects_duplicate_ids() {
         })
     );
 }
+
+#[test]
+fn semantic_wait_steps_validate_before_dispatch_and_require_semantic_values() {
+    let wait = |value_key: &str, json_pointer: Option<&str>, max_frames| {
+        StoryInteractionStep::WaitForValue {
+            value_key: value_key.to_owned(),
+            json_pointer: json_pointer.map(str::to_owned),
+            expected: json!(true),
+            max_frames,
+        }
+    };
+    for step in [
+        wait(" ", None, None),
+        wait("state", Some("ready"), None),
+        wait("state", None, Some(0)),
+        wait("state", None, Some(MAX_INTERACTION_WAITED_FRAMES + 1)),
+    ] {
+        assert!(matches!(
+            validate_interaction_request(&request(vec![StoryInteractionStep::Blur {}, step])),
+            Err(StorybookAutomationError::InvalidInteractionStep { step_index: 1, .. })
+        ));
+    }
+    let batch = request(vec![wait("state", Some("/ready"), Some(3))]);
+    assert!(matches!(
+        AutomationCapabilities::new([AutomationCapability::FrameWaits])
+            .validate_interaction(&batch),
+        Err(StorybookAutomationError::UnsupportedCapability {
+            capability: AutomationCapability::SemanticValues,
+        })
+    ));
+    AutomationCapabilities::new([AutomationCapability::SemanticValues])
+        .validate_interaction(&batch)
+        .expect("semantic readiness uses the semantic-values capability");
+    for pointer in [None, Some(""), Some("/nested/ready")] {
+        validate_interaction_request(&request(vec![wait("state", pointer, None)]))
+            .expect("bounded default and complete-value pointers are valid");
+    }
+}
+
+#[test]
+fn semantic_wait_step_round_trips_its_exact_condition_and_rejects_unknown_fields() {
+    let value = json!({
+        "type": "wait_for_value", "value_key": "state",
+        "json_pointer": "/ready", "expected": true, "max_frames": 3,
+    });
+    let step: StoryInteractionStep =
+        serde_json::from_value(value.clone()).expect("typed wait step");
+    assert_eq!(
+        serde_json::to_value(&step).expect("serialized wait step"),
+        value
+    );
+    let mut unknown = value;
+    unknown["retry"] = json!(true);
+    assert!(serde_json::from_value::<StoryInteractionStep>(unknown).is_err());
+    let scenario = StoryScenario::new("ready-then-input", "Wait for rendered readiness")
+        .step(StoryScenarioStep::new("Wait until ready", step.clone()));
+    assert_eq!(scenario.interaction_request("story").steps, [step]);
+}

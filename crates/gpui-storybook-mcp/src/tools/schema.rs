@@ -1,6 +1,6 @@
 //! JSON Schema construction for Storybook MCP tools.
 
-use component_shape_mcp::{McpSchema, McpSchemaProperties};
+use component_shape_mcp::{McpSchema, McpSchemaProperties, nullable_schema};
 use schemars::{JsonSchema, generate::SchemaSettings};
 use serde_json::{Value, json};
 
@@ -258,6 +258,35 @@ pub(crate) fn interaction_step_schema() -> McpSchema {
                 ("delta_y".to_owned(), McpSchema::number()),
             ],
             ["point", "delta_x", "delta_y"],
+        ),
+        tagged_interaction_step_schema(
+            "wait_for_value",
+            [
+                (
+                    "value_key".to_owned(),
+                    McpSchema::string().with_extension("minLength", json!(1)),
+                ),
+                (
+                    "json_pointer".to_owned(),
+                    nullable_schema(McpSchema::string().with_extension("pattern", json!("^(/|$)"))),
+                ),
+                ("expected".to_owned(), McpSchema::any()),
+                (
+                    "max_frames".to_owned(),
+                    nullable_schema(
+                        McpSchema::integer()
+                            .with_minimum(1_u64)
+                            .with_extension(
+                                "maximum",
+                                json!(gpui_storybook_automation::MAX_INTERACTION_WAITED_FRAMES),
+                            )
+                            .with_default(
+                                gpui_storybook_automation::DEFAULT_INTERACTION_POSTCONDITION_FRAMES,
+                            ),
+                    ),
+                ),
+            ],
+            ["value_key", "expected"],
         ),
         tagged_interaction_step_schema(
             "wait_frames",

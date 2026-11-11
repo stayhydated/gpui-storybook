@@ -58,7 +58,8 @@ then open the window.
   lifetime. Generic remote input requires
   `GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1` and can invoke application effects.
 - Use typed controls and semantic targets for reproducible input. Expose
-  rendered state through `storybook_value` for bounded postcondition checks;
+  rendered state through `storybook_value` for bounded `WaitForValue` steps and
+  final postcondition checks;
   use PNG captures for visual assertions.
 - Use `gpui-storybook-test` for isolated cases. Keep baseline checking and
   acceptance explicit, and supply assets, initialization, and theme/language

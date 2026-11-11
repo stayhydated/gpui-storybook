@@ -19,7 +19,7 @@ The Storybook 0.8 line uses Kit 0.9; Storybook 0.7 uses Kit 0.8.
 - Register stateful previews with `#[story]` or derive component previews with
   `ComponentStory`.
 - Edit typed controls, inspect scoped actions, switch themes and viewports, and
-  run repeatable scenarios from the workbench.
+  run repeatable scenarios with bounded semantic readiness from the workbench.
 - Drive live Linux and macOS sessions through MCP, or exercise isolated stories
   with the portable headless test runner.
 

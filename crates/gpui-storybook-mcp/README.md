@@ -18,7 +18,9 @@ interaction opt-in. Shared request types and validation come from
 
 The tools discover stable story routes, read and set typed controls, run
 declared scenarios, inspect rendered semantic values, and capture named
-viewports or explicit dimensions. Generic actions and input are exposed only
+viewports or explicit dimensions. Interaction batches support `wait_for_value`
+steps that gate subsequent input on bounded semantic readiness. Generic actions
+and input are exposed only
 when `GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1`; those operations can trigger
 application effects.
 

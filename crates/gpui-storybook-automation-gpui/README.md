@@ -11,6 +11,9 @@ metadata. Invalidate window regions before replacing a surface.
 
 `AttachedInteraction` validates the entire batch before dispatch. Keystrokes
 send both press and release events so native controls finish their activation.
+`WaitForValue` steps refresh frames until their exact semantic condition matches,
+retain the host lease, and revalidate the host on each frame. Their observations
+include the matching value and frames waited. Timeout stops subsequent input.
 Application authentication, fixtures, permissions, and action argument validation
 remain with the application.
 
