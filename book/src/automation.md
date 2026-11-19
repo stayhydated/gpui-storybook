@@ -276,6 +276,29 @@ click:
 }
 ```
 
+Within one scenario or batch, use a `wait_for_value` step before input that
+depends on an asynchronous result. For example, wait for a rejected request to
+become submittable before clicking Retry:
+
+```json
+{
+  "type": "wait_for_value",
+  "value_key": "request-state",
+  "json_pointer": "/can_submit",
+  "expected": true,
+  "max_frames": 120
+}
+```
+
+A typed `StoryScenarioStep` uses `StoryInteractionStep::WaitForValue` with the
+same fields. Each check reads newly rendered state while retaining the batch's
+exclusive operation lease. A missing or nonmatching value is checked again up
+to the bound. Timeout stops the batch before later input; it does not retry
+prior input. The successful step observation includes `value_match` with the
+actual value and frames waited, and an empty `dispatches` array. Keep final
+postconditions to verify the entire flow. Fixed `wait_frames` steps express a
+rendering delay; use semantic waits for state readiness.
+
 `storybook_run_steps` can open a route, apply a `controls` map, size the story
 region for paired rendered-pixel `width` and `height` values or a named
 `viewport`, execute a non-empty `steps` array, and capture the resulting route.
@@ -323,6 +346,7 @@ The closed step variants are:
 | `pointer_click` | Dispatch move, down, and up at `point`; optional `button`, `click_count`, and `modifiers` default to a single left click with no modifiers |
 | `click_target` | Dispatch move, down, and up at the center of semantic `target_key`; accepts the same optional button, count, and modifiers |
 | `scroll` | Dispatch pixel `delta_x` and `delta_y` at `point` |
+| `wait_for_value` | Gate later input on exact rendered `value_key`/optional `json_pointer` matching JSON `expected`; optional `max_frames` is 1–120, default 120 |
 | `wait_frames` | Refresh and continue after the positive rendered-frame `count` |
 
 Pointer points default to normalized coordinates:
@@ -340,8 +364,10 @@ selector path; neither interaction mode can target the gallery sidebar, the
 workbench, the title bar, or the global screen.
 
 A batch allows at most 64 steps, up to 64 binding strings in each `keystrokes`
-step, 4 KiB across UTF-8 `text` values and keystroke syntax, 120 explicitly
-waited frames, and one final capture. Zero-frame waits and non-finite point or
+step, 4 KiB across UTF-8 `text` values and keystroke syntax, 120 fixed-wait
+frames, up to 120 frames per semantic wait, and one final capture. The fixed-wait
+budget counts `wait_frames` steps only; each semantic wait and final
+postcondition has its own frame bound. Zero-frame waits and non-finite point or
 scroll values are rejected. Every keystroke and action payload is constructed
 before route, control, or input dispatch begins. The result reports a request
 ID, active story, dispatched-step count, available GPUI dispatch observations,

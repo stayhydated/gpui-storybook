@@ -189,16 +189,22 @@ element ID and derives a readable label; use
 `storybook_run_steps` accepts an optional `story_key`, controls, paired rendered-pixel
 dimensions or viewport, a required non-empty step list, and an optional final
 capture. Step types are `focus_next`, `focus_previous`, `blur`, `keystrokes`,
-`text`, `dispatch_action`, `click_target`, `pointer_move`, `pointer_click`, `scroll`, and
-`wait_frames`. Supplying a `story_key` focuses the selected story's focus handle
-before the first step.
+`text`, `dispatch_action`, `click_target`, `pointer_move`, `pointer_click`, `scroll`,
+`wait_for_value`, and `wait_frames`. Supplying a `story_key` focuses the
+selected story's focus handle before the first step.
 
 Keystroke strings follow the runtime host OS, including browser hosts:
 `secondary-` means Command on macOS and Control elsewhere.
 
 GPUI defers registered-action dispatch; the executor resumes with the next step
-after that dispatch is delivered. Use `wait_frames` before a later action when
-earlier widget input schedules its own next-frame state change.
+after that dispatch is delivered. Before input that depends on asynchronous
+completion, insert `wait_for_value` with `value_key`, optional `json_pointer`,
+exact JSON `expected`, and optional `max_frames` (1–120, default 120).
+`StoryInteractionStep::WaitForValue` uses the same fields in a typed scenario.
+The batch retains its exclusive lease while checking fresh rendered state; a
+timeout prevents later steps. The step observation's `value_match` records the
+matching value and frames waited. Keep final postconditions to verify the full
+flow. Use `wait_frames` for a fixed rendering delay.
 
 Pointer points default to normalized `x`/`y` values in `0.0..=1.0`. The
 `logical_pixels` space is relative to fresh active-route bounds. Points cannot
@@ -206,8 +212,10 @@ reach Storybook chrome or the global screen. A click dispatches move, down, and
 up.
 
 Limits are 64 steps, 64 binding strings per `keystrokes` step, 4 KiB across
-UTF-8 text values and keystroke syntax, 120 waited frames, and one final
-capture. Complete validation happens before input dispatch. The capture is the
+UTF-8 text values and keystroke syntax, 120 fixed-wait frames, up to 120 frames
+per semantic wait, and one final capture. The fixed-wait budget counts only
+`wait_frames`; semantic waits and final postconditions each have their own
+bound. Complete validation happens before input dispatch. The capture is the
 first requested frame after the final step or explicit waits. Runtime failures
 report `steps_dispatched`; do not retry automatically.
 

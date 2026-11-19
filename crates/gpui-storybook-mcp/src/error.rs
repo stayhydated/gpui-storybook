@@ -2,7 +2,7 @@
 
 use component_shape_mcp::McpToolError;
 use frame_capture::{CaptureEnvError, CaptureLaunchEnvError};
-use gpui_storybook_core::automation::StorybookAutomationError;
+use gpui_storybook_automation::StorybookAutomationError;
 use thiserror::Error;
 
 #[derive(Debug, Error)]

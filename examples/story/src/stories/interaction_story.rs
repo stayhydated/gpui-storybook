@@ -81,8 +81,13 @@ impl gpui_storybook::Story for InteractionStory {
                     },
                 ))
                 .step(StoryScenarioStep::new(
-                    "Wait for the pressed state to settle",
-                    StoryInteractionStep::WaitFrames { count: 1 },
+                    "Wait for the click to be reflected in rendered state",
+                    StoryInteractionStep::WaitForValue {
+                        value_key: "fixture-state".to_owned(),
+                        json_pointer: Some("/clicks".to_owned()),
+                        expected: serde_json::json!(1),
+                        max_frames: None,
+                    },
                 ))
                 .step(StoryScenarioStep::new(
                     "Set the final status action",

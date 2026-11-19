@@ -19,7 +19,7 @@ The Storybook 0.8 line uses Kit 0.9; Storybook 0.7 uses Kit 0.8.
 - Register stateful previews with `#[story]` or derive component previews with
   `ComponentStory`.
 - Edit typed controls, inspect scoped actions, switch themes and viewports, and
-  run repeatable scenarios from the workbench.
+  run repeatable scenarios with bounded semantic readiness from the workbench.
 - Drive live Linux and macOS sessions through MCP, or exercise isolated stories
   with the portable headless test runner.
 
@@ -27,9 +27,10 @@ Live captures size the story canvas to desktop, tablet, mobile, or explicit
 pixel dimensions and crop gallery chrome from the PNG.
 
 Published GPUI supports portable headless capture on Linux and macOS. Live
-Wayland window capture belongs to the older `gpui-pre =0.3.7` stack on the
-[`wayland-render-image` branch][wayland-patches]; its fixed Git patches are
-incompatible with the Kit 0.9 stack. Live macOS capture uses the native renderer.
+Wayland window capture requires consumer-owned backend patches from the
+[Zed capture fork](https://github.com/stayhydated/zed/tree/wayland-render-image).
+Use a revision compatible with the application’s pinned GPUI packages. Live
+macOS capture uses the native renderer.
 
 ## Crates
 
@@ -40,6 +41,8 @@ serve custom hosts and tooling.
 | Crate | Purpose |
 | --- | --- |
 | [`gpui-storybook`][gpui-storybook-readme] | Application facade for initialization, story discovery, and public re-exports. |
+| `gpui-storybook-automation` | Target-neutral controls, scenarios, snapshots, validation, and backend interface. |
+| `gpui-storybook-automation-gpui` | Automation attachment and interaction for application-owned GPUI windows. |
 | [`gpui-storybook-core`][gpui-storybook-core-readme] | Lower-level gallery, workbench, preference UI, and automation runtime. |
 | [`gpui-storybook-example-component`][gpui-storybook-example-component-readme] | Executable `ComponentStory` examples; not published. |
 | [`gpui-storybook-example-story`][gpui-storybook-example-story-readme] | Executable stateful `#[story]` examples and portable capture fixture; not published. |
@@ -68,4 +71,3 @@ serve custom hosts and tooling.
 [gpui-storybook-preferences-readme]: https://github.com/stayhydated/gpui-storybook/blob/master/crates/gpui-storybook-preferences/README.md
 [gpui-storybook-test-readme]: https://github.com/stayhydated/gpui-storybook/blob/master/crates/gpui-storybook-test/README.md
 [gpui-storybook-toml-readme]: https://github.com/stayhydated/gpui-storybook/blob/master/crates/gpui-storybook-toml/README.md
-[wayland-patches]: https://github.com/stayhydated/gpui-storybook/blob/wayland-render-image/Cargo.toml

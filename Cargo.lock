@@ -5055,6 +5055,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "gpui-storybook-automation"
+version = "0.8.0"
+dependencies = [
+ "bon",
+ "proptest",
+ "schemars",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "gpui-storybook-automation-gpui"
+version = "0.8.0"
+dependencies = [
+ "bon",
+ "gpui-kit",
+ "gpui-pre",
+ "gpui-storybook-automation",
+ "image",
+ "schemars",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "gpui-storybook-core"
 version = "0.8.0"
 dependencies = [
@@ -5069,6 +5098,8 @@ dependencies = [
  "gpui-kit",
  "gpui-pre",
  "gpui-pre-platform",
+ "gpui-storybook-automation",
+ "gpui-storybook-automation-gpui",
  "gpui-storybook-preferences",
  "gtk",
  "image",
@@ -5158,6 +5189,7 @@ version = "0.8.0"
 dependencies = [
  "component-shape-mcp",
  "frame-capture",
+ "gpui-storybook-automation",
  "gpui-storybook-core",
  "rmcp",
  "schemars",
