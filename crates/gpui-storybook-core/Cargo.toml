@@ -17,6 +17,7 @@ ignored = [ "gpui", "gpui_platform" ]
 
 [features]
 capture = [
+  "gpui-storybook-automation-gpui/capture",
   "dep:gpui_platform",
   "dep:image",
   "gpui-kit/test-support",
@@ -26,6 +27,8 @@ inspector = [ "gpui-kit/inspector" ]
 performance = [ "dep:gpui", "gpui/profiler" ]
 
 [dependencies]
+gpui-storybook-automation = { workspace = true }
+gpui-storybook-automation-gpui = { workspace = true }
 anyhow = { workspace = true }
 base64 = { workspace = true }
 derive_more = { features = [ "as_ref", "display", "from" ], workspace = true }

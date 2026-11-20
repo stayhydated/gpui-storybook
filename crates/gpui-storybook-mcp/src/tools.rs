@@ -12,11 +12,11 @@ use component_shape_mcp::{
     tool_structured_result,
 };
 use frame_capture::CaptureLaunchEnv as FrameCaptureLaunchEnv;
-use gpui_storybook_core::automation::{
-    MAX_INTERACTION_WAITED_FRAMES, SharedStorybookAutomation, StoryInteractionRequest,
-    StoryInteractionStep, StoryModifiers, StoryMouseButton, StoryScreenshotRequest,
-    StorySemanticValueSnapshot, StorySemanticValuesSnapshot, StorybookAutomation,
-    StorybookAutomationError,
+use gpui_storybook_automation::{
+    AutomationBackend, AutomationCapability, MAX_INTERACTION_WAITED_FRAMES,
+    SharedAutomationBackend, StoryInteractionRequest, StoryInteractionStep, StoryModifiers,
+    StoryMouseButton, StoryScreenshotRequest, StorySemanticValueSnapshot,
+    StorySemanticValuesSnapshot, StorybookAutomationError,
 };
 use rmcp::model::CallToolResult as ToolCallResult;
 use serde_json::{Value, json};
@@ -226,6 +226,22 @@ pub(crate) fn interaction_automation_tool_error(error: StorybookAutomationError)
 
 pub(crate) fn structured_automation_error(error: StorybookAutomationError) -> McpToolError {
     let detail = match &error {
+        StorybookAutomationError::SettlementFailed { operation, cleanup } => json!({
+            "code": "settlement_failed", "operation": operation, "cleanup": cleanup,
+        }),
+        StorybookAutomationError::HostNotReady { message } => {
+            json!({"code": "host_not_ready", "message": message})
+        },
+        StorybookAutomationError::StaleHost { message } => {
+            json!({"code": "stale_host", "message": message})
+        },
+        StorybookAutomationError::OutcomeUnknown {
+            request_id,
+            message,
+        } => json!({"code": "outcome_unknown", "request_id": request_id, "message": message}),
+        StorybookAutomationError::UnsupportedCapability { capability } => {
+            json!({ "code": "unsupported_capability", "capability": capability })
+        },
         StorybookAutomationError::StartupTimedOut { seconds } => json!({
             "code": "startup_timed_out",
             "seconds": seconds,
@@ -370,7 +386,7 @@ fn decode_interaction_request(input: RunStepsInput) -> StoryInteractionRequest {
 }
 
 async fn await_automation_startup(
-    automation: &StorybookAutomation,
+    automation: &dyn AutomationBackend,
 ) -> Result<(), StorybookAutomationError> {
     tokio::time::timeout(
         Duration::from_secs(AUTOMATION_STARTUP_TIMEOUT_SECS),
@@ -379,11 +395,11 @@ async fn await_automation_startup(
     .await
     .map_err(|_| StorybookAutomationError::StartupTimedOut {
         seconds: AUTOMATION_STARTUP_TIMEOUT_SECS,
-    })
+    })?
 }
 
 async fn read_semantic_value(
-    automation: &StorybookAutomation,
+    automation: &dyn AutomationBackend,
     value_key: &str,
 ) -> Result<SemanticValueOutput, StorybookAutomationError> {
     let snapshot = automation.read_semantic_values().await?;
@@ -410,7 +426,7 @@ pub(crate) fn semantic_value_output(
 }
 
 async fn wait_for_semantic_value(
-    automation: &StorybookAutomation,
+    automation: &dyn AutomationBackend,
     input: WaitForValueInput,
 ) -> Result<WaitForValueOutput, StorybookAutomationError> {
     let max_frames = input.max_frames.unwrap_or(MAX_INTERACTION_WAITED_FRAMES);
@@ -420,6 +436,7 @@ async fn wait_for_semantic_value(
     let wait = async {
         let mut last_route = automation
             .current_story()
+            .await?
             .story
             .map(|story| story.capture_route_id)
             .unwrap_or_else(|| "<active-story>".to_owned());
@@ -448,19 +465,19 @@ async fn wait_for_semantic_value(
         })
     };
 
-    tokio::time::timeout(Duration::from_secs(SEMANTIC_VALUE_WAIT_TIMEOUT_SECS), wait)
-        .await
-        .unwrap_or_else(|_| {
-            Err(StorybookAutomationError::SemanticValueWaitTimedOut {
-                route: automation
-                    .current_story()
-                    .story
-                    .map(|story| story.capture_route_id)
-                    .unwrap_or_else(|| "<active-story>".to_owned()),
-                key: value_key,
-                max_frames,
-            })
-        })
+    match tokio::time::timeout(Duration::from_secs(SEMANTIC_VALUE_WAIT_TIMEOUT_SECS), wait).await {
+        Ok(result) => result,
+        Err(_) => Err(StorybookAutomationError::SemanticValueWaitTimedOut {
+            route: automation
+                .current_story()
+                .await?
+                .story
+                .map(|story| story.capture_route_id)
+                .unwrap_or_else(|| "<active-story>".to_owned()),
+            key: value_key,
+            max_frames,
+        }),
+    }
 }
 
 pub(crate) fn semantic_value_matches(
@@ -587,4 +604,32 @@ pub(crate) fn cargo_launch_command_for(
 
     command.extend(cargo_args.iter().cloned());
     command
+}
+
+async fn run_backend_steps(
+    automation: &dyn AutomationBackend,
+    request: StoryInteractionRequest,
+) -> Result<crate::StoryInteractionSnapshot, StorybookAutomationError> {
+    automation.capabilities().validate_interaction(&request)?;
+    automation.run_steps(request).await
+}
+
+async fn run_backend_scenario(
+    automation: &dyn AutomationBackend,
+    story_key: Option<String>,
+    scenario_key: String,
+) -> Result<crate::StoryScenarioRunSnapshot, StorybookAutomationError> {
+    let capabilities = automation.capabilities();
+    capabilities.require(AutomationCapability::FreshScenarios)?;
+    let story = match &story_key {
+        Some(key) => automation.get_story(key.clone()).await?,
+        None => automation
+            .current_story()
+            .await?
+            .story
+            .ok_or(StorybookAutomationError::NoActiveStory)?,
+    };
+    let scenario = crate::find_scenario(&story, &scenario_key)?;
+    capabilities.validate_interaction(&scenario.interaction_request(story.capture_route_id))?;
+    automation.run_scenario(story_key, scenario_key).await
 }

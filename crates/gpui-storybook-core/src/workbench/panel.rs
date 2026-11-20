@@ -363,7 +363,8 @@ impl StoryWorkbench {
                         continue;
                     };
                     let state = cx.new(|cx| {
-                        ColorPickerState::new(window, cx).default_value(gpui_kit::Hsla::from(color))
+                        ColorPickerState::new(window, cx)
+                            .default_value(crate::controls::hsla_color(color))
                     });
                     let target = target.clone();
                     let control_key = key.clone();
@@ -374,8 +375,11 @@ impl StoryWorkbench {
                             let ColorPickerEvent::Change(Some(color)) = event else {
                                 return;
                             };
-                            let result =
-                                target.set(&control_key, ControlValue::Color((*color).into()), cx);
+                            let result = target.set(
+                                &control_key,
+                                ControlValue::Color(crate::controls::control_color(*color)),
+                                cx,
+                            );
                             this.last_error = result.err().map(|error| error.to_string().into());
                             cx.notify();
                         },
@@ -426,7 +430,7 @@ impl StoryWorkbench {
                     let ControlValue::Color(color) = value else {
                         continue;
                     };
-                    let expected = gpui_kit::Hsla::from(color);
+                    let expected = crate::controls::hsla_color(color);
                     if state.read(cx).value() != Some(expected) {
                         state.update(cx, |state, cx| state.set_value(expected, window, cx));
                     }

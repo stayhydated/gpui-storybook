@@ -11,6 +11,8 @@ in `rust-toolchain.toml` for local validation.
 | Surface | Audience and responsibility |
 |---|---|
 | `crates/gpui-storybook` | Application facade: initialization, discovery, filtering, and public re-exports |
+| `crates/gpui-storybook-automation` | Target-neutral automation contracts, validation, and backend interface |
+| `crates/gpui-storybook-automation-gpui` | Application-owned window attachment, interaction dispatch, and rendered regions |
 | `crates/gpui-storybook-core` | Runtime integration: gallery, workbench, story containers, preferences UI, and automation |
 | `crates/gpui-storybook-macros` | Public macro syntax and generated registrations, controls, and substory keys |
 | `crates/gpui-storybook-toml` | Public configuration schema, loading, and filters |
@@ -85,7 +87,7 @@ Sway and a working Wgpu adapter.
 
 The `wayland-render-image` branch's root `[patch.crates-io]` pins
 `gpui-pre-linux`, `gpui-pre-wgpu`, and `gpui-pre-platform` to one Zed fork
-revision, compatible with `gpui-pre =0.3.7`. Keep those revisions and the patch
+revision, compatible with the GPUI version pinned on that branch. Keep those revisions and the patch
 example in `book/src/automation.md` aligned, and commit the updated `Cargo.lock`
 when changing a pin. Consumer applications apply these patches in their own
 workspace root for Wayland window capture; Cargo patches are not inherited from

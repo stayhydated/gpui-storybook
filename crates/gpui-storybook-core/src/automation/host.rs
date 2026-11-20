@@ -1,55 +1,6 @@
 use super::*;
 
-pub(crate) fn rendered_interaction_targets(
-    story: StorySnapshot,
-) -> Result<StoryInteractionTargetsSnapshot, StorybookAutomationError> {
-    let route = story.capture_route_id.clone();
-    let targets = interaction_targets(&route).map_err(|error| match error {
-        InteractionTargetLookupError::RouteNotRendered => {
-            StorybookAutomationError::InteractionTargetsUnavailable {
-                route: route.clone(),
-            }
-        },
-        InteractionTargetLookupError::DuplicateKey(key) => {
-            StorybookAutomationError::DuplicateInteractionTarget {
-                route: route.clone(),
-                key,
-            }
-        },
-    })?;
-    Ok(StoryInteractionTargetsSnapshot { story, targets })
-}
-
-pub(crate) fn rendered_semantic_values(
-    story: StorySnapshot,
-) -> Result<StorySemanticValuesSnapshot, StorybookAutomationError> {
-    let route = story.capture_route_id.clone();
-    let values = semantic_values(&route).map_err(|error| match error {
-        SemanticValueLookupError::RouteNotRendered => {
-            StorybookAutomationError::SemanticValuesUnavailable {
-                route: route.clone(),
-            }
-        },
-        SemanticValueLookupError::DuplicateKey(key) => {
-            StorybookAutomationError::DuplicateSemanticValue {
-                route: route.clone(),
-                key,
-            }
-        },
-    })?;
-    Ok(StorySemanticValuesSnapshot { story, values })
-}
-
-pub(crate) fn schedule_semantic_value_read(
-    story: StorySnapshot,
-    response: oneshot::Sender<Result<StorySemanticValuesSnapshot, StorybookAutomationError>>,
-    window: &mut Window,
-) {
-    window.refresh();
-    window.on_next_frame(move |_window, _cx| {
-        let _ = response.send(rendered_semantic_values(story));
-    });
-}
+pub(crate) use gpui_storybook_automation_gpui::snapshot::schedule_semantic_value_read;
 
 pub(super) async fn receive_host_response<T>(
     receiver: oneshot::Receiver<Result<T, StorybookAutomationError>>,
@@ -72,29 +23,6 @@ pub(super) fn resolve_story_route(
         .find(|story| story.key == story_key || story.capture_route_id == story_key)?;
 
     Some(story_snapshot_for_route(story.clone(), route_id))
-}
-
-pub(super) fn find_scenario(
-    story: &StorySnapshot,
-    scenario_key: &str,
-) -> Result<StoryScenarioSnapshot, StorybookAutomationError> {
-    let mut matches = story
-        .scenarios
-        .iter()
-        .filter(|scenario| scenario.key == scenario_key);
-    let Some(scenario) = matches.next() else {
-        return Err(StorybookAutomationError::ScenarioNotFound {
-            story_key: story.key.clone(),
-            scenario_key: scenario_key.to_owned(),
-        });
-    };
-    if matches.next().is_some() {
-        return Err(StorybookAutomationError::DuplicateScenarioKey {
-            story_key: story.key.clone(),
-            scenario_key: scenario_key.to_owned(),
-        });
-    }
-    Ok(scenario.clone())
 }
 
 pub(super) fn story_snapshot_for_route(mut story: StorySnapshot, route_id: &str) -> StorySnapshot {

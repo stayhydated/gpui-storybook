@@ -3,6 +3,7 @@ use crate::{capture::storybook_capture_env, tools::*};
 use component_shape_mcp::{
     McpSchema, McpServer, tool_call_structured_content, tool_structured_result,
 };
+use gpui_storybook_core::automation::StorybookAutomation;
 use serde_json::{Value, json};
 use std::{env, ffi::OsString, path::PathBuf, sync::Mutex};
 

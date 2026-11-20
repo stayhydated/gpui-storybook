@@ -5,7 +5,7 @@
 
 `gpui-storybook` is the application-facing facade for building a searchable
 GPUI component gallery with typed controls, scoped actions,
-themes, viewports, and repeatable scenarios.
+themes, viewports, and repeatable scenarios with bounded semantic readiness.
 
 Requires Rust 1.99 or newer and GPUI Kit 0.9.0. The optional `mcp` feature
 supports Linux and macOS; other targets reject that feature.

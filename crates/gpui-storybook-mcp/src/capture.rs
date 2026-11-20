@@ -4,8 +4,8 @@ use std::{collections::BTreeMap, path::PathBuf, thread, time::Duration};
 
 use frame_capture::CaptureRouteId;
 pub use frame_capture::{CaptureConfig, CaptureEnv, CaptureFrame, PixelSize};
-use gpui_storybook_core::automation::{
-    DEFAULT_STORY_CAPTURE_HEIGHT, DEFAULT_STORY_CAPTURE_WIDTH, SharedStorybookAutomation,
+use gpui_storybook_automation::{
+    DEFAULT_STORY_CAPTURE_HEIGHT, DEFAULT_STORY_CAPTURE_WIDTH, SharedAutomationBackend,
     StoryDefaultSize, StoryScreenshotRequest, StorySnapshot,
 };
 use schemars::JsonSchema;
@@ -48,25 +48,18 @@ pub fn capture_requested() -> bool {
 }
 
 pub fn start_capture_session_from_env(
-    automation: SharedStorybookAutomation,
+    automation: SharedAutomationBackend,
 ) -> Result<Option<thread::JoinHandle<Result<(), StorybookMcpError>>>, StorybookMcpError> {
     let env = storybook_capture_env();
     if std::env::var_os(env.route_var()).is_none() && std::env::var_os(env.path_var()).is_none() {
         return Ok(None);
     }
 
-    let default_story_key = automation.stories().first().map(|story| story.key.clone());
-
-    if let Some(default_story_key) = default_story_key {
-        let session = read_capture_session(default_story_key)?;
-        start_capture_session(automation, session, true).map(Some)
-    } else {
-        start_capture_session_from_env_when_ready(automation).map(Some)
-    }
+    start_capture_session_from_env_when_ready(automation).map(Some)
 }
 
 pub fn start_capture_session(
-    automation: SharedStorybookAutomation,
+    automation: SharedAutomationBackend,
     session: StorybookCaptureSession,
     exit_after_capture: bool,
 ) -> Result<thread::JoinHandle<Result<(), StorybookMcpError>>, StorybookMcpError> {
@@ -91,7 +84,7 @@ pub fn start_capture_session(
 }
 
 fn start_capture_session_from_env_when_ready(
-    automation: SharedStorybookAutomation,
+    automation: SharedAutomationBackend,
 ) -> Result<thread::JoinHandle<Result<(), StorybookMcpError>>, StorybookMcpError> {
     thread::Builder::new()
         .name("gpui-storybook-capture-session".to_string())
@@ -115,16 +108,19 @@ fn start_capture_session_from_env_when_ready(
 }
 
 async fn wait_for_default_story_key(
-    automation: SharedStorybookAutomation,
+    automation: SharedAutomationBackend,
 ) -> Result<String, StorybookMcpError> {
     tokio::time::timeout(
         Duration::from_secs(CAPTURE_SESSION_TIMEOUT_SECS),
         async move {
             loop {
-                if let Some(default_story_key) =
-                    automation.stories().first().map(|story| story.key.clone())
+                if let Some(default_story_key) = automation
+                    .stories()
+                    .await?
+                    .first()
+                    .map(|story| story.key.clone())
                 {
-                    return default_story_key;
+                    return Ok(default_story_key);
                 }
 
                 tokio::time::sleep(Duration::from_millis(10)).await;
@@ -134,11 +130,11 @@ async fn wait_for_default_story_key(
     .await
     .map_err(|_| StorybookMcpError::CaptureSessionTimedOut {
         seconds: CAPTURE_SESSION_TIMEOUT_SECS,
-    })
+    })?
 }
 
 async fn run_capture_session(
-    automation: SharedStorybookAutomation,
+    automation: SharedAutomationBackend,
     session: StorybookCaptureSession,
     exit_after_capture: bool,
 ) -> Result<(), StorybookMcpError> {

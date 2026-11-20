@@ -1,4 +1,14 @@
 use super::*;
+
+#[cfg(feature = "capture")]
+#[test]
+fn facade_capture_exposes_the_gallery_image_backend() {
+    let backend = StorybookAutomation::new();
+    let capabilities = backend.capabilities();
+    assert!(capabilities.contains(AutomationCapability::StoryCapture));
+    assert!(capabilities.contains(AutomationCapability::CaptureControls));
+    assert!(capabilities.contains(AutomationCapability::InteractionCapture));
+}
 use es_fluent::{FluentMessage, FluentMessageLookup};
 use std::{
     convert::Infallible,
