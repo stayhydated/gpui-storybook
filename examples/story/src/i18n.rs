@@ -18,7 +18,6 @@ pub fn apply_locale(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use es_fluent::FluentLocalizerExt as _;
     use gpui_es_fluent::I18n;
     use iso_types::VariantArray as _;
 
