@@ -112,6 +112,8 @@ impl Render for StoryWorkbench {
                     .relative()
                     .w_full()
                     .min_w_0()
+                    // Keep the scrollbar's bottom hit area below the tab buttons.
+                    .pb(gpui_kit::component::scroll::Scrollbar::width())
                     .debug_selector(|| "workbench-tabs-scroll".to_owned())
                     .on_scroll(cx.listener(Self::scroll_tabs))
                     .child(
