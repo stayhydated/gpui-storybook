@@ -6,7 +6,7 @@ persistence modes, system detection, saved intent, effective presentation, and
 diagnostics. Applications configure preferences through `StorybookOptions`
 from the [`gpui-storybook` facade][facade].
 
-Requires Rust 1.99 or newer.
+Requires Rust 1.100 or newer.
 
 See the [preference API source][api] for persistence modes, cancellation,
 recovery, and saved-versus-resolved preference semantics.

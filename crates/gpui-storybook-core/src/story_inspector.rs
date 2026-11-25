@@ -131,11 +131,3 @@ impl Element for InspectableStoryElement {
         self.child.paint(window, cx);
     }
 }
-
-impl IntoElement for InspectableStoryElement {
-    type Element = Self;
-
-    fn into_element(self) -> Self::Element {
-        self
-    }
-}

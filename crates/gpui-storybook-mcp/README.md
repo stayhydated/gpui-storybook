@@ -7,7 +7,7 @@
 over `SharedAutomationBackend` on Linux and macOS. Applications normally enable
 it through the [facade's `mcp` feature][facade].
 
-Requires Rust 1.99 or newer and a live GPUI Storybook host on Linux or macOS.
+Requires Rust 1.100 or newer and a live GPUI Storybook host on Linux or macOS.
 Depend on this crate directly when owning the MCP server or capture lifecycle.
 
 ## Overview

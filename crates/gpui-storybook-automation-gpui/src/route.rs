@@ -4,7 +4,7 @@ use gpui_storybook_automation::{StoryDefaultSize, StoryScenarioSnapshot, StorySn
 
 /// Metadata for an embedded application route. The key is also its capture route.
 /// Applications own route selection and scenario fixture policy.
-#[derive(Clone, Debug, bon::Builder)]
+#[derive(bon::Builder, Clone, Debug)]
 pub struct EmbeddedRoute {
     key: String,
     title: String,

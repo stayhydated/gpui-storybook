@@ -15,21 +15,6 @@ struct StorybookI18n {
 
 impl Global for StorybookI18n {}
 
-impl StorybookI18n {
-    fn select_language(&self, language: &LanguageIdentifier) -> Result<(), LocalizationError> {
-        match self.localizer.select_language(language) {
-            Ok(()) => Ok(()),
-            Err(LocalizationError::LanguageNotSupported(_)) => {
-                tracing::debug!(
-                    "requested Storybook shell locale is unavailable; using embedded English fallback"
-                );
-                self.localizer.select_language(&fallback_language())
-            },
-            Err(error) => Err(error),
-        }
-    }
-}
-
 impl FluentLocalizer for StorybookI18n {
     fn localize<'a>(
         &self,
@@ -55,9 +40,8 @@ pub fn init(cx: &mut App) -> Result<(), EmbeddedInitError> {
     if cx.try_global::<StorybookI18n>().is_some() {
         return Ok(());
     }
-    let localizer = GPUI_STORYBOOK_CORE_I18N_MODULE.create_localizer();
-    localizer
-        .select_language(&fallback_language())
+    let localizer = GPUI_STORYBOOK_CORE_I18N_MODULE
+        .create_localizer(&fallback_language())
         .map_err(EmbeddedInitError::LanguageSelection)?;
     cx.set_global(StorybookI18n { localizer });
     Ok(())
@@ -77,7 +61,17 @@ pub fn change_locale<L>(cx: &mut App, locale: L) -> Result<(), LocalizationError
 where
     L: Into<LanguageIdentifier>,
 {
-    cx.global::<StorybookI18n>().select_language(&locale.into())
+    let replacement = match GPUI_STORYBOOK_CORE_I18N_MODULE.create_localizer(&locale.into()) {
+        Err(LocalizationError::LanguageNotSupported(_)) => {
+            tracing::debug!(
+                "requested Storybook shell locale is unavailable; using embedded English fallback"
+            );
+            GPUI_STORYBOOK_CORE_I18N_MODULE.create_localizer(&fallback_language())?
+        },
+        result => result?,
+    };
+    cx.global_mut::<StorybookI18n>().localizer = replacement;
+    Ok(())
 }
 
 /// Attempts to localize a message through Storybook's embedded shell context.

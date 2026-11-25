@@ -6,14 +6,6 @@ pub(super) struct CaptureScopeElement {
     pub(super) child: AnyElement,
 }
 
-impl IntoElement for CaptureScopeElement {
-    type Element = Self;
-
-    fn into_element(self) -> Self::Element {
-        self
-    }
-}
-
 impl Element for CaptureScopeElement {
     type RequestLayoutState = LayoutId;
     type PrepaintState = ();
@@ -141,14 +133,6 @@ pub(super) struct CaptureSubstoryElement {
     pub(super) child: AnyElement,
 }
 
-impl IntoElement for CaptureSubstoryElement {
-    type Element = Self;
-
-    fn into_element(self) -> Self::Element {
-        self
-    }
-}
-
 impl Element for CaptureSubstoryElement {
     type RequestLayoutState = LayoutId;
     type PrepaintState = ();
@@ -251,14 +235,6 @@ pub(super) struct InteractionTargetElement {
     pub(super) child: AnyElement,
 }
 
-impl IntoElement for InteractionTargetElement {
-    type Element = Self;
-
-    fn into_element(self) -> Self::Element {
-        self
-    }
-}
-
 impl Element for InteractionTargetElement {
     type RequestLayoutState = LayoutId;
     type PrepaintState = ();
@@ -324,14 +300,6 @@ pub(super) struct SemanticValueElement {
     pub(super) label: String,
     pub(super) value: Value,
     pub(super) child: AnyElement,
-}
-
-impl IntoElement for SemanticValueElement {
-    type Element = Self;
-
-    fn into_element(self) -> Self::Element {
-        self
-    }
 }
 
 impl Element for SemanticValueElement {
