@@ -3572,7 +3572,6 @@ dependencies = [
 name = "gpui-storybook-automation"
 version = "0.8.0"
 dependencies = [
- "bon",
  "schemars",
  "serde",
  "serde_json",
@@ -3591,7 +3590,6 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.21",
  "tokio",
- "tracing",
 ]
 
 [[package]]
