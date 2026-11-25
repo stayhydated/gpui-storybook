@@ -9,10 +9,11 @@ GPUI Storybook gives application developers a searchable gallery
 for developing, inspecting, and exercising GPUI components outside
 the rest of their application.
 
-Requires Rust 1.99 or newer across the workspace. Native applications use GPUI
-Kit 0.9.0; the capture integrations target published `gpui-pre =0.3.11`. Live MCP
+Requires Rust 1.100 or newer across the workspace. Native applications use
+GPUI Kit 0.11.0; capture integrations target published `gpui-pre =0.3.14`. Live MCP
 sessions support Linux and macOS; the Sway launcher is Linux-only.
-The Storybook 0.8 line uses Kit 0.9; Storybook 0.7 uses Kit 0.8.
+Previous releases used older GPUI families: Storybook 0.8 used Kit 0.9 and
+Storybook 0.7 used Kit 0.8.
 
 ## Overview
 

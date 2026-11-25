@@ -7,7 +7,7 @@
 GPUI Storybook. Applications should normally enable the default `macros` feature
 on the [`gpui-storybook` facade][facade].
 
-Requires Rust 1.99 or newer. Generated code uses the facade
+Requires Rust 1.100 or newer. Generated code uses the facade
 and its `gpui_storybook` dependency name.
 
 ## Overview

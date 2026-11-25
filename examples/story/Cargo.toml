@@ -27,17 +27,16 @@ performance = [ "gpui-storybook/performance" ]
 
 [dependencies]
 es-fluent = { workspace = true }
-es-fluent-lang = { workspace = true }
 es-fluent-manager-embedded = { workspace = true }
 gpui-kit = { workspace = true }
 gpui-es-fluent = { workspace = true }
 gpui_platform = { workspace = true }
 gpui-storybook = { workspace = true }
+iso-types = { workspace = true }
 rust-embed = { workspace = true }
 schemars = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-strum = { workspace = true }
 tracing = { workspace = true }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]

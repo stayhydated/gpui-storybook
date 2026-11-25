@@ -29,8 +29,10 @@ image renderer; see the automation reference for both platform commands.
 Keep these pieces aligned:
 
 - call `es_fluent_build::track_i18n_assets()` from `build.rs`;
-- define the embedded module and `#[es_fluent_language]` enum in
-  library-reachable code;
+- enable the `locales` and `fluent` features on `iso-types`;
+- define the embedded module and `#[iso_locale]` enum in library-reachable code;
+- use `#[iso_locale(custom)]` with locale-tag messages for application-owned
+  picker labels;
 - reference the private embedded-module static inside the locale adapter;
 - call `gpui_es_fluent::replace_with_language`;
 - pass the enum's fallback and adapter to `StorybookOptions::new`.

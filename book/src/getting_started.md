@@ -13,9 +13,9 @@ You need:
 - embedded Fluent resources and a typed language enum;
 - compatible versions of GPUI Kit and the Fluent integration crates.
 
-The workspace targets Rust 1.99 and edition 2024. The Storybook 0.8
-line uses GPUI Kit 0.9.0, gpui-es-fluent 0.4 and the es-fluent 0.21.2 family.
-Storybook 0.7 targets Kit 0.8; keep these public GPUI type families together.
+This workspace targets Rust 1.100 and edition 2024. Use GPUI Kit 0.11.0,
+gpui-es-fluent 0.5, and the es-fluent 0.22 family together. Storybook 0.8
+used Kit 0.9 and Storybook 0.7 used Kit 0.8; do not mix GPUI type families.
 
 ## Add the Storybook package dependencies
 
@@ -26,13 +26,12 @@ look like this:
 ```toml
 [dependencies]
 es-fluent.workspace = true
-es-fluent-lang.workspace = true
 es-fluent-manager-embedded.workspace = true
 gpui-kit.workspace = true
 gpui-es-fluent.workspace = true
 gpui-storybook.workspace = true
+iso-types.workspace = true
 rust-embed.workspace = true
-strum.workspace = true
 tracing.workspace = true
 
 [build-dependencies]
@@ -80,14 +79,11 @@ Define the embedded module and language enum in library-reachable code. For a
 package named `my-app-storybook`, `src/i18n.rs` can contain:
 
 ```rust
-use es_fluent::EsFluent;
-use es_fluent_lang::es_fluent_language;
-use strum::EnumIter;
+use iso_types::iso_locale;
 
 es_fluent_manager_embedded::define_i18n_module!();
 
-#[es_fluent_language]
-#[derive(Clone, Copy, Debug, EnumIter, EsFluent, PartialEq)]
+#[iso_locale]
 pub enum Languages {}
 
 pub fn apply_locale(
@@ -98,6 +94,12 @@ pub fn apply_locale(
     gpui_es_fluent::replace_with_language(cx, language)
 }
 ```
+
+Enable the `locales` and `fluent` features on `iso-types`. The macro reads the
+locale folders and fallback from the package configuration. For a picker with
+application-owned labels, use `#[iso_locale(custom)]` and define each canonical
+locale tag as a message in the package's Fluent resources. The examples use
+this mode to keep the names in their native languages.
 
 The generated private static uses the Cargo package name converted to upper
 snake case, followed by `_I18N_MODULE`. Reference it in the same module before

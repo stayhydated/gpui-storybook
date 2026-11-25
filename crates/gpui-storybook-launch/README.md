@@ -6,7 +6,7 @@
 session on Linux, supplying the compositor-driven frame callbacks required by
 GPUI Storybook MCP and startup capture without using the physical display.
 
-Requires Rust 1.99 or newer, Linux, Sway on `PATH`, and a working Wgpu adapter
+Requires Rust 1.100 or newer, Linux, Sway on `PATH`, and a working Wgpu adapter
 for the child GPUI application.
 
 The launcher supports inspection and interaction on the published Kit 0.9

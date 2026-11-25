@@ -8,7 +8,7 @@ filter evaluation for tools that need configuration without the GPUI runtime.
 The [`gpui-storybook` facade][facade] selects the active configuration and
 applies it during initialization and story discovery.
 
-Requires Rust 1.99 or newer.
+Requires Rust 1.100 or newer.
 
 ## Configuration
 
