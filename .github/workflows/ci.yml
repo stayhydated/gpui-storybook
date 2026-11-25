@@ -12,6 +12,7 @@ env:
   CARGO_TERM_COLOR: always
   RUSTUP_TOOLCHAIN: "1.100.0"
   SCCACHE_GHA_ENABLED: true
+  SCCACHE_CONF: ${{ github.workspace }}/.github/sccache.toml
   RUSTC_WRAPPER: sccache
 
 jobs:
