@@ -15,7 +15,7 @@ use std::{
 pub const PROTOCOL_VERSION: u32 = 2;
 pub const MAX_WIRE_BYTES: usize = 1024 * 1024;
 
-#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize, bon::Builder)]
+#[derive(bon::Builder, Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct SurfaceGeometry {
     x: u32,
@@ -74,7 +74,7 @@ pub enum DisplayOrientation {
 
 /// Application-advertised appearance. Stable IDs distinguish schemes that share
 /// the same light/dark classification, such as dark and OLED canvases.
-#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize, bon::Builder)]
+#[derive(bon::Builder, Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct HostAppearance {
     id: String,
@@ -117,7 +117,7 @@ impl HostAppearance {
 }
 
 /// A readiness failure with enough context to explain the next useful action.
-#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize, thiserror::Error)]
+#[derive(Clone, Debug, Deserialize, Eq, thiserror::Error, JsonSchema, PartialEq, Serialize)]
 #[serde(tag = "reason", rename_all = "snake_case", deny_unknown_fields)]
 pub enum HostReadinessIssue {
     #[error("application surface is unavailable: {message}")]
@@ -161,7 +161,7 @@ pub enum HostReadinessIssue {
     AppearanceUnavailable { id: String },
 }
 
-#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize, bon::Builder)]
+#[derive(bon::Builder, Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct HostDescriptor {
     protocol_version: u32,
@@ -305,7 +305,7 @@ pub enum HostAction {
     },
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize, bon::Builder)]
+#[derive(bon::Builder, Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct HostActionDescriptor {
     name: String,
@@ -346,7 +346,7 @@ pub enum DeviceResult {
     CaptureTicket { ticket: u64, host: HostDescriptor },
 }
 
-#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize, bon::Builder)]
+#[derive(bon::Builder, Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct DeviceRequest {
     protocol_version: u32,
@@ -391,7 +391,7 @@ impl DeviceRequest {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize, bon::Builder)]
+#[derive(bon::Builder, Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct DeviceResponse {
     protocol_version: u32,
@@ -421,7 +421,7 @@ pub enum HostCaptureScope {
     Gpui,
 }
 
-#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize, bon::Builder)]
+#[derive(bon::Builder, Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct HostCaptureSnapshot {
     request_id: u64,

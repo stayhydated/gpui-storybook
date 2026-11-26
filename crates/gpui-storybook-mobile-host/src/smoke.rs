@@ -7,7 +7,7 @@ use std::time::Duration;
 
 /// Application-owned fixture expectations. Steps and scenarios execute once;
 /// semantic postconditions repeat only freshly rendered observations.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, bon::Builder)]
+#[derive(bon::Builder, Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct SmokePlan {
     route: Option<String>,
@@ -75,7 +75,7 @@ impl SmokePlan {
     }
 }
 
-#[derive(Clone, Debug, bon::Builder)]
+#[derive(bon::Builder, Clone, Debug)]
 pub struct SmokeOptions {
     output: PathBuf,
     #[builder(default)]

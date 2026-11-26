@@ -25,7 +25,7 @@ fn validate_apk(metadata: &std::fs::Metadata) -> Result<(), StorybookAutomationE
 
 /// Explicit device selection and overall I/O deadlines. The local ADB server
 /// owns transport selection; Storybook owns framing, limits, and input outcomes.
-#[derive(Clone, Debug, bon::Builder)]
+#[derive(bon::Builder, Clone, Debug)]
 pub struct AdbTransportOptions {
     serial: String,
     #[builder(default = SocketAddr::from(([127, 0, 0, 1], 5037)))]

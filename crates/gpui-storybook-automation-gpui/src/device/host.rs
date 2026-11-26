@@ -4,7 +4,7 @@ use super::*;
 use gpui::{Entity, Render, WindowHandle};
 
 /// Device endpoint and native appearance choices for one embedded application.
-#[derive(Clone, bon::Builder)]
+#[derive(bon::Builder, Clone)]
 pub struct DeviceHostOptions {
     /// Explicit application build/runtime opt-in. The default opens no endpoint.
     #[builder(default)]

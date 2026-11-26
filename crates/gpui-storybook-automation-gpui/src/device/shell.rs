@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 
 /// One committed native frame. The application supplies its public state;
 /// the adapter owns revisions, geometry generations, and acknowledgment.
-#[derive(Clone, Debug, Deserialize, Serialize, bon::Builder)]
+#[derive(bon::Builder, Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct NativeObservation {
     route: String,

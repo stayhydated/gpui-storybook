@@ -31,7 +31,7 @@ pub use host::{DeviceHost, DeviceHostOptions};
 
 type Reply = SyncSender<Result<DeviceResult, StorybookAutomationError>>;
 /// Immutable native observation captured alongside an owner-thread update.
-#[derive(Clone, bon::Builder)]
+#[derive(bon::Builder, Clone)]
 pub struct NativeShellSnapshot {
     sync_issue: Option<HostReadinessIssue>,
     route: String,

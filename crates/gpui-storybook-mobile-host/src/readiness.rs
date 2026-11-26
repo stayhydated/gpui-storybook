@@ -4,7 +4,7 @@ use crate::*;
 use std::time::Duration;
 
 /// Conditions for a fresh device attachment. No submitted operation is retried.
-#[derive(Clone, Debug, bon::Builder)]
+#[derive(bon::Builder, Clone, Debug)]
 pub struct ReadinessOptions {
     #[builder(default = Duration::from_secs(30))]
     timeout: Duration,
