@@ -310,6 +310,9 @@ impl io::Write for DeadlineStream<'_> {
 }
 
 fn serve_connection(mut stream: TcpStream, shared: &SharedEndpoint) -> io::Result<()> {
+    // Accepted sockets can inherit the listener's nonblocking mode (e.g. on
+    // macOS and Windows). DeadlineStream relies on blocking I/O with timeouts.
+    stream.set_nonblocking(false)?;
     while !shared.closed.load(Ordering::Acquire) {
         let request: DeviceRequest = read_frame(&mut DeadlineStream {
             stream: &mut stream,
@@ -440,6 +443,53 @@ mod tests {
             std::thread::sleep(Duration::from_millis(1));
         }
     }
+    #[test]
+    fn connection_waits_for_a_frame_when_accepted_socket_is_nonblocking() {
+        let endpoint = DeviceEndpoint::listen(0, "surface-1".to_owned()).unwrap();
+        let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).unwrap();
+        let mut client = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+        client
+            .set_read_timeout(Some(Duration::from_secs(3)))
+            .unwrap();
+        let (server, _) = listener.accept().unwrap();
+        // Explicitly model BSD/macOS accept semantics on Linux as well.
+        server.set_nonblocking(true).unwrap();
+
+        let shared = endpoint.shared.clone();
+        let (ready, started) = mpsc::sync_channel(0);
+        let (settled, finished) = mpsc::sync_channel(1);
+        let worker = std::thread::spawn(move || {
+            ready.send(()).unwrap();
+            let _ = settled.send(serve_connection(server, &shared));
+        });
+        started.recv_timeout(Duration::from_secs(3)).unwrap();
+        assert!(
+            matches!(
+                finished.recv_timeout(Duration::from_millis(100)),
+                Err(mpsc::RecvTimeoutError::Timeout)
+            ),
+            "the connection closed while waiting for its first frame"
+        );
+
+        write_frame(
+            &mut client,
+            &request(
+                1,
+                PROTOCOL_VERSION + 1,
+                "surface-1",
+                DeviceOperation::GetHost {},
+            ),
+        )
+        .unwrap();
+        let response: DeviceResponse = read_frame(&mut client).unwrap();
+        assert!(matches!(
+            response.into_outcome(),
+            Err(StorybookAutomationError::ProtocolMismatch { .. })
+        ));
+        drop(client);
+        worker.join().unwrap();
+    }
+
     #[test]
     fn real_endpoint_rejects_protocol_and_retains_disconnected_mutation_ownership() {
         let endpoint = DeviceEndpoint::listen(0, "surface-1".to_owned()).unwrap();
