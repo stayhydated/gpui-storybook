@@ -5,12 +5,13 @@
 tests, PNG capture, visual baselines, capture matrices, and optional GPUI frame
 budgets without opening the gallery shell.
 
-Add it as a development dependency. Enable `performance` only when tests need
+For the Storybook 0.8 / Kit 0.9 line, add it as a development
+dependency. Enable `performance` only when tests need
 GPUI profiler samples and budgets:
 
 ```toml
 [dev-dependencies]
-gpui-storybook-test = { version = "0.7", features = ["performance"] }
+gpui-storybook-test = { version = "0.8", features = ["performance"] }
 ```
 
 Keep the crate that contains the story registrations linked from the test
@@ -115,6 +116,10 @@ maximum-duration budgets. These measurements are better suited to regression
 checks than the cumulative gallery Perf tab because each case starts with an
 isolated window and its own histograms.
 
+`PerformanceBudget` duration setters preserve nanoseconds up to `u64::MAX`.
+Larger durations saturate at that limit, so increasing a budget cannot wrap it
+into a stricter threshold.
+
 Treat timing thresholds as platform-specific test policy. Pin the renderer,
 fonts, assets, viewport, theme, language, controls, and CI hardware class before
 comparing either pixels or frame timing.
@@ -122,7 +127,7 @@ comparing either pixels or frame timing.
 ## Platform expectations
 
 The runner asks `gpui_platform` for the current headless renderer. In the
-pinned `gpui-pre` 0.3.7 stack, `current_headless_renderer` returns a Metal
+pinned `gpui-pre` 0.3.14 stack, `current_headless_renderer` returns a Metal
 renderer on macOS and a Wgpu renderer on Linux, so an explicit headless runner
 capture runs on both. Windows gets `Ok(None)`, and its DirectX renderer reaches
 `render_to_image` only through a real window, which the runner's headless
@@ -133,7 +138,7 @@ Headless capture therefore follows one path per platform:
 | Platform | Portable runner capture | Application capture |
 |---|---|---|
 | macOS | Metal headless renderer | Metal window renderer |
-| Linux | Wgpu headless renderer (gpui-pre 0.3.7) | Wayland Wgpu window renderer with consumer-owned Git patches |
+| Linux | Wgpu headless renderer (gpui-pre 0.3.14) | `gpui-pre` 0.3.14 Wayland branch with its pinned Git patches |
 | Windows | Not available (`Ok(None)`) | DirectX window readback on an unshown window |
 
 The runner owns its offscreen window and renderer inside a fresh
@@ -155,4 +160,4 @@ output.
 Rendered route, target, and value registries belong to each application and
 window. Fresh runner contexts and simultaneously attached embedded windows can
 reuse stable route keys while retaining independent rendered state. See
-[embedded mobile automation](mobile_automation.md) for application-owned roots.
+[portable device automation](mobile_automation.md) for application-owned roots.

@@ -7,52 +7,28 @@ fmt:
     taplo fmt
     rumdl fmt .
 
+# Run with the versioned CI quality tools installed and Docker available.
+quality:
+    taplo fmt --check
+    rumdl check .
+    typos
+    cargo sort-derives --check
+    docker run --rm -v "{{justfile_directory()}}:/repo" -w /repo rhysd/actionlint:1.7.12
+    git ls-files -z '*.sh' '*.bash' | xargs -0 --no-run-if-empty shellcheck
+
 clippy:
-    cargo clippy --workspace --all-features \
-        --exclude gpui-storybook-example-story \
-        --exclude gpui-storybook-example-component
+    cargo clippy --workspace --all-features --all-targets --locked -- -D warnings
 
 check:
-    cargo check --workspace --all-features \
+    cargo check --workspace --all-features --locked \
         --exclude gpui-storybook-example-story \
         --exclude gpui-storybook-example-component
 
 test:
-    cargo test --workspace --all-features
-
-# Build the opted-in example with the explicitly configured Android SDK/NDK.
-mobile-build abi="x86_64":
-    python3 examples/mobile/build.py --automation --profile mobile \
-        --sdk "$ANDROID_HOME" --ndk "$ANDROID_NDK_HOME" --abi "{{abi}}"
-
-# Install and launch the example on one selected device, then serve MCP.
-mobile-host serial abi="x86_64":
-    cargo run -p gpui-storybook-mobile-host --locked -- \
-        serve --serial "{{serial}}" --allow-interaction \
-        --config examples/mobile/storybook.toml \
-        --install "target/mobile-example/{{abi}}/storybook.apk" --launch
-
-# Inspect readiness of the declared Android application.
-mobile-doctor serial:
-    cargo run -p gpui-storybook-mobile-host --locked -- \
-        doctor --serial "{{serial}}" --config examples/mobile/storybook.toml
-
-# Run semantic/capture/lifecycle qualification on an exclusively owned emulator.
-mobile-smoke serial:
-    cargo run -p gpui-storybook-mobile-host --locked -- \
-        smoke --serial "{{serial}}" --config examples/mobile/storybook.toml \
-        --allow-interaction --lifecycle
-
-# Verify an already running, opted-in example on an owned emulator.
-mobile-test serial:
-    python3 examples/mobile/verify.py --serial "{{serial}}"
-    STORYBOOK_ANDROID_SERIAL="{{serial}}" cargo test -p gpui-storybook-mobile-host --test android --locked -- --ignored
-    python3 examples/mobile/verify_native.py --serial "{{serial}}"
-    python3 examples/mobile/native/build.py --sdk "$ANDROID_HOME"
-    python3 examples/mobile/native/verify.py --serial "{{serial}}"
+    cargo test --workspace --all-features --locked
 
 cov:
-    cargo llvm-cov --workspace \
+    cargo llvm-cov --workspace --locked \
         --exclude gpui-storybook-example-story \
         --exclude gpui-storybook-example-component \
         --exclude xtask \
@@ -60,10 +36,10 @@ cov:
         --all-features --all-targets
 
 test-publish:
-    cargo publish --workspace --dry-run --allow-dirty
+    cargo publish --workspace --dry-run --locked --allow-dirty
 
 test-docs:
-    cargo doc --workspace --all-features --no-deps --open
+    cargo doc --workspace --all-features --no-deps --locked --open
 
 book:
     mdbook serve book

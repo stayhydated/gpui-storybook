@@ -1,7 +1,8 @@
 # GPUI Storybook mobile host
 
 Launch, diagnose, and verify an explicitly selected Android application's
-embedded GPUI automation. Consumer `storybook.toml` metadata supplies the package,
+application-owned automation endpoint. This branch does not ship an Android
+APK or provide the GPUI mobile runtime. Consumer `storybook.toml` metadata supplies the package,
 Activity, port, APK, optional build hook, and runtime/fixture extras. The computer
 owns direct ADB connections and PNG destinations; the application owns public
 state, effects, and admission.

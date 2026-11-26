@@ -9,7 +9,7 @@ GPUI Storybook gives application developers a searchable gallery
 for developing, inspecting, and exercising GPUI components outside
 the rest of their application.
 
-The workspace requires Rust 1.99 or newer and uses edition 2024.
+The workspace requires Rust 1.100 or newer and uses edition 2024.
 
 ## Overview
 
@@ -19,21 +19,15 @@ The workspace requires Rust 1.99 or newer and uses edition 2024.
   run repeatable scenarios from the workbench.
 - Drive live Linux and macOS sessions through MCP, or exercise isolated stories
   with the portable headless test runner.
-- Attach to an opted-in Android application, coordinate native navigation with
-  embedded GPUI views, and capture the display or GPUI surface through ADB.
+- Reuse portable device protocol, bounded transport, and scoped ADB capture
+  with an application that owns its platform bridge.
 
 MCP servers consume an asynchronous automation backend. Shared contracts and
 validation live in `gpui-storybook-automation`; core supplies the gallery backend.
 Application-owned roots attach through `gpui-storybook-automation-gpui`.
-The maintained Android example combines Jetpack Compose navigation and an
-automatable native counter with embedded GPUI content,
-while `gpui-storybook-mobile-host` serves its remote MCP connection through
-consumer launch configuration, readiness diagnostics, a reusable smoke harness,
-bounded `adbutils-rs` device sockets, retained cleanup outcomes, and atomic PNG
-publication. Device-owned session generations invalidate replaced surfaces.
-AndroidX UI Automator qualifies native selectors, touch, IME input, lifecycle,
-and screenshots on the declared API 36 emulator. Android arm64 has signed build
-coverage; iOS has neutral contract compilation coverage.
+This branch keeps portable device automation and the ADB host, but does not build
+or qualify an embedded Android app. Native GPUI mobile integration awaits
+official upstream support.
 
 Live captures size the story canvas to desktop, tablet, mobile, or explicit
 pixel dimensions and crop gallery chrome from the PNG.
@@ -53,7 +47,6 @@ own workspace root.
 | `gpui-storybook-core` | Runtime shell and lower-level integration APIs | [README](crates/gpui-storybook-core/README.md) |
 | `gpui-storybook-example-component` | Executable `ComponentStory` registration examples | [README](examples/component/README.md) |
 | `gpui-storybook-example-embedded` | Application-owned Counter and Notes views | [README](examples/embedded/README.md) |
-| `gpui-storybook-example-mobile` | Maintained Android native shell and device qualification | [README](examples/mobile/README.md) |
 | `gpui-storybook-example-story` | Executable stateful `#[story]` registration examples | [README](examples/story/README.md) |
 | `gpui-storybook-launch` | Linux headless Sway launcher for automation sessions | [README](crates/gpui-storybook-launch/README.md) |
 | `gpui-storybook-mcp` | Typed live automation and story-region capture tools | [README](crates/gpui-storybook-mcp/README.md) |

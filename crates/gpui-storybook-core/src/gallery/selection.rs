@@ -1,6 +1,22 @@
 use super::*;
 
 impl Gallery {
+    pub(super) fn sync_story_activation(&mut self, window: &mut Window, cx: &mut App) {
+        use gpui_kit::component::dock::BasePanel as _;
+
+        let selected = self.workbench_state.read(cx).active_story();
+        if self.activated_story == selected {
+            return;
+        }
+        if let Some(previous) = self.activated_story.take() {
+            previous.update(cx, |story, cx| story.set_active(false, window, cx));
+        }
+        if let Some(selected) = selected {
+            selected.update(cx, |story, cx| story.set_active(true, window, cx));
+            self.activated_story = Some(selected);
+        }
+    }
+
     pub(super) fn set_active_story(&mut self, name: &str, app_cx: &mut App) {
         let lowercase_name = name.to_lowercase().replace("story", "");
         let story_index = self.stories.iter().position(|story_entity| {

@@ -1,10 +1,10 @@
 use super::*;
 
-pub(super) fn format_key_binding(binding: &KeyBinding) -> String {
+pub(super) fn format_key_binding(binding: &KeyBinding, os: OperatingSystem) -> String {
     binding
         .keystrokes()
         .iter()
-        .map(ToString::to_string)
+        .map(|keystroke| keystroke.display(os).to_string())
         .collect::<Vec<_>>()
         .join(" ")
 }
@@ -78,6 +78,7 @@ impl StoryWorkbench {
             .with(|settings| settings.inline_subschemas = true)
             .into_generator();
 
+        let os = cx.platform_info().os;
         let action_rows = actions.into_iter().map(|action| {
             let name = action.name();
             let documentation = documentation.get(name).copied();
@@ -88,7 +89,7 @@ impl StoryWorkbench {
             let bindings = window
                 .bindings_for_action_in(action.as_ref(), &action_scope_focus)
                 .into_iter()
-                .map(|binding| format_key_binding(&binding))
+                .map(|binding| format_key_binding(&binding, os))
                 .collect::<Vec<_>>();
             let dispatch_focus = action_scope_focus.clone();
 

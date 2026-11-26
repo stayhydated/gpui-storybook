@@ -132,6 +132,7 @@ impl AutomationCapabilities {
                     AutomationCapability::SemanticTargets
                 },
                 StoryInteractionStep::Scroll { .. } => AutomationCapability::Scroll,
+                StoryInteractionStep::WaitForValue { .. } => AutomationCapability::SemanticValues,
                 StoryInteractionStep::WaitFrames { .. } => AutomationCapability::FrameWaits,
             };
             self.require(capability)?;

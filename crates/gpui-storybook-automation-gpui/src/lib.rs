@@ -13,6 +13,3 @@ pub use route::EmbeddedRoute;
 
 #[cfg(feature = "device")]
 pub mod device;
-
-#[cfg(all(feature = "android", target_os = "android"))]
-pub mod android;

@@ -13,6 +13,10 @@ struct ControlledStory {
     enabled: bool,
 }
 
+#[derive(Default)]
+struct StoryActivations(Vec<bool>);
+impl gpui_kit::Global for StoryActivations {}
+
 impl StoryControls for ControlledStory {
     fn control_specs(&self) -> Vec<ControlSpec> {
         vec![ControlSpec {
@@ -72,6 +76,77 @@ impl Story for ControlledStory {
             enabled: false,
         })
     }
+
+    fn on_active(&mut self, active: bool, _: &mut Window, cx: &mut App) {
+        if cx.has_global::<StoryActivations>() {
+            cx.global_mut::<StoryActivations>().0.push(active);
+        }
+    }
+}
+
+#[gpui_kit::test]
+fn gallery_activates_selected_stories_and_their_fresh_scenario_instances(cx: &mut App) {
+    gpui_kit::init(cx);
+    cx.set_global(StoryActivations::default());
+    let automation = crate::automation::StorybookAutomation::new();
+    let automation_for_view = automation.clone();
+    let window: gpui_kit::WindowHandle<Gallery> = cx
+        .open_window(Default::default(), move |window, cx| {
+            let stories = [("crate-One", "One"), ("crate-Two", "Two")]
+                .into_iter()
+                .map(|(key, name)| {
+                    let story = StoryContainer::panel::<ControlledStory>(window, cx);
+                    story.update(cx, |story, _| {
+                        story.set_registration_metadata(RegisteredStoryMetadata::new(
+                            StoryKey::new(key),
+                            StoryName::new(name),
+                            None,
+                            "crate",
+                            "/tmp/crate",
+                            "src/stories.rs",
+                            1,
+                        ));
+                    });
+                    story
+                })
+                .collect();
+            Gallery::view_with_automation(stories, None, automation_for_view, window, cx)
+        })
+        .expect("gallery opens");
+    window
+        .update(cx, |gallery, window, cx| {
+            assert_eq!(cx.global::<StoryActivations>().0, [true]);
+            for key in ["crate-One", "crate-Two"] {
+                let (response, mut result) = oneshot::channel();
+                gallery.handle_automation_command(
+                    StorybookAutomationCommand::OpenStory {
+                        key: key.into(),
+                        response,
+                        _operation: automation.begin_operation().expect("operation starts"),
+                    },
+                    window,
+                    cx,
+                );
+                result
+                    .try_recv()
+                    .expect("selection responds")
+                    .expect("story opens");
+            }
+            assert_eq!(cx.global::<StoryActivations>().0, [true, false, true]);
+            let selected = gallery
+                .workbench_state
+                .read(cx)
+                .active_story()
+                .expect("story selected");
+            selected.update(cx, |story, cx| {
+                assert!(story.recreate_for_scenario(window, cx));
+            });
+            assert_eq!(
+                cx.global::<StoryActivations>().0,
+                [true, false, true, false, true]
+            );
+        })
+        .expect("gallery remains open");
 }
 
 fn story(
@@ -287,9 +362,7 @@ fn gallery_selects_by_title_key_and_automation_command(cx: &mut App) {
         .expect("gallery should update");
 }
 
-#[test]
-fn capture_dimensions_override_preview_and_keep_chrome_outside_the_story() {
-    let app = TestAppContext::single();
+fn exercise_capture_dimensions(app: &mut TestAppContext) {
     let mut gallery = None;
     let window = app.update(|cx| {
         gpui_kit::init(cx);
@@ -331,7 +404,7 @@ fn capture_dimensions_override_preview_and_keep_chrome_outside_the_story() {
         .expect("capture layout window should open")
     });
     let gallery = gallery.expect("gallery should be constructed");
-    let mut cx = VisualTestContext::from_window(window.into(), &app);
+    let mut cx = VisualTestContext::from_window(window.into(), app);
     gallery.update(&mut cx, |gallery, cx| {
         gallery.workbench_state.update(cx, |state, cx| {
             state.set_viewport(crate::presentation::StoryViewportPreset::Desktop, cx);
@@ -421,6 +494,20 @@ fn capture_dimensions_override_preview_and_keep_chrome_outside_the_story() {
             cx.debug_bounds("story-canvas-resize-corner").is_some(),
             viewport == crate::presentation::StoryViewportPreset::Responsive
         );
+    }
+    // Release retained text layouts while their cleanup task can still run.
+    cx.update(|window, _| window.remove_window());
+    drop(gallery);
+    cx.run_until_parked();
+}
+
+// Keep Borrow out of the GPUI test macro's generated Rc::borrow scope.
+mod capture_layout {
+    #[gpui_kit::test]
+    fn capture_dimensions_override_preview_and_keep_chrome_outside_the_story(
+        app: &mut gpui_kit::TestAppContext,
+    ) {
+        super::exercise_capture_dimensions(app);
     }
 }
 

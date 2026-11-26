@@ -107,6 +107,7 @@ impl PerformanceReport {
 ///
 /// All duration limits are expressed in nanoseconds in the serialized form.
 /// Use the duration builder methods when constructing a budget in Rust.
+/// Durations above `u64::MAX` nanoseconds saturate at that limit.
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct PerformanceBudget {
@@ -133,13 +134,13 @@ impl PerformanceBudget {
 
     /// Sets the maximum draw p95 duration.
     pub const fn with_max_draw_p95(mut self, duration: Duration) -> Self {
-        self.max_draw_p95_nanos = Some(duration.as_nanos() as u64);
+        self.max_draw_p95_nanos = Some(duration_nanos(duration));
         self
     }
 
     /// Sets the maximum draw duration.
     pub const fn with_max_draw(mut self, duration: Duration) -> Self {
-        self.max_draw_nanos = Some(duration.as_nanos() as u64);
+        self.max_draw_nanos = Some(duration_nanos(duration));
         self
     }
 
@@ -151,14 +152,23 @@ impl PerformanceBudget {
 
     /// Sets the maximum dirty-to-present p95 duration.
     pub const fn with_max_dirty_to_present_p95(mut self, duration: Duration) -> Self {
-        self.max_dirty_to_present_p95_nanos = Some(duration.as_nanos() as u64);
+        self.max_dirty_to_present_p95_nanos = Some(duration_nanos(duration));
         self
     }
 
     /// Sets the maximum dirty-to-present duration.
     pub const fn with_max_dirty_to_present(mut self, duration: Duration) -> Self {
-        self.max_dirty_to_present_nanos = Some(duration.as_nanos() as u64);
+        self.max_dirty_to_present_nanos = Some(duration_nanos(duration));
         self
+    }
+}
+
+const fn duration_nanos(duration: Duration) -> u64 {
+    let nanos = duration.as_nanos();
+    if nanos > u64::MAX as u128 {
+        u64::MAX
+    } else {
+        nanos as u64
     }
 }
 
@@ -319,6 +329,35 @@ mod tests {
         );
         assert_eq!(failure.violations[4].statistic, PerformanceStatistic::P95);
         assert_eq!(failure.violations[5].statistic, PerformanceStatistic::Max);
+    }
+
+    #[test]
+    fn duration_limits_preserve_values_and_saturate_without_wrapping() {
+        let maximum = Duration::from_nanos(u64::MAX);
+        for (duration, expected) in [
+            (Duration::ZERO, 0),
+            (Duration::from_nanos(42), 42),
+            (maximum, u64::MAX),
+            (maximum + Duration::from_nanos(1), u64::MAX),
+            (Duration::MAX, u64::MAX),
+        ] {
+            let budget = PerformanceBudget::default()
+                .with_max_draw_p95(duration)
+                .with_max_draw(duration)
+                .with_max_dirty_to_present_p95(duration)
+                .with_max_dirty_to_present(duration);
+
+            assert_eq!(budget.max_draw_p95_nanos, Some(expected));
+            assert_eq!(budget.max_draw_nanos, Some(expected));
+            assert_eq!(budget.max_dirty_to_present_p95_nanos, Some(expected));
+            assert_eq!(budget.max_dirty_to_present_nanos, Some(expected));
+
+            let report = PerformanceReport::from_summaries(
+                summary(1, expected, expected),
+                summary(1, expected, expected),
+            );
+            assert_eq!(report.check(&budget), Ok(()), "duration: {duration:?}");
+        }
     }
 
     #[test]

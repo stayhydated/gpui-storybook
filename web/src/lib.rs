@@ -3,7 +3,7 @@ use stayhydated_dioxus::{Project, ProjectSite, StayhydatedEmbeddedDemoProjectApp
 
 const PROJECT: Project = Project::new(
     "gpui-storybook",
-    "Storybook for GPUI with TOML-initialized gallery layouts, pane-centered previews, select-driven grouped variants, typed controls and scenarios, explicit story-root action/keymap diagnostics, optional GPUI performance telemetry and Inspector integration, portable headless visual tests, static catalog export, and backend-driven Linux/macOS MCP tools for gallery or embedded GPUI interaction, bounded structured-state waits, and maintained Android SDK lifecycle/GPUI adapters, named appearances, consumer launch configuration, readiness diagnostics, semantic smoke qualification, and display capture with fresh session generations, direct ADB transport, atomic PNG publication, and AndroidX native qualification.",
+    "Storybook for GPUI with TOML-initialized gallery layouts, pane-centered previews, select-driven grouped variants, typed controls and scenarios, explicit story-root action/keymap diagnostics, optional GPUI performance telemetry and Inspector integration, portable headless visual tests, static catalog export, and backend-driven Linux/macOS MCP tools for gallery or embedded GPUI interaction, bounded structured-state waits, and application-owned portable device automation with typed readiness, ADB display capture, and session-aware transport.",
 )
     .with_skill_command("npx skills add stayhydated/gpui-storybook");
 const SITE_URL: &str = "https://stayhydated.github.io/gpui-storybook/";

@@ -54,7 +54,7 @@ unic-langid = { features = [ "serde" ], workspace = true }
 url = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-gtk = { version = "0.19" }
+gtk = { version = "0.19.0" }
 
 [target.'cfg(unix)'.dependencies]
 libc = { workspace = true }
@@ -67,10 +67,10 @@ es-fluent-build = { workspace = true }
 
 [dev-dependencies]
 gpui-kit = { features = [ "test-support" ], workspace = true }
+read-fonts = { workspace = true }
 strum.workspace = true
 tempfile.workspace = true
 tokio = { features = [ "rt" ], workspace = true }
-ttf-parser = { workspace = true }
 
 [lints]
 workspace = true

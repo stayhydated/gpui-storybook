@@ -31,8 +31,8 @@ use gpui_kit::component::{
 use gpui_kit::{
     Action, AnyElement, App, AppContext as _, ClipboardItem, Context, Entity, EntityId,
     EventEmitter, FocusHandle, Focusable, InteractiveElement as _, IntoElement, KeyBinding,
-    ParentElement as _, Pixels, Render, ScrollHandle, ScrollWheelEvent, SharedString, Size,
-    Styled as _, Subscription, Window, div, point, prelude::FluentBuilder as _, px, size,
+    OperatingSystem, ParentElement as _, Pixels, Render, ScrollEvent, ScrollHandle, SharedString,
+    Size, Styled as _, Subscription, Window, div, point, prelude::FluentBuilder as _, px, size,
 };
 use serde::{Deserialize, Serialize};
 #[cfg(not(target_family = "wasm"))]

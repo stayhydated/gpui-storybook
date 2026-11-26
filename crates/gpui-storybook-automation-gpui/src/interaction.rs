@@ -3,7 +3,7 @@ use crate::regions::{capture_region_bounds, scroll_capture_region_into_view};
 use crate::snapshot::{rendered_interaction_targets, rendered_semantic_values};
 use gpui::{
     Action, App, Keystroke, Modifiers, MouseDownEvent, MouseMoveEvent, MouseUpEvent, PlatformInput,
-    ScrollDelta, ScrollWheelEvent, TouchPhase, Window, point, px,
+    ScrollDelta, ScrollEvent, ScrollSource, TouchPhase, Window, point, px,
 };
 #[cfg(test)]
 use serde::Deserialize;

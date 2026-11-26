@@ -440,7 +440,9 @@ impl StorybookAutomation {
     /// Runs one validated interaction batch on the live GPUI window thread.
     ///
     /// The batch owns the shared operation guard through every frame wait and
-    /// optional capture. After executor admission, the batch completes even if
+    /// optional capture. A `WaitForValue` step retains that guard while waiting
+    /// for an exact freshly rendered value before subsequent input. After
+    /// executor admission, the batch completes even if
     /// its response receiver is canceled. Its guard is retained until submitted
     /// work settles; dispatched clicks and actions are never retried.
     pub async fn run_steps(

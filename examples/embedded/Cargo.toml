@@ -7,7 +7,7 @@ license.workspace = true
 publish = false
 
 [dependencies]
-gpui-kit = { default-features = false, features = [ "component", "assets" ], version = "0.7.0" }
+gpui-kit = { default-features = false, features = [ "component", "assets" ], version = "=0.11.0" }
 gpui-storybook-automation = { workspace = true }
 gpui-storybook-automation-gpui = { workspace = true }
 schemars = { workspace = true }
@@ -17,6 +17,8 @@ serde_json = { workspace = true }
 [dev-dependencies]
 gpui-kit = { features = [ "test-support" ], workspace = true }
 gpui-storybook-automation-gpui = { features = [ "device" ], workspace = true }
+# These desktop tests use Storybook's workspace-local device protocol and admission
+# crate. It is not the third-party GPUI Mobile renderer and does not link one.
 gpui-storybook-mobile = { workspace = true }
 tokio = { features = [ "sync" ], workspace = true }
 

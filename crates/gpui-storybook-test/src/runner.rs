@@ -1,6 +1,7 @@
 use super::*;
 
 /// Headless story runner with fresh-context isolation for every case.
+/// Theme, controls, and case configuration are installed before story activation.
 #[derive(Clone, Debug, Default)]
 pub struct HeadlessStoryRunner {
     config: RunnerConfig,
@@ -172,6 +173,10 @@ impl HeadlessStoryRunner {
                             axis: configuration_axis(&case_for_window),
                             message,
                         });
+                }
+                if setup_error_for_window.borrow().is_none() {
+                    use gpui_kit::component::dock::BasePanel as _;
+                    story.update(app, |story, cx| story.set_active(true, window, cx));
                 }
                 story
             })

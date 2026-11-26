@@ -13,5 +13,5 @@ lease through frame callbacks even if the response receiver is dropped.
 `cargo test -p gpui-storybook-example-embedded --locked` renders the production
 views, clicks the counter, writes through the GPUI text path, repeats fresh
 scenarios, and verifies preflight rejection and cancellation ownership.
-GPUI text insertion exercises the GPUI input handler; native IME qualification
-belongs to the Android harness.
+GPUI text insertion exercises the GPUI input handler. These desktop tests do
+not qualify native Android input.

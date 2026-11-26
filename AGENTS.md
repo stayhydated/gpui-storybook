@@ -23,10 +23,7 @@ in `rust-toolchain.toml` for local validation.
 | `crates/gpui-storybook-test` | Public test integration: fresh story contexts, captures, matrices, baselines, and frame budgets |
 | `crates/gpui-storybook-preferences` | Internal typed persistence, system detection, and preference resolution |
 | `examples/story`, `examples/component` | Executable application examples and registration fixtures |
-| `examples/embedded`, `examples/mobile` | Shared production views, Android native shell, and maintained device qualification |
-| `examples/mobile/native` | Hash-pinned AndroidX native input and lifecycle harness |
-| `examples/mobile/android` | Pinned Gradle/Kotlin/Compose shell, dependency locks, and artifact verification |
-| `examples/mobile/tools` | Isolated, unpublished Android library qualification probes |
+| `examples/embedded` | Application-owned Counter and Notes views and portable device coordination tests |
 | `book/src` | Application user guide; navigate through `SUMMARY.md` |
 | `skills/use-gpui-storybook` | Application integration guidance for coding agents |
 | `web/src/lib.rs` | Public catalog and site routes |
@@ -63,20 +60,11 @@ instructions and book or API navigation to those linked surfaces.
   contract.
 - **Automation and capture:** keep MCP schemas, core automation/capture
   contracts, examples, and the automation skill reference aligned.
-- **Android automation:** keep neutral wire contracts, device admission, native
-  acknowledgment, owned host cleanup, and capture provenance aligned. Preserve
-  caller-cancellation settlement, fresh endpoint-owned sessions, and typed
-  secondary cleanup errors. Keep the example's build/runtime opt-in explicit.
-  The mobile CI workflow gates release; library probes stay in their separate
-  unpublished workspace.
-  Compose state belongs to the Activity; native actions validate before enqueueing
-  and acknowledge committed frames. Keep accessibility test tags, native value
-  keys, MCP descriptors, and independent native/GPUI qualification aligned.
-  Refresh Android dependencies deliberately with `build.py --write-gradle-locks`
-  and review both Gradle locks and SHA-256 verification metadata.
-  The Kotlin native harness shares the app's Gradle/compiler pins and verifies
-  its AndroidX closure independently. Its builder owns a separate Gradle lockfile.
-  Preserve JVM descriptors when editing Kotlin JNI callbacks.
+- **Portable device automation:** keep wire contracts, admission,
+  acknowledgment, host cleanup, and capture provenance aligned. Preserve
+  lifecycle invalidation and never replay an admitted mutation. This branch
+  does not compile an embedded Android example or depend on unofficial GPUI
+  mobile bindings.
 - **Portable tests:** keep the test crate README, portable-testing and automation
   book sections, examples, and automation skill reference aligned when capture
   matrices, baseline policy, context setup, or frame budgets change.
@@ -104,8 +92,7 @@ Sway and a working Wgpu adapter.
 
 The `wayland-render-image` branch's root `[patch.crates-io]` pins
 `gpui-pre-linux`, `gpui-pre-wgpu`, and `gpui-pre-platform` to one Zed fork
-revision, compatible with `gpui-pre =0.3.7`. Keep those revisions and the patch
-example in `book/src/automation.md` aligned, and commit the updated `Cargo.lock`
+revision, compatible with `gpui-pre =0.3.14`. Keep those revisions and the documented GPUI family in `book/src/automation.md` aligned, and commit the updated `Cargo.lock`
 when changing a pin. Consumer applications apply these patches in their own
 workspace root for Wayland window capture; Cargo patches are not inherited from
 dependencies. Portable runner capture uses the published headless renderers.
@@ -137,12 +124,3 @@ CI tests all features on Linux. On macOS it excludes the Linux-only launcher;
 on Windows it uses default features and excludes the launcher, MCP crate, and
 mobile host.
 Use the matching platform scope when reproducing those jobs.
-
-`just mobile-build [abi]` builds the opted-in Android example using
-`ANDROID_HOME` and `ANDROID_NDK_HOME`. `just mobile-host <serial> [abi]`
-installs/launches it and serves MCP. `just mobile-doctor <serial>` reads endpoint readiness and
-`just mobile-smoke <serial>` runs the declared semantic plan and owned-emulator
-lifecycle checks. `just mobile-test <serial>` qualifies an
-already running example on an exclusively owned API 36 emulator, including
-AndroidX native input and lifecycle. Preserve the selected device and forwarding
-ownership boundaries; record renderer, image, font, and IME inputs with captures.

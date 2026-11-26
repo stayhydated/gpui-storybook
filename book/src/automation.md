@@ -19,7 +19,7 @@ templates, presentation, interaction requests, snapshots, and validation.
 It can be checked for Android and iOS independently from GPUI rendering. Core
 owns the gallery, story construction, GPUI entity adapters, and desktop capture.
 The GPUI automation crate owns reusable instrumentation, window scoping, and
-frame execution. [Embedded Android automation](mobile_automation.md) uses an
+frame execution. [Portable device automation](mobile_automation.md) uses an
 application-owned root and native shell with the same contracts.
 
 Tool discovery includes operations supported by the selected backend. Input
@@ -36,29 +36,17 @@ cancellation, timeout, or disconnect.
 
 ## Pin the Wayland capture backends
 
-Linux Wayland window capture uses the Zed fork's image readback support with
-`gpui-pre =0.3.7`. The
-[`wayland-render-image` branch](https://github.com/stayhydated/gpui-storybook/tree/wayland-render-image)
-pins and tests these backends; `master` uses published GPUI packages. Add these
-patches to your application's workspace root `Cargo.toml` and commit the
-resolved `Cargo.lock`:
+The [Wayland branch manifest][wayland-manifest] pins the three GPUI Pre 0.3.14
+backend packages to the same Zed fork revision for GPUI Kit 0.11. Copy its
+`[patch.crates-io]` entries into your application workspace root and commit the
+resolved `Cargo.lock`. Cargo does not inherit patches from dependencies. Keep
+the remaining GPUI packages on the published 0.3.14 snapshot.
 
-```toml
-[patch.crates-io]
-gpui-pre-linux = { git = "https://github.com/stayhydated/zed", rev = "d80c3ebacff25e1f8723dfc7da0720f2dab62ea7" }
-gpui-pre-platform = { git = "https://github.com/stayhydated/zed", rev = "d80c3ebacff25e1f8723dfc7da0720f2dab62ea7" }
-gpui-pre-wgpu = { git = "https://github.com/stayhydated/zed", rev = "d80c3ebacff25e1f8723dfc7da0720f2dab62ea7" }
-```
+On either Wayland branch, `just wayland-capture-test` verifies startup capture
+at desktop, tablet, mobile, and custom sizes through private Sway. Portable
+runner captures can instead use the published GPUI headless renderers.
 
-Keep all three packages on the same revision. Cargo applies patches from the
-workspace root; adding Storybook as a dependency does not inherit its patches.
-The remaining GPUI packages retain the published snapshot used by `gpui-kit`.
-
-On the `wayland-render-image` branch, `just wayland-capture-test` verifies
-startup capture at desktop, tablet, mobile, and custom sizes through private
-Sway. Install the Linux runtime dependencies below before running that check.
-Portable runner captures work with the published GPUI packages on Linux without
-a compositor.
+[wayland-manifest]: https://github.com/stayhydated/gpui-storybook/blob/wayland-render-image/Cargo.toml
 
 ## Enable MCP support
 

@@ -9,12 +9,13 @@ fn action_debugger_formats_multi_stroke_bindings() {
         },
         None,
     );
-    let expected = if cfg!(target_os = "macos") {
-        "^K enter"
-    } else {
-        "ctrl-K enter"
-    };
-    assert_eq!(format_key_binding(&binding), expected);
+    for (os, expected) in [
+        (OperatingSystem::Mac, "^K enter"),
+        (OperatingSystem::Linux, "ctrl-K enter"),
+        (OperatingSystem::Windows, "ctrl-K enter"),
+    ] {
+        assert_eq!(format_key_binding(&binding, os), expected);
+    }
 }
 
 #[gpui_kit::test]
@@ -190,7 +191,7 @@ fn action_reset_toolbar_stays_visible_and_recreates_the_story(cx: &mut TestAppCo
     let items = visual_cx
         .debug_bounds("workbench-actions-items")
         .expect("action rows should render in their own scroll region");
-    visual_cx.simulate_event(ScrollWheelEvent {
+    visual_cx.simulate_event(ScrollEvent {
         position: items.center(),
         delta: ScrollDelta::Pixels(point(px(0.), px(-180.))),
         ..Default::default()

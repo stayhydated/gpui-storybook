@@ -17,15 +17,14 @@ The `mcp` feature is unsupported on Windows and produces a compile-time error
 there. Set `GPUI_STORYBOOK_MCP_STDIO=1` to serve MCP over stdio. Route tracing
 and diagnostic logs to standard error.
 
-For Linux Wayland window capture, copy the three `[patch.crates-io]` entries
-from GPUI Storybook's
-[`wayland-render-image` branch](https://github.com/stayhydated/gpui-storybook/blob/wayland-render-image/Cargo.toml)
-into the application's workspace root. They pin `gpui-pre-linux`,
-`gpui-pre-wgpu`, and `gpui-pre-platform` to the same Zed fork commit and retain
-`gpui-pre =0.3.7` for compatibility with `gpui-kit`. Commit the resolved
-`Cargo.lock`; Cargo patches are not inherited from dependencies. Verify the
-pinned path on that branch with `just wayland-capture-test`. The `master` branch
-uses published GPUI packages, including for portable headless capture.
+Live Wayland window capture on GPUI Kit 0.11 needs the three GPUI Pre
+0.3.14 backend patches from the
+[`wayland-render-image` branch manifest](https://github.com/stayhydated/gpui-storybook/blob/wayland-render-image/Cargo.toml).
+Copy all three entries from `[patch.crates-io]` to the application's workspace
+root and commit its resolved `Cargo.lock`; Cargo patches are not inherited.
+Verify capture on that branch with `just wayland-capture-test`. The unpatched
+published Linux stack still supports portable headless rendering but not live
+Wayland window readback.
 
 On Linux, install Sway plus `libgl1-mesa-dri` and `mesa-vulkan-drivers`, then
 install the reusable launcher and run stdio and startup-capture sessions
@@ -123,74 +122,21 @@ before dispatching a complete batch. Retain host-side exclusive ownership until
 submitted work settles; cancellation never authorizes replay. Scenarios create
 fresh fixtures and ordinary interactions preserve state.
 
-## Embedded GPUI and Android hosts
+## Portable device hosts
 
-Enable `gpui-storybook-automation-gpui/android` for `DeviceHost::attach_android`.
-Supply the existing root, `EmbeddedRoute` catalog, capabilities, and
-`DeviceHostOptions`. Its default opens no endpoint; pass `.automation(true)` only
-with application build/runtime opt-in. Retain `host.native_shell()` for JNI and
-run the owner against the existing window. `EmbeddedRoot` requires route selection
-and public revision; optional controls/actions/fixtures have defaults.
+The `device` feature of `gpui-storybook-automation-gpui` enables application-owned
+device coordination. Provide the native bridge and pass the route catalog and
+capabilities to `DeviceHost`. Its default does not open a device endpoint.
+Retain exclusive operation leases through native acknowledgments and invalidate
+the session when the surface changes. Native GPUI mobile support awaits
+official upstream; this branch does not include a GPUI Android app or JNI bridge.
 
-Export the version-matched Kotlin source with
-`gpui-storybook-mobile-host android-source --output PATH`. Construct its
-`StorybookAutomation` on the Activity with `NativeBridge`, the current SurfaceView,
-a committed `NativeFrame` reader, and the application selection callback. Forward
-lifecycle, surface release, and close; expose `storybookDispatch(String): Boolean`.
-JNI forwards `publish_json`, `is_current`, and `is_input_allowed` to the retained
-`NativeShellHandle`. Read Compose state during composition, capture it in
-`SideEffect`, and return null until that snapshot is committed.
-
-The SDK owns geometry revisions, frame acknowledgments, permit retention,
-attachment replacement, and polling. Rotation replaces the session even when an
-Activity/window is retained; IME-only viewport changes preserve it. Application
-fixtures, authentication, permissions, public values, and action validation remain
-application-owned. Lower-level hosts use `GpuiHostAttachment`, `DeviceCoordinator`,
-`NativeShellSnapshot`, and `DeviceEndpoint::listen_fresh`.
-
-Declare native `HostAppearance` IDs and labels in `DeviceHostOptions`. Override
-`EmbeddedRoot::apply_host_appearance` for custom schemes such as OLED. Discover
-choices with `storybook_get_host`, then submit
-`{"action":{"action":"set_appearance","id":"oled"}}` only for an advertised ID.
-Native action/semantic keys remain stable and distinct from GPUI keys.
-
-Declare package, activity, device port, APK, build hook, and runtime/fixture extras
-under `[android]` in the consumer's `storybook.toml`. Paths resolve against that
-file's directory. Use these commands:
-
-```sh
-gpui-storybook-mobile-host serve --serial DEVICE --config storybook.toml --launch --allow-interaction
-gpui-storybook-mobile-host doctor --serial DEVICE --config storybook.toml
-gpui-storybook-mobile-host smoke --serial DEVICE --config storybook.toml --allow-interaction --lifecycle
-```
-
-`serve --build --launch` runs the configured build hook once. Installation and
-launch are single submissions; failed installs preserve the package. EOF drains
-captures, and `--stop-on-eof` stops only the observed owned PID. A replaced process
-is preserved. Diagnostics stay on stderr; MCP uses stdin/stdout.
-
-`doctor` reports typed readiness causes and the last observation on timeout.
-`RemoteBackend::attach_when_ready` repeats only discovery. A new session requires
-explicit reattachment and capability rediscovery; never replay a submitted mutation.
-Protocol version 2 uses closed, bounded length-prefixed JSON.
-
-An application smoke plan declares its route, optional scenario/steps, and exact
-semantic postconditions. Effects require explicit interaction opt-in. Lifecycle
-qualification requires an exclusively owned disposable emulator; it checks
-rotation, stale sessions, retained state/PID, pause/resume, captures, and restores
-the observed rotation policy. The command writes a partial/complete JSON report
-and scoped PNGs. Library consumers retain `SmokeRunner`, await `shutdown`, then
-stop its initial Tokio runtime; response cancellation leaves work and restoration
-owned. `RemoteBackend::shutdown` and `AdbTransport::shutdown` settle captures and
-installs for lower-level integrations.
-
-The maintained example shares its production `DemoRoot`, SDK Kotlin adapter, and
-real GPUI runtime. Its builder pins SDK/build tools 36, NDK 27.1.12297006, API
-baseline 31, the `mobile` profile, GPUI Mobile revision
-`9075e3aa3eea812127f2c60ed66f0cd5798ff245`, and GPUI 0.3.7. The Gradle/Kotlin closure
-is locked and SHA-256 verified. Keep renderer, image, font, scale, and IME inputs
-with qualification evidence. Run the example's MCP, native, and AndroidX checks
-from its owning guide; never guess an application fixture or baseline acceptance.
+An already provisioned application may attach through the ADB host using an
+explicit device serial and consumer-owned `storybook.toml`. Ensure that the
+endpoint and host use matching wire versions. Discovery can retry, but never
+replay submitted work after a cancellation or transport failure. Capture
+dimensions are observed, not inferred, and must identify scope and provenance.
+Use the [device guide](../../../book/src/mobile_automation.md) for more.
 
 ## MCP tools
 
@@ -277,13 +223,22 @@ element ID and derives a readable label; use
 `storybook_run_steps` accepts an optional `story_key`, controls, paired rendered-pixel
 dimensions or viewport, a required non-empty step list, and an optional final
 capture. Step types are `focus_next`, `focus_previous`, `blur`, `keystrokes`,
-`text`, `dispatch_action`, `click_target`, `pointer_move`, `pointer_click`, `scroll`, and
-`wait_frames`. Supplying a `story_key` focuses the selected story's focus handle
-before the first step.
+`text`, `dispatch_action`, `click_target`, `pointer_move`, `pointer_click`, `scroll`,
+`wait_for_value`, and `wait_frames`. Supplying a `story_key` focuses the
+selected story's focus handle before the first step.
+
+Keystroke strings follow the runtime host OS, including browser hosts:
+`secondary-` means Command on macOS and Control elsewhere.
 
 GPUI defers registered-action dispatch; the executor resumes with the next step
-after that dispatch is delivered. Use `wait_frames` before a later action when
-earlier widget input schedules its own next-frame state change.
+after that dispatch is delivered. Before input that depends on asynchronous
+completion, insert `wait_for_value` with `value_key`, optional `json_pointer`,
+exact JSON `expected`, and optional `max_frames` (1–120, default 120).
+`StoryInteractionStep::WaitForValue` uses the same fields in a typed scenario.
+The batch retains its exclusive lease while checking fresh rendered state; a
+timeout prevents later steps. The step observation's `value_match` records the
+matching value and frames waited. Keep final postconditions to verify the full
+flow. Use `wait_frames` for a fixed rendering delay.
 
 Pointer points default to normalized `x`/`y` values in `0.0..=1.0`. The
 `logical_pixels` space is relative to fresh active-route bounds. Points cannot
@@ -291,8 +246,10 @@ reach Storybook chrome or the global screen. A click dispatches move, down, and
 up.
 
 Limits are 64 steps, 64 binding strings per `keystrokes` step, 4 KiB across
-UTF-8 text values and keystroke syntax, 120 waited frames, and one final
-capture. Complete validation happens before input dispatch. The capture is the
+UTF-8 text values and keystroke syntax, 120 fixed-wait frames, up to 120 frames
+per semantic wait, and one final capture. The fixed-wait budget counts only
+`wait_frames`; semantic waits and final postconditions each have their own
+bound. Complete validation happens before input dispatch. The capture is the
 first requested frame after the final step or explicit waits. Runtime failures
 report `steps_dispatched`; do not retry automatically.
 
@@ -373,13 +330,15 @@ language, and named control axes. Keep baseline policy explicit: use `Check`
 in verification, and expose `Update` only through a deliberate acceptance
 workflow. With the `performance` feature, require enough native GPUI profiler
 samples before enforcing draw or dirty-to-present p95 and maximum budgets.
+`PerformanceBudget` duration setters saturate at `u64::MAX` nanoseconds.
 
-In the pinned `gpui-pre` 0.3.7 stack, `current_headless_renderer` returns a
+In the pinned `gpui-pre` 0.3.11 stack, `current_headless_renderer` returns a
 Metal renderer on macOS and a Wgpu renderer on Linux, so runner captures run on
 both. Windows gets `Ok(None)`; its DirectX renderer reaches `render_to_image`
 only through a real window, outside the runner's headless context. Linux
-Wayland application captures use the Git-patched Wgpu window renderer and
-private Sway. The `mcp` feature supports Linux and macOS; the
+Wayland application captures require the Wayland branch's matching GPUI Pre 0.3.14
+Git-patched Wgpu window renderer and private Sway; those patches do not apply
+to Kit 0.9. The `mcp` feature supports Linux and macOS; the
 `wayland-render-image` branch verifies application capture at desktop, tablet,
 mobile, and custom sizes.
 Treat renderer, fonts, assets, and CI hardware as part of the baseline or timing

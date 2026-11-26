@@ -8,7 +8,7 @@ use std::{collections::BTreeMap, path::PathBuf};
 pub const MAX_INTERACTION_STEPS: usize = 64;
 /// Maximum UTF-8 byte length accepted across text values and keystroke strings.
 pub const MAX_INTERACTION_TEXT_BYTES: usize = 4 * 1024;
-/// Maximum number of rendered frames one batch may explicitly wait for.
+/// Maximum fixed-wait frames per batch and frame bound for one semantic condition.
 pub const MAX_INTERACTION_WAITED_FRAMES: u16 = 120;
 
 /// Runtime-visible GPUI action metadata.
@@ -153,6 +153,24 @@ pub enum StoryInteractionStep {
         /// Vertical logical-pixel delta.
         delta_y: f32,
     },
+    /// Wait for an exact rendered semantic value before continuing later steps.
+    ///
+    /// The batch retains its exclusive operation lease while refreshing frames.
+    /// A timeout fails the batch without dispatching subsequent input.
+    WaitForValue {
+        /// Stable semantic value key rendered by the active story route.
+        value_key: String,
+        /// Optional RFC 6901 JSON Pointer inside the semantic value.
+        #[serde(default)]
+        json_pointer: Option<String>,
+        /// Expected JSON value, compared using exact equality.
+        expected: Value,
+        /// Maximum freshly rendered frames to inspect. Omission uses
+        /// [`DEFAULT_INTERACTION_POSTCONDITION_FRAMES`].
+        #[serde(default)]
+        #[schemars(range(min = 1, max = MAX_INTERACTION_WAITED_FRAMES))]
+        max_frames: Option<u16>,
+    },
     /// Refresh and continue after a positive number of rendered frames.
     WaitFrames {
         /// Rendered frames to wait.
@@ -226,7 +244,7 @@ impl StoryInteractionPostcondition {
     }
 }
 
-/// Successful result for one exact semantic-value postcondition.
+/// Successful result for one exact rendered semantic-value condition.
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct StoryInteractionPostconditionSnapshot {
@@ -289,7 +307,7 @@ pub enum StoryInteractionDispatch {
     },
 }
 
-/// Dispatch observations for one completed interaction step.
+/// Input dispatch and semantic readiness observations for one completed step.
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct StoryInteractionObservation {
@@ -297,6 +315,9 @@ pub struct StoryInteractionObservation {
     pub step_index: usize,
     /// One entry per GPUI dispatch made by the step.
     pub dispatches: Vec<StoryInteractionDispatch>,
+    /// Exact rendered value matched by a `WaitForValue` step, which dispatches no input.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub value_match: Option<StoryInteractionPostconditionSnapshot>,
 }
 
 /// Result of an interaction batch executed by the live GPUI host.

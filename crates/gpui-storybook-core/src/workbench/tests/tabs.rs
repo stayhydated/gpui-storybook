@@ -44,7 +44,7 @@ fn workbench_tabs_scroll_horizontally() {
         .debug_bounds("workbench-tab-controls")
         .expect("controls tab should render")
         .center();
-    cx.simulate_event(ScrollWheelEvent {
+    cx.simulate_event(ScrollEvent {
         position,
         delta: ScrollDelta::Pixels(point(px(-60.), px(0.))),
         ..Default::default()
@@ -83,7 +83,7 @@ fn workbench_tabs_scroll_with_a_vertical_wheel() {
         .debug_bounds("workbench-tabs-scroll")
         .expect("tab strip should render")
         .center();
-    cx.simulate_event(ScrollWheelEvent {
+    cx.simulate_event(ScrollEvent {
         position,
         delta: ScrollDelta::Pixels(point(px(0.), px(-60.))),
         ..Default::default()
@@ -104,9 +104,15 @@ fn workbench_tabs_scroll_with_a_vertical_wheel() {
 }
 
 #[test]
-fn workbench_tab_click_selects_through_the_scrollbar_overlay() {
+fn workbench_tab_and_always_visible_scrollbar_remain_clickable() {
     let mut app = TestAppContext::single();
-    app.update(gpui_kit::init);
+    app.update(|cx| {
+        gpui_kit::init(cx);
+        gpui_kit::component::Theme::set_scrollbar_mode(
+            gpui_kit::component::scroll::ScrollbarMode::Always,
+            cx,
+        );
+    });
     let (window, mut visual_cx) = open_workbench(&mut app, 320.);
     let cx = &mut visual_cx;
 
@@ -114,16 +120,32 @@ fn workbench_tab_click_selects_through_the_scrollbar_overlay() {
     let workbench = window
         .root(cx)
         .expect("the workbench should be the window root");
-    let position = cx
+    let strip = cx
+        .debug_bounds("workbench-tabs-scroll")
+        .expect("tab strip should render");
+    let track_height = gpui_kit::component::scroll::Scrollbar::width();
+    let tab = cx
         .debug_bounds("workbench-tab-theme")
-        .expect("theme tab should render")
-        .center();
-    cx.simulate_click(position, Modifiers::default());
+        .expect("theme tab should render");
+    assert!(
+        tab.bottom() <= strip.bottom() - track_height,
+        "the scrollbar track should not overlap the tab's hit target"
+    );
+    assert!(
+        workbench.read_with(cx, |workbench, _| workbench
+            .tab_scroll_handle
+            .max_offset()
+            .x)
+            > px(0.),
+        "the bar must actually overflow for this regression test"
+    );
+
+    cx.simulate_click(tab.center(), Modifiers::default());
     draw(cx);
 
     assert_eq!(
         workbench.read_with(cx, |workbench, _| workbench.selected_tab),
         WorkbenchTab::Theme,
-        "clicking a tab should still select it"
+        "the visible scrollbar must not swallow a tab click"
     );
 }

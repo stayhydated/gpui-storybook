@@ -1,5 +1,5 @@
 use super::*;
-use gpui_kit::{ScrollDelta, ScrollWheelEvent, TestAppContext, VisualTestContext, point};
+use gpui_kit::{ScrollDelta, ScrollEvent, TestAppContext, VisualTestContext, point};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[derive(Action, Clone, Default, Eq, PartialEq)]

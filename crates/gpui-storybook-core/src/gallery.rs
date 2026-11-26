@@ -32,9 +32,11 @@ use std::{
 
 /// Searchable gallery host with independently toggled navigation and workbench
 /// sidebars around a story canvas centered within the available main pane.
+/// Selection activates the exact story member, including fresh scenario instances.
 pub struct Gallery {
     stories: Vec<Entity<StoryContainer>>,
     active_index: Option<usize>,
+    activated_story: Option<Entity<StoryContainer>>,
     left_sidebar_visible: bool,
     right_sidebar_visible: bool,
     left_sidebar_width: Pixels,
@@ -159,7 +161,8 @@ impl Gallery {
                 },
                 _ => {},
             }),
-            cx.observe(&workbench_state, |this, state, cx| {
+            cx.observe_in(&workbench_state, window, |this, state, window, cx| {
+                this.sync_story_activation(window, cx);
                 if let Some(automation) = &this.automation
                     && let Some(story) = state.read(cx).active_story()
                     && let Some(key) = story.read(cx).story_key_label()
@@ -173,6 +176,7 @@ impl Gallery {
         let mut this = Self {
             search_input,
             stories: initial_stories.clone(),
+            activated_story: None,
             active_index: if initial_stories.is_empty() {
                 None
             } else {
@@ -194,6 +198,7 @@ impl Gallery {
 
         this.sync_automation_stories(cx);
         this.sync_workbench_active(cx);
+        this.sync_story_activation(window, cx);
         this.confirm_active_story(cx);
         if let Some(command_receiver) = command_receiver {
             this.attach_automation_host(command_receiver, window, cx);

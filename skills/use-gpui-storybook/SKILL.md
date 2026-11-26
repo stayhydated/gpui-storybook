@@ -59,14 +59,15 @@ then open the window.
   lifetime. Generic remote input requires
   `GPUI_STORYBOOK_MCP_ALLOW_INTERACTION=1` and can invoke application effects.
 - Use typed controls and semantic targets for reproducible input. Expose
-  rendered state through `storybook_value` for bounded postcondition checks;
+  rendered state through `storybook_value` for bounded `WaitForValue` steps and
+  final postcondition checks;
   use PNG captures for visual assertions.
 - Use `gpui-storybook-test` for isolated cases. Keep baseline checking and
   acceptance explicit, and supply assets, initialization, and theme/language
   adapters required by the application.
-- Use `gpui-storybook-automation-gpui`, `gpui-storybook-mobile`, and the mobile
-  host for an opted-in Android application. Keep native lifecycle dispatch,
-  endpoint session invalidation, and computer-owned ADB capture aligned.
+- On the Wayland mobile-automation branch, use the portable device contracts
+  only with an application-owned platform bridge. Native GPUI mobile support
+  awaits official upstream; do not substitute an unofficial runtime.
 
 After edits, build the affected Storybook package with the requested features.
 Exercise the changed route, control, scenario, or capture when the target

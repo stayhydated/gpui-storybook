@@ -41,7 +41,7 @@ thiserror = { workspace = true }
 tokio = { features = [ "full" ], workspace = true }
 
 [dev-dependencies]
-proptest = { default-features = false, features = [ "std" ], version = "1.11" }
+proptest = { default-features = false, features = [ "std" ], version = "1.12.0" }
 tempfile = { workspace = true }
 
 [lints]

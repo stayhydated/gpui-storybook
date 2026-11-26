@@ -26,6 +26,9 @@ impl Gallery {
         match command {
             StorybookAutomationCommand::OpenStory { key, response, .. } => {
                 let result = self.set_active_story_by_key(&key, cx);
+                if result.is_ok() {
+                    self.sync_story_activation(window, cx);
+                }
                 cx.notify();
                 let _ = response.send(result);
             },
@@ -142,6 +145,7 @@ impl Gallery {
                     if let Some(route) = &request.story_key {
                         self.set_active_story_by_key(route, cx)?;
                     }
+                    self.sync_story_activation(window, cx);
                     if fresh_story {
                         let story_entity = self
                             .workbench_state
