@@ -11,6 +11,8 @@ in `rust-toolchain.toml` for local validation.
 | Surface | Audience and responsibility |
 |---|---|
 | `crates/gpui-storybook` | Application facade: initialization, discovery, filtering, and public re-exports |
+| `crates/gpui-storybook-automation` | Target-neutral automation contracts, validation, and backend interface |
+| `crates/gpui-storybook-automation-gpui` | Application-owned window attachment, interaction dispatch, and rendered regions |
 | `crates/gpui-storybook-core` | Runtime integration: gallery, workbench, story containers, preferences UI, and automation |
 | `crates/gpui-storybook-macros` | Public macro syntax and generated registrations, controls, and substory keys |
 | `crates/gpui-storybook-toml` | Public configuration schema, loading, and filters |
@@ -67,24 +69,28 @@ instructions and book or API navigation to those linked surfaces.
   affected FTL catalogs, and locale setup instructions aligned when message keys
   or locale wiring change.
 
+Set `MDBOOK_BUILD__CREATE_MISSING=false` when validating book changes so a
+missing navigation target fails validation instead of creating a chapter.
+
 Build publication artifacts through `cargo xtask`: the sources are `book/src`,
 `web/src`, and `examples/story`. The generated book, LLM text, demo, and site
 outputs are not independent editing surfaces.
 
-## Validate Wayland capture
+## Validate capture backends
 
-`just wayland-capture-test` runs the story example's startup-capture
-regression against the Git-pinned GPUI backends. It requires Sway and a working
-Wgpu adapter. The check captures the button story at desktop, tablet, mobile,
-and custom sizes in a private compositor, decodes the PNGs, and verifies
-dimensions, rendered content, and exclusion of workbench controls.
+The `master` branch uses published GPUI packages. Keep the Zed fork patches
+and Wayland startup-capture regression on `wayland-render-image`. On that
+branch, `just wayland-capture-test` captures the button story at desktop,
+tablet, mobile, and custom sizes in private Sway, decodes the PNGs, and verifies
+dimensions, rendered content, and exclusion of workbench controls. It requires
+Sway and a working Wgpu adapter.
 
-The root `[patch.crates-io]` pins `gpui-pre-linux`, `gpui-pre-wgpu`, and
-`gpui-pre-platform` to one Zed fork revision, compatible with `gpui-pre =0.3.7`.
-Keep these revisions and the patch example in `book/src/automation.md` aligned,
-and commit the updated `Cargo.lock`. Consumer applications must apply these
-patches in their own workspace root for Wayland window capture; Cargo patches
-are not inherited from dependencies.
+The `wayland-render-image` branch's root `[patch.crates-io]` pins
+`gpui-pre-linux`, `gpui-pre-wgpu`, and `gpui-pre-platform` to one Zed fork
+revision, compatible with the GPUI version pinned on that branch. Keep those revisions and the documented GPUI family in `book/src/automation.md` aligned, and commit the updated `Cargo.lock`
+when changing a pin. Consumer applications apply these patches in their own
+workspace root for Wayland window capture; Cargo patches are not inherited from
+dependencies. Portable runner capture uses the published headless renderers.
 
 ## Validate the changed surface
 
@@ -94,6 +100,10 @@ unexecuted or failed checks.
 | Change | Validation |
 |---|---|
 | Markdown | `rumdl check` with the edited paths |
+| Repository quality | `just quality` with the versioned CI tools installed and Docker available |
+| Facade features | `bash scripts/check-features.sh <selection>` with `default`, `no-default`, `macros`, `inspector`, `performance`, or `mcp` |
+| Publishable packages | `cargo publish --workspace --dry-run --locked` |
+| Dependency policy | `cargo deny --workspace --locked --all-features check advisories sources` |
 | Book or LLM text | `cargo xtask build book` and `cargo xtask build llms-txt` |
 | Macro expansion | `cargo test -p gpui-storybook-macros --locked` |
 | Preference storage or resolution | `cargo test -p gpui-storybook-preferences --locked` |
@@ -102,10 +112,17 @@ unexecuted or failed checks.
 | GPUI demo | `cargo xtask build gpui-demo` |
 | Catalog | `cargo xtask build web` |
 
-`just fmt` formats Rust, TOML, and Markdown. `just check` and `just clippy`
-exclude the two example packages; `just test` includes them. `just web-build`
+`just fmt` formats Rust, TOML, and Markdown. `just check` excludes the two
+example packages; `just clippy` and `just test` include them. `just web-build`
 assembles all publication artifacts.
 
 CI tests all features on Linux. On macOS it excludes the Linux-only launcher;
 on Windows it uses default features and excludes the launcher and MCP crate.
 Use the matching platform scope when reproducing those jobs.
+
+The dependency policy checks unmaintained advisories for immediate normal,
+development, and build dependencies of workspace members. Vulnerability,
+yanked-package, and source checks still cover the full dependency graph.
+
+Workflow Actions use verified version tags. The local quality recipe and CI
+both use `rhysd/actionlint:1.7.12`, including ShellCheck and pyflakes.

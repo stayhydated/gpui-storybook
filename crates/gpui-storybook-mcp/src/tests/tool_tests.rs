@@ -237,7 +237,7 @@ fn interaction_capability_gates_closed_tools_and_annotations() {
     let variants = run_steps["inputSchema"]["properties"]["steps"]["items"]["oneOf"]
         .as_array()
         .expect("steps should use oneOf");
-    assert_eq!(variants.len(), 11);
+    assert_eq!(variants.len(), 12);
     assert!(
         variants
             .iter()
@@ -249,6 +249,21 @@ fn interaction_capability_gates_closed_tools_and_annotations() {
             .find(|variant| variant["properties"]["type"]["const"] == kind)
             .unwrap_or_else(|| panic!("step variant `{kind}` should exist"))
     };
+    let wait = variant("wait_for_value");
+    assert_eq!(wait["required"], json!(["type", "value_key", "expected"]));
+    assert_eq!(wait["properties"]["max_frames"]["anyOf"][0]["minimum"], 1);
+    assert_eq!(
+        wait["properties"]["max_frames"]["anyOf"][0]["maximum"],
+        MAX_INTERACTION_WAITED_FRAMES
+    );
+    assert_eq!(
+        wait["properties"]["max_frames"]["anyOf"][0]["default"],
+        MAX_INTERACTION_WAITED_FRAMES
+    );
+    assert_eq!(
+        wait["properties"]["json_pointer"]["anyOf"][0]["pattern"],
+        "^(/|$)"
+    );
     let pointer = &variant("pointer_move")["properties"]["point"]["oneOf"];
     assert_eq!(pointer[0]["properties"]["x"]["minimum"], 0);
     assert_eq!(pointer[0]["properties"]["x"]["maximum"], 1.0);
@@ -632,4 +647,25 @@ fn async_tools_return_structured_live_host_errors() {
         invalid["structuredContent"]["error"]["kind"],
         "decode_field"
     );
+}
+
+#[test]
+fn settlement_failures_publish_both_typed_outcomes() {
+    let error = StorybookAutomationError::SettlementFailed {
+        operation: Box::new(StorybookAutomationError::OutcomeUnknown {
+            request_id: 91,
+            message: "reply lost".to_owned(),
+        }),
+        cleanup: Box::new(StorybookAutomationError::CaptureUnavailable {
+            message: "cleanup failed".to_owned(),
+        }),
+    };
+    let result = serde_json::to_value(interaction_automation_tool_error(error)).unwrap();
+    assert_eq!(result["isError"], true);
+    let detail = &result["structuredContent"]["error"]["details"][0];
+    assert_eq!(detail["code"], "settlement_failed");
+    assert_eq!(detail["operation"]["code"], "outcome_unknown");
+    assert_eq!(detail["operation"]["request_id"], 91);
+    assert_eq!(detail["cleanup"]["code"], "capture_unavailable");
+    assert_eq!(detail["cleanup"]["message"], "cleanup failed");
 }

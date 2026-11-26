@@ -26,11 +26,9 @@ use gpui_kit::{
     AnyWindowHandle, App, AssetSource, Entity, HeadlessAppContext, PlatformTextSystem, Size,
     Window, WindowHandle, px, size,
 };
+use gpui_storybook_core::capture_region::scroll_capture_region_into_view;
 #[cfg(feature = "capture")]
 use gpui_storybook_core::capture_region::{CaptureRegionImageError, crop_capture_region_image};
-use gpui_storybook_core::capture_region::{
-    reset_capture_regions_for_story, scroll_capture_region_into_view,
-};
 use gpui_storybook_core::{
     controls::{ControlError, ControlSnapshot, ControlTarget, ControlValue},
     presentation::{StoryPresentation, StoryViewportPreset},

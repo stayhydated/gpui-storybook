@@ -1,32 +1,25 @@
 # Automation and capture
 
 On Linux or macOS, enable the `mcp` feature to inspect and open stories from
-another process or to capture the rendered story region as a PNG. The feature
+another process. Live story-region PNG capture uses the native renderer on
+macOS. For published Linux headless captures, use the portable test runner. The feature
 is unsupported on Windows and produces a compile-time error there. The standard
 gallery view attaches the automation controller installed by
 `gpui_storybook::init`.
 
 ## Pin the Wayland capture backends
 
-Linux Wayland window capture uses the Zed fork's image readback support with
-`gpui-pre =0.3.7`. Add these patches to your application's workspace root
-`Cargo.toml` and commit the resolved `Cargo.lock`:
+The [Wayland branch manifest][wayland-manifest] pins the three GPUI Pre 0.3.14
+backend packages to the same Zed fork revision for GPUI Kit 0.11. Copy its
+`[patch.crates-io]` entries into your application workspace root and commit the
+resolved `Cargo.lock`. Cargo does not inherit patches from dependencies. Keep
+the remaining GPUI packages on the published 0.3.14 snapshot.
 
-```toml
-[patch.crates-io]
-gpui-pre-linux = { git = "https://github.com/stayhydated/zed", rev = "d80c3ebacff25e1f8723dfc7da0720f2dab62ea7" }
-gpui-pre-platform = { git = "https://github.com/stayhydated/zed", rev = "d80c3ebacff25e1f8723dfc7da0720f2dab62ea7" }
-gpui-pre-wgpu = { git = "https://github.com/stayhydated/zed", rev = "d80c3ebacff25e1f8723dfc7da0720f2dab62ea7" }
-```
+On either Wayland branch, `just wayland-capture-test` verifies startup capture
+at desktop, tablet, mobile, and custom sizes through private Sway. Portable
+runner captures can instead use the published GPUI headless renderers.
 
-Keep all three packages on the same revision. Cargo applies patches from the
-workspace root; adding Storybook as a dependency does not inherit its patches.
-The remaining GPUI packages retain the published snapshot used by `gpui-kit`.
-
-The Storybook checkout verifies startup capture at desktop, tablet, mobile,
-and custom sizes through private Sway with `just wayland-capture-test`.
-Install the Linux runtime dependencies below before running that check.
-Portable runner captures also work on Linux without a compositor.
+[wayland-manifest]: https://github.com/stayhydated/gpui-storybook/blob/wayland-render-image/Cargo.toml
 
 ## Enable MCP support
 
@@ -268,6 +261,29 @@ click:
 }
 ```
 
+Within one scenario or batch, use a `wait_for_value` step before input that
+depends on an asynchronous result. For example, wait for a rejected request to
+become submittable before clicking Retry:
+
+```json
+{
+  "type": "wait_for_value",
+  "value_key": "request-state",
+  "json_pointer": "/can_submit",
+  "expected": true,
+  "max_frames": 120
+}
+```
+
+A typed `StoryScenarioStep` uses `StoryInteractionStep::WaitForValue` with the
+same fields. Each check reads newly rendered state while retaining the batch's
+exclusive operation lease. A missing or nonmatching value is checked again up
+to the bound. Timeout stops the batch before later input; it does not retry
+prior input. The successful step observation includes `value_match` with the
+actual value and frames waited, and an empty `dispatches` array. Keep final
+postconditions to verify the entire flow. Fixed `wait_frames` steps express a
+rendering delay; use semantic waits for state readiness.
+
 `storybook_run_steps` can open a route, apply a `controls` map, size the story
 region for paired rendered-pixel `width` and `height` values or a named
 `viewport`, execute a non-empty `steps` array, and capture the resulting route.
@@ -308,13 +324,14 @@ The closed step variants are:
 | Step | Fields and behavior |
 |---|---|
 | `focus_next`, `focus_previous`, `blur` | Move or clear GPUI focus |
-| `keystrokes` | Parse and dispatch each GPUI binding string in `keys` |
+| `keystrokes` | Parse and dispatch each GPUI binding string in `keys` using the runtime host OS; `secondary-` means Command on macOS and Control elsewhere |
 | `text` | Insert the UTF-8 `value` into the focused basic text input; this is not IME, clipboard, paste, or dead-key simulation |
 | `dispatch_action` | Build a registered action by `name` and optional JSON `args`, dispatch it, and resume the batch after GPUI delivers that deferred dispatch |
 | `pointer_move` | Dispatch a move at the story-relative `point` |
 | `pointer_click` | Dispatch move, down, and up at `point`; optional `button`, `click_count`, and `modifiers` default to a single left click with no modifiers |
 | `click_target` | Dispatch move, down, and up at the center of semantic `target_key`; accepts the same optional button, count, and modifiers |
 | `scroll` | Dispatch pixel `delta_x` and `delta_y` at `point` |
+| `wait_for_value` | Gate later input on exact rendered `value_key`/optional `json_pointer` matching JSON `expected`; optional `max_frames` is 1–120, default 120 |
 | `wait_frames` | Refresh and continue after the positive rendered-frame `count` |
 
 Pointer points default to normalized coordinates:
@@ -332,8 +349,10 @@ selector path; neither interaction mode can target the gallery sidebar, the
 workbench, the title bar, or the global screen.
 
 A batch allows at most 64 steps, up to 64 binding strings in each `keystrokes`
-step, 4 KiB across UTF-8 `text` values and keystroke syntax, 120 explicitly
-waited frames, and one final capture. Zero-frame waits and non-finite point or
+step, 4 KiB across UTF-8 `text` values and keystroke syntax, 120 fixed-wait
+frames, up to 120 frames per semantic wait, and one final capture. The fixed-wait
+budget counts `wait_frames` steps only; each semantic wait and final
+postcondition has its own frame bound. Zero-frame waits and non-finite point or
 scroll values are rejected. Every keystroke and action payload is constructed
 before route, control, or input dispatch begins. The result reports a request
 ID, active story, dispatched-step count, available GPUI dispatch observations,
@@ -422,7 +441,9 @@ enumerate sections rendered inside a story, so inspect the `Substory` enum,
 
 ## Capture during startup
 
-Set a route and output path before launching an MCP-enabled binary:
+On macOS, set a route and output path before launching an MCP-enabled binary.
+Linux startup PNG capture requires the pinned GPUI Kit 0.11 Wayland stack;
+with Kit 0.9, use the portable headless runner on Linux instead:
 
 ```bash
 WGPU_CAPTURE_ROUTE=my-app-storybook-ButtonStory \
@@ -432,8 +453,9 @@ cargo run -p my-app-storybook --features mcp
 
 Storybook opens the route, creates missing parent directories, writes the PNG,
 and exits after capture. Capture startup disables preference persistence and
-uses the deterministic light presentation. On Linux, wrap this command with
-`gpui-storybook-launch` as shown above. On macOS, use the direct Cargo command.
+uses the deterministic light presentation. For the legacy Linux capture stack,
+wrap this command with `gpui-storybook-launch` as shown above. On macOS, use the
+direct Cargo command.
 
 | Environment variable | Meaning |
 |---|---|

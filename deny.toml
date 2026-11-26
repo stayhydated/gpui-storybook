@@ -1,0 +1,14 @@
+# Check advisories and dependency sources without inventing a license policy.
+[advisories]
+unmaintained = "workspace"
+
+[sources]
+allow-git = [
+  "https://github.com/DioxusLabs/components",
+  "https://github.com/stayhydated/shared",
+  "https://github.com/stayhydated/zed",
+  "https://github.com/stayhydated/component-shape",
+  "https://github.com/stayhydated/gpui-es-fluent",
+]
+unknown-git = "deny"
+unknown-registry = "deny"

@@ -13,13 +13,14 @@ The `mcp` feature is unsupported on Windows and produces a compile-time error
 there. Set `GPUI_STORYBOOK_MCP_STDIO=1` to serve MCP over stdio. Route tracing
 and diagnostic logs to standard error.
 
-For Linux Wayland window capture, copy the three `[patch.crates-io]` entries
-from GPUI Storybook's root `Cargo.toml` into the application's workspace root.
-They pin `gpui-pre-linux`, `gpui-pre-wgpu`, and `gpui-pre-platform` to the same
-Zed fork commit and retain `gpui-pre =0.3.7` for compatibility with `gpui-kit`.
-Commit the resolved `Cargo.lock`; Cargo patches are not inherited from
-dependencies. Verify the pinned path in the Storybook checkout with
-`just wayland-capture-test`.
+Live Wayland window capture on GPUI Kit 0.11 needs the three GPUI Pre
+0.3.14 backend patches from the
+[`wayland-render-image` branch manifest](https://github.com/stayhydated/gpui-storybook/blob/wayland-render-image/Cargo.toml).
+Copy all three entries from `[patch.crates-io]` to the application's workspace
+root and commit its resolved `Cargo.lock`; Cargo patches are not inherited.
+Verify capture on that branch with `just wayland-capture-test`. The unpatched
+published Linux stack still supports portable headless rendering but not live
+Wayland window readback.
 
 On Linux, install Sway plus `libgl1-mesa-dri` and `mesa-vulkan-drivers`, then
 install the reusable launcher and run stdio and startup-capture sessions
@@ -183,13 +184,22 @@ element ID and derives a readable label; use
 `storybook_run_steps` accepts an optional `story_key`, controls, paired rendered-pixel
 dimensions or viewport, a required non-empty step list, and an optional final
 capture. Step types are `focus_next`, `focus_previous`, `blur`, `keystrokes`,
-`text`, `dispatch_action`, `click_target`, `pointer_move`, `pointer_click`, `scroll`, and
-`wait_frames`. Supplying a `story_key` focuses the selected story's focus handle
-before the first step.
+`text`, `dispatch_action`, `click_target`, `pointer_move`, `pointer_click`, `scroll`,
+`wait_for_value`, and `wait_frames`. Supplying a `story_key` focuses the
+selected story's focus handle before the first step.
+
+Keystroke strings follow the runtime host OS, including browser hosts:
+`secondary-` means Command on macOS and Control elsewhere.
 
 GPUI defers registered-action dispatch; the executor resumes with the next step
-after that dispatch is delivered. Use `wait_frames` before a later action when
-earlier widget input schedules its own next-frame state change.
+after that dispatch is delivered. Before input that depends on asynchronous
+completion, insert `wait_for_value` with `value_key`, optional `json_pointer`,
+exact JSON `expected`, and optional `max_frames` (1–120, default 120).
+`StoryInteractionStep::WaitForValue` uses the same fields in a typed scenario.
+The batch retains its exclusive lease while checking fresh rendered state; a
+timeout prevents later steps. The step observation's `value_match` records the
+matching value and frames waited. Keep final postconditions to verify the full
+flow. Use `wait_frames` for a fixed rendering delay.
 
 Pointer points default to normalized `x`/`y` values in `0.0..=1.0`. The
 `logical_pixels` space is relative to fresh active-route bounds. Points cannot
@@ -197,8 +207,10 @@ reach Storybook chrome or the global screen. A click dispatches move, down, and
 up.
 
 Limits are 64 steps, 64 binding strings per `keystrokes` step, 4 KiB across
-UTF-8 text values and keystroke syntax, 120 waited frames, and one final
-capture. Complete validation happens before input dispatch. The capture is the
+UTF-8 text values and keystroke syntax, 120 fixed-wait frames, up to 120 frames
+per semantic wait, and one final capture. The fixed-wait budget counts only
+`wait_frames`; semantic waits and final postconditions each have their own
+bound. Complete validation happens before input dispatch. The capture is the
 first requested frame after the final step or explicit waits. Runtime failures
 report `steps_dispatched`; do not retry automatically.
 
@@ -279,14 +291,17 @@ language, and named control axes. Keep baseline policy explicit: use `Check`
 in verification, and expose `Update` only through a deliberate acceptance
 workflow. With the `performance` feature, require enough native GPUI profiler
 samples before enforcing draw or dirty-to-present p95 and maximum budgets.
+`PerformanceBudget` duration setters saturate at `u64::MAX` nanoseconds.
 
-In the pinned `gpui-pre` 0.3.7 stack, `current_headless_renderer` returns a
+In the pinned `gpui-pre` 0.3.11 stack, `current_headless_renderer` returns a
 Metal renderer on macOS and a Wgpu renderer on Linux, so runner captures run on
 both. Windows gets `Ok(None)`; its DirectX renderer reaches `render_to_image`
 only through a real window, outside the runner's headless context. Linux
-Wayland application captures use the Git-patched Wgpu window renderer and
-private Sway. The `mcp` feature supports Linux and macOS; Linux CI verifies
-application capture at desktop, tablet, mobile, and custom sizes.
+Wayland application captures require the Wayland branch's matching GPUI Pre 0.3.14
+Git-patched Wgpu window renderer and private Sway; those patches do not apply
+to Kit 0.9. The `mcp` feature supports Linux and macOS; the
+`wayland-render-image` branch verifies application capture at desktop, tablet,
+mobile, and custom sizes.
 Treat renderer, fonts, assets, and CI hardware as part of the baseline or timing
 environment; keep platform-specific accepted output where rasterization differs.
 

@@ -148,7 +148,7 @@ fn scenario_reset_toolbar_stays_visible_recreates_the_story_and_clears_the_resul
     let items = visual_cx
         .debug_bounds("workbench-scenarios-items")
         .expect("scenario rows should render in their own scroll region");
-    visual_cx.simulate_event(ScrollWheelEvent {
+    visual_cx.simulate_event(ScrollEvent {
         position: items.center(),
         delta: ScrollDelta::Pixels(point(px(0.), px(-180.))),
         ..Default::default()

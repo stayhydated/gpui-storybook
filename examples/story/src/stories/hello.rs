@@ -3,7 +3,7 @@ use gpui_kit::component::StyledExt as _;
 use gpui_kit::*;
 
 #[derive(EsFluent)]
-enum StoryItems {
+pub(crate) enum StoryItems {
     Hi,
     Title,
 }

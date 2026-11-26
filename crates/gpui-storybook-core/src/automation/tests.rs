@@ -95,7 +95,7 @@ fn scenario_catalog_lists_stable_descriptors_and_reports_missing_keys() {
             .description("Presses the primary button.")
             .step(StoryScenarioStep::new(
                 "focus button",
-                StoryInteractionStep::FocusNext,
+                StoryInteractionStep::FocusNext {},
             )),
     ];
     let automation = StorybookAutomation::with_stories(vec![story.clone()]);
@@ -131,7 +131,7 @@ fn run_scenario_resolves_descriptor_before_requiring_live_host() {
         vec![
             StoryScenario::new("press", "Press button").step(StoryScenarioStep::new(
                 "focus button",
-                StoryInteractionStep::FocusNext,
+                StoryInteractionStep::FocusNext {},
             )),
         ];
     let automation = StorybookAutomation::with_stories(vec![story]);
